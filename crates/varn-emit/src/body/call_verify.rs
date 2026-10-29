@@ -16,7 +16,8 @@ impl<'a> FnEmitter<'a> {
         match ty {
             BackendTy::Dynamic(reason) => untyped_reason(reason),
             BackendTy::Array(el) => self.tt.contains(el) && self.is_untyped(self.tt.get(el)),
-            BackendTy::Int
+            BackendTy::Literal(_)
+            | BackendTy::Int
             | BackendTy::Float
             | BackendTy::Bool
             | BackendTy::Char
@@ -143,7 +144,8 @@ impl<'a> FnEmitter<'a> {
             BackendTy::Nullable(_) | BackendTy::Dynamic(_) if boxed_already => arg,
             BackendTy::Nullable(_) => self.cast_to(arg, param),
             BackendTy::Dynamic(_) => self.cast_to(arg, param),
-            BackendTy::Int
+            BackendTy::Literal(_)
+            | BackendTy::Int
             | BackendTy::Float
             | BackendTy::Bool
             | BackendTy::Char

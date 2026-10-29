@@ -4,6 +4,7 @@ mod assign_ops;
 mod binary_ops;
 mod calls;
 mod literal_text;
+pub(crate) use literal_text::parse_literal_atom;
 mod logical_ops;
 mod precedence;
 mod primary;

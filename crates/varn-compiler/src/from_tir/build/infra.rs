@@ -19,7 +19,9 @@ impl<'m> Builder<'m> {
 
     pub(super) fn new_value(&mut self, ty: BackendTy) -> Value {
         let v = Value(self.values.len() as u32);
-        self.values.push(ValueDef { ty });
+        self.values.push(ValueDef {
+            ty: ty.representation(),
+        });
         v
     }
 

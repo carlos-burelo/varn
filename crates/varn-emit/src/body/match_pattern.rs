@@ -108,7 +108,8 @@ impl<'a> FnEmitter<'a> {
             .enum_id(enum_name)
             .or_else(|| match s.ty.non_nullable(self.tt) {
                 BackendTy::Enum(e) => Some(e),
-                BackendTy::Int
+                BackendTy::Literal(_)
+                | BackendTy::Int
                 | BackendTy::Float
                 | BackendTy::Bool
                 | BackendTy::Char

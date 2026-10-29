@@ -41,7 +41,8 @@ fn dump_block(out: &mut String, func: &SsaFunc, id: u32, block: &Block) {
                     ty(BackendTy::Dynamic(DynReason::Runtime))
                 ),
                 BackendTy::Dynamic(_) => format!("{} = ", val(v)),
-                t @ (BackendTy::Int
+                t @ (BackendTy::Literal(_)
+                | BackendTy::Int
                 | BackendTy::Float
                 | BackendTy::Bool
                 | BackendTy::Char

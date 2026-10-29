@@ -19,6 +19,9 @@ impl<'r> Checker<'r> {
         call_id: varn_core::ast::AstId,
         bind: &BindResult,
     ) {
+        for arg in type_args {
+            self.check_type_names(arg, bind);
+        }
         let arena = self.ast_arena;
         if let ExprKind::Identifier { name } = &arena.expr(callee).kind {
             let name = bind.interner.resolve(*name);

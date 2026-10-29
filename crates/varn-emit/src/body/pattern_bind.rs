@@ -131,7 +131,8 @@ impl<'a> FnEmitter<'a> {
                 };
                 let elem_ty = match src.ty.non_nullable(self.tt) {
                     BackendTy::Array(e) => self.tt.get(e),
-                    BackendTy::Int
+                    BackendTy::Literal(_)
+                    | BackendTy::Int
                     | BackendTy::Float
                     | BackendTy::Bool
                     | BackendTy::Char
@@ -248,7 +249,8 @@ impl<'a> FnEmitter<'a> {
                 .map(|f| f.ty)
                 .unwrap_or(BackendTy::Dynamic(DynReason::Declared)),
             BackendTy::Dynamic(reason) => BackendTy::Dynamic(reason),
-            BackendTy::Int
+            BackendTy::Literal(_)
+            | BackendTy::Int
             | BackendTy::Float
             | BackendTy::Bool
             | BackendTy::Char
@@ -273,7 +275,8 @@ impl<'a> FnEmitter<'a> {
         let span = arr.span;
         let read_ty = match elem.ty {
             BackendTy::Nullable(_) | BackendTy::Dynamic(_) => elem.ty,
-            t @ BackendTy::Int
+            t @ BackendTy::Literal(_)
+            | t @ BackendTy::Int
             | t @ BackendTy::Float
             | t @ BackendTy::Bool
             | t @ BackendTy::Char

@@ -101,7 +101,8 @@ pub(super) fn emit_extensions(
             .unwrap_or(BackendTy::Dynamic(DynReason::Unrecorded));
         let this_cid = match recv_ty {
             BackendTy::Class(cid) => Some(cid),
-            BackendTy::Int
+            BackendTy::Literal(_)
+            | BackendTy::Int
             | BackendTy::Float
             | BackendTy::Bool
             | BackendTy::Char

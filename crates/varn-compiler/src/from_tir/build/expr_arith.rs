@@ -58,7 +58,7 @@ impl<'m> Builder<'m> {
         let v = self.lower_expr(operand)?;
         match op {
             TirUnOp::IsNull => match self.value_ty(v) {
-                BackendTy::Int | BackendTy::Float | BackendTy::Bool => {
+                BackendTy::Literal(_) | BackendTy::Int | BackendTy::Float | BackendTy::Bool => {
                     Ok(self.emit(InstKind::ConstBool(false), BackendTy::Bool))
                 }
                 BackendTy::Str
@@ -103,6 +103,7 @@ impl<'m> Builder<'m> {
     fn static_truthiness(&mut self, v: Value) -> Option<Value> {
         match self.value_ty(v) {
             BackendTy::Bool => Some(v),
+            BackendTy::Literal(_) => None,
             BackendTy::Int
             | BackendTy::Float
             | BackendTy::Str
@@ -113,6 +114,7 @@ impl<'m> Builder<'m> {
             | BackendTy::Tuple(_)
             | BackendTy::Class(_) => Some(self.emit(InstKind::ConstBool(true), BackendTy::Bool)),
             BackendTy::Nullable(inner) => match self.tir.types.get(inner) {
+                BackendTy::Literal(_) => None,
                 BackendTy::Int
                 | BackendTy::Float
                 | BackendTy::Str
@@ -186,6 +188,7 @@ impl<'m> Builder<'m> {
             ));
         }
         let from = match self.value_ty(v) {
+            literal @ BackendTy::Literal(_) => super::ops::numeric_domain(literal.representation()),
             BackendTy::Int => Some(D::Int),
             BackendTy::Float => Some(D::Float),
             BackendTy::Bool

@@ -1,8 +1,8 @@
 mod ty;
 
 pub use ty::{
-    BackendTy, ClassId, DynReason, EnumId, FnId, LocalId, ModuleId, ShapeField, ShapeId, SigId,
-    TyId, TyListId, TyTable,
+    BackendTy, ClassId, DynReason, EnumId, FnId, LiteralStrId, LocalId, ModuleId, ShapeField,
+    ShapeId, SigId, TyId, TyListId, TyTable,
 };
 
 mod resolution;

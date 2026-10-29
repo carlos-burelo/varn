@@ -1,5 +1,10 @@
+use varn_core::TypeLiteral;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TyId(pub u32);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct LiteralStrId(pub u32);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TyListId(pub u32);
@@ -74,6 +79,7 @@ pub enum DynReason {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BackendTy {
+    Literal(TypeLiteral<LiteralStrId>),
     Int,
     Float,
     Bool,
@@ -99,6 +105,35 @@ pub enum BackendTy {
 }
 
 impl BackendTy {
+    pub fn representation(self) -> Self {
+        match self {
+            BackendTy::Literal(TypeLiteral::Int(_)) => BackendTy::Int,
+            BackendTy::Literal(TypeLiteral::Str(_)) => BackendTy::Str,
+            BackendTy::Literal(TypeLiteral::Bool(_)) => BackendTy::Bool,
+            BackendTy::Literal(TypeLiteral::Char(_)) => BackendTy::Char,
+            other @ BackendTy::Int
+            | other @ BackendTy::Float
+            | other @ BackendTy::Bool
+            | other @ BackendTy::Char
+            | other @ BackendTy::Str
+            | other @ BackendTy::Bytes
+            | other @ BackendTy::Decimal
+            | other @ BackendTy::BigInt
+            | other @ BackendTy::Array(_)
+            | other @ BackendTy::Map(..)
+            | other @ BackendTy::Dict(_)
+            | other @ BackendTy::Set(_)
+            | other @ BackendTy::Tuple(_)
+            | other @ BackendTy::Class(_)
+            | other @ BackendTy::Enum(_)
+            | other @ BackendTy::Fn(_)
+            | other @ BackendTy::Nullable(_)
+            | other @ BackendTy::Void
+            | other @ BackendTy::Never
+            | other @ BackendTy::Dynamic(_) => other,
+        }
+    }
+
     pub fn is_boxed(self) -> bool {
         matches!(
             self,
@@ -113,6 +148,7 @@ impl BackendTy {
     pub fn field_kind(self, types: &TyTable) -> Option<varn_core::RuntimeKind> {
         use varn_core::RuntimeKind as T;
         match self {
+            BackendTy::Literal(_) => self.representation().field_kind(types),
             BackendTy::Int => Some(T::Int),
             BackendTy::Float => Some(T::Float),
             BackendTy::Bool => Some(T::Bool),
@@ -150,7 +186,8 @@ impl BackendTy {
             BackendTy::Nullable(inner) if depth < DEPTH_LIMIT && t.contains(inner) => {
                 t.get(inner).non_nullable_with_depth(t, depth + 1)
             }
-            other @ BackendTy::Int
+            other @ BackendTy::Literal(_)
+            | other @ BackendTy::Int
             | other @ BackendTy::Float
             | other @ BackendTy::Bool
             | other @ BackendTy::Char
@@ -175,7 +212,7 @@ impl BackendTy {
 
     pub fn is_unboxed_scalar(self) -> bool {
         matches!(
-            self,
+            self.representation(),
             BackendTy::Int | BackendTy::Float | BackendTy::Bool | BackendTy::Char
         )
     }
@@ -183,6 +220,7 @@ impl BackendTy {
 
 #[derive(Debug, Default, Clone)]
 pub struct TyTable {
+    literal_strings: Vec<std::sync::Arc<str>>,
     entries: Vec<BackendTy>,
     dedup: rustc_hash::FxHashMap<BackendTy, u32>,
     lists: Vec<Vec<BackendTy>>,
@@ -193,6 +231,19 @@ pub struct TyTable {
 }
 
 impl TyTable {
+    pub fn intern_literal_str(&mut self, text: &str) -> LiteralStrId {
+        if let Some(at) = self.literal_strings.iter().position(|s| s.as_ref() == text) {
+            return LiteralStrId(at as u32);
+        }
+        let id = LiteralStrId(self.literal_strings.len() as u32);
+        self.literal_strings.push(std::sync::Arc::from(text));
+        id
+    }
+
+    pub fn literal_str(&self, id: LiteralStrId) -> Option<&str> {
+        self.literal_strings.get(id.0 as usize).map(|s| s.as_ref())
+    }
+
     pub fn intern(&mut self, ty: BackendTy) -> TyId {
         if let Some(&i) = self.dedup.get(&ty) {
             return TyId(i);

@@ -45,7 +45,8 @@ impl<'a> FnEmitter<'a> {
     pub(super) fn by_name_reason(&self, receiver: BackendTy) -> DynReason {
         match receiver.non_nullable(self.tt) {
             BackendTy::Dynamic(reason) => reason,
-            BackendTy::Int
+            BackendTy::Literal(_)
+            | BackendTy::Int
             | BackendTy::Float
             | BackendTy::Bool
             | BackendTy::Char

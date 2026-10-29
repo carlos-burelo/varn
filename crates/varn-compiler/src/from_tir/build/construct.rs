@@ -265,7 +265,8 @@ fn supplied(arg: &TirArg) -> Option<bool> {
         | varn_tir::BackendTy::Dynamic(_)
         | varn_tir::BackendTy::Void
         | varn_tir::BackendTy::Never => None,
-        varn_tir::BackendTy::Int
+        varn_tir::BackendTy::Literal(_)
+        | varn_tir::BackendTy::Int
         | varn_tir::BackendTy::Float
         | varn_tir::BackendTy::Bool
         | varn_tir::BackendTy::Char

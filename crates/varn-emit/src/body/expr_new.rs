@@ -72,7 +72,8 @@ impl<'a> FnEmitter<'a> {
         let targs = self.lower_call_args(call_id, args);
         let built = match ty.non_nullable(self.tt) {
             BackendTy::Class(foreign) => class.or(Some(foreign)),
-            BackendTy::Int
+            BackendTy::Literal(_)
+            | BackendTy::Int
             | BackendTy::Float
             | BackendTy::Bool
             | BackendTy::Char

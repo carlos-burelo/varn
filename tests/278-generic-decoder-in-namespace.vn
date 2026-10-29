@@ -1,0 +1,36 @@
+import { describe, it, expect } from "std:test";
+import { Json } from "std:encoding";
+
+namespace Wire {
+    export function read<T>(text: str): T {
+        return Json.parse<T>(text);
+    }
+
+    export function readAll<T>(text: str): T[] {
+        return Json.parse<T[]>(text);
+    }
+}
+
+type Point = { x: int, y: int };
+
+function readFails(text: str): bool {
+    try {
+        Wire.read<Point>(text)
+        return false
+    } catch (e) {
+        return true
+    }
+}
+
+await describe("278 generic decoder in a namespace", async () => {
+    await it("a decoder wrapper is checked against the caller's concrete type", () => {
+        const p = Wire.read<Point>("{\"x\":1,\"y\":2}");
+        expect(p.x + p.y).toBe(3);
+        expect(Wire.readAll<int>("[1,2,3]").length).toBe(3);
+    });
+
+    await it("a mismatch is rejected at the concrete call site", () => {
+        expect(readFails("{\"x\":1}")).toBeTruthy();
+        expect(readFails("{\"x\":1,\"y\":\"2\"}")).toBeTruthy();
+    });
+});

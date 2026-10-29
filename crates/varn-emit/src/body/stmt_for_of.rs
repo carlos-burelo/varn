@@ -57,8 +57,8 @@ impl<'a> FnEmitter<'a> {
                 end,
                 inclusive,
             } = &self.ast_arena.expr(right).kind
-            && matches!(self.expr_ty(*start), BackendTy::Int)
-            && matches!(self.expr_ty(*end), BackendTy::Int)
+            && matches!(self.expr_ty(*start).representation(), BackendTy::Int)
+            && matches!(self.expr_ty(*end).representation(), BackendTy::Int)
         {
             let (start, end, inclusive) = (*start, *end, *inclusive);
             let lo = self.lower_expr(start);

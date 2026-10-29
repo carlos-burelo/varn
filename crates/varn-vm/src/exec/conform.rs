@@ -132,6 +132,14 @@ fn fit_in(cx: &Cx, v: VmValue, desc: &TypeDesc, scope: Option<&Scope>) -> Option
     let witnesses = cx.witnesses;
     match desc {
         TypeDesc::Any => Some(()),
+        TypeDesc::Literal(value) => exact(match value {
+            varn_core::TypeLiteral::Int(n) => v.is_int() && v.as_int() == *n,
+            varn_core::TypeLiteral::Bool(b) => v.is_bool() && v.as_bool() == *b,
+            varn_core::TypeLiteral::Char(c) => heap.char_of(v) == Some(*c),
+            varn_core::TypeLiteral::Str(s) => {
+                heap.is_string(v) && heap.str_repr_borrowed(v).as_ref() == s
+            }
+        }),
         TypeDesc::Int => exact(v.is_int()),
         TypeDesc::Float => exact(v.is_f64()),
         TypeDesc::Bool => exact(v.is_bool()),

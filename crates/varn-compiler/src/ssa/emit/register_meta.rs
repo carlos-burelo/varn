@@ -43,6 +43,7 @@ pub(super) fn derive_register_meta(
 pub(crate) fn slot_kind_of(ty: BackendTy) -> varn_types::register_meta::SlotKind {
     use varn_types::register_meta::SlotKind;
     match ty {
+        BackendTy::Literal(_) => slot_kind_of(ty.representation()),
         BackendTy::Int => SlotKind::Int,
         BackendTy::Float => SlotKind::Float,
         BackendTy::Bool => SlotKind::Bool,

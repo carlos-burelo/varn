@@ -8,7 +8,7 @@ pub(crate) fn parse_literal_type(
 ) -> Result<TypeNode, String> {
     use varn_core::ast::{operators::UnaryOp, ExprKind};
     use varn_core::TypeLiteral;
-    let expr = crate::expressions::parse_unary_expr(s)?;
+    let expr = crate::expressions::parse_literal_atom(s)?;
     let literal = match &s.arena.expr(expr).kind {
         ExprKind::IntLiteral { value, .. } => TypeLiteral::Int(*value),
         ExprKind::Unary {
@@ -16,7 +16,11 @@ pub(crate) fn parse_literal_type(
             operand,
             ..
         } => match &s.arena.expr(*operand).kind {
-            ExprKind::IntLiteral { value, .. } => TypeLiteral::Int(-*value),
+            ExprKind::IntLiteral { value, .. } => TypeLiteral::Int(
+                value
+                    .checked_neg()
+                    .ok_or_else(|| literal_type_error(range))?,
+            ),
             ExprKind::FloatLiteral { .. }
             | ExprKind::BigIntLiteral { .. }
             | ExprKind::DecimalLiteral { .. }

@@ -1,3 +1,5 @@
+use crate::OptError;
+type Result<T> = std::result::Result<T, OptError>;
 use std::sync::Arc;
 use varn_core::type_desc::FieldDesc;
 use varn_core::TypeDesc;
@@ -19,15 +21,15 @@ impl<'m> Describer<'m> {
         }
     }
 
-    pub(crate) fn describe(&mut self, ty: BackendTy) -> TypeDesc {
+    pub(crate) fn describe(&mut self, ty: BackendTy) -> Result<TypeDesc> {
         self.at(ty)
     }
 
-    fn of(&mut self, id: TyId) -> TypeDesc {
+    fn of(&mut self, id: TyId) -> Result<TypeDesc> {
         if self.tir.types.contains(id) {
             self.at(self.tir.types.get(id))
         } else {
-            TypeDesc::Any
+            Ok(TypeDesc::Any)
         }
     }
 
@@ -41,8 +43,22 @@ impl<'m> Describer<'m> {
         }
     }
 
-    fn at(&mut self, ty: BackendTy) -> TypeDesc {
-        match ty {
+    fn at(&mut self, ty: BackendTy) -> Result<TypeDesc> {
+        Ok(match ty {
+            BackendTy::Literal(value) => TypeDesc::Literal(match value {
+                varn_core::TypeLiteral::Int(n) => varn_core::TypeLiteral::Int(n),
+                varn_core::TypeLiteral::Bool(b) => varn_core::TypeLiteral::Bool(b),
+                varn_core::TypeLiteral::Char(c) => varn_core::TypeLiteral::Char(c),
+                varn_core::TypeLiteral::Str(id) => varn_core::TypeLiteral::Str(
+                    self.tir
+                        .types
+                        .literal_str(id)
+                        .ok_or_else(|| {
+                            OptError::Internal(format!("from_tir: missing literal string {}", id.0))
+                        })?
+                        .to_owned(),
+                ),
+            }),
             BackendTy::Int => TypeDesc::Int,
             BackendTy::Float => TypeDesc::Float,
             BackendTy::Bool => TypeDesc::Bool,
@@ -51,20 +67,24 @@ impl<'m> Describer<'m> {
             BackendTy::Bytes => TypeDesc::Bytes,
             BackendTy::Decimal => TypeDesc::Decimal,
             BackendTy::BigInt => TypeDesc::BigInt,
-            BackendTy::Array(el) => TypeDesc::Array(Box::new(self.of(el))),
-            BackendTy::Dict(v) => TypeDesc::Dict(Box::new(self.of(v))),
+            BackendTy::Array(el) => TypeDesc::Array(Box::new(self.of(el)?)),
+            BackendTy::Dict(v) => TypeDesc::Dict(Box::new(self.of(v)?)),
             BackendTy::Map(k, v) => {
-                let key = self.of(k);
-                let val = self.of(v);
+                let key = self.of(k)?;
+                let val = self.of(v)?;
                 TypeDesc::Map(Box::new(key), Box::new(val))
             }
-            BackendTy::Set(el) => TypeDesc::Set(Box::new(self.of(el))),
+            BackendTy::Set(el) => TypeDesc::Set(Box::new(self.of(el)?)),
             BackendTy::Tuple(list) => {
                 if !self.tir.types.contains_list(list) {
-                    return TypeDesc::Any;
+                    return Ok(TypeDesc::Any);
                 }
                 let els = self.tir.types.get_list(list).to_vec();
-                TypeDesc::Tuple(els.into_iter().map(|el| self.at(el)).collect())
+                TypeDesc::Tuple(
+                    els.into_iter()
+                        .map(|el| self.at(el))
+                        .collect::<Result<_>>()?,
+                )
             }
             BackendTy::Class(class) => match self.tir.class(class) {
                 Some(info) => {
@@ -88,7 +108,7 @@ impl<'m> Describer<'m> {
             },
             BackendTy::Fn(_) | BackendTy::Dynamic(DynReason::Callable) => TypeDesc::Callable,
             BackendTy::Nullable(inner) => {
-                let inner = self.of(inner);
+                let inner = self.of(inner)?;
                 if inner.is_any() {
                     TypeDesc::Any
                 } else {
@@ -99,29 +119,31 @@ impl<'m> Describer<'m> {
                 DynReason::Shape(id) | DynReason::Interface(id) | DynReason::Record(id),
             ) => {
                 if !self.tir.types.contains_shape(id) {
-                    return TypeDesc::Any;
+                    return Ok(TypeDesc::Any);
                 }
                 if let Some(at) = self.open.iter().rposition(|open| *open == id) {
                     let name = match self.tir.types.shape_name(id) {
                         Some(name) => name.to_string(),
-                        None => return TypeDesc::Any,
+                        None => return Ok(TypeDesc::Any),
                     };
-                    return TypeDesc::Enclosing {
+                    return Ok(TypeDesc::Enclosing {
                         up: (self.open.len() - 1 - at) as u32,
                         name,
-                    };
+                    });
                 }
                 self.open.push(id);
                 let shape = self.tir.types.get_shape(id).to_vec();
                 let fields = shape
                     .into_iter()
-                    .map(|field| FieldDesc {
-                        name: field.name.to_string(),
-                        ty: self.at(field.ty),
-                        optional: field.optional,
-                        readonly: field.readonly,
+                    .map(|field| {
+                        Ok(FieldDesc {
+                            name: field.name.to_string(),
+                            ty: self.at(field.ty)?,
+                            optional: field.optional,
+                            readonly: field.readonly,
+                        })
                     })
-                    .collect();
+                    .collect::<Result<_>>()?;
                 self.open.pop();
                 if matches!(ty, BackendTy::Dynamic(DynReason::Record(_))) {
                     TypeDesc::Record(fields)
@@ -147,7 +169,7 @@ impl<'m> Describer<'m> {
                 | DynReason::Boxed
                 | DynReason::Runtime,
             ) => TypeDesc::Any,
-        }
+        })
     }
 }
 
@@ -158,7 +180,7 @@ fn global_name(tir: &TirModule, bare: &str) -> ContractWitness {
     }
 }
 
-pub(crate) fn param_contract(tir: &TirModule, f: &TirFunction) -> Option<ParamContract> {
+pub(crate) fn param_contract(tir: &TirModule, f: &TirFunction) -> Result<Option<ParamContract>> {
     let defaulted = super::build::defaulted_param_mask(&f.body, f.params.len());
     let mut describer = Describer::new(tir);
     let mut fixed: Vec<TypeDesc> = f
@@ -166,10 +188,11 @@ pub(crate) fn param_contract(tir: &TirModule, f: &TirFunction) -> Option<ParamCo
         .iter()
         .zip(&defaulted)
         .map(|(ty, defaulted)| {
-            let desc = describer.describe(*ty);
-            match desc {
+            let desc = describer.describe(*ty)?;
+            Ok(match desc {
                 TypeDesc::Any | TypeDesc::Nullable(_) => desc,
-                required @ TypeDesc::Int
+                required @ TypeDesc::Literal(_)
+                | required @ TypeDesc::Int
                 | required @ TypeDesc::Float
                 | required @ TypeDesc::Bool
                 | required @ TypeDesc::Char
@@ -193,7 +216,8 @@ pub(crate) fn param_contract(tir: &TirModule, f: &TirFunction) -> Option<ParamCo
                 {
                     TypeDesc::Nullable(Box::new(required))
                 }
-                required @ TypeDesc::Int
+                required @ TypeDesc::Literal(_)
+                | required @ TypeDesc::Int
                 | required @ TypeDesc::Float
                 | required @ TypeDesc::Bool
                 | required @ TypeDesc::Char
@@ -213,13 +237,13 @@ pub(crate) fn param_contract(tir: &TirModule, f: &TirFunction) -> Option<ParamCo
                 | required @ TypeDesc::Object(_)
                 | required @ TypeDesc::Record(_)
                 | required @ TypeDesc::Enclosing { .. } => required,
-            }
+            })
         })
-        .collect();
+        .collect::<Result<_>>()?;
     let rest = match (f.has_rest, f.params.last()) {
         (true, Some(BackendTy::Array(el))) => {
             fixed.pop();
-            Some(describer.of(*el))
+            Some(describer.of(*el)?)
         }
         (true, Some(_)) => {
             fixed.pop();
@@ -228,18 +252,18 @@ pub(crate) fn param_contract(tir: &TirModule, f: &TirFunction) -> Option<ParamCo
         (true, None) | (false, _) => None,
     };
     if fixed.iter().all(TypeDesc::is_any) && rest.as_ref().is_none_or(TypeDesc::is_any) {
-        return None;
+        return Ok(None);
     }
     let desc = TypeDesc::Args {
         fixed,
         rest: rest.map(Box::new),
     };
-    Some(ParamContract {
+    Ok(Some(ParamContract {
         desc: desc.encode(),
         witnesses: describer
             .witnesses
             .iter()
             .map(|name| global_name(tir, name))
             .collect(),
-    })
+    }))
 }

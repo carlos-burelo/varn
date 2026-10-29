@@ -34,21 +34,9 @@ pub fn parse_unary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
         TokenKind::Bang => prefix_unary!(UnaryOp::Not),
         TokenKind::Tilde => prefix_unary!(UnaryOp::BitNot),
         TokenKind::Minus => {
-            const I64_MIN_MAGNITUDE: &str = "9223372036854775808";
             s.advance();
-            if s.kind() == TokenKind::IntegerLiteral
-                && s.lexeme().replace('_', "") == I64_MIN_MAGNITUDE
-            {
-                s.advance();
-                let full_range = s.span_from(start_range);
-                let raw = s.interner.intern(&format!("-{}", I64_MIN_MAGNITUDE));
-                return Ok(s.expr(
-                    full_range,
-                    ExprKind::IntLiteral {
-                        value: i64::MIN,
-                        raw,
-                    },
-                ));
+            if let Some(expr) = super::super::literal_text::take_min_integer(s, start_range) {
+                return Ok(expr);
             }
 
             let o = parse_unary_expr(s)?;

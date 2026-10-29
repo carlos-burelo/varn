@@ -69,7 +69,9 @@ fn simplify(
     };
     let (l, r) = (*lhs, *rhs);
 
-    match ty {
+    let representation = ty.representation();
+    match &representation {
+        BackendTy::Literal(_) => None,
         BackendTy::Int => {
             let li = int_const.get(&l).copied();
             let ri = int_const.get(&r).copied();

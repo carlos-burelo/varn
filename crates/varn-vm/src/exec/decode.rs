@@ -33,6 +33,7 @@ fn walk(
     }
     match desc {
         TypeDesc::Any
+        | TypeDesc::Literal(_)
         | TypeDesc::Int
         | TypeDesc::Bool
         | TypeDesc::Char

@@ -44,7 +44,8 @@ impl<'m> Builder<'m> {
         let conv = match to {
             BackendTy::BigInt if from == BackendTy::Int => varn_core::ValueConv::IntToBigInt,
             BackendTy::Decimal if from == BackendTy::Int => varn_core::ValueConv::IntToDecimal,
-            BackendTy::Int
+            BackendTy::Literal(_)
+            | BackendTy::Int
             | BackendTy::Float
             | BackendTy::Bool
             | BackendTy::Char
@@ -72,6 +73,7 @@ impl<'m> Builder<'m> {
     }
 
     pub(super) fn coerce(&mut self, v: Value, target: BackendTy) -> Value {
+        let target = target.representation();
         let from = self.value_ty(v);
         if from == target || (from.is_boxed() && target.is_boxed()) {
             v

@@ -8,7 +8,8 @@ impl<'a> FnEmitter<'a> {
         let lowered = self.lower_expr(e);
         match lowered.ty {
             BackendTy::Bool | BackendTy::Dynamic(_) => lowered,
-            BackendTy::Int
+            BackendTy::Literal(_)
+            | BackendTy::Int
             | BackendTy::Float
             | BackendTy::Char
             | BackendTy::Str
@@ -30,8 +31,8 @@ impl<'a> FnEmitter<'a> {
     }
 
     pub(super) fn to_str(&mut self, e: TirExpr) -> TirExpr {
-        if e.ty == BackendTy::Str {
-            return e;
+        if e.ty.representation() == BackendTy::Str {
+            return self.cast_to(e, BackendTy::Str);
         }
         if let BackendTy::Class(id) = e.ty
             && self.m.classes.get(id.0 as usize).is_some_and(|info| {
@@ -76,7 +77,8 @@ impl<'a> FnEmitter<'a> {
         };
         let untyped = untyped_reason(reason);
         match ty.non_nullable(self.tt) {
-            BackendTy::Str
+            BackendTy::Literal(_)
+            | BackendTy::Str
             | BackendTy::Bool
             | BackendTy::Int
             | BackendTy::Float

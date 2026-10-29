@@ -71,7 +71,7 @@ impl<'a> FnEmitter<'a> {
             target,
             BackendTy::Float | BackendTy::Decimal | BackendTy::BigInt
         );
-        if arg.ty == BackendTy::Int && wider {
+        if arg.ty.representation() == BackendTy::Int && wider {
             self.cast_to(arg, target)
         } else {
             arg

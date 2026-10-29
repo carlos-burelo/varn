@@ -48,6 +48,9 @@ pub(crate) fn is_ternary_at(s: &TokenStream) -> bool {
 pub(crate) fn parse_array_type(s: &mut TokenStream) -> Result<TypeNode, String> {
     let start = s.range();
     let mut ty = super::primary::parse_primary_type(s)?;
+    if matches!(ty.kind, TypeKind::Literal(_)) && s.check(TokenKind::LBracket) {
+        return Err("literal types cannot be used as array element types or indexed".to_owned());
+    }
 
     loop {
         if s.check(TokenKind::LBracket) && s.peek_kind(1) == TokenKind::RBracket {

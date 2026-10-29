@@ -7,6 +7,16 @@ use varn_sem::types::TypeContext;
 
 impl<'r> Checker<'r> {
     pub(crate) fn check_type_names(&mut self, node: &TypeNode, bind: &BindResult) -> bool {
+        if self.has_literal_container(node, bind) {
+            self.emit(
+                Diagnostic::error(
+                    ErrorCode::InvalidTypeAnnotation,
+                    "literal types cannot be container element or key/value types",
+                )
+                .with_range(node.range),
+            );
+            return false;
+        }
         match &node.kind {
             TypeKind::Named(name, _) => self.check_type_name(*name, node, bind),
             TypeKind::Generic(name, args, _) => {
@@ -84,6 +94,48 @@ impl<'r> Checker<'r> {
             | TypeKind::EnumVariant { .. }
             | TypeKind::TypePredicate { .. } => true,
         }
+    }
+
+    fn has_literal_container(&mut self, node: &TypeNode, bind: &BindResult) -> bool {
+        let view = BindView::new(bind, self.resolver).at(self.current_scope);
+        let root = varn_sem::resolve::resolve_type_node(
+            node,
+            Some(&view),
+            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+        );
+        let table = &self.ty_table;
+        let mut pending = vec![root];
+        let mut visited = std::collections::BTreeSet::new();
+        while let Some(ty) = pending.pop() {
+            let ty = varn_sem::resolve::expand_alias(ty, Some(&view), table);
+            if !visited.insert(ty.0) {
+                continue;
+            }
+            if let Some(
+                kind @ (varn_core::BuiltinType::Array
+                | varn_core::BuiltinType::Map
+                | varn_core::BuiltinType::Set),
+            ) = ty.builtin_of(table)
+            {
+                let count = if kind == varn_core::BuiltinType::Map {
+                    2
+                } else {
+                    1
+                };
+                for i in 0..count {
+                    let arg = varn_sem::resolve::expand_alias(
+                        ty.builtin_arg(i, table),
+                        Some(&view),
+                        table,
+                    );
+                    if matches!(table.get(arg.0), TypeKind::Literal(_)) {
+                        return true;
+                    }
+                }
+            }
+            pending.extend(ty.components(table));
+        }
+        false
     }
 
     fn check_type_name(

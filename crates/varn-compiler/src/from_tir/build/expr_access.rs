@@ -86,9 +86,17 @@ impl<'m> Builder<'m> {
             value_ty
         };
         let kind = match inner {
+            BackendTy::Literal(varn_core::TypeLiteral::Str(_)) => {
+                InstKind::StrLength { operand: obj }
+            }
             BackendTy::Str => InstKind::StrLength { operand: obj },
             BackendTy::Array(_) | BackendTy::Tuple(_) => InstKind::ArrayLength { operand: obj },
-            BackendTy::Int
+            BackendTy::Literal(
+                varn_core::TypeLiteral::Int(_)
+                | varn_core::TypeLiteral::Bool(_)
+                | varn_core::TypeLiteral::Char(_),
+            )
+            | BackendTy::Int
             | BackendTy::Float
             | BackendTy::Bool
             | BackendTy::Char

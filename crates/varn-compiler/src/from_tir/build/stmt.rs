@@ -78,6 +78,7 @@ impl<'m> Builder<'m> {
                         self.coerce(v, declared)
                     }
                     None => match declared {
+                        BackendTy::Literal(_) => self.zero_value(declared.representation()),
                         BackendTy::Int => self.emit(InstKind::ConstInt(0), declared),
                         BackendTy::Float => self.emit(InstKind::ConstFloat(0.0), declared),
                         BackendTy::Bool => self.emit(InstKind::ConstBool(false), declared),

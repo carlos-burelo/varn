@@ -5,7 +5,8 @@ impl<'a> FnEmitter<'a> {
     pub(super) fn keyed_read_ty(&mut self, container: BackendTy, slot: BackendTy) -> BackendTy {
         match container.non_nullable(self.tt) {
             BackendTy::Map(..) | BackendTy::Dict(_) => self.nullable_of(slot),
-            BackendTy::Int
+            BackendTy::Literal(_)
+            | BackendTy::Int
             | BackendTy::Float
             | BackendTy::Bool
             | BackendTy::Char
@@ -35,7 +36,8 @@ impl<'a> FnEmitter<'a> {
     pub(super) fn nullable_of(&mut self, ty: BackendTy) -> BackendTy {
         match ty {
             BackendTy::Nullable(_) | BackendTy::Dynamic(_) | BackendTy::Void => ty,
-            member @ BackendTy::Int
+            member @ BackendTy::Literal(_)
+            | member @ BackendTy::Int
             | member @ BackendTy::Float
             | member @ BackendTy::Bool
             | member @ BackendTy::Char

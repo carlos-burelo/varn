@@ -1,8 +1,11 @@
 use std::fmt;
 
+mod literal;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TypeDesc {
     Any,
+    Literal(crate::TypeLiteral<String>),
     Int,
     Float,
     Bool,
@@ -60,6 +63,7 @@ impl TypeDesc {
     fn encode_into(&self, out: &mut String) {
         match self {
             TypeDesc::Any => out.push('*'),
+            TypeDesc::Literal(value) => literal::encode(value, out),
             TypeDesc::Int => out.push('i'),
             TypeDesc::Float => out.push('f'),
             TypeDesc::Bool => out.push('b'),
@@ -177,6 +181,7 @@ fn decode_one(rest: &mut &str) -> Option<TypeDesc> {
     *rest = &rest[tag.len_utf8()..];
     Some(match tag {
         '*' => TypeDesc::Any,
+        'L' => TypeDesc::Literal(literal::decode(rest)?),
         'i' => TypeDesc::Int,
         'f' => TypeDesc::Float,
         'b' => TypeDesc::Bool,
@@ -268,6 +273,7 @@ impl fmt::Display for TypeDesc {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             TypeDesc::Any => f.write_str("dynamic"),
+            TypeDesc::Literal(value) => literal::display(value, f),
             TypeDesc::Int => f.write_str("int"),
             TypeDesc::Float => f.write_str("float"),
             TypeDesc::Bool => f.write_str("bool"),

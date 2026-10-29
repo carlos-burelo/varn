@@ -39,8 +39,8 @@ pub(super) fn check_binary(
         return;
     }
 
-    let l = lhs.ty.non_nullable(&m.types);
-    let r = rhs.ty.non_nullable(&m.types);
+    let l = lhs.ty.non_nullable(&m.types).representation();
+    let r = rhs.ty.non_nullable(&m.types).representation();
 
     if matches!(l, BackendTy::Dynamic(_)) || matches!(r, BackendTy::Dynamic(_)) {
         return;

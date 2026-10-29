@@ -21,6 +21,7 @@ pub(crate) fn binary_opcode(
 fn bin_opcode(op: HirBinOp, ty: BackendTy) -> OpCode {
     use HirBinOp::*;
     match ty {
+        BackendTy::Literal(_) => bin_opcode(op, ty.representation()),
         BackendTy::Int => match op {
             Add => OpCode::AddInt,
             Sub => OpCode::SubInt,

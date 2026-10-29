@@ -57,6 +57,7 @@ pub(super) fn is_free_fn_name(name: &str) -> bool {
 pub(super) fn numeric_domain(bt: BackendTy) -> Option<varn_core::NumericDomain> {
     use varn_core::NumericDomain as D;
     Some(match bt {
+        BackendTy::Literal(_) => return numeric_domain(bt.representation()),
         BackendTy::Int => D::Int,
         BackendTy::Float => D::Float,
         BackendTy::BigInt => D::BigInt,

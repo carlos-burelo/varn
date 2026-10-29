@@ -19,6 +19,10 @@ fn assignable_with_depth(m: &TirModule, from: BackendTy, to: BackendTy, depth: u
         return true;
     }
 
+    if matches!(from, BackendTy::Literal(_)) && !matches!(to, BackendTy::Literal(_)) {
+        return assignable_with_depth(m, from.representation(), to, depth + 1);
+    }
+
     if from == BackendTy::Never {
         return true;
     }

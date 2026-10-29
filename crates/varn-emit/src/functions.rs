@@ -228,7 +228,8 @@ pub(super) fn emit_function(
             param_tys[i] = match inner {
                 BackendTy::Dynamic(_) | BackendTy::Nullable(_) => inner,
                 _ if p.optional => BackendTy::Nullable(types.intern(inner)),
-                BackendTy::Int
+                BackendTy::Literal(_)
+                | BackendTy::Int
                 | BackendTy::Float
                 | BackendTy::Bool
                 | BackendTy::Char

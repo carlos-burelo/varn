@@ -235,6 +235,7 @@ impl<'m> Builder<'m> {
 
     pub(super) fn zero_value(&mut self, ty: BackendTy) -> Value {
         match ty {
+            BackendTy::Literal(_) => self.zero_value(ty.representation()),
             BackendTy::Int => self.emit(InstKind::ConstInt(0), ty),
             BackendTy::Float => self.emit(InstKind::ConstFloat(0.0), ty),
             BackendTy::Bool => self.emit(InstKind::ConstBool(false), ty),

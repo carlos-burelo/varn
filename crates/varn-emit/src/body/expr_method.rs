@@ -52,7 +52,8 @@ impl<'a> FnEmitter<'a> {
                 let slot = ci.method_slot(name)?;
                 Some((slot, ci.method_at(slot)?.sig))
             }),
-            BackendTy::Int
+            BackendTy::Literal(_)
+            | BackendTy::Int
             | BackendTy::Float
             | BackendTy::Bool
             | BackendTy::Char

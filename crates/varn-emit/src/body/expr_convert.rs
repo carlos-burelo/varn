@@ -26,6 +26,9 @@ impl<'a> FnEmitter<'a> {
     }
 
     fn checks_structure(&self, from: BackendTy, to: BackendTy) -> bool {
+        if matches!(to.non_nullable(self.tt), BackendTy::Literal(_)) {
+            return true;
+        }
         let container = |t: BackendTy| {
             matches!(
                 t.non_nullable(self.tt),

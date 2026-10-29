@@ -31,7 +31,7 @@ pub(super) use context::{Builder, Result};
 
 impl<'m> Builder<'m> {
     fn lower_expr(&mut self, e: &TirExpr) -> Result<Value> {
-        let ty = e.ty;
+        let ty = e.ty.representation();
         match &e.kind {
             TirExprKind::IntLit(n) => Ok(self.emit(InstKind::ConstInt(*n), BackendTy::Int)),
             TirExprKind::FloatLit(f) => Ok(self.emit(InstKind::ConstFloat(*f), BackendTy::Float)),

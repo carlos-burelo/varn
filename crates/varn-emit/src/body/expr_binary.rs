@@ -124,8 +124,8 @@ impl<'a> FnEmitter<'a> {
             op,
             TirBinOp::Eq | TirBinOp::Ne | TirBinOp::Lt | TirBinOp::Le | TirBinOp::Gt | TirBinOp::Ge
         );
-        let l = lhs.ty.non_nullable(self.tt);
-        let r = rhs.ty.non_nullable(self.tt);
+        let l = lhs.ty.non_nullable(self.tt).representation();
+        let r = rhs.ty.non_nullable(self.tt).representation();
 
         if matches!(l, BackendTy::Dynamic(_)) || matches!(r, BackendTy::Dynamic(_)) {
             let ty = if is_cmp {
@@ -141,7 +141,7 @@ impl<'a> FnEmitter<'a> {
 
         if l == r {
             let ty = if is_cmp { BackendTy::Bool } else { l };
-            return (lhs, rhs, ty);
+            return (self.cast_to(lhs, l), self.cast_to(rhs, r), ty);
         }
 
         let common = if op == TirBinOp::Add

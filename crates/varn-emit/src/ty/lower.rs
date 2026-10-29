@@ -130,7 +130,14 @@ fn lower_kind(
 ) -> BackendTy {
     match *kind {
         TypeKind::Primitive(p) => lower_primitive(p),
-        TypeKind::Literal(l) => lower_primitive(l.base()),
+        TypeKind::Literal(l) => BackendTy::Literal(match l {
+            varn_core::TypeLiteral::Int(n) => varn_core::TypeLiteral::Int(n),
+            varn_core::TypeLiteral::Bool(b) => varn_core::TypeLiteral::Bool(b),
+            varn_core::TypeLiteral::Char(c) => varn_core::TypeLiteral::Char(c),
+            varn_core::TypeLiteral::Str(s) => {
+                varn_core::TypeLiteral::Str(tt.intern_literal_str(interner.resolve(s)))
+            }
+        }),
 
         TypeKind::Array(el) => {
             let inner = lower_type(&Type::resolved(el), table, interner, tt, names);

@@ -8,7 +8,8 @@ use varn_tir::DynReason;
 pub(super) fn is_structural(ty: BackendTy) -> bool {
     matches!(
         ty,
-        BackendTy::Array(_)
+        BackendTy::Literal(_)
+            | BackendTy::Array(_)
             | BackendTy::Map(..)
             | BackendTy::Dict(_)
             | BackendTy::Set(_)
@@ -41,7 +42,7 @@ impl<'m> Builder<'m> {
             varn_tir::CheckKind::Decode => varn_core::runtime_ops::DECODE,
         };
         let mut describer = Describer::new(self.tir);
-        let desc = describer.describe(node_ty);
+        let desc = describer.describe(node_ty)?;
         let text = self.emit(InstKind::ConstStr(Arc::from(desc.encode())), BackendTy::Str);
         let mut args = vec![text];
         for name in &describer.witnesses {

@@ -95,7 +95,7 @@ fn compile_one(
     let mut proto = emit_function_meta(ssa, &fn_meta(f), source_file, scope)?;
     proto.state_size = state_size;
     if !is_top_level {
-        proto.param_contract = super::describe::param_contract(tir, f);
+        proto.param_contract = super::describe::param_contract(tir, f)?;
         proto.checks_params = proto.param_contract.is_some();
     }
     if is_top_level {

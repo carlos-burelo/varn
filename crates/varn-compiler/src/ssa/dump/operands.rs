@@ -17,6 +17,7 @@ pub(super) fn val(v: Value) -> String {
 
 pub(super) fn ty(t: BackendTy) -> &'static str {
     match t {
+        BackendTy::Literal(_) => ty(t.representation()),
         BackendTy::Int => varn_core::LangPrimitive::Int.name(),
         BackendTy::Float => varn_core::LangPrimitive::Float.name(),
         BackendTy::Bool => varn_core::LangPrimitive::Bool.name(),

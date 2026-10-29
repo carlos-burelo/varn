@@ -26,6 +26,16 @@ fn check_ty_recursive(
         ));
     };
     match ty {
+        BackendTy::Literal(varn_core::TypeLiteral::Str(id)) => {
+            if m.types.literal_str(id).is_none() {
+                bad(&format!("LiteralStrId({})", id.0), errors);
+            }
+        }
+        BackendTy::Literal(
+            varn_core::TypeLiteral::Int(_)
+            | varn_core::TypeLiteral::Bool(_)
+            | varn_core::TypeLiteral::Char(_),
+        ) => {}
         BackendTy::Class(c) if m.class(c).is_none() => bad(&format!("ClassId({})", c.0), errors),
         BackendTy::Enum(en) if m.enum_info(en).is_none() => {
             bad(&format!("EnumId({})", en.0), errors)
@@ -95,7 +105,8 @@ pub(super) fn check_res(
 ) {
     let receiver_class = |recv: &TirExpr| match recv.ty.non_nullable(&m.types) {
         BackendTy::Class(c) => Some(c),
-        BackendTy::Int
+        BackendTy::Literal(_)
+        | BackendTy::Int
         | BackendTy::Float
         | BackendTy::Bool
         | BackendTy::Char
@@ -160,7 +171,8 @@ pub(super) fn check_res(
                                 .enum_info(en)
                                 .and_then(|info| info.member_at(*slot))
                                 .is_some(),
-                            BackendTy::Int
+                            BackendTy::Literal(_)
+                            | BackendTy::Int
                             | BackendTy::Float
                             | BackendTy::Bool
                             | BackendTy::Char

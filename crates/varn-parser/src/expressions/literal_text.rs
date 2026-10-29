@@ -1,3 +1,44 @@
+use crate::stream::TokenStream;
+use varn_core::ast::{operators::UnaryOp, ExprId, ExprKind};
+use varn_core::{SourceRange, TokenKind};
+
+pub(crate) fn parse_literal_atom(s: &mut TokenStream) -> Result<ExprId, String> {
+    let start = s.range();
+    if !s.eat(TokenKind::Minus) {
+        return super::primary::parse_primary_expr(s);
+    }
+    if let Some(expr) = take_min_integer(s, start) {
+        return Ok(expr);
+    }
+    let operand = super::primary::parse_primary_expr(s)?;
+    let range = s.span_from(start);
+    Ok(s.expr(
+        range,
+        ExprKind::Unary {
+            op: UnaryOp::Minus,
+            prefix: true,
+            operand,
+        },
+    ))
+}
+
+pub(crate) fn take_min_integer(s: &mut TokenStream, start: SourceRange) -> Option<ExprId> {
+    const I64_MIN_MAGNITUDE: &str = "9223372036854775808";
+    if s.kind() != TokenKind::IntegerLiteral || s.lexeme().replace('_', "") != I64_MIN_MAGNITUDE {
+        return None;
+    }
+    s.advance();
+    let range = s.span_from(start);
+    let raw = s.interner.intern(&format!("-{I64_MIN_MAGNITUDE}"));
+    Some(s.expr(
+        range,
+        ExprKind::IntLiteral {
+            value: i64::MIN,
+            raw,
+        },
+    ))
+}
+
 pub(super) fn parse_int_radix(raw: &str) -> Option<i64> {
     let cleaned = raw.replace('_', "");
     if let Some(hex) = cleaned

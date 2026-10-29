@@ -5,8 +5,8 @@ use std::sync::Arc;
 use varn_core::ast::{AstArena, AstId, ExprId, ExprKind};
 use varn_sem::output::TypeEntry;
 use varn_tir::{
-    BackendTy, ClassId, ClassInfo, DynReason, EnumId, LocalId, Resolution, Signature, Span,
-    TirExpr, TirExprKind, TirFunction, TirStmt, TyTable,
+    BackendTy, ClassId, DynReason, EnumId, LocalId, Resolution, Signature, Span, TirExpr,
+    TirExprKind, TirFunction, TirStmt, TyTable,
 };
 
 impl<'a> FnEmitter<'a> {
@@ -57,7 +57,8 @@ impl<'a> FnEmitter<'a> {
         if is_generator {
             self.yield_ty = match declared {
                 BackendTy::Dynamic(DynReason::Yields(yielded)) => self.tt.get(yielded),
-                other @ BackendTy::Int
+                other @ BackendTy::Literal(_)
+                | other @ BackendTy::Int
                 | other @ BackendTy::Float
                 | other @ BackendTy::Bool
                 | other @ BackendTy::Char
@@ -81,7 +82,8 @@ impl<'a> FnEmitter<'a> {
         } else if is_async {
             self.return_ty = match declared {
                 BackendTy::Dynamic(DynReason::Awaitable(result)) => self.tt.get(result),
-                other @ BackendTy::Int
+                other @ BackendTy::Literal(_)
+                | other @ BackendTy::Int
                 | other @ BackendTy::Float
                 | other @ BackendTy::Bool
                 | other @ BackendTy::Char
@@ -319,60 +321,6 @@ impl<'a> FnEmitter<'a> {
 
     pub fn take_pending(&mut self) -> Vec<TirStmt> {
         std::mem::take(&mut self.pending)
-    }
-
-    pub(super) fn class_of(&self, ty: BackendTy) -> Option<&'a ClassInfo> {
-        match ty.non_nullable(self.tt) {
-            BackendTy::Class(c) => self.m.classes.get(c.0 as usize),
-            BackendTy::Int
-            | BackendTy::Float
-            | BackendTy::Bool
-            | BackendTy::Char
-            | BackendTy::Str
-            | BackendTy::Bytes
-            | BackendTy::Decimal
-            | BackendTy::BigInt
-            | BackendTy::Array(_)
-            | BackendTy::Map(..)
-            | BackendTy::Dict(_)
-            | BackendTy::Set(_)
-            | BackendTy::Tuple(_)
-            | BackendTy::Enum(_)
-            | BackendTy::Fn(_)
-            | BackendTy::Nullable(_)
-            | BackendTy::Void
-            | BackendTy::Never
-            | BackendTy::Dynamic(_) => None,
-        }
-    }
-
-    pub(super) fn core_class_name(&self, ty: BackendTy) -> Option<&'static str> {
-        use varn_core::RuntimeKind as T;
-        let tag = match ty.non_nullable(self.tt) {
-            BackendTy::Array(_) => T::Array,
-            BackendTy::Str => T::Str,
-            BackendTy::Map(..) => T::Map,
-            BackendTy::Set(_) => T::Set,
-            BackendTy::Int => T::Int,
-            BackendTy::Float => T::Float,
-            BackendTy::Bool => T::Bool,
-            BackendTy::Char => T::Char,
-            BackendTy::Bytes => T::Bytes,
-            BackendTy::Decimal => T::Decimal,
-            BackendTy::BigInt => T::BigInt,
-            BackendTy::Dynamic(DynReason::Yields(_)) => T::Generator,
-            BackendTy::Dynamic(DynReason::Range(_)) => T::Range,
-            BackendTy::Tuple(_)
-            | BackendTy::Dict(_)
-            | BackendTy::Class(_)
-            | BackendTy::Enum(_)
-            | BackendTy::Fn(_)
-            | BackendTy::Nullable(_)
-            | BackendTy::Void
-            | BackendTy::Never
-            | BackendTy::Dynamic(_) => return None,
-        };
-        varn_core::op_id::core_class_name(tag)
     }
 
     pub(super) fn expr_ty(&mut self, e: ExprId) -> BackendTy {

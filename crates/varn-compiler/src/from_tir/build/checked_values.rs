@@ -158,7 +158,8 @@ impl Builder<'_> {
                     return self.lower_conform(v, node_ty, ty, kind);
                 }
             }
-            varn_tir::BackendTy::Array(_)
+            varn_tir::BackendTy::Literal(_)
+            | varn_tir::BackendTy::Array(_)
             | varn_tir::BackendTy::Map(..)
             | varn_tir::BackendTy::Dict(_)
             | varn_tir::BackendTy::Set(_)
@@ -202,12 +203,16 @@ impl Builder<'_> {
             ) => {}
         }
         let conv = match ty {
+            BackendTy::Literal(_) => {
+                return self.lower_conform(v, node_ty, ty.representation(), kind)
+            }
             BackendTy::Str => varn_core::ValueConv::ExpectStr,
             BackendTy::Bool => varn_core::ValueConv::ExpectBool,
             BackendTy::Int => varn_core::ValueConv::ExpectInt,
             BackendTy::Float => varn_core::ValueConv::ExpectFloat,
             BackendTy::Nullable(inner) => {
                 let conv = match self.tir.types.get(inner) {
+                    BackendTy::Literal(_) => return self.lower_conform(v, node_ty, ty, kind),
                     BackendTy::Str => varn_core::ValueConv::ExpectStrOrNull,
                     BackendTy::Bool => varn_core::ValueConv::ExpectBoolOrNull,
                     BackendTy::Int => varn_core::ValueConv::ExpectIntOrNull,

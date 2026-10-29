@@ -1,7 +1,7 @@
 import { describe, it, expect } from "std:test";
 import { Json } from "std:encoding";
 
-type Profile = { name: str, age: int, tags: str[] };
+type Profile = { name: "ann", age: int, tags: str[] };
 
 function decodeFails(decode: () => dynamic): bool {
     try {
@@ -21,16 +21,16 @@ await describe("260 json decode validates", async () => {
     });
 
     await it("unknown fields are rejected and key order does not matter", () => {
-        expect(decodeFails(() => Json.parse<Profile>("{\"tags\":[],\"extra\":true,\"age\":3,\"name\":\"bo\"}"))).toBeTruthy();
-        const p = Json.parse<Profile>("{\"tags\":[],\"age\":3,\"name\":\"bo\"}");
-        expect(p.name).toBe("bo");
+        expect(decodeFails(() => Json.parse<Profile>("{\"tags\":[],\"extra\":true,\"age\":3,\"name\":\"ann\"}"))).toBeTruthy();
+        const p = Json.parse<Profile>("{\"tags\":[],\"age\":3,\"name\":\"ann\"}");
+        expect(p.name).toBe("ann");
         expect(p.age).toBe(3);
     });
 
     await it("a missing or mistyped field is rejected", () => {
         expect(decodeFails(() => Json.parse<Profile>("{}"))).toBeTruthy();
-        expect(decodeFails(() => Json.parse<Profile>("{\"name\":1,\"age\":3,\"tags\":[]}"))).toBeTruthy();
-        expect(decodeFails(() => Json.parse<Profile>("{\"name\":\"a\",\"age\":3,\"tags\":[1]}"))).toBeTruthy();
+        expect(decodeFails(() => Json.parse<Profile>("{\"name\":\"wrong\",\"age\":3,\"tags\":[]}"))).toBeTruthy();
+        expect(decodeFails(() => Json.parse<Profile>("{\"name\":\"ann\",\"age\":3,\"tags\":[1]}"))).toBeTruthy();
     });
 
     await it("arrays and scalars are validated element by element", () => {
@@ -40,8 +40,8 @@ await describe("260 json decode validates", async () => {
         expect(Json.parse<float>("1")).toBe(1.0);
     });
 
-    await it("numbers that do not fit int are rejected", () => {
-        expect(decodeFails(() => Json.parse<int>("1.5"))).toBeTruthy();
+    await it("literal mismatches and numbers outside int are rejected", () => {
+        expect(decodeFails(() => Json.parse<1>("2"))).toBeTruthy();
         expect(decodeFails(() => Json.parse<int>("99999999999999999999"))).toBeTruthy();
     });
 

@@ -90,7 +90,8 @@ fn build_inner(
             BackendTy::BigInt | BackendTy::Decimal if !defaulted[i] => {
                 b.widen_exact(v, BackendTy::Int, *pty)
             }
-            BackendTy::Int
+            BackendTy::Literal(_)
+            | BackendTy::Int
             | BackendTy::Float
             | BackendTy::Bool
             | BackendTy::Char
@@ -188,7 +189,7 @@ impl<'m> Builder<'m> {
         let Some(declared) = self.defaulted.get_mut(i as usize).and_then(Option::take) else {
             return Ok(());
         };
-        let ty = declared.non_nullable(&self.tir.types);
+        let ty = declared.non_nullable(&self.tir.types).representation();
         if filled != Some(ty) {
             return Ok(());
         }
@@ -199,7 +200,8 @@ impl<'m> Builder<'m> {
             BackendTy::Float => Some(varn_core::ValueConv::ExpectFloat),
             BackendTy::Bool => Some(varn_core::ValueConv::ExpectBool),
             BackendTy::Str => Some(varn_core::ValueConv::ExpectStr),
-            BackendTy::Dynamic(_)
+            BackendTy::Literal(_)
+            | BackendTy::Dynamic(_)
             | BackendTy::Nullable(_)
             | BackendTy::Decimal
             | BackendTy::BigInt
