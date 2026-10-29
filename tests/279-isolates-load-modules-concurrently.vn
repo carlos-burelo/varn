@@ -1,0 +1,17 @@
+import { describe, it, expect } from "std:test";
+import { spawnIsolate, channel } from "std:task";
+import { workerParallel } from "./helpers/isolate-workers.vn";
+
+await describe("279 isolates load modules concurrently", async () => {
+    await it("many workers compiling the same module agree", async () => {
+        const out = channel<int>(32)
+        for (let i = 1; i <= 24; i = i + 1) {
+            await spawnIsolate(workerParallel, [out.tx, i, 0])
+        }
+        let sum = 0
+        for (let i = 0; i < 24; i = i + 1) {
+            sum = sum + (await out.rx.receive())
+        }
+        expect(sum).toBe(3000)
+    });
+});

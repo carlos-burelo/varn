@@ -7,6 +7,7 @@ pub struct ModuleResolver {
     pub(super) graph: parking_lot::Mutex<ModuleGraph>,
 
     pub(super) in_flight: parking_lot::Mutex<rustc_hash::FxHashSet<String>>,
+    binding: parking_lot::ReentrantMutex<()>,
 
     pub(super) core_exports: parking_lot::Mutex<Option<Arc<varn_sem::cores::CoreExports>>>,
     pub(super) core_members: parking_lot::Mutex<Option<Arc<varn_sem::cores::CoreMembers>>>,
@@ -28,9 +29,14 @@ impl ModuleResolver {
             loader,
             graph: parking_lot::Mutex::default(),
             in_flight: parking_lot::Mutex::default(),
+            binding: parking_lot::ReentrantMutex::new(()),
             core_exports: parking_lot::Mutex::default(),
             core_members: parking_lot::Mutex::default(),
         }
+    }
+
+    pub(super) fn bind_guard(&self) -> parking_lot::ReentrantMutexGuard<'_, ()> {
+        self.binding.lock()
     }
 
     pub(super) fn load_source(&self, id: &ModuleId) -> Option<varn_modules::loader::ModuleSource> {

@@ -16,6 +16,7 @@ impl ImportResolver for ModuleResolver {
     }
 
     fn module_bind(&self, abs_path: &str) -> Option<Arc<BindResult>> {
+        let _binding = self.bind_guard();
         if let Some(cached) = self.cached_bind(abs_path) {
             return Some(cached);
         }
@@ -63,6 +64,7 @@ impl ImportResolver for ModuleResolver {
     }
 
     fn module_exports(&self, abs_path: &str, visiting: &mut Vec<String>) -> Arc<ExportMap> {
+        let _binding = self.bind_guard();
         if let Some(cached) = self.cached_exports(abs_path) {
             return cached;
         }
@@ -96,6 +98,7 @@ impl ImportResolver for ModuleResolver {
     }
 
     fn stdlib_bind(&self, specifier: &str) -> Option<Arc<BindResult>> {
+        let _binding = self.bind_guard();
         let key = ModuleId::stdlib(specifier).as_str();
         if let Some(cached) = self.cached_bind(&key) {
             return Some(cached);
@@ -109,6 +112,7 @@ impl ImportResolver for ModuleResolver {
     }
 
     fn stdlib_exports(&self, specifier: &str) -> Arc<ExportMap> {
+        let _binding = self.bind_guard();
         let key = ModuleId::stdlib(specifier).as_str();
         if let Some(cached) = self.cached_exports(&key) {
             return cached;

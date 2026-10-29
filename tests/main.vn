@@ -269,6 +269,7 @@ import "./275-array-search-equality.vn"
 import "./276-recursion-through-callbacks.vn"
 import "./277-template-uses-to-string.vn"
 import "./278-generic-decoder-in-namespace.vn"
+import "./279-isolates-load-modules-concurrently.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {
