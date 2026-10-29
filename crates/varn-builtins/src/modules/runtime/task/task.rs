@@ -39,6 +39,16 @@ varn_macros::varn_record! {
     struct ChannelRecord;
 }
 
+fn module_key(path: &str) -> String {
+    let unified = path.replace('\\', "/");
+    let trimmed = unified.strip_prefix("//?/").unwrap_or(&unified);
+    trimmed.to_lowercase()
+}
+
+fn same_module(a: &str, b: &str) -> bool {
+    module_key(a) == module_key(b)
+}
+
 varn_contract! {
     module: "runtime:task",
     contract: "src/modules/runtime/task/task_runtime.vn",
@@ -69,6 +79,16 @@ varn_contract! {
             let (resolved_path, export_name) = ctx
                 .get_function_location(func)
                 .ok_or_else(|| "spawnIsolate: first argument must be a function reference".to_string())?;
+
+            if ctx
+                .entry_module()
+                .is_some_and(|entry| same_module(&entry, &resolved_path))
+            {
+                let err_msg = format!(
+                    "spawnIsolate: '{export_name}' lives in the entry module '{resolved_path}'; the worker would load that module and run its top-level code again, so move the worker function to its own module"
+                );
+                return Ok(reject_with_message(ctx, &err_msg));
+            }
 
             let module_val = match ctx.load_module(&resolved_path) {
                 Ok(m) => m,

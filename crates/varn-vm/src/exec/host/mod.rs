@@ -120,6 +120,10 @@ impl NativeCtx for ExecCtx {
         crate::heap_array::array_pop(&self.heap, arr)
     }
 
+    fn entry_module(&self) -> Option<String> {
+        self.entry_module.clone()
+    }
+
     fn values_equal(&self, a: VmValue, b: VmValue) -> bool {
         crate::exec::compare::eq(a, b, &self.heap)
     }

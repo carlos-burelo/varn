@@ -164,6 +164,21 @@ Check "cache-concurrent-writers" {
     ($runs | Where-Object { $_.Code -ne 0 -or $_.Out -ne "same" }).Count -eq 0
 }
 
+Check "isolate-worker-in-entry-module-is-rejected" {
+    $src = @'
+import { spawnIsolate, channel, Sender } from "std:task"
+export async function sendInt(out: Sender<int>): Task<void> { await out.send(7) }
+print("entry-ran")
+const ch = channel<int>(1)
+await spawnIsolate(sendInt, [ch.tx])
+print(await ch.rx.receive())
+'@
+    $f = Write-Vn "isolate\entry.vn" $src
+    $r = Vn run $f
+    $starts = ([regex]::Matches($r.Out, "entry-ran")).Count
+    $r.Code -ne 0 -and $starts -eq 1 -and $r.Out -match "entry module"
+}
+
 Check "eval-honors-permissions" {
     $code = 'import { readText } from "std:fs"; print(readText("Cargo.toml").length > 0)'
     $denied = Vn eval --allow-net $code
@@ -190,7 +205,7 @@ print("standalone-ok " + sqrt(16.0).toString());'
     $built = Vn build $f --target exe -o $exe
     Push-Location (Join-Path $work "cache")
     try { $ran = & $exe 2>&1 | Out-String } finally { Pop-Location }
-    $built.Code -eq 0 -and $ran.Trim() -eq "standalone-ok 4"
+    $built.Code -eq 0 -and $ran.Trim() -eq "standalone-ok 4.0"
 }
 
 Check "exe-corrupt-trailer-is-an-error" {

@@ -49,6 +49,9 @@ impl Vm {
                 .globals_mut()
                 .reserve_module_region(proto.global_count, true);
             self.ctx.main_module_base.get_or_insert(entry.module_base);
+            self.ctx
+                .entry_module
+                .get_or_insert_with(|| proto.chunk.source_file.to_string());
             self.ctx.push_frame(Rc::new(entry))?;
         }
 

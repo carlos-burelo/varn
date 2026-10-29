@@ -32,6 +32,7 @@ pub(super) fn spawn_isolate(
             let mut machine =
                 crate::Vm::new(std::rc::Rc::new(rustc_hash::FxHashMap::default()), settings);
             machine.ctx.capabilities = std::rc::Rc::new(parent_caps_inner);
+            machine.ctx.entry_module = Some(module_path_str.clone());
             if let Some(ld) = loader {
                 machine = machine.with_loader(ld);
             }
