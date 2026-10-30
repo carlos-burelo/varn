@@ -9,6 +9,7 @@ fn bind_reuse_listener(addr: SocketAddr) -> std::io::Result<TcpListener> {
         socket2::Domain::IPV6
     };
     let sock = socket2::Socket::new(domain, socket2::Type::STREAM, None)?;
+    #[cfg(not(windows))]
     sock.set_reuse_address(true)?;
     sock.set_nonblocking(true)?;
     sock.bind(&addr.into())?;
@@ -17,24 +18,34 @@ fn bind_reuse_listener(addr: SocketAddr) -> std::io::Result<TcpListener> {
 }
 
 impl IoDriver {
-    pub fn listen(&self, port: i64) -> std::io::Result<i64> {
-        self.listen_with(port, None)
+    pub fn listen(&self, port: i64, host: &str) -> std::io::Result<i64> {
+        self.listen_with(port, host, None)
     }
 
-    pub fn listen_tls(&self, port: i64, cert_pem: &str, key_pem: &str) -> Result<i64, String> {
+    pub fn listen_tls(
+        &self,
+        port: i64,
+        host: &str,
+        cert_pem: &str,
+        key_pem: &str,
+    ) -> Result<i64, String> {
         let config = tls::server_config(cert_pem, key_pem)?;
-        self.listen_with(port, Some(config))
-            .map_err(|e| format!("cannot listen on port {port}: {e}"))
+        self.listen_with(port, host, Some(config))
+            .map_err(|e| format!("cannot listen on {host}:{port}: {e}"))
     }
 
     fn listen_with(
         &self,
         port: i64,
+        host: &str,
         tls: Option<Arc<rustls::ServerConfig>>,
     ) -> std::io::Result<i64> {
-        let addr: SocketAddr = format!("127.0.0.1:{port}")
+        let invalid = |message: String| std::io::Error::new(ErrorKind::InvalidInput, message);
+        let ip: std::net::IpAddr = host
             .parse()
-            .map_err(|e| std::io::Error::new(ErrorKind::InvalidInput, e))?;
+            .map_err(|_| invalid(format!("'{host}' is not an IP address")))?;
+        let port = u16::try_from(port).map_err(|_| invalid(format!("port {port} is out of range")))?;
+        let addr = SocketAddr::new(ip, port);
         let listener = bind_reuse_listener(addr)?;
         let id = next_socket_id();
 

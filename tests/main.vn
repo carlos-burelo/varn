@@ -281,6 +281,7 @@ import "./287-fs-exists-and-stat-tell-the-truth.vn"
 import "./288-network-failures-carry-their-cause.vn"
 import "./289-tls.vn"
 import "./290-http-client-framing.vn"
+import "./291-listen-honours-its-address.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

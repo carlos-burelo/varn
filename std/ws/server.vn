@@ -19,10 +19,10 @@ export class WsServer {
         this._port = port;
     }
 
-    static listen(port: int): WsServer {
+    static listen(port: int, host: str = "127.0.0.1"): WsServer {
         let server = new WsServer(port);
         try {
-            server._listener = tcpListen$(port);
+            server._listener = tcpListen$(port, host);
         } catch (e) {
             throw stdError(E_WS_IO, "could not listen on port " + port.toString() + " (" + e.message + ")");
         }

@@ -118,19 +118,19 @@ export class HttpServer {
         return this._isListening;
     }
 
-    listen(port: int): void {
+    listen(port: int, host: str = "127.0.0.1"): void {
         if (this._isListening) return;
         this._port = port;
-        this._listenerId = tcpListen$(port);
+        this._listenerId = tcpListen$(port, host);
         this._isListening = true;
 
         spawn(this._acceptLoop());
     }
 
-    listenTls(port: int, cert: str, key: str): void {
+    listenTls(port: int, cert: str, key: str, host: str = "127.0.0.1"): void {
         if (this._isListening) return;
         this._port = port;
-        this._listenerId = tcpListenTls$(port, cert, key);
+        this._listenerId = tcpListenTls$(port, host, cert, key);
         this._isListening = true;
 
         spawn(this._acceptLoop());

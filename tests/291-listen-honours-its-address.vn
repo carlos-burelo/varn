@@ -1,0 +1,35 @@
+import { describe, it, expect } from "std:test";
+import { TcpStream, TcpListener } from "std:net";
+
+function failure(run: () => dynamic): str {
+    try {
+        run()
+        return ""
+    } catch (e) {
+        return e.message
+    }
+}
+
+await describe("291 listen honours its address", async () => {
+    await it("a name that is not an IP address is rejected", async () => {
+        expect(failure(() => TcpListener.listen(19900, "not-an-ip")).indexOf("not an IP address") !== null).toBeTruthy();
+    });
+
+    await it("a port outside 0..65535 is rejected", async () => {
+        expect(failure(() => TcpListener.listen(70000)).indexOf("out of range") !== null).toBeTruthy();
+        expect(failure(() => TcpListener.listen(-1)).indexOf("out of range") !== null).toBeTruthy();
+    });
+
+    await it("a second listener cannot take a port that is in use", async () => {
+        const first = TcpListener.listen(19901);
+        expect(failure(() => TcpListener.listen(19901)).startsWith("TcpListenError")).toBeTruthy();
+        first.close();
+    });
+
+    await it("an explicit address is the one that is bound", async () => {
+        const wide = TcpListener.listen(19902, "0.0.0.0");
+        const client = await TcpStream.connect("127.0.0.1", 19902, 1);
+        client.close();
+        wide.close();
+    });
+});

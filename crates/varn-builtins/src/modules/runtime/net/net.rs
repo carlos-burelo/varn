@@ -41,13 +41,13 @@ varn_contract! {
                 .map_err(|e| format!("Net.decodeURIComponent: {e}"))
         }
 
-        fn tcpListen(ctx: &mut dyn NativeCtx, port: i64) -> Result<i64, String> {
+        fn tcpListen(ctx: &mut dyn NativeCtx, port: i64, host: &str) -> Result<i64, String> {
             if !ctx.check_net_listen(port) {
                 return Err(format!("SecurityError: Permission denied (net.server) on port {port}"));
             }
             driver()
-                .listen(port)
-                .map_err(|e| format!("tcpListen: cannot listen on port {port}: {e}"))
+                .listen(port, host)
+                .map_err(|e| format!("tcpListen: cannot listen on {host}:{port}: {e}"))
         }
 
         fn tcpAccept(ctx: &mut dyn NativeCtx, listener_id: i64) -> Result<VmValue, String> {
@@ -71,12 +71,12 @@ varn_contract! {
             Ok(ctx.task_from_host(task, HostOpen::Plain))
         }
 
-        fn tcpListenTls(ctx: &mut dyn NativeCtx, port: i64, cert: &str, key: &str) -> Result<i64, String> {
+        fn tcpListenTls(ctx: &mut dyn NativeCtx, port: i64, host: &str, cert: &str, key: &str) -> Result<i64, String> {
             if !ctx.check_net_listen(port) {
                 return Err(format!("SecurityError: Permission denied (net.server) on port {port}"));
             }
             driver()
-                .listen_tls(port, cert, key)
+                .listen_tls(port, host, cert, key)
                 .map_err(|e| format!("tcpListenTls: {e}"))
         }
 

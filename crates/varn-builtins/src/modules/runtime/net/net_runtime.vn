@@ -25,11 +25,11 @@ export declare function isIPv6$(s: str): bool;
 export declare function encodeURIComponent$(value: str): str;
 export declare function decodeURIComponent$(value: str): str;
 
-export declare function tcpListen$(port: int): int;
+export declare function tcpListen$(port: int, host: str): int;
 export declare function tcpAccept$(listenerId: int): TaskHandle<int>;
 export declare function tcpConnect$(host: str, port: int): TaskHandle<int>;
 export declare function tcpConnectTls$(host: str, port: int, ca?: str): TaskHandle<int>;
-export declare function tcpListenTls$(port: int, cert: str, key: str): int;
+export declare function tcpListenTls$(port: int, host: str, cert: str, key: str): int;
 export declare function tcpRead$(connId: int, len: int): TaskHandle<Bytes?>;
 export declare function tcpWrite$(connId: int, data: Bytes | str): TaskHandle<int>;
 export declare function tcpClose$(connId: int): void;

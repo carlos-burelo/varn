@@ -159,7 +159,7 @@ export class TcpListener {
 
     static listenTls(port: int, cert: str, key: str, host: str = "127.0.0.1"): TcpListener {
         try {
-            return new TcpListener(tcpListenTls$(port, cert, key), port, host);
+            return new TcpListener(tcpListenTls$(port, host, cert, key), port, host);
         } catch (e) {
             throw new Error(`TcpListenError: Could not bind a TLS listener to port ${port} (${e.message})`);
         }
@@ -167,7 +167,7 @@ export class TcpListener {
 
     static listen(port: int, host: str = "127.0.0.1"): TcpListener {
         try {
-            return new TcpListener(tcpListen$(port), port, host);
+            return new TcpListener(tcpListen$(port, host), port, host);
         } catch (e) {
             throw new Error(`TcpListenError: Could not bind listener to port ${port} (${e.message})`);
         }
