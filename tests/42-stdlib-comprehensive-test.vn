@@ -1,7 +1,7 @@
 import { describe, it, expect } from "std:test";
 import { Duration, PlainDateTime, nowInstant, Instant } from 'std:time';
 import { List, Stack, Queue } from 'std:collections';
-import { fetch } from 'std:http';
+import { fetch, HttpServer, Request, Response } from 'std:http';
 import { Json } from 'std:encoding';
 import { uuid, sha256 } from 'std:crypto';
 import { writeText as fsWrite, exists as fsExists, readText as fsRead, tempDir as fsTempDir, remove as fsRemove } from 'std:fs';
@@ -11,7 +11,7 @@ import { platform as sysPlatform, cwd as sysCwd } from 'std:sys';
 import { isIP as netIsIP, Query, Url } from 'std:net';
 import { Path } from 'std:path';
 import { defineMetadata, getMetadata, hasMetadata, MetaKey } from 'std:reflect';
-import { sleep, TaskGroup, spawn, parallel } from 'std:task';
+import { sleep, delay, TaskGroup, spawn, parallel } from 'std:task';
 
 
 // Disposable, AsyncDisposable, Partial, Required, Readonly, Mutable, Record
@@ -126,10 +126,14 @@ async function runComprehensiveTest(): Task<void> {
     expect(hasMetadata("my_key", list)).toBeTruthy();
 
     // 12. std:http
-    let clientTask = fetch("http://%/");
-    let clientRes = await clientTask;
+    let httpServer = new HttpServer();
+    httpServer.get("/", async (req: Request) => new Response("hello from 42", 200, {}));
+    httpServer.listen(19882);
+    await delay(150);
+    let clientRes = await fetch("http://127.0.0.1:19882/");
     expect(clientRes.status).toBe(200);
-    expect(clientRes.body.length > 0).toBeTruthy();
+    expect(clientRes.body).toBe("hello from 42");
+    httpServer.close();
 
     // 13. std:task
     async function threeHundred(): Task<int> {

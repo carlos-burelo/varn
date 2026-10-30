@@ -22,6 +22,7 @@ await describe("288 network failures carry their cause", async () => {
     await it("fetch never fabricates a response", async () => {
         const message = await messageOf(() => fetch("http://127.0.0.1:1/"));
         expect(message.startsWith("NetworkError")).toBeTruthy();
+        expect((await messageOf(() => fetch("http://%/"))).length > 0).toBeTruthy();
     });
 
     await it("an unbindable port is an error, not a silent listener", async () => {
