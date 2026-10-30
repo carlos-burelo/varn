@@ -271,6 +271,7 @@ import "./277-template-uses-to-string.vn"
 import "./278-generic-decoder-in-namespace.vn"
 import "./279-isolates-load-modules-concurrently.vn"
 import "./280-isolate-join-rejects-with-error.vn"
+import "./281-time-parsing-is-strict.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

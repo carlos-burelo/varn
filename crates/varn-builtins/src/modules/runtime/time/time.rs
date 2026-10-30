@@ -3,45 +3,51 @@ use varn_types::{NativeCtx, VmValue};
 
 pub struct TimeRuntime;
 
-fn parse_iso_duration(s: &str) -> i64 {
-    let s = s.strip_prefix('P').unwrap_or(s);
-    let mut ms: i64 = 0;
-    let mut rest = s;
-
-    if let Some(t_pos) = rest.find('T') {
-        let date_part = &rest[..t_pos];
-        rest = &rest[t_pos + 1..];
-        if let Some(d_pos) = date_part.find('D')
-            && let Ok(d) = date_part[..d_pos].parse::<i64>()
-        {
-            ms += d * 86400 * 1000;
-        }
-    } else {
-        if let Some(d_pos) = rest.find('D')
-            && let Ok(d) = rest[..d_pos].parse::<i64>()
-        {
-            ms += d * 86400 * 1000;
-        }
-        return ms;
+fn parse_iso_duration(text: &str) -> Result<i64, String> {
+    let invalid = || format!("invalid ISO-8601 duration '{text}'");
+    let body = text.strip_prefix('P').ok_or_else(invalid)?;
+    let (date_part, time_part) = match body.split_once('T') {
+        Some((date, time)) => (date, Some(time)),
+        None => (body, None),
+    };
+    if date_part.is_empty() && time_part.is_none_or(str::is_empty) {
+        return Err(invalid());
     }
-
-    let mut num_buf = String::new();
-    for ch in rest.chars() {
-        if ch.is_ascii_digit() || ch == '.' {
-            num_buf.push(ch);
-        } else {
-            if let Ok(n) = num_buf.parse::<f64>() {
-                match ch {
-                    'H' => ms += (n * 3600.0 * 1000.0) as i64,
-                    'M' => ms += (n * 60.0 * 1000.0) as i64,
-                    'S' => ms += (n * 1000.0) as i64,
-                    _ => {}
-                }
+    let mut ms = 0.0_f64;
+    let sections = [(date_part, 'D'), (time_part.unwrap_or(""), 'T')];
+    for (section, kind) in sections {
+        let mut number = String::new();
+        for ch in section.chars() {
+            if ch.is_ascii_digit() || ch == '.' {
+                number.push(ch);
+                continue;
             }
-            num_buf.clear();
+            let value: f64 = number.parse().map_err(|_| invalid())?;
+            number.clear();
+            ms += value
+                * match (kind, ch) {
+                    ('D', 'W') => 7.0 * 86_400_000.0,
+                    ('D', 'D') => 86_400_000.0,
+                    ('T', 'H') => 3_600_000.0,
+                    ('T', 'M') => 60_000.0,
+                    ('T', 'S') => 1_000.0,
+                    _ => return Err(invalid()),
+                };
+        }
+        if !number.is_empty() {
+            return Err(invalid());
         }
     }
-    ms
+    if !ms.is_finite() || ms > i64::MAX as f64 {
+        return Err(invalid());
+    }
+    Ok(ms.round() as i64)
+}
+
+fn parse_iso_instant(text: &str) -> Result<i64, String> {
+    chrono::DateTime::parse_from_rfc3339(text)
+        .map(|dt| dt.timestamp_millis())
+        .map_err(|e| format!("invalid ISO-8601 instant '{text}': {e}"))
 }
 
 fn set_int(ctx: &mut dyn NativeCtx, obj: VmValue, key: &str, val: i64) {
@@ -60,7 +66,10 @@ varn_contract! {
                 .unwrap_or(0))
         }
         fn parseIsoDuration(_ctx: &mut dyn NativeCtx, s: &str) -> Result<i64, String> {
-            Ok(parse_iso_duration(s))
+            parse_iso_duration(s)
+        }
+        fn parseIsoInstant(_ctx: &mut dyn NativeCtx, s: &str) -> Result<i64, String> {
+            parse_iso_instant(s)
         }
         fn msToParts(ctx: &mut dyn NativeCtx, ms: i64) -> Result<VmValue, String> {
             use chrono::{Datelike, TimeZone, Timelike, Utc};
@@ -86,19 +95,23 @@ varn_contract! {
                     .map(|v| ctx.as_int(v))
                     .unwrap_or(0)
             };
-            let year = get_int(ctx, "year") as i32;
-            let month = get_int(ctx, "month") as u32;
-            let day = get_int(ctx, "day") as u32;
-            let hour = get_int(ctx, "hour") as u32;
-            let minute = get_int(ctx, "minute") as u32;
-            let second = get_int(ctx, "second") as u32;
-            let millisecond = get_int(ctx, "millisecond") as u32;
+            let invalid = || "Invalid date parts".to_string();
+            let year = i32::try_from(get_int(ctx, "year")).map_err(|_| invalid())?;
+            let month = u32::try_from(get_int(ctx, "month")).map_err(|_| invalid())?;
+            let day = u32::try_from(get_int(ctx, "day")).map_err(|_| invalid())?;
+            let hour = u32::try_from(get_int(ctx, "hour")).map_err(|_| invalid())?;
+            let minute = u32::try_from(get_int(ctx, "minute")).map_err(|_| invalid())?;
+            let second = u32::try_from(get_int(ctx, "second")).map_err(|_| invalid())?;
+            let millisecond = u32::try_from(get_int(ctx, "millisecond"))
+                .ok()
+                .filter(|ms| *ms < 1000)
+                .ok_or_else(|| "Invalid millisecond".to_string())?;
 
             use chrono::{TimeZone, Timelike, Utc};
             let dt = Utc
                 .with_ymd_and_hms(year, month, day, hour, minute, second)
                 .single()
-                .ok_or_else(|| "Invalid date parts".to_string())?
+                .ok_or_else(invalid)?
                 .with_nanosecond(millisecond * 1_000_000)
                 .ok_or_else(|| "Invalid millisecond".to_string())?;
             Ok(dt.timestamp_millis())

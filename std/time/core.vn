@@ -1,6 +1,7 @@
 import {
     nowMs$,
     parseIsoDuration$,
+    parseIsoInstant$,
     msToParts$,
     partsToMs$,
     RuntimeTimeParts
@@ -56,7 +57,7 @@ export function toISOString(ms: int): str {
 }
 
 export function fromISO(iso: str): int {
-    return parseIsoDuration$(iso);
+    return parseIsoInstant$(iso);
 }
 
 export function toParts(ms: int): TimeParts {
