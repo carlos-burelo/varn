@@ -4,7 +4,7 @@
  */
 export declare class decimal {
     toString(): str;
-    toFixed(digits?: int): str;
+    @fallible toFixed(digits?: int): str;
     abs(): decimal;
     sign(): int;
     negate(): decimal;

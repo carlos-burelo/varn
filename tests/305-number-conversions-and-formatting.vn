@@ -1,0 +1,72 @@
+import { describe, it, expect } from "std:test";
+import { ParseError } from "std:error";
+
+const NAN: float = 0.0 / 0.0;
+const INF: float = 1.0 / 0.0;
+
+function outcome(f: () => str): str {
+    try { return f(); } catch (e) {
+        return e instanceof RangeError ? "range" : e instanceof IntegerOverflow ? "overflow" : e instanceof ParseError ? "parse" : "other:" + e.name;
+    }
+}
+
+await describe("305 number conversions and formatting", async () => {
+    await it("float.parse reports a malformed text instead of answering NaN", async () => {
+        expect(outcome(() => float.parse("  1.5e3 ").toString())).toBe("1500.0");
+        expect(outcome(() => float.parse("abc").toString())).toBe("parse");
+        expect(outcome(() => float.parse("").toString())).toBe("parse");
+        expect(outcome(() => float.parse("-Infinity").toString())).toBe("-Infinity");
+        expect(outcome(() => float.parse("NaN").toString())).toBe("NaN");
+        expect(float.tryParse("x") === null).toBe(true);
+        expect((float.tryParse("2.5") as float).toString()).toBe("2.5");
+    });
+
+    await it("toFixed rounds the exact binary value half away from zero, like round", async () => {
+        expect((2.5).toFixed(0)).toBe("3");
+        expect((3.5).toFixed(0)).toBe("4");
+        expect((-2.5).toFixed(0)).toBe("-3");
+        expect((0.125).toFixed(2)).toBe("0.13");
+        expect((1.005).toFixed(2)).toBe("1.00");
+        expect((2.675).toFixed(2)).toBe("2.67");
+        expect((999.5).toFixed(0)).toBe("1000");
+        expect((9.995).toFixed(2)).toBe("9.99");
+        expect((0.1).toFixed(20)).toBe("0.10000000000000000555");
+        expect((-0.001).toFixed(2)).toBe("-0.00");
+        expect((0.0).toFixed(2)).toBe("0.00");
+    });
+
+    await it("toFixed keeps non-finite values readable and bounds its digits", async () => {
+        expect(NAN.toFixed(2)).toBe("NaN");
+        expect(INF.toFixed(2)).toBe("Infinity");
+        expect(outcome(() => (1.5).toFixed(-1))).toBe("range");
+        expect(outcome(() => (1.5).toFixed(101))).toBe("range");
+        expect(outcome(() => (1.5d).toFixed(-1))).toBe("range");
+        expect(outcome(() => (7).toFixed(101))).toBe("range");
+    });
+
+    await it("int.toFixed is exact beyond 2^53", async () => {
+        expect((9007199254740993).toFixed(2)).toBe("9007199254740993.00");
+        expect((-5).toFixed()).toBe("-5");
+        expect((12).toFixed(3)).toBe("12.000");
+    });
+
+    await it("float.toInt refuses what an int cannot hold", async () => {
+        expect((2.9).toInt()).toBe(2);
+        expect((-2.9).toInt()).toBe(-2);
+        expect(outcome(() => NAN.toInt().toString())).toBe("overflow");
+        expect(outcome(() => INF.toInt().toString())).toBe("overflow");
+        expect(outcome(() => (1e19).toInt().toString())).toBe("overflow");
+    });
+
+    await it("float min, max, clamp and sign follow the same IEEE rules as std:math", async () => {
+        expect(NAN.max(1.0).toString()).toBe("NaN");
+        expect((1.0).min(NAN).toString()).toBe("NaN");
+        expect((5.0).clamp(1.0, 3.0).toString()).toBe("3.0");
+        expect(NAN.clamp(1.0, 3.0).toString()).toBe("NaN");
+        expect(outcome(() => (5.0).clamp(3.0, 1.0).toString())).toBe("range");
+        expect(outcome(() => (5).clamp(3, 1).toString())).toBe("range");
+        expect(NAN.sign().toString()).toBe("NaN");
+        expect((-0.0).sign().toString()).toBe("-0.0");
+        expect((-3.0).sign().toString()).toBe("-1.0");
+    });
+});

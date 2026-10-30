@@ -32,9 +32,11 @@ varn_contract! {
         fn valueOf(_ctx: &mut dyn NativeCtx, this: i64) -> i64 { this }
         fn toLocaleString(_ctx: &mut dyn NativeCtx, this: i64) -> String { this.to_string() }
 
-        fn toFixed(_ctx: &mut dyn NativeCtx, this: i64, digits: Option<i64>) -> String {
-            let d = digits.unwrap_or(0).max(0) as usize;
-            format!("{:.*}", d, this as f64)
+        fn toFixed(_ctx: &mut dyn NativeCtx, this: i64, digits: Option<i64>) -> Result<String, NativeError> {
+            let d = varn_core::fixed_digits(digits).ok_or_else(|| {
+                NativeError::range_error(format!("toFixed: digits must be within 0..={}", varn_core::FIXED_MAX_DIGITS))
+            })?;
+            Ok(if d == 0 { this.to_string() } else { format!("{this}.{}", "0".repeat(d)) })
         }
 
         fn abs(_ctx: &mut dyn NativeCtx, this: i64) -> Result<i64, NativeError> {
@@ -47,8 +49,11 @@ varn_contract! {
         fn bitwiseNot(_ctx: &mut dyn NativeCtx, this: i64) -> i64 { !this }
         fn min(_ctx: &mut dyn NativeCtx, this: i64, other: i64) -> i64 { this.min(other) }
         fn max(_ctx: &mut dyn NativeCtx, this: i64, other: i64) -> i64 { this.max(other) }
-        fn clamp(_ctx: &mut dyn NativeCtx, this: i64, lo: i64, hi: i64) -> i64 {
-            this.max(lo).min(hi)
+        fn clamp(_ctx: &mut dyn NativeCtx, this: i64, lo: i64, hi: i64) -> Result<i64, NativeError> {
+            if lo > hi {
+                return Err(NativeError::range_error(format!("clamp: the lower bound {lo} is above the upper bound {hi}")));
+            }
+            Ok(this.max(lo).min(hi))
         }
 
         fn toHex(_ctx: &mut dyn NativeCtx, this: i64) -> String {

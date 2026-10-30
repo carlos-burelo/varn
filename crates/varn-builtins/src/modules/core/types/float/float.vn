@@ -5,25 +5,26 @@ export declare class float {
     static MAX_VALUE: float;
     static MIN_VALUE: float;
     static EPSILON: float;
-    static parse(s: str): float;
+    @fallible static parse(s: str): float;
+    static tryParse(s: str): float?;
     isNaN(): bool;
     isFinite(): bool;
     isInfinite(): bool;
 
     toString(): str;
     valueOf(): float;
-    toFixed(digits?: int): str;
+    @fallible toFixed(digits?: int): str;
     abs(): float;
-    sign(): int;
+    sign(): float;
     negate(): float;
     min(other: float): float;
     max(other: float): float;
-    clamp(lo: float, hi: float): float;
+    @fallible clamp(lo: float, hi: float): float;
     pow(exponent: float): float;
     isInteger(): bool;
     floor(): float;
     ceil(): float;
     round(): float;
     trunc(): float;
-    toInt(): int;
+    @fallible toInt(): int;
 }

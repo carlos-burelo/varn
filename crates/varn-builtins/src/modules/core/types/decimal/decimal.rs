@@ -65,12 +65,14 @@ varn_contract! {
         fn toString(ctx: &mut dyn NativeCtx, this: VmValue) -> String {
             get_decimal(ctx, this).map(|d| d.to_plain_string()).unwrap_or_else(|| "0".to_string())
         }
-        fn toFixed(ctx: &mut dyn NativeCtx, this: VmValue, digits: Option<i64>) -> String {
-            let places = digits.unwrap_or(0).max(0);
-            match get_decimal(ctx, this) {
-                Some(d) => d.with_scale_round(places, RoundingMode::HalfEven).to_plain_string(),
+        fn toFixed(ctx: &mut dyn NativeCtx, this: VmValue, digits: Option<i64>) -> Result<String, NativeError> {
+            let places = varn_core::fixed_digits(digits).ok_or_else(|| {
+                NativeError::range_error(format!("toFixed: digits must be within 0..={}", varn_core::FIXED_MAX_DIGITS))
+            })?;
+            Ok(match get_decimal(ctx, this) {
+                Some(d) => d.with_scale_round(places as i64, RoundingMode::HalfEven).to_plain_string(),
                 None => "0".to_string(),
-            }
+            })
         }
         fn abs(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
             match get_decimal(ctx, this) { Some(d) => alloc_decimal(ctx, d.abs()), None => VmValue::null() }

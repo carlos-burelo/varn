@@ -1,5 +1,5 @@
 use varn_macros::varn_contract;
-use varn_types::{NativeCtx, NativeFnResult, VmValue};
+use varn_types::{NativeCtx, NativeError, NativeFnResult, VmValue};
 
 pub struct Float;
 
@@ -13,8 +13,13 @@ varn_contract! {
         fn MIN_VALUE(_ctx: &mut dyn NativeCtx) -> f64 { f64::MIN }
         fn EPSILON(_ctx: &mut dyn NativeCtx) -> f64 { f64::EPSILON }
 
-        fn parse(_ctx: &mut dyn NativeCtx, s: &str) -> f64 {
-            s.trim().parse::<f64>().unwrap_or(f64::NAN)
+        fn parse(_ctx: &mut dyn NativeCtx, s: &str) -> Result<f64, NativeError> {
+            s.trim()
+                .parse::<f64>()
+                .map_err(|e| NativeError::std(varn_core::StdErrorClass::Parse, format!("float.parse({s:?}): {e}")))
+        }
+        fn tryParse(_ctx: &mut dyn NativeCtx, s: &str) -> Option<f64> {
+            s.trim().parse::<f64>().ok()
         }
         fn isNaN(_ctx: &mut dyn NativeCtx, this: f64) -> bool { this.is_nan() }
         fn isFinite(_ctx: &mut dyn NativeCtx, this: f64) -> bool { this.is_finite() }
@@ -23,19 +28,22 @@ varn_contract! {
 
         fn toString(_ctx: &mut dyn NativeCtx, this: f64) -> String { varn_core::float_to_string(this) }
         fn valueOf(_ctx: &mut dyn NativeCtx, this: f64) -> f64 { this }
-        fn toFixed(_ctx: &mut dyn NativeCtx, this: f64, digits: Option<i64>) -> String {
-            let d = digits.unwrap_or(0).max(0) as usize;
-            format!("{:.*}", d, this)
+        fn toFixed(_ctx: &mut dyn NativeCtx, this: f64, digits: Option<i64>) -> Result<String, NativeError> {
+            let d = varn_core::fixed_digits(digits).ok_or_else(|| {
+                NativeError::range_error(format!("toFixed: digits must be within 0..={}", varn_core::FIXED_MAX_DIGITS))
+            })?;
+            Ok(varn_core::float_to_fixed(this, d))
         }
         fn abs(_ctx: &mut dyn NativeCtx, this: f64) -> f64 { this.abs() }
-        fn sign(_ctx: &mut dyn NativeCtx, this: f64) -> i64 {
-            if this > 0.0 { 1 } else if this < 0.0 { -1 } else { 0 }
-        }
+        fn sign(_ctx: &mut dyn NativeCtx, this: f64) -> f64 { varn_core::fsign(this) }
         fn negate(_ctx: &mut dyn NativeCtx, this: f64) -> f64 { -this }
-        fn min(_ctx: &mut dyn NativeCtx, this: f64, other: f64) -> f64 { this.min(other) }
-        fn max(_ctx: &mut dyn NativeCtx, this: f64, other: f64) -> f64 { this.max(other) }
-        fn clamp(_ctx: &mut dyn NativeCtx, this: f64, lo: f64, hi: f64) -> f64 {
-            this.max(lo).min(hi)
+        fn min(_ctx: &mut dyn NativeCtx, this: f64, other: f64) -> f64 { varn_core::fmin(this, other) }
+        fn max(_ctx: &mut dyn NativeCtx, this: f64, other: f64) -> f64 { varn_core::fmax(this, other) }
+        fn clamp(_ctx: &mut dyn NativeCtx, this: f64, lo: f64, hi: f64) -> Result<f64, NativeError> {
+            if lo > hi {
+                return Err(NativeError::range_error(format!("clamp: the lower bound {lo} is above the upper bound {hi}")));
+            }
+            Ok(varn_core::fmin(varn_core::fmax(this, lo), hi))
         }
         fn pow(_ctx: &mut dyn NativeCtx, this: f64, exponent: f64) -> f64 { this.powf(exponent) }
         fn isInteger(_ctx: &mut dyn NativeCtx, this: f64) -> bool {
@@ -49,7 +57,10 @@ varn_contract! {
 
 
 
-        fn toInt(_ctx: &mut dyn NativeCtx, this: f64) -> i64 { this.trunc() as i64 }
+        fn toInt(_ctx: &mut dyn NativeCtx, this: f64) -> Result<i64, NativeError> {
+            varn_core::float_to_int(this)
+                .ok_or_else(|| NativeError::integer_overflow(format!("integer overflow: {this} does not fit int")))
+        }
     }
 }
 

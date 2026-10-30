@@ -31,6 +31,55 @@ pub fn pow_int(a: i64, e: u64) -> Option<i64> {
     }
 }
 
+pub const FIXED_MAX_DIGITS: i64 = 100;
+
+pub fn fixed_digits(digits: Option<i64>) -> Option<usize> {
+    let d = digits.unwrap_or(0);
+    if (0..=FIXED_MAX_DIGITS).contains(&d) {
+        Some(d as usize)
+    } else {
+        None
+    }
+}
+
+pub fn float_to_fixed(x: f64, digits: usize) -> String {
+    if !x.is_finite() {
+        return crate::float_to_string(x);
+    }
+    let exact = format!("{:.1100}", x.abs());
+    let (whole, fraction) = exact.split_once('.').unwrap_or((exact.as_str(), ""));
+    let mut kept: Vec<u8> = whole.bytes().chain(fraction.bytes().take(digits)).collect();
+    let round_up = fraction.as_bytes().get(digits).is_some_and(|d| *d >= b'5');
+    if round_up {
+        let mut at = kept.len();
+        loop {
+            if at == 0 {
+                kept.insert(0, b'1');
+                break;
+            }
+            at -= 1;
+            if kept[at] == b'9' {
+                kept[at] = b'0';
+            } else {
+                kept[at] += 1;
+                break;
+            }
+        }
+    }
+    let point = kept.len() - digits;
+    let (int_part, frac_part) = kept.split_at(point);
+    let mut out = String::new();
+    if x.is_sign_negative() && x != 0.0 {
+        out.push('-');
+    }
+    out.push_str(std::str::from_utf8(int_part).unwrap_or("0"));
+    if digits > 0 {
+        out.push('.');
+        out.push_str(std::str::from_utf8(frac_part).unwrap_or(""));
+    }
+    out
+}
+
 #[inline]
 pub fn fmax(a: f64, b: f64) -> f64 {
     if a.is_nan() || b.is_nan() {

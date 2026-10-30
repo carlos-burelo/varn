@@ -12,14 +12,14 @@ export declare class int {
     toString(): str;
     valueOf(): int;
     toLocaleString(): str;
-    toFixed(digits?: int): str;
+    @fallible toFixed(digits?: int): str;
     @fallible abs(): int;
     sign(): int;
     @fallible negate(): int;
     bitwiseNot(): int;
     min(other: int): int;
     max(other: int): int;
-    clamp(lo: int, hi: int): int;
+    @fallible clamp(lo: int, hi: int): int;
     toHex(): str;
     toBinary(): str;
     toOctal(): str;

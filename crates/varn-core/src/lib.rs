@@ -54,9 +54,10 @@ pub use accessor::AccessorKind;
 pub use intrinsics::MemberKey;
 pub use module_id::{ImportSpecifier, ModuleId, ModuleKind};
 pub use numeric::{
-    add_int, binary_operand_kind, ceil_div_int, checked_int, div_int, float_to_string,
-    floor_div_int, fmax, fmin, fsign, mod_int, mul_int, neg_int, pow_int, rem_int, shl_int,
-    shr_int, sub_int, ushr_int, IntDivFault, NumericOperand, INT_MAX, INT_MIN, SHIFT_MAX,
+    add_int, binary_operand_kind, ceil_div_int, checked_int, div_int, fixed_digits, float_to_fixed,
+    float_to_string, floor_div_int, fmax, fmin, fsign, mod_int, mul_int, neg_int, pow_int, rem_int,
+    shl_int, shr_int, sub_int, ushr_int, IntDivFault, NumericOperand, FIXED_MAX_DIGITS, INT_MAX,
+    INT_MIN, SHIFT_MAX,
 };
 pub use numeric_conv::{float_to_int, NumericDomain, ValueConv};
 pub use runtime_kind::{FieldAccess, RuntimeKind};
