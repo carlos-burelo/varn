@@ -85,3 +85,20 @@ pub(in crate::clif) struct Lowered {
 
     pub frameless: bool,
 }
+
+impl Ctx<'_> {
+    pub(super) fn exits(
+        &self,
+        b: &mut cranelift_frontend::FunctionBuilder,
+    ) -> (
+        Option<cranelift_codegen::ir::Block>,
+        Option<cranelift_codegen::ir::Block>,
+    ) {
+        let mut st = self.pure_try.borrow_mut();
+        let landing = st.stack.last().and_then(|h| st.clif_map.get(h).copied());
+        if landing.is_none() && st.err_ret.is_none() {
+            st.err_ret = Some(b.create_block());
+        }
+        (landing, st.err_ret)
+    }
+}

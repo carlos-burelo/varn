@@ -35,11 +35,7 @@ pub(super) fn emit_bin(
     let ectx = ctx.exec_ctx;
     let result_off = h.jit_native_result_offset as i32;
     let err_off = h.jit_error_flag_offset as i32;
-    let (landing, err_ret) = {
-        let st = ctx.pure_try.borrow();
-        let landing = st.stack.last().and_then(|hh| st.clif_map.get(hh).copied());
-        (landing, st.err_ret)
-    };
+    let (landing, err_ret) = ctx.exits(b);
     let arith = |b: &mut FunctionBuilder, helper| {
         Out::Boxed(boxed_binop(
             b, ctx.cc, helper, ectx, result_off, err_off, landing, err_ret, a, c,
@@ -86,11 +82,7 @@ pub(super) fn emit_un(
     let ectx = ctx.exec_ctx;
     let result_off = h.jit_native_result_offset as i32;
     let err_off = h.jit_error_flag_offset as i32;
-    let (landing, err_ret) = {
-        let st = ctx.pure_try.borrow();
-        let landing = st.stack.last().and_then(|hh| st.clif_map.get(hh).copied());
-        (landing, st.err_ret)
-    };
+    let (landing, err_ret) = ctx.exits(b);
     Ok(match op {
         DynUnOp::Neg => {
             super::exceptions::call_checked(b, ctx, h.negate, &[ectx, tag, payload])?;

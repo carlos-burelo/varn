@@ -61,11 +61,7 @@ fn guard_limit(b: &mut FunctionBuilder, ctx: &Ctx<'_>, exhausted: Value, helper:
     let err_off = helpers.jit_error_flag_offset as i32;
     b.ins().store(m, zero, ctx.exec_ctx, err_off);
     call_helper_void(b, ctx.cc, helper, &[ctx.exec_ctx, zero, zero, zero, zero]);
-    let (landing, err_ret) = {
-        let st = ctx.pure_try.borrow();
-        let landing = st.stack.last().and_then(|h| st.clif_map.get(h).copied());
-        (landing, st.err_ret)
-    };
+    let (landing, err_ret) = ctx.exits(b);
     match (landing, err_ret) {
         (Some(handler), _) => {
             let thrown = b.ins().load(

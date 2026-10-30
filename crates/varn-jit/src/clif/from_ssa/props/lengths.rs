@@ -51,11 +51,7 @@ pub(crate) fn emit_str_length(
 ) -> Result<Value, String> {
     let (tag, payload) = boxed_parts(b, ctx, values, operand)?;
     let ectx = exec_ctx(ctx);
-    let (landing, err_ret) = {
-        let st = ctx.pure_try.borrow();
-        let landing = st.stack.last().and_then(|h| st.clif_map.get(h).copied());
-        (landing, st.err_ret)
-    };
+    let (landing, err_ret) = ctx.exits(b);
     Ok(super::super::super::strings::str_length_boxed(
         b,
         ctx.cc,

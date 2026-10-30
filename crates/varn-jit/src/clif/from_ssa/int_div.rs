@@ -28,11 +28,7 @@ pub(super) fn emit(
     };
     let err_off = ctx.helpers.jit_error_flag_offset as i32;
     let res_off = ctx.helpers.jit_native_result_offset as i32;
-    let (landing, err_ret) = {
-        let st = ctx.pure_try.borrow();
-        let landing = st.stack.last().and_then(|h| st.clif_map.get(h).copied());
-        (landing, st.err_ret)
-    };
+    let (landing, err_ret) = ctx.exits(b);
     guard_overflow(
         b,
         ctx.cc,

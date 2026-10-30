@@ -8,12 +8,8 @@ use super::super::heap::{boxed_value, exec_ctx};
 use super::super::store::{load_value, Out};
 use super::super::Ctx;
 
-fn field_io<'a>(ctx: &'a Ctx<'_>) -> Result<FieldIo<'a>, String> {
-    let (landing, err_ret) = {
-        let st = ctx.pure_try.borrow();
-        let landing = st.stack.last().and_then(|h| st.clif_map.get(h).copied());
-        (landing, st.err_ret)
-    };
+fn field_io<'a>(b: &mut FunctionBuilder, ctx: &'a Ctx<'_>) -> Result<FieldIo<'a>, String> {
+    let (landing, err_ret) = ctx.exits(b);
     Ok(FieldIo {
         helpers: ctx.helpers,
         cc: ctx.cc,
@@ -58,9 +54,10 @@ pub(crate) fn emit_get_fixed_field(
         }
     }
     if let varn_core::FieldAccess::Compact(kind) = access {
+        let io = field_io(b, ctx)?;
         return Ok(Out::Boxed(load_compact(
             b,
-            &field_io(ctx)?,
+            &io,
             ivar,
             obj,
             offset,
@@ -110,7 +107,8 @@ fn emit_get_fixed_field_native(
     let slow = b.create_block();
     let cont = b.create_block();
     b.append_block_param(cont, merge_ty);
-    let data_base = cached_base(b, ivar, &field_io(ctx)?, obj, slow);
+    let io = field_io(b, ctx)?;
+    let data_base = cached_base(b, ivar, &io, obj, slow);
     let off = offset as i32;
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let v = match TypeLayout::of_field(tag).repr {
@@ -172,29 +170,12 @@ pub(crate) fn emit_set_fixed_field(
     );
     if native {
         let raw = load_value(b, ctx, values, value)?;
-        store_compact_native(
-            b,
-            &field_io(ctx)?,
-            ivar,
-            obj,
-            raw,
-            vk,
-            offset,
-            kind,
-            slot as usize,
-        );
+        let io = field_io(b, ctx)?;
+        store_compact_native(b, &io, ivar, obj, raw, vk, offset, kind, slot as usize);
         return Ok(());
     }
     let val = boxed_value(b, ctx, values, value)?;
-    store_compact(
-        b,
-        &field_io(ctx)?,
-        ivar,
-        obj,
-        val,
-        offset,
-        kind,
-        slot as usize,
-    );
+    let io = field_io(b, ctx)?;
+    store_compact(b, &io, ivar, obj, val, offset, kind, slot as usize);
     Ok(())
 }

@@ -323,9 +323,7 @@ pub(in crate::clif) fn try_lower(
         }
     }
 
-    if ctx.frame.is_some() {
-        exceptions::emit_pure_err_ret(&mut b, &ctx)?;
-    }
+    exceptions::emit_pure_err_ret(&mut b, &ctx)?;
 
     b.seal_all_blocks();
     b.finalize(isa.frontend_config());
