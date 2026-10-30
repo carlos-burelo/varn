@@ -12,6 +12,7 @@ export interface RequestInit {
     identity?: str;
     followRedirects?: bool;
     maxRedirects?: int;
+    timeoutMs?: int;
 }
 
 const MAX_LINE = 8192;

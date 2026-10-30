@@ -1,6 +1,7 @@
 import { tcpConnect$, tcpConnectTls$, tcpWrite$, tcpClose$, httpMethodName$, HttpMethod } from "runtime:net";
 import { Url } from "std:net";
-import { ProtocolError } from "std:error";
+import { ProtocolError, TimeoutError } from "std:error";
+import { Task } from "std:task";
 import { Response, RawResponse, RequestInit, readHttpResponse } from "std:http/core";
 import { isRedirect, sameOrigin, resolveLocation, redirectedMethod, redirectedHeaders } from "std:http/redirect";
 
@@ -76,7 +77,11 @@ async function doFetch(connId: int, parsedUrl: Url, method: HttpMethod, headers:
     return response;
 }
 
-async function fetchOnce(url: str, method: HttpMethod, headers: { [key: str]: str }, body: str, ca: str?, identity: str?): Task<Response> {
+class FetchState {
+    connId: int = -1;
+}
+
+async function fetchOnce(url: str, method: HttpMethod, headers: { [key: str]: str }, body: str, ca: str?, identity: str?, state: FetchState): Task<Response> {
     const parsedUrl = Url.parse(url);
     const host = parsedUrl.host;
 
@@ -92,11 +97,12 @@ async function fetchOnce(url: str, method: HttpMethod, headers: { [key: str]: st
     }
 
     const connId = secure ? await tcpConnectTls$(host, port, ca, identity) : await tcpConnect$(host, port);
+    state.connId = connId;
 
     return await doFetch(connId, parsedUrl, method, headers, body);
 }
 
-export async function fetch(url: str, init: RequestInit = {}): Task<Response> {
+async function fetchFollowing(url: str, init: RequestInit, state: FetchState): Task<Response> {
     const follow = init.followRedirects ?? true;
     const limit = init.maxRedirects ?? 20;
     let current = url;
@@ -105,7 +111,7 @@ export async function fetch(url: str, init: RequestInit = {}): Task<Response> {
     let headers = init.headers ?? {};
     let hops = 0;
     while (true) {
-        const response = await fetchOnce(current, method, headers, body, init.ca, init.identity);
+        const response = await fetchOnce(current, method, headers, body, init.ca, init.identity, state);
         response.url = current;
         const location = response.headers.get("location");
         if (!follow || location === null || !isRedirect(response.status)) {
@@ -125,6 +131,22 @@ export async function fetch(url: str, init: RequestInit = {}): Task<Response> {
         }
         method = nextMethod;
         current = next;
+    }
+}
+
+export async function fetch(url: str, init: RequestInit = {}): Task<Response> {
+    const state = new FetchState();
+    const limit = init.timeoutMs;
+    if (limit === null) {
+        return await fetchFollowing(url, init, state);
+    }
+    try {
+        return await Task.timeout(fetchFollowing(url, init, state), limit);
+    } catch (e: TimeoutError) {
+        if (state.connId >= 0) {
+            tcpClose$(state.connId);
+        }
+        throw e;
     }
 }
 
