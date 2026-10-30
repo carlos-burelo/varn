@@ -80,45 +80,36 @@ impl IoDriver {
     }
 
     pub fn connect(&self, host: &str, port: i64) -> HostPromise {
-        let addr: SocketAddr = match format!("{host}:{port}").parse() {
-            Ok(a) => a,
-            Err(_) => {
-                if let Ok(mut addrs) = format!("{host}:{port}").to_socket_addrs() {
-                    match addrs.next() {
-                        Some(a) => a,
-                        None => {
-                            let t = HostPromise::pending();
-                            t.complete(Ok(SendValue::Int(-1)));
-                            return t;
-                        }
-                    }
-                } else {
-                    let t = HostPromise::pending();
-                    t.complete(Ok(SendValue::Int(-1)));
-                    return t;
-                }
-            }
-        };
-
-        let stream = match TcpStream::connect(addr) {
-            Ok(s) => s,
-            Err(_) => {
-                let t = HostPromise::pending();
-                t.complete(Ok(SendValue::Int(-1)));
-                return t;
-            }
-        };
-
-        let conn_id = next_socket_id();
         let task = HostPromise::pending();
+        let target = format!("{host}:{port}");
+        match target.parse::<SocketAddr>() {
+            Ok(addr) => self.connect_addr(addr, task.clone()),
+            Err(_) => {
+                let pending = task.clone();
+                crate::runtime::blocking::detach(move || {
+                    match target.to_socket_addrs().ok().and_then(|mut addrs| addrs.next()) {
+                        Some(addr) => driver().connect_addr(addr, pending),
+                        None => pending.complete(Ok(SendValue::Int(-1))),
+                    }
+                });
+            }
+        }
+        task
+    }
 
+    fn connect_addr(&self, addr: SocketAddr, task: HostPromise) {
+        let Ok(stream) = TcpStream::connect(addr) else {
+            task.complete(Ok(SendValue::Int(-1)));
+            return;
+        };
+        let conn_id = next_socket_id();
         let mut reg = self.registry.lock().unwrap_or_else(|e| e.into_inner());
         reg.streams.insert(
             conn_id,
             StreamState {
                 stream,
                 is_connecting: true,
-                pending_connect: Some(task.clone()),
+                pending_connect: Some(task),
                 pending_read: None,
                 pending_write: None,
             },
@@ -126,7 +117,6 @@ impl IoDriver {
         drop(reg);
         let _ = self.cmd_tx.send(DriverCommand::RegisterStream(conn_id));
         let _ = self.waker.wake();
-        task
     }
 
     pub fn read(&self, conn_id: i64, len: usize) -> HostPromise {

@@ -61,6 +61,13 @@ fn worker() {
     }
 }
 
+pub fn detach(work: impl FnOnce() + Send + 'static) {
+    crate::modules::net::driver::driver();
+    submit(Box::new(move || {
+        let _ = catch_unwind(AssertUnwindSafe(work));
+    }));
+}
+
 fn submit(job: Job) {
     let pool = pool();
     let spawn = {
@@ -90,13 +97,12 @@ pub fn failure(message: impl Into<String>) -> SendValue {
 }
 
 pub fn run(work: impl FnOnce() -> Completion + Send + 'static) -> HostPromise {
-    crate::modules::net::driver::driver();
     let promise = HostPromise::pending();
     let done = promise.clone();
-    submit(Box::new(move || {
-        let outcome = catch_unwind(AssertUnwindSafe(work))
-            .unwrap_or_else(|_| Err(failure("blocking operation panicked")));
-        done.complete(outcome);
-    }));
+    let rejected = promise.clone();
+    detach(move || match catch_unwind(AssertUnwindSafe(work)) {
+        Ok(outcome) => done.complete(outcome),
+        Err(_) => rejected.complete(Err(failure("blocking operation panicked"))),
+    });
     promise
 }
