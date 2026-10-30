@@ -1,14 +1,19 @@
-import { describe, it, expect } from "std:test";
-import { spawnIsolate } from "std:task";
+import { describe, it, expect, AssertionError } from "std:test";
+import { spawnIsolate, Task } from "std:task";
 import { Json } from "std:encoding";
 import { fromISO } from "std:time";
-import { readText } from "std:fs";
+import { readText, readTextAsync } from "std:fs";
 import {
     StdError, IoError, FsError, FsNotFoundError, FsPermissionError, FsExistsError, FsEncodingError,
     BadDescriptorError, ClosedError, NetError, ResolveError, ConnectError, TlsError, ProtocolError,
     CapabilityError, TimeoutError, CancelledError, ParseError, DecodeError
 } from "std:error";
 import { readsMissingFile } from "./helpers/error-workers.vn";
+
+class Point {
+    x: int = 1;
+    y: str = "a";
+}
 
 class Expected {
     error: StdError;
@@ -140,5 +145,35 @@ await describe("296 error model", async () => {
         expect(wrapped.cause !== null).toBe(true);
         expect((wrapped.cause as ParseError).position).toBe(3);
         expect(wrapped.path).toBe("$.user.age");
+    });
+    await it("Task.race rethrows the winner's error with its class", async () => {
+        const failing = async () => {
+            await readTextAsync("/definitely/not/here");
+            return 1;
+        };
+        let path = "";
+        try {
+            await Task.race([failing()]);
+        } catch (e: FsNotFoundError) {
+            path = e.path;
+        }
+        expect(path).toBe("/definitely/not/here");
+    });
+    await it("AssertionError is a named Error", async () => {
+        const failure = new AssertionError("expected 1 but received 2");
+        expect(failure.name).toBe("AssertionError");
+        expect(failure instanceof Error).toBe(true);
+        expect(failure.message).toBe("expected 1 but received 2");
+    });
+    await it("an error serializes to JSON with its code and fields", async () => {
+        const text = Json.stringify(new FsNotFoundError("/x/y"));
+        const parsed = Json.parse(text);
+        expect(parsed["code"]).toBe("fs.not_found");
+        expect(parsed["name"]).toBe("FsNotFoundError");
+        expect(parsed["path"]).toBe("/x/y");
+    });
+
+    await it("a class instance serializes by its declared fields", async () => {
+        expect(Json.stringify(new Point())).toBe('{"x":1,"y":"a"}');
     });
 });

@@ -1,5 +1,12 @@
 import { deepEq$ } from "runtime:testing";
 
+export class AssertionError extends Error {
+    constructor(message: str) {
+        super(message);
+        this.name = "AssertionError";
+    }
+}
+
 let passedCount = 0;
 let failedCount = 0;
 
@@ -58,7 +65,7 @@ export class Expectation<T> {
     toBe(expected: T): void {
         if (!isEq(this.actual, expected)) {
             failedCount = failedCount + 1;
-            throw new Error(`Expected ${expected} but received ${this.actual}`);
+            throw new AssertionError(`Expected ${expected} but received ${this.actual}`);
         }
         passedCount = passedCount + 1;
     }
@@ -66,7 +73,7 @@ export class Expectation<T> {
     toEqual(expected: T): void {
         if (!deepEq(this.actual, expected)) {
             failedCount = failedCount + 1;
-            throw new Error(`Expected equal ${expected} but received ${this.actual}`);
+            throw new AssertionError(`Expected equal ${expected} but received ${this.actual}`);
         }
         passedCount = passedCount + 1;
     }
@@ -74,7 +81,7 @@ export class Expectation<T> {
     toBeTruthy(): void {
         if (!this.actual) {
             failedCount = failedCount + 1;
-            throw new Error(`Expected truthy value but received ${this.actual}`);
+            throw new AssertionError(`Expected truthy value but received ${this.actual}`);
         }
         passedCount = passedCount + 1;
     }
@@ -82,7 +89,7 @@ export class Expectation<T> {
     toBeFalsy(): void {
         if (this.actual) {
             failedCount = failedCount + 1;
-            throw new Error(`Expected falsy value but received ${this.actual}`);
+            throw new AssertionError(`Expected falsy value but received ${this.actual}`);
         }
         passedCount = passedCount + 1;
     }
@@ -90,7 +97,7 @@ export class Expectation<T> {
     toBeNull(): void {
         if (this.actual !== null) {
             failedCount = failedCount + 1;
-            throw new Error(`Expected null but received ${this.actual}`);
+            throw new AssertionError(`Expected null but received ${this.actual}`);
         }
         passedCount = passedCount + 1;
     }
@@ -98,7 +105,7 @@ export class Expectation<T> {
     toBeNotNull(): void {
         if (this.actual === null) {
             failedCount = failedCount + 1;
-            throw new Error("Expected non-null value");
+            throw new AssertionError("Expected non-null value");
         }
         passedCount = passedCount + 1;
     }
@@ -109,7 +116,7 @@ export class Expectation<T> {
         if (diff < 0.0) diff = -diff;
         if (diff > epsilon) {
             failedCount = failedCount + 1;
-            throw new Error(`Expected ${a} to be close to ${expected} within ${epsilon}`);
+            throw new AssertionError(`Expected ${a} to be close to ${expected} within ${epsilon}`);
         }
         passedCount = passedCount + 1;
     }
@@ -129,7 +136,7 @@ export class Expectation<T> {
         }
         if (!found) {
             failedCount = failedCount + 1;
-            throw new Error("Expected container to contain item");
+            throw new AssertionError("Expected container to contain item");
         }
         passedCount = passedCount + 1;
     }
@@ -145,12 +152,12 @@ export class Expectation<T> {
         }
         if (!threw) {
             failedCount = failedCount + 1;
-            throw new Error("Expected function to throw");
+            throw new AssertionError("Expected function to throw");
         }
         if (expectedErr.length > 0) {
             if (!errMessage.includes(expectedErr)) {
                 failedCount = failedCount + 1;
-                throw new Error("Expected error containing '" + expectedErr + "', got '" + errMessage + "'");
+                throw new AssertionError("Expected error containing '" + expectedErr + "', got '" + errMessage + "'");
             }
         }
         passedCount = passedCount + 1;
@@ -164,7 +171,7 @@ export function expect<T>(val: T): Expectation<T> {
 export function assertEqual<T>(actual: T, expected: T, label: str = "assertEqual"): void {
     if (!isEq(actual, expected)) {
         failedCount = failedCount + 1;
-        throw new Error("ASSERT FAIL: " + label + " (expected " + expected + " but got " + actual + ")");
+        throw new AssertionError("ASSERT FAIL: " + label + " (expected " + expected + " but got " + actual + ")");
     }
     passedCount = passedCount + 1;
 }
@@ -172,7 +179,7 @@ export function assertEqual<T>(actual: T, expected: T, label: str = "assertEqual
 export function assertTrue(cond: bool, label: str = "assertTrue"): void {
     if (!cond) {
         failedCount = failedCount + 1;
-        throw new Error("ASSERT FAIL: " + label);
+        throw new AssertionError("ASSERT FAIL: " + label);
     }
     passedCount = passedCount + 1;
 }
@@ -180,7 +187,7 @@ export function assertTrue(cond: bool, label: str = "assertTrue"): void {
 export function assertFalse(cond: bool, label: str = "assertFalse"): void {
     if (cond) {
         failedCount = failedCount + 1;
-        throw new Error("ASSERT FAIL: " + label + " (expected false but got true)");
+        throw new AssertionError("ASSERT FAIL: " + label + " (expected false but got true)");
     }
     passedCount = passedCount + 1;
 }
@@ -188,7 +195,7 @@ export function assertFalse(cond: bool, label: str = "assertFalse"): void {
 export function assertNull<T>(val: T?, msg: str = "assertNull"): void {
     if (val !== null) {
         failedCount = failedCount + 1;
-        throw new Error("ASSERT FAIL: " + msg + " (expected null, got " + val + ")");
+        throw new AssertionError("ASSERT FAIL: " + msg + " (expected null, got " + val + ")");
     }
     passedCount = passedCount + 1;
 }
@@ -196,7 +203,7 @@ export function assertNull<T>(val: T?, msg: str = "assertNull"): void {
 export function assertNotNull<T>(val: T?, msg: str = "assertNotNull"): void {
     if (val === null) {
         failedCount = failedCount + 1;
-        throw new Error("ASSERT FAIL: " + msg + " (expected non-null value)");
+        throw new AssertionError("ASSERT FAIL: " + msg + " (expected non-null value)");
     }
     passedCount = passedCount + 1;
 }
@@ -204,7 +211,7 @@ export function assertNotNull<T>(val: T?, msg: str = "assertNotNull"): void {
 export function assertNotEqual<T>(a: T, b: T, msg: str = "assertNotEqual"): void {
     if (isEq(a, b)) {
         failedCount = failedCount + 1;
-        throw new Error("ASSERT FAIL: " + msg + " (expected values to differ, got " + a + ")");
+        throw new AssertionError("ASSERT FAIL: " + msg + " (expected values to differ, got " + a + ")");
     }
     passedCount = passedCount + 1;
 }
@@ -219,7 +226,7 @@ export function assertContainsItem<T>(container: T[], item: T, msg: str = "asser
     }
     if (!found) {
         failedCount = failedCount + 1;
-        throw new Error("ASSERT FAIL: " + msg + " (array does not contain item)");
+        throw new AssertionError("ASSERT FAIL: " + msg + " (array does not contain item)");
     }
     passedCount = passedCount + 1;
 }
@@ -229,7 +236,7 @@ export function assertCloseTo(a: float, b: float, epsilon: float = 0.00001, msg:
     if (diff < 0.0) diff = -diff;
     if (diff > epsilon) {
         failedCount = failedCount + 1;
-        throw new Error(`ASSERT FAIL: ${msg} (${a} is not close to ${b} within ${epsilon})`);
+        throw new AssertionError(`ASSERT FAIL: ${msg} (${a} is not close to ${b} within ${epsilon})`);
     }
     passedCount = passedCount + 1;
 }
@@ -245,12 +252,12 @@ export function assertThrows(fn: () => void, expectedErr: str = "", msg: str = "
     }
     if (!threw) {
         failedCount = failedCount + 1;
-        throw new Error("ASSERT FAIL: " + msg + " (function did not throw)");
+        throw new AssertionError("ASSERT FAIL: " + msg + " (function did not throw)");
     }
     if (expectedErr.length > 0) {
         if (!errMessage.includes(expectedErr)) {
             failedCount = failedCount + 1;
-            throw new Error("ASSERT FAIL: " + msg + " (expected error containing '" + expectedErr + "', got '" + errMessage + "')");
+            throw new AssertionError("ASSERT FAIL: " + msg + " (expected error containing '" + expectedErr + "', got '" + errMessage + "')");
         }
     }
     passedCount = passedCount + 1;
@@ -258,7 +265,7 @@ export function assertThrows(fn: () => void, expectedErr: str = "", msg: str = "
 
 export function fail(msg: str = "fail"): void {
     failedCount = failedCount + 1;
-    throw new Error("ASSERT FAIL: " + msg);
+    throw new AssertionError("ASSERT FAIL: " + msg);
 }
 
 export function summary(): void {
