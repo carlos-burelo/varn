@@ -4,7 +4,7 @@ use std::sync::{Condvar, Mutex, OnceLock, PoisonError};
 use std::time::Duration;
 use varn_types::task::Completion;
 use varn_types::value::SendValue;
-use varn_types::HostPromise;
+use varn_types::{HostOpen, HostPromise, NativeCtx, VmValue};
 
 const MAX_WORKERS: usize = 256;
 const IDLE_EXIT: Duration = Duration::from_secs(10);
@@ -105,4 +105,11 @@ pub fn run(work: impl FnOnce() -> Completion + Send + 'static) -> HostPromise {
         Err(_) => rejected.complete(Err(failure("blocking operation panicked"))),
     });
     promise
+}
+
+pub fn task(
+    ctx: &mut dyn NativeCtx,
+    work: impl FnOnce() -> Result<SendValue, String> + Send + 'static,
+) -> VmValue {
+    ctx.task_from_host(run(move || work().map_err(failure)), HostOpen::Plain)
 }

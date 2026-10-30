@@ -1,0 +1,40 @@
+import { describe, it, expect } from "std:test";
+import {
+    tempDir, readTextAsync, writeTextAsync, appendTextAsync, readLinesAsync,
+    readBytesAsync, writeBytesAsync, copyAsync, readDirAsync, removeAllAsync, exists
+} from "std:fs";
+import { StdError } from "std:error";
+
+const dir = tempDir() + "/varn-284-async";
+
+async function codeOf(run: () => Task<str>): Task<str> {
+    try {
+        await run()
+        return ""
+    } catch (e) {
+        return (e as StdError).code
+    }
+}
+
+await describe("284 async fs", async () => {
+    await it("file contents round trip without blocking", async () => {
+        await writeTextAsync(dir + "-a.txt", "one\ntwo\n");
+        await appendTextAsync(dir + "-a.txt", "three\n");
+        expect(await readTextAsync(dir + "-a.txt")).toBe("one\ntwo\nthree\n");
+        expect((await readLinesAsync(dir + "-a.txt")).length).toBe(3);
+        await writeBytesAsync(dir + "-b.bin", Bytes.fromString("raw"));
+        expect((await readBytesAsync(dir + "-b.bin")).length).toBe(3);
+        await copyAsync(dir + "-a.txt", dir + "-c.txt");
+        expect(await readTextAsync(dir + "-c.txt")).toBe("one\ntwo\nthree\n");
+        const names = await readDirAsync(tempDir());
+        expect(names.indexOf("varn-284-async-c.txt") !== null).toBeTruthy();
+        await removeAllAsync(dir + "-a.txt");
+        await removeAllAsync(dir + "-b.bin");
+        await removeAllAsync(dir + "-c.txt");
+        expect(exists(dir + "-a.txt")).toBe(false);
+    });
+
+    await it("async failures carry the same codes as the sync API", async () => {
+        expect(await codeOf(() => readTextAsync(dir + "-missing"))).toBe("E_FS_NOT_FOUND");
+    });
+});

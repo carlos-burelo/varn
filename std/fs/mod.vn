@@ -21,3 +21,15 @@ export {
     tempDir,
     readLines
 } from "std:fs/ops";
+
+export {
+    readBytesAsync,
+    writeBytesAsync,
+    readTextAsync,
+    writeTextAsync,
+    appendTextAsync,
+    readDirAsync,
+    removeAllAsync,
+    copyAsync,
+    readLinesAsync
+} from "std:fs/async_ops";

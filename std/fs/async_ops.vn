@@ -1,0 +1,86 @@
+import {
+    appendFileTextAsync$,
+    copyFileAsync$,
+    readDirAsync$,
+    readFileBytesAsync$,
+    readFileTextAsync$,
+    readLinesAsync$,
+    removeAllAsync$,
+    writeFileBytesAsync$,
+    writeFileTextAsync$
+} from "runtime:fs";
+
+import { Task } from "std:task";
+import { toStdError, E_FS_IO } from "std:error";
+
+export async function readBytesAsync(path: str): Task<Bytes> {
+    try {
+        return await readFileBytesAsync$(path);
+    } catch (e) {
+        throw toStdError(e as Error, E_FS_IO);
+    }
+}
+
+export async function writeBytesAsync(path: str, data: Bytes): Task<void> {
+    try {
+        await writeFileBytesAsync$(path, data);
+    } catch (e) {
+        throw toStdError(e as Error, E_FS_IO);
+    }
+}
+
+export async function readTextAsync(path: str): Task<str> {
+    try {
+        return await readFileTextAsync$(path);
+    } catch (e) {
+        throw toStdError(e as Error, E_FS_IO);
+    }
+}
+
+export async function writeTextAsync(path: str, content: str): Task<void> {
+    try {
+        await writeFileTextAsync$(path, content);
+    } catch (e) {
+        throw toStdError(e as Error, E_FS_IO);
+    }
+}
+
+export async function appendTextAsync(path: str, content: str): Task<void> {
+    try {
+        await appendFileTextAsync$(path, content);
+    } catch (e) {
+        throw toStdError(e as Error, E_FS_IO);
+    }
+}
+
+export async function readDirAsync(path: str): Task<str[]> {
+    try {
+        return await readDirAsync$(path);
+    } catch (e) {
+        throw toStdError(e as Error, E_FS_IO);
+    }
+}
+
+export async function removeAllAsync(path: str): Task<void> {
+    try {
+        await removeAllAsync$(path);
+    } catch (e) {
+        throw toStdError(e as Error, E_FS_IO);
+    }
+}
+
+export async function copyAsync(from: str, to: str): Task<void> {
+    try {
+        await copyFileAsync$(from, to);
+    } catch (e) {
+        throw toStdError(e as Error, E_FS_IO);
+    }
+}
+
+export async function readLinesAsync(path: str): Task<str[]> {
+    try {
+        return await readLinesAsync$(path);
+    } catch (e) {
+        throw toStdError(e as Error, E_FS_IO);
+    }
+}
