@@ -23,9 +23,9 @@ varn_contract! {
             Ok(std::env::consts::OS.to_string())
         }
         fn cwd(_ctx: &mut dyn NativeCtx) -> Result<String, String> {
-            Ok(std::env::current_dir()
+            std::env::current_dir()
                 .map(|p| p.to_string_lossy().into_owned())
-                .unwrap_or_default())
+                .map_err(|e| format!("sys.cwd: cannot read the current directory: {e}"))
         }
         fn args(ctx: &mut dyn NativeCtx) -> Result<Vec<VmValue>, String> {
             Ok(std::env::args().map(|s| ctx.alloc_str_owned(s)).collect())
@@ -33,11 +33,17 @@ varn_contract! {
         fn exit(_ctx: &mut dyn NativeCtx, code: Option<i64>) -> Result<(), String> {
             std::process::exit(code.unwrap_or(0) as i32)
         }
-        fn env(ctx: &mut dyn NativeCtx, key: &str) -> Result<String, String> {
+        fn env(ctx: &mut dyn NativeCtx, key: &str) -> Result<Option<String>, String> {
             if !ctx.check_env(key) {
                 return Err(format!("SecurityError: Permission denied (sys.env) for variable '{key}'"));
             }
-            Ok(std::env::var(key).unwrap_or_default())
+            match std::env::var(key) {
+                Ok(value) => Ok(Some(value)),
+                Err(std::env::VarError::NotPresent) => Ok(None),
+                Err(std::env::VarError::NotUnicode(_)) => {
+                    Err(format!("sys.env: variable '{key}' is not valid Unicode"))
+                }
+            }
         }
         fn setEnv(ctx: &mut dyn NativeCtx, key: &str, val: &str) -> Result<(), String> {
             if !ctx.check_env(key) {
