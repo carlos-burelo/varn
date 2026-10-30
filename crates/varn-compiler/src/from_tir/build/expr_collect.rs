@@ -4,6 +4,8 @@ use std::sync::Arc;
 use varn_tir::{BackendTy, DynReason};
 use varn_tir::{Resolution, TirExpr};
 
+const ARRAY_CHUNK: usize = 64;
+
 impl<'m> Builder<'m> {
     pub(super) fn lower_array_lit(
         &mut self,
@@ -13,34 +15,60 @@ impl<'m> Builder<'m> {
         let any_spread = els
             .iter()
             .any(|el| matches!(el, varn_tir::TirArrayEl::Spread(_)));
-        if any_spread {
-            let mut vals: Vec<(Value, bool)> = Vec::with_capacity(els.len());
-            for el in els {
-                match el {
-                    varn_tir::TirArrayEl::Expr(x) => vals.push((self.lower_expr(x)?, false)),
-                    varn_tir::TirArrayEl::Spread(x) => vals.push((self.lower_expr(x)?, true)),
-                    varn_tir::TirArrayEl::Hole => {
-                        let n =
-                            self.emit(InstKind::ConstNull, BackendTy::Dynamic(DynReason::Boxed));
-                        vals.push((n, false));
-                    }
+        let mut chunks = els.chunks(ARRAY_CHUNK);
+        let first = chunks.next().unwrap_or(&[]);
+        let mut array = self.build_array_chunk(first, ty, any_spread)?;
+        for chunk in chunks {
+            if any_spread {
+                let mut parts = vec![(array, true)];
+                parts.extend(self.array_chunk_parts(chunk)?);
+                array = self.emit(InstKind::BuildArraySpread { elements: parts }, ty);
+            } else {
+                for el in chunk {
+                    let value = self.array_element(el)?;
+                    self.emit_effect(InstKind::ArrayPush { array, value });
                 }
             }
-            Ok(self.emit(InstKind::BuildArraySpread { elements: vals }, ty))
+        }
+        Ok(array)
+    }
+
+    fn array_element(&mut self, el: &varn_tir::TirArrayEl) -> Result<Value> {
+        match el {
+            varn_tir::TirArrayEl::Expr(x) | varn_tir::TirArrayEl::Spread(x) => self.lower_expr(x),
+            varn_tir::TirArrayEl::Hole => {
+                Ok(self.emit(InstKind::ConstNull, BackendTy::Dynamic(DynReason::Boxed)))
+            }
+        }
+    }
+
+    fn array_chunk_parts(&mut self, chunk: &[varn_tir::TirArrayEl]) -> Result<Vec<(Value, bool)>> {
+        chunk
+            .iter()
+            .map(|el| {
+                Ok((
+                    self.array_element(el)?,
+                    matches!(el, varn_tir::TirArrayEl::Spread(_)),
+                ))
+            })
+            .collect()
+    }
+
+    fn build_array_chunk(
+        &mut self,
+        chunk: &[varn_tir::TirArrayEl],
+        ty: BackendTy,
+        spread: bool,
+    ) -> Result<Value> {
+        if spread {
+            let parts = self.array_chunk_parts(chunk)?;
+            Ok(self.emit(InstKind::BuildArraySpread { elements: parts }, ty))
         } else {
-            let mut vals = Vec::with_capacity(els.len());
-            for el in els {
-                match el {
-                    varn_tir::TirArrayEl::Expr(x) => vals.push(self.lower_expr(x)?),
-                    varn_tir::TirArrayEl::Hole => {
-                        let n =
-                            self.emit(InstKind::ConstNull, BackendTy::Dynamic(DynReason::Boxed));
-                        vals.push(n);
-                    }
-                    varn_tir::TirArrayEl::Spread(_) => unreachable!(),
-                }
-            }
-            Ok(self.emit(InstKind::BuildArray { elements: vals }, ty))
+            let elements = chunk
+                .iter()
+                .map(|el| self.array_element(el))
+                .collect::<Result<Vec<_>>>()?;
+            Ok(self.emit(InstKind::BuildArray { elements }, ty))
         }
     }
 
