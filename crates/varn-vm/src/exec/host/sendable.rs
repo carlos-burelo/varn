@@ -66,9 +66,9 @@ pub(super) fn to_sendable(
                         })?;
                     return Ok(varn_types::value::SendValue::Endpoint(end, id));
                 }
-                let mut map = rustc_hash::FxHashMap::default();
+                let mut map = Vec::new();
                 for (k, nv) in borrow.iter() {
-                    map.insert(k.to_string(), ctx.to_sendable(nv)?);
+                    map.push((k.to_string(), ctx.to_sendable(nv)?));
                 }
                 Ok(varn_types::value::SendValue::Object(map))
             }
@@ -109,23 +109,24 @@ pub(super) fn to_sendable(
                 )))
             }
             Some(HeapObj::Range(r)) => {
-                let mut fields = rustc_hash::FxHashMap::default();
-                fields.insert(
-                    varn_core::MemberKey::Start.as_str().to_string(),
-                    varn_types::value::SendValue::Int(r.start),
-                );
-                fields.insert(
-                    varn_core::MemberKey::End.as_str().to_string(),
-                    varn_types::value::SendValue::Int(r.end),
-                );
-                fields.insert(
-                    varn_core::MemberKey::Inclusive.as_str().to_string(),
-                    varn_types::value::SendValue::Bool(r.inclusive),
-                );
-                fields.insert(
-                    "step".to_string(),
-                    varn_types::value::SendValue::Int(r.step),
-                );
+                let fields = vec![
+                    (
+                        varn_core::MemberKey::Start.as_str().to_string(),
+                        varn_types::value::SendValue::Int(r.start),
+                    ),
+                    (
+                        varn_core::MemberKey::End.as_str().to_string(),
+                        varn_types::value::SendValue::Int(r.end),
+                    ),
+                    (
+                        varn_core::MemberKey::Inclusive.as_str().to_string(),
+                        varn_types::value::SendValue::Bool(r.inclusive),
+                    ),
+                    (
+                        "step".to_string(),
+                        varn_types::value::SendValue::Int(r.step),
+                    ),
+                ];
                 Ok(varn_types::value::SendValue::Object(fields))
             }
             Some(

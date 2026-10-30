@@ -19,7 +19,7 @@ pub enum SendValue {
     Decimal(Decimal),
     Char(char),
     Array(Vec<SendValue>),
-    Object(rustc_hash::FxHashMap<String, SendValue>),
+    Object(Vec<(String, SendValue)>),
     Map(Vec<(SendValue, SendValue)>),
     Set(Vec<SendValue>),
     Endpoint(super::ChannelEndpoint, u64),
