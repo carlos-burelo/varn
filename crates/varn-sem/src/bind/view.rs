@@ -37,7 +37,10 @@ impl<'r> BindView<'r> {
 
     pub fn class_parent(&self, name: &str, origin: Option<&str>) -> Option<super::ClassParent> {
         match self.foreign(origin) {
-            Some(rb) => rb.get_class_parent(name).cloned(),
+            Some(rb) => rb
+                .get_class_parent(name)
+                .cloned()
+                .map(|parent| Self::owned_by(parent, origin)),
             None => self.bind.get_class_parent(name).cloned(),
         }
     }
@@ -45,11 +48,25 @@ impl<'r> BindView<'r> {
     pub fn heritage(&self, name: &str, origin: Option<&str>) -> Vec<super::ClassParent> {
         let owner = self.foreign(origin);
         let bind = owner.as_deref().unwrap_or(self.bind);
-        bind.get_class_parent(name)
+        let heritage = bind
+            .get_class_parent(name)
             .into_iter()
             .chain(bind.get_class_interfaces(name))
-            .cloned()
-            .collect()
+            .cloned();
+        if owner.is_some() {
+            heritage
+                .map(|parent| Self::owned_by(parent, origin))
+                .collect()
+        } else {
+            heritage.collect()
+        }
+    }
+
+    fn owned_by(mut parent: super::ClassParent, origin: Option<&str>) -> super::ClassParent {
+        if parent.origin.is_none() {
+            parent.origin = origin.map(Arc::from);
+        }
+        parent
     }
 
     pub fn type_param_names(&self, name: &str, origin: Option<&str>) -> Option<Vec<Arc<str>>> {

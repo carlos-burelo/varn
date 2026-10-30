@@ -1,0 +1,33 @@
+import { describe, it, expect } from "std:test";
+import { Root, Mid, Leaf, Deepest, RootError, LeafError } from "./helpers/deep-hierarchy.vn";
+
+function idOf(root: Root): int {
+    return root.id;
+}
+
+await describe("297 deep class hierarchy across modules", async () => {
+    await it("an imported subclass is assignable to every ancestor", async () => {
+        const a: Root = new Mid();
+        const b: Root = new Leaf();
+        const c: Root = new Deepest();
+        const d: Mid = new Deepest();
+        expect(idOf(a) + idOf(b) + idOf(c) + d.id).toBe(4);
+    });
+
+    await it("an imported error class is assignable to Error and to its ancestors", async () => {
+        const asRoot: RootError = new LeafError("deep");
+        const asError: Error = new LeafError("deep");
+        expect(asRoot.message).toBe("deep");
+        expect(asError.message).toBe("deep");
+    });
+
+    await it("a typed catch selects through several levels", async () => {
+        let seen = "";
+        try {
+            throw new LeafError("boom");
+        } catch (e: RootError) {
+            seen = e.message;
+        }
+        expect(seen).toBe("boom");
+    });
+});
