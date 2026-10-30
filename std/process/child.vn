@@ -1,5 +1,8 @@
 import {
     exec$,
+    execAsync$,
+    execResult$,
+    waitProcessAsync$,
     currentExe$,
     spawnProcess$,
     waitProcess$,
@@ -7,6 +10,8 @@ import {
     ProcessOutput,
     ProcessStatus
 } from "runtime:process";
+
+import { Task } from "std:task";
 
 export type ProcessResult = ProcessOutput;
 
@@ -21,6 +26,11 @@ export class ChildProcess {
         return waitProcess$(this.pid);
     }
 
+    async waitAsync(): Task<ProcessStatus> {
+        let exitCode = await waitProcessAsync$(this.pid);
+        return { exitCode: exitCode, success: exitCode == 0 };
+    }
+
     kill(): bool {
         return killProcess$(this.pid);
     }
@@ -33,6 +43,11 @@ export namespace Process {
 
     export function exec(command: str): ProcessResult {
         return exec$(command);
+    }
+
+    export async function execAsync(command: str): Task<ProcessResult> {
+        let id = await execAsync$(command);
+        return execResult$(id);
     }
 
     export function spawn(command: str, args: str[] = []): ChildProcess {

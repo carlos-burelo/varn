@@ -1,0 +1,32 @@
+import { describe, it, expect } from "std:test";
+import { sleep, spawn } from "std:task";
+import { platform } from "std:sys";
+import { Process } from "std:process";
+
+await describe("285 async process", async () => {
+    await it("execAsync and waitAsync report the exit status", async () => {
+        const windows = platform() == "windows";
+        const out = await Process.execAsync("echo hello");
+        expect(out.exitCode).toBe(0);
+        expect(out.stdout.indexOf("hello") !== null).toBeTruthy();
+        const child = windows ? Process.spawn("cmd", ["/C", "exit 3"]) : Process.spawn("sh", ["-c", "exit 3"]);
+        const status = await child.waitAsync();
+        expect(status.exitCode).toBe(3);
+        expect(status.success).toBe(false);
+    });
+
+    await it("a child can be killed while another task waits for it", async () => {
+        const windows = platform() == "windows";
+        const child = windows ? Process.spawn("powershell", ["-NoProfile", "-Command", "Start-Sleep 30"]) : Process.spawn("sleep", ["30"]);
+        const waiting = spawn(child.waitAsync());
+        await sleep(100);
+        expect(child.kill()).toBe(true);
+        let rejected = false;
+        try {
+            await waiting
+        } catch (e) {
+            rejected = true
+        }
+        expect(rejected).toBe(true);
+    });
+});

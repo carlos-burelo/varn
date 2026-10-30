@@ -274,6 +274,8 @@ import "./280-isolate-join-rejects-with-error.vn"
 import "./281-time-parsing-is-strict.vn"
 import "./282-ffi-typed-calls.vn"
 import "./283-filestream-is-asynchronous.vn"
+import "./284-async-fs.vn"
+import "./285-async-process.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {
