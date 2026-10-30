@@ -294,6 +294,8 @@ import "./300-sqlite-contract.vn"
 import "./301-rest-params-in-async-and-generator-methods.vn"
 import "./302-integer-arithmetic-in-hot-code.vn"
 import "./303-power-shift-and-float-extremes.vn"
+import "./304-large-array-literals.vn"
+import "./305-number-conversions-and-formatting.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

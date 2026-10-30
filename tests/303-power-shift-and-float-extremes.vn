@@ -74,4 +74,35 @@ await describe("303 power, shifts and float extremes", async () => {
         expect(floatKind(sign(FL[2]))).toBe("-0.0");
         expect(floatKind(Math.sign(-FL[3]))).toBe("-1.0");
     });
+    await it("a bigint power takes the whole exponent and refuses what cannot fit", async () => {
+        const one: bigint = 1n;
+        const two: bigint = 2n;
+        const huge: bigint = 4000000000n;
+        expect(((-one) ** huge).toString()).toBe("1");
+        expect(((-one) ** (huge + one)).toString()).toBe("-1");
+        expect((one ** huge).toString()).toBe("1");
+        let negative = "";
+        try { (two ** (-one)).toString(); } catch (e: RangeError) { negative = "range"; }
+        expect(negative).toBe("range");
+        let tooBig = "";
+        try { (two ** huge).toString(); } catch (e: RangeError) { tooBig = "range"; }
+        expect(tooBig).toBe("range");
+    });
+    await it("a decimal power is exact for integral exponents and refuses the rest", async () => {
+        const two: decimal = 2d;
+        const ten: decimal = 10d;
+        const half: decimal = 0.5d;
+        const zero: decimal = 0d;
+        expect((two ** 3d).toString()).toBe("8");
+        expect((ten ** 30d).toString()).toBe("1000000000000000000000000000000");
+        expect((two ** (-1d)).toString()).toBe("0.5");
+        expect((half ** 2d).toString()).toBe("0.25");
+        expect((zero ** zero).toString()).toBe("1");
+        let fractional = "";
+        try { (two ** half).toString(); } catch (e: RangeError) { fractional = "range"; }
+        expect(fractional).toBe("range");
+        let division = "";
+        try { (zero ** (-1d)).toString(); } catch (e: DivisionByZero) { division = "zero"; }
+        expect(division).toBe("zero");
+    });
 });
