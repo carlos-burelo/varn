@@ -109,6 +109,12 @@ Para simplificar la validación y asegurar cero roturas antes de hacer commit/pu
   ```
   Reproduce lo que solo falla en Linux (código bajo `cfg`, imports sin usar, lints). Requiere Docker Desktop en ejecución.
 
+- **Cross-check sin Docker**:
+  ```powershell
+  .\scriptserify-ci-local.ps1   # cfg(unix/macos) vía `cargo check --target` + finales de línea CRLF/LF
+  ```
+  Red rápida (<5 min) para código de otras plataformas; no corre la suite. Requiere `rustup target add x86_64-unknown-linux-gnu aarch64-apple-darwin`.
+
 > [!IMPORTANT]
 > **Antes de `git push`**: el resumen final de `verify.ps1 -Fast` debe decir `[TODO CORRECTO]` (se lee ese resumen, no solo los totales de tests: clippy, el corpus de errores y la gobernanza de tamaño fallan sin tocar `PASSED/FAILED`). Si el cambio toca código dependiente de la plataforma, se corre además `ci-linux.ps1`. Tras el push se vigila el CI (`gh run list`, `gh run watch`) hasta verde; un CI rojo se arregla antes que cualquier trabajo nuevo.
 
