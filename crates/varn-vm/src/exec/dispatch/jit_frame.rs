@@ -118,12 +118,12 @@ pub(super) unsafe fn run_compiled_frame(
         Ok(val) => {
             if unsafe { (*ctx).jit_error_flag } != 0 {
                 unsafe { (*ctx).jit_error_flag = 0 };
-                let err_obj = unsafe { (*ctx).jit_panic_exception_err_obj.take() };
-                let error_val = unsafe {
-                    (*ctx)
-                        .jit_panic_exception_error
-                        .take()
-                        .unwrap_or((*ctx).jit_native_result)
+                let thrown = unsafe { (*ctx).jit_native_result };
+                let stored_obj = unsafe { (*ctx).jit_panic_exception_err_obj.take() };
+                let stored_val = unsafe { (*ctx).jit_panic_exception_error.take() };
+                let (error_val, err_obj) = match stored_val {
+                    Some(val) if val == thrown => (val, stored_obj),
+                    Some(_) | None => (thrown, None),
                 };
                 if unsafe { (*ctx).frames.len() } > depth {
                     let frame = unsafe { (*ctx).frames.pop() }.unwrap();

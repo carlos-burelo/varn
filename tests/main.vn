@@ -283,6 +283,7 @@ import "./289-tls.vn"
 import "./290-http-client-framing.vn"
 import "./291-listen-honours-its-address.vn"
 import "./292-http-server-framing.vn"
+import "./293-throw-in-catch-after-native-error.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {
