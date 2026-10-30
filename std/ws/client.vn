@@ -16,7 +16,7 @@ import {
 
 import { Url } from "std:net";
 import { AsyncReader, AsyncWriter } from "std:io";
-import { toStdError, stdError, E_WS_IO, E_WS_CLOSED, E_WS_CONNECT } from "std:error";
+import { ProtocolError, ClosedError } from "std:error";
 
 export enum WebSocketReadyState {
     Connecting = 0,
@@ -47,7 +47,7 @@ export async function readHttpHead(connId: int): Task<#{ head: str, rest: Bytes 
         }
         let chunk = await tcpRead$(connId, 4096);
         if (chunk === null) {
-            throw stdError(E_WS_CONNECT, "connection closed during handshake");
+            throw new ProtocolError("connection closed during handshake");
         }
         buf = bytesConcat(buf, chunk as Bytes);
     }
@@ -87,15 +87,10 @@ export class WebSocket implements AsyncReader, AsyncWriter {
         let parsed = Url.parse(url);
         const secure = parsed.protocol === "wss";
         if (!secure && parsed.protocol !== "" && parsed.protocol !== "ws") {
-            throw stdError(E_WS_CONNECT, "only ws:// and wss:// URLs are supported");
+            throw new TypeError("only ws:// and wss:// URLs are supported");
         }
         let port = parsed.port ?? (secure ? 443 : 80);
-        let conn = -1;
-        try {
-            conn = secure ? await tcpConnectTls$(parsed.host, port) : await tcpConnect$(parsed.host, port);
-        } catch (e) {
-            throw stdError(E_WS_CONNECT, "could not connect to " + parsed.host + ":" + port.toString() + " (" + e.message + ")");
-        }
+        const conn = secure ? await tcpConnectTls$(parsed.host, port) : await tcpConnect$(parsed.host, port);
         try {
             let key = wsKey$();
             let target = parsed.path;
@@ -115,7 +110,7 @@ export class WebSocket implements AsyncReader, AsyncWriter {
             return ws;
         } catch (e) {
             tcpClose$(conn);
-            throw toStdError(e as Error, E_WS_IO);
+            throw e;
         }
     }
 
@@ -183,7 +178,7 @@ export class WebSocket implements AsyncReader, AsyncWriter {
 
     async send(message: str | Bytes): Task<int> {
         if (!this.isOpen) {
-            throw stdError(E_WS_CLOSED, "WebSocket is closed");
+            throw new ClosedError("WebSocket is closed");
         }
         try {
             let data: Bytes;
@@ -198,9 +193,8 @@ export class WebSocket implements AsyncReader, AsyncWriter {
             await tcpWrite$(this._conn, wsFrameBytes$(data, opcode));
             return data.length;
         } catch (e) {
-            let err = toStdError(e as Error, E_WS_IO);
-            this._notifyError(err.message);
-            throw err;
+            this._notifyError(e.message);
+            throw e;
         }
     }
 
@@ -224,9 +218,8 @@ export class WebSocket implements AsyncReader, AsyncWriter {
                 try {
                     chunk = await tcpRead$(this._conn, 8192);
                 } catch (e) {
-                    let err = toStdError(e as Error, E_WS_IO);
-                    this._notifyError(err.message);
-                    throw err;
+                    this._notifyError(e.message);
+                    throw e;
                 }
                 if (chunk === null) {
                     this.close();
@@ -242,9 +235,8 @@ export class WebSocket implements AsyncReader, AsyncWriter {
                 try {
                     await this._pumpControl(opcode, payload);
                 } catch (e) {
-                    let err = toStdError(e as Error, E_WS_IO);
-                    this._notifyError(err.message);
-                    throw err;
+                    this._notifyError(e.message);
+                    throw e;
                 }
                 if (!this.isOpen) {
                     return null;

@@ -395,37 +395,80 @@ pub(crate) fn outcome_of_cell(cell: &TaskCell) -> Outcome {
     outcome_of(cell)
 }
 
-pub(crate) fn error_parts(heap: &HeapInner, thrown: VmValue) -> Option<(String, String)> {
+fn plain_field(heap: &HeapInner, value: VmValue) -> Option<varn_types::value::SendValue> {
+    use varn_types::value::SendValue;
+    if value.is_int() {
+        Some(SendValue::Int(value.as_int()))
+    } else if value.is_bool() {
+        Some(SendValue::Bool(value.as_bool()))
+    } else if heap.is_string(value) {
+        Some(SendValue::Str(heap.str_repr(value)))
+    } else {
+        None
+    }
+}
+
+pub(crate) fn error_value(
+    heap: &HeapInner,
+    thrown: VmValue,
+) -> Option<varn_types::value::SendValue> {
+    use varn_core::MemberKey;
+    use varn_types::value::SendValue;
     if !thrown.is_heap() {
         return None;
     }
+    let carried = [
+        MemberKey::Message.as_str(),
+        MemberKey::Name.as_str(),
+        MemberKey::Stack.as_str(),
+    ];
     if let Some(inst) = heap.instance(thrown.as_heap())
         && let Some(class) = ClassObj::find_by_id(inst.class_id)
     {
-        let message = class
-            .layout()
-            .fields
-            .iter()
-            .find(|f| f.name.as_ref() == "message")
-            .and_then(|f| inst.read_field(f))
-            .map(|m| heap.str_repr(m))
-            .unwrap_or_default();
-        return Some((class.name.to_string(), message));
+        let layout = class.layout();
+        let mut message = String::new();
+        let mut fields = Vec::new();
+        for field in layout.fields.iter() {
+            let Some(value) = inst.read_field(field) else {
+                continue;
+            };
+            if field.name.as_ref() == MemberKey::Message.as_str() {
+                message = heap.str_repr(value);
+            } else if !carried.contains(&field.name.as_ref())
+                && let Some(plain) = plain_field(heap, value)
+            {
+                fields.push((field.name.to_string(), plain));
+            }
+        }
+        return Some(SendValue::Error {
+            class: class.name.to_string(),
+            message,
+            fields,
+        });
     }
     let entries = crate::exec::value_views::object_entries(heap, thrown)?;
-    let field = |name: &str| {
-        entries
-            .iter()
-            .find(|(key, _)| key == name)
-            .map(|(_, value)| heap.str_repr(*value))
-    };
-    let message = field("message")?;
-    Some((field("name").unwrap_or_else(|| "Error".to_owned()), message))
+    let named = |name: &str| entries.iter().find(|(key, _)| key == name).map(|(_, v)| *v);
+    let message = heap.str_repr(named(MemberKey::Message.as_str())?);
+    let class = named(MemberKey::Name.as_str())
+        .map(|v| heap.str_repr(v))
+        .unwrap_or_else(|| varn_core::RuntimeErrorKind::Error.class_name().to_owned());
+    let fields = entries
+        .iter()
+        .filter(|(key, _)| !carried.contains(&key.as_str()))
+        .filter_map(|(key, value)| Some((key.to_string(), plain_field(heap, *value)?)))
+        .collect();
+    Some(SendValue::Error {
+        class,
+        message,
+        fields,
+    })
 }
 
 fn rejection_text(heap: &HeapInner, thrown: VmValue) -> String {
-    match error_parts(heap, thrown) {
-        Some((class, message)) => format!("{class}: {message}"),
-        None => heap.str_repr(thrown),
+    match error_value(heap, thrown) {
+        Some(varn_types::value::SendValue::Error { class, message, .. }) => {
+            format!("{class}: {message}")
+        }
+        Some(_) | None => heap.str_repr(thrown),
     }
 }

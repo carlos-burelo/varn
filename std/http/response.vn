@@ -1,3 +1,4 @@
+import { ProtocolError } from "std:error";
 import { WireReader, readChunkedBody } from "std:http/wire";
 import { Headers } from "std:http/headers";
 import { Json, JsonValue } from "std:encoding";
@@ -16,7 +17,7 @@ export class RawResponse {
 function addHeader(resp: RawResponse, line: str): void {
     const colon = line.indexOf(":");
     if (colon === null || colon <= 0) {
-        throw new Error(`malformed header line '${line}'`);
+        throw new ProtocolError(`malformed header line '${line}'`);
     }
     const key = line.slice(0, colon).trim().toLowerCase();
     const value = line.slice(colon + 1).trim();
@@ -38,7 +39,7 @@ export async function readHttpResponse(connId: int, headOnly: bool = false): Tas
     const status = statusLine as str;
     const afterVersion = status.indexOf(" ");
     if (afterVersion === null) {
-        throw new Error(`malformed status line '${status}'`);
+        throw new ProtocolError(`malformed status line '${status}'`);
     }
     const remainder = status.slice(afterVersion + 1);
     const afterCode = remainder.indexOf(" ");
@@ -48,7 +49,7 @@ export async function readHttpResponse(connId: int, headOnly: bool = false): Tas
     while (true) {
         const headerLine = await wire.line();
         if (headerLine === null) {
-            throw new Error("connection closed inside the response headers");
+            throw new ProtocolError("connection closed inside the response headers");
         }
         if ((headerLine as str).length === 0) {
             break;
@@ -61,18 +62,18 @@ export async function readHttpResponse(connId: int, headOnly: bool = false): Tas
     }
     const coding = resp.headers["transfer-encoding"];
     if (coding !== null && coding.toLowerCase().indexOf("chunked") !== null) {
-        resp.payload = await readChunkedBody(wire, MAX_BODY, "the response body is too large");
+        resp.payload = await readChunkedBody(wire, MAX_BODY);
         return resp;
     }
     const lengthText = resp.headers["content-length"];
     if (lengthText !== null) {
         const expected = int.parse(lengthText);
         if (expected < 0 || expected > MAX_BODY) {
-            throw new Error(`unacceptable Content-Length ${expected}`);
+            throw new ProtocolError(`unacceptable Content-Length ${expected}`);
         }
         const data = await wire.take(expected);
         if (data === null) {
-            throw new Error(`connection closed before the ${expected} byte body arrived`);
+            throw new ProtocolError(`connection closed before the ${expected} byte body arrived`);
         }
         resp.payload = data as Bytes;
         return resp;

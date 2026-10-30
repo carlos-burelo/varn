@@ -1,16 +1,14 @@
 use base64::Engine;
 use rand::RngCore;
 use sha1::Digest;
+use varn_core::StdErrorClass;
 use varn_macros::varn_contract;
+use varn_types::NativeError;
 use varn_types::{NativeCtx, VmValue};
 
 pub struct WsRuntime;
 
 const WS_GUID: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-
-fn coded(code: &str, msg: impl std::fmt::Display) -> String {
-    format!("{code}|{msg}")
-}
 
 fn accept_key(client_key: &str) -> String {
     let mut hasher = sha1::Sha1::new();
@@ -45,43 +43,43 @@ varn_contract! {
     module: "runtime:ws",
     contract: "src/modules/runtime/ws/ws_runtime.vn",
     impl WsRuntime {
-        fn wsKey(_ctx: &mut dyn NativeCtx) -> Result<String, String> {
+        fn wsKey(_ctx: &mut dyn NativeCtx) -> Result<String, NativeError> {
             let mut key = [0u8; 16];
             rand::thread_rng().fill_bytes(&mut key);
             Ok(base64::engine::general_purpose::STANDARD.encode(key))
         }
 
-        fn wsAcceptResponse(_ctx: &mut dyn NativeCtx, request: &str) -> Result<String, String> {
+        fn wsAcceptResponse(_ctx: &mut dyn NativeCtx, request: &str) -> Result<String, NativeError> {
             let client_key = header_value(request, "sec-websocket-key")
-                .ok_or_else(|| coded("E_WS_HANDSHAKE", "missing Sec-WebSocket-Key"))?;
+                .ok_or_else(|| NativeError::std(StdErrorClass::Protocol, "missing Sec-WebSocket-Key"))?;
             let accept = accept_key(&client_key);
             Ok(format!(
                 "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: {accept}\r\n\r\n"
             ))
         }
 
-        fn wsValidateResponse(_ctx: &mut dyn NativeCtx, head: &str, key: &str) -> Result<(), String> {
+        fn wsValidateResponse(_ctx: &mut dyn NativeCtx, head: &str, key: &str) -> Result<(), NativeError> {
             let status_line = head.split("\r\n").next().unwrap_or("");
             if !status_line.contains("101") {
-                return Err(coded("E_WS_CONNECT", format!("expected 101, got '{status_line}'")));
+                return Err(NativeError::std(StdErrorClass::Protocol, format!("expected 101, got '{status_line}'")));
             }
             let expected = accept_key(key);
             match header_value(head, "sec-websocket-accept") {
                 Some(got) if got == expected => Ok(()),
-                Some(_) | None => Err(coded("E_WS_CONNECT", "bad Sec-WebSocket-Accept")),
+                Some(_) | None => Err(NativeError::std(StdErrorClass::Protocol, "bad Sec-WebSocket-Accept")),
             }
         }
 
-        fn wsFrameBytes(ctx: &mut dyn NativeCtx, payload: VmValue, opcode: VmValue) -> Result<VmValue, String> {
+        fn wsFrameBytes(ctx: &mut dyn NativeCtx, payload: VmValue, opcode: VmValue) -> Result<VmValue, NativeError> {
             let opcode = match WsOpcode::from_value(ctx, opcode) {
                 Some(WsOpcode::Continuation) | None => {
-                    return Err(coded("E_WS_BAD_ARG", "expected a sendable WsOpcode"));
+                    return Err(NativeError::type_error("expected a sendable WsOpcode"));
                 }
                 Some(op @ (WsOpcode::Text | WsOpcode::Binary | WsOpcode::Close | WsOpcode::Ping | WsOpcode::Pong)) => op.tag(),
             };
             let data = ctx
                 .buffer_to_bytes(payload)
-                .ok_or_else(|| coded("E_WS_BAD_ARG", "expected Bytes"))?;
+                .ok_or_else(|| NativeError::type_error("expected Bytes"))?;
             let mut mask = [0u8; 4];
             rand::thread_rng().fill_bytes(&mut mask);
             let mut out = Vec::with_capacity(14 + data.len());
@@ -102,10 +100,10 @@ varn_contract! {
             Ok(ctx.alloc_buffer_from_bytes(&out))
         }
 
-        fn wsParseFrame(ctx: &mut dyn NativeCtx, data: VmValue) -> Result<Option<VmValue>, String> {
+        fn wsParseFrame(ctx: &mut dyn NativeCtx, data: VmValue) -> Result<Option<VmValue>, NativeError> {
             let bytes = ctx
                 .buffer_to_bytes(data)
-                .ok_or_else(|| coded("E_WS_BAD_ARG", "expected Bytes"))?;
+                .ok_or_else(|| NativeError::type_error("expected Bytes"))?;
             if bytes.len() < 2 {
                 return Ok(None);
             }
@@ -129,7 +127,7 @@ varn_contract! {
                     bytes[9],
                 ]);
                 if wide > (isize::MAX as u64) {
-                    return Err(coded("E_WS_PROTOCOL", "frame too large"));
+                    return Err(NativeError::std(StdErrorClass::Protocol, "frame too large"));
                 }
                 len = wide as usize;
                 pos = 10;
@@ -144,7 +142,7 @@ varn_contract! {
             }
             let is_control = opcode >= 8;
             if is_control && (!fin || len > 125) {
-                return Err(coded("E_WS_PROTOCOL", "bad control frame"));
+                return Err(NativeError::std(StdErrorClass::Protocol, "bad control frame"));
             }
             if bytes.len() < pos + len {
                 return Ok(None);
@@ -156,8 +154,8 @@ varn_contract! {
                 }
             }
             let opcode = WsOpcode::of_tag(opcode as i64)
-                .ok_or_else(|| coded("E_WS_PROTOCOL", format!("bad opcode {opcode}")))?
-                .to_value(ctx)?;
+                .ok_or_else(|| format!("bad opcode {opcode}")).map_err(|e| NativeError::std(StdErrorClass::Protocol, e))?
+                .to_value(ctx).map_err(|e| NativeError::std(StdErrorClass::Protocol, e))?;
             let payload = ctx.alloc_buffer_from_bytes(&payload);
             Ok(Some(
                 WsFrame {

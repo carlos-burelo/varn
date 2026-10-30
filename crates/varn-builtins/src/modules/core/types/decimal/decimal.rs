@@ -24,7 +24,7 @@ fn rounded(ctx: &mut dyn NativeCtx, this: VmValue, mode: RoundingMode) -> VmValu
 }
 
 fn not_decimal() -> NativeError {
-    NativeError::from("decimal: receiver is not a decimal")
+    NativeError::type_error("decimal: receiver is not a decimal")
 }
 
 fn pow_decimal(d: &BigDecimal, exp: i64) -> Result<BigDecimal, NativeError> {
@@ -54,7 +54,7 @@ varn_contract! {
             let d = s
                 .trim()
                 .parse::<BigDecimal>()
-                .map_err(|e| NativeError::from(format!("decimal.parse({s:?}): {e}")))?;
+                .map_err(|e| NativeError::std(varn_core::StdErrorClass::Parse, format!("decimal.parse({s:?}): {e}")))?;
             Ok(alloc_decimal(ctx, d))
         }
         fn tryParse(ctx: &mut dyn NativeCtx, s: &str) -> Option<VmValue> {

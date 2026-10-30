@@ -66,9 +66,9 @@ varn_contract! {
         }
         fn step(ctx: &mut dyn NativeCtx, this: VmValue, n: i64) -> Result<VmValue, NativeError> {
             if n <= 0 {
-                return Err(NativeError::from(format!("range step must be positive, got {n}")));
+                return Err(NativeError::range_error(format!("range step must be positive, got {n}")));
             }
-            let r = get_range(ctx, this).ok_or_else(|| NativeError::from("range.step: not a range"))?;
+            let r = get_range(ctx, this).ok_or_else(|| NativeError::type_error("range.step: not a range"))?;
             Ok(ctx.alloc_range_data(r.with_step(r.step * n)))
         }
         fn forEach(ctx: &mut dyn NativeCtx, this: VmValue, callback: VmValue) -> Result<(), NativeError> {

@@ -20,7 +20,7 @@ varn_contract! {
             get_bigint(ctx, this).map(|n| n.to_string()).unwrap_or_else(|| "0".to_string())
         }
         fn toInt(ctx: &mut dyn NativeCtx, this: VmValue) -> Result<i64, NativeError> {
-            let n = get_bigint(ctx, this).ok_or_else(|| NativeError::from("bigint.toInt: not a bigint"))?;
+            let n = get_bigint(ctx, this).ok_or_else(|| NativeError::type_error("bigint.toInt: not a bigint"))?;
             n.to_i64().ok_or_else(|| {
                 NativeError::integer_overflow(format!("integer overflow: {n} does not fit int"))
             })

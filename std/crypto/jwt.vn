@@ -9,7 +9,7 @@ function macName(algo: str): str {
     if (algo === "HS512") {
         return "sha512";
     }
-    throw new Error("Jwt: unsupported algorithm '" + algo + "'");
+    throw new RangeError("Jwt: unsupported algorithm '" + algo + "'");
 }
 
 export namespace Jwt {

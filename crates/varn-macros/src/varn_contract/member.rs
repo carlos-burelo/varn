@@ -145,10 +145,7 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
     let is_void = matches!(m.ret, Mapped::Void);
     let is_fn = m.kind == Kind::Function;
 
-    let trait_ret = if is_fn {
-        let inner = if is_void { quote!(()) } else { rty.clone() };
-        quote!(::core::result::Result<#inner, String>)
-    } else if m.fallible {
+    let trait_ret = if is_fn || m.fallible {
         let inner = if is_void { quote!(()) } else { rty.clone() };
         quote!(::core::result::Result<#inner, ::varn_types::NativeError>)
     } else if is_void {

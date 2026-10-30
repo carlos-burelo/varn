@@ -12,7 +12,7 @@ pub(super) fn natural_cmp(
     }
     match ctx.method(a, "compare") {
         Some(compare) => sign(ctx, compare, &[b]),
-        None => Err(NativeError::from(format!(
+        None => Err(NativeError::type_error(format!(
             "sort: {} and {} have no natural order; pass a comparator or implement Comparable",
             ctx.str_repr(a),
             ctx.str_repr(b)
@@ -27,7 +27,7 @@ pub(super) fn sign(
 ) -> Result<Ordering, NativeError> {
     let result = ctx.call_vm(compare, args)?;
     if !result.is_int() {
-        return Err(NativeError::from("sort: a comparator must return int"));
+        return Err(NativeError::type_error("sort: a comparator must return int"));
     }
     Ok(result.as_int().cmp(&0))
 }

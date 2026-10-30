@@ -1,0 +1,5 @@
+import { readText } from "std:fs";
+
+export async function readsMissingFile(path: str): Task<void> {
+    readText(path);
+}

@@ -285,6 +285,9 @@ import "./291-listen-honours-its-address.vn"
 import "./292-http-server-framing.vn"
 import "./293-throw-in-catch-after-native-error.vn"
 import "./295-http-server-sends-response-headers.vn"
+import "./296-error-model.vn"
+import "./297-deep-class-hierarchy-across-modules.vn"
+import "./298-std-errors-are-typed.vn"
 import "./294-fetch-follows-redirects.vn"
 
 await describe("main.vn import.meta.main", async () => {

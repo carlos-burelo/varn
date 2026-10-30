@@ -1,0 +1,4 @@
+// runtime:error — canonical codes and class registration for the std error taxonomy.
+
+export declare function errorCode$(className: str): str;
+export declare function registerErrorClasses$(classes: dynamic[]): void;

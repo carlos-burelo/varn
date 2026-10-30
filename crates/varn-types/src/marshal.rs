@@ -1,8 +1,9 @@
 use crate::native_ctx::NativeCtx;
+use crate::native_error::NativeError;
 use crate::vm_value::VmValue;
 
 pub trait FromVm: Sized {
-    fn from_vm(ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, String>;
+    fn from_vm(ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, NativeError>;
 }
 
 pub trait IntoVm {
@@ -11,49 +12,51 @@ pub trait IntoVm {
 
 impl FromVm for VmValue {
     #[inline]
-    fn from_vm(_ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, String> {
+    fn from_vm(_ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, NativeError> {
         Ok(v)
     }
 }
 
 impl FromVm for i64 {
     #[inline]
-    fn from_vm(_ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, String> {
+    fn from_vm(_ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, NativeError> {
         if v.is_int() {
             Ok(v.as_int())
         } else {
-            Err(format!("expected int, got {v:?}"))
+            Err(NativeError::type_error(format!("expected int, got {v:?}")))
         }
     }
 }
 
 impl FromVm for f64 {
     #[inline]
-    fn from_vm(_ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, String> {
+    fn from_vm(_ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, NativeError> {
         if v.is_f64() || v.is_int() {
             Ok(v.to_f64())
         } else {
-            Err(format!("expected float, got {v:?}"))
+            Err(NativeError::type_error(format!(
+                "expected float, got {v:?}"
+            )))
         }
     }
 }
 
 impl FromVm for bool {
     #[inline]
-    fn from_vm(_ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, String> {
+    fn from_vm(_ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, NativeError> {
         if v.is_bool() {
             Ok(v.as_bool())
         } else {
-            Err(format!("expected bool, got {v:?}"))
+            Err(NativeError::type_error(format!("expected bool, got {v:?}")))
         }
     }
 }
 
 impl FromVm for String {
     #[inline]
-    fn from_vm(ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, String> {
+    fn from_vm(ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, NativeError> {
         ctx.str_owned(v)
-            .ok_or_else(|| format!("expected str, got {v:?}"))
+            .ok_or_else(|| NativeError::type_error(format!("expected str, got {v:?}")))
     }
 }
 
@@ -115,7 +118,7 @@ impl std::fmt::Display for VnStr {
 
 impl FromVm for VnStr {
     #[inline]
-    fn from_vm(ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, String> {
+    fn from_vm(ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, NativeError> {
         if v.is_sso() {
             let mut buf = [0u8; crate::vm_value::SSO_MAX_LEN];
             let len = v.sso_as_str(&mut buf).len() as u8;
@@ -125,21 +128,21 @@ impl FromVm for VnStr {
         let ascii = ctx.str_is_ascii(v);
         ctx.str_shared(v)
             .map(|s| VnStr::Shared(s, ascii))
-            .ok_or_else(|| format!("expected str, got {v:?}"))
+            .ok_or_else(|| NativeError::type_error(format!("expected str, got {v:?}")))
     }
 }
 
 impl FromVm for char {
     #[inline]
-    fn from_vm(ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, String> {
+    fn from_vm(ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, NativeError> {
         ctx.as_char(v)
-            .ok_or_else(|| format!("expected char, got {v:?}"))
+            .ok_or_else(|| NativeError::type_error(format!("expected char, got {v:?}")))
     }
 }
 
 impl<T: FromVm> FromVm for Option<T> {
     #[inline]
-    fn from_vm(ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, String> {
+    fn from_vm(ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, NativeError> {
         if v.is_null() {
             Ok(None)
         } else {
@@ -286,11 +289,13 @@ impl VnArray {
 
 impl FromVm for VnArray {
     #[inline]
-    fn from_vm(ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, String> {
+    fn from_vm(ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, NativeError> {
         if ctx.is_array(v) {
             Ok(VnArray(v))
         } else {
-            Err(format!("expected array, got {v:?}"))
+            Err(NativeError::type_error(format!(
+                "expected array, got {v:?}"
+            )))
         }
     }
 }

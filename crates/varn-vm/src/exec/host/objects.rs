@@ -122,7 +122,8 @@ impl ExecCtx {
     }
     pub(super) fn host_alloc_instance(&mut self, class_name: &str) -> Option<VmValue> {
         let class_obj = self.get_class(class_name)?;
-        let instance_nv = self.heap.alloc_object();
+        let (shape, slots) = class_obj.instance_shape();
+        let instance_nv = self.heap.alloc_object_cell(false, shape, slots, &[]);
         if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get_mut(instance_nv.as_heap()) {
             o.set_class(class_obj);
         }

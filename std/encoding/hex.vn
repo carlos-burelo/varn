@@ -1,3 +1,4 @@
+import { ParseError } from "std:error";
 import { toString$, fromBytes$ } from "runtime:buffer";
 
 const HEX_CHARS: str = "0123456789abcdef";
@@ -24,7 +25,7 @@ function hexCharToNibble(character: str): int {
     if (code >= 65 && code <= 70) {
         return code - 65 + 10;
     }
-    throw new Error("invalid hex character: " + character);
+    throw new ParseError("invalid hex character: " + character);
 }
 
 export namespace Hex {
@@ -40,7 +41,7 @@ export namespace Hex {
 
     export function decode(hexString: str): str {
         if (hexString.length % 2 !== 0) {
-            throw new Error("invalid hex string length");
+            throw new ParseError("invalid hex string length");
         }
         let bytes: int[] = [];
         let length: int = hexString.length;

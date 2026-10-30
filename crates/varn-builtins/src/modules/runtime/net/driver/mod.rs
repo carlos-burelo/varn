@@ -8,13 +8,71 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 use tls::Tls;
-use varn_types::{value::SendValue, HostPromise};
+use varn_core::{ErrorField, StdErrorClass};
+use varn_types::{value::SendValue, HostPromise, NativeError};
 
 const WAKER_TOKEN: Token = Token(usize::MAX);
 static NEXT_SOCKET_ID: AtomicI64 = AtomicI64::new(1);
 
-pub(super) fn failure(what: &str, cause: impl std::fmt::Display) -> SendValue {
-    crate::runtime::blocking::failure(format!("{what}: {cause}"))
+fn raised(error: NativeError) -> SendValue {
+    SendValue::from_native_error(&error)
+}
+
+pub(super) fn closed(what: &str, detail: impl std::fmt::Display) -> SendValue {
+    raised(NativeError::std(StdErrorClass::Closed, format!("{what}: {detail}")))
+}
+
+pub(super) fn io_failure(what: &str, e: &std::io::Error) -> SendValue {
+    let kind = e.kind();
+    let class = if kind == ErrorKind::ConnectionReset
+        || kind == ErrorKind::ConnectionAborted
+        || kind == ErrorKind::BrokenPipe
+        || kind == ErrorKind::NotConnected
+        || kind == ErrorKind::UnexpectedEof
+    {
+        StdErrorClass::Closed
+    } else if kind == ErrorKind::TimedOut {
+        StdErrorClass::Timeout
+    } else {
+        StdErrorClass::Net
+    };
+    raised(NativeError::std(class, format!("{what}: {e}")))
+}
+
+pub(super) fn tls_failure(e: &std::io::Error) -> SendValue {
+    if e.kind() == ErrorKind::InvalidData {
+        raised(NativeError::std(StdErrorClass::Tls, e.to_string()))
+    } else {
+        io_failure("tls", e)
+    }
+}
+
+pub(super) fn tls_setup_failure(detail: impl std::fmt::Display) -> SendValue {
+    raised(NativeError::std(StdErrorClass::Tls, detail.to_string()))
+}
+
+fn at_endpoint(error: NativeError, host: &str, port: u16) -> SendValue {
+    raised(
+        error
+            .with_str(ErrorField::Host, host)
+            .with_int(ErrorField::Port, i64::from(port)),
+    )
+}
+
+pub(super) fn connect_failure(host: &str, port: u16, detail: impl std::fmt::Display) -> SendValue {
+    at_endpoint(
+        NativeError::std(StdErrorClass::Connect, format!("{host}:{port}: {detail}")),
+        host,
+        port,
+    )
+}
+
+pub(super) fn resolve_failure(host: &str, port: u16) -> SendValue {
+    at_endpoint(
+        NativeError::std(StdErrorClass::Resolve, format!("cannot resolve {host}:{port}")),
+        host,
+        port,
+    )
 }
 
 pub fn next_socket_id() -> i64 {
@@ -45,6 +103,7 @@ type Settled = (HostPromise, Result<SendValue, SendValue>);
 struct StreamState {
     stream: TcpStream,
     tls: Option<Tls>,
+    target: Option<(String, u16)>,
     is_connecting: bool,
     pending_connect: Option<HostPromise>,
     pending_read: Option<PendingRead>,
@@ -56,6 +115,7 @@ impl StreamState {
         Self {
             stream,
             tls: None,
+            target: None,
             is_connecting: false,
             pending_connect: None,
             pending_read: None,

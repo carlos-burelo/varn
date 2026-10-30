@@ -99,7 +99,7 @@ impl IoDriver {
                                         resolved_conns.push((task, conn_id));
                                         new_streams.push((conn_id, state));
                                     }
-                                    Err(e) => task.reject(failure("accept", e)),
+                                    Err(e) => task.reject(tls_setup_failure(e)),
                                 }
                             }
                             Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
@@ -107,7 +107,7 @@ impl IoDriver {
                                 break;
                             }
                             Err(e) => {
-                                task.reject(failure("accept", e));
+                                task.reject(io_failure("accept", &e));
                             }
                         }
                     }
@@ -138,7 +138,11 @@ impl IoDriver {
                             match outcome {
                                 Err(e) => {
                                     if let Some(task) = stream_state.pending_connect.take() {
-                                        deferred.push((task, Err(failure("connect", e))));
+                                        let (host, port) = stream_state
+                                            .target
+                                            .clone()
+                                            .unwrap_or_else(|| (String::new(), 0));
+                                        deferred.push((task, Err(connect_failure(&host, port, e))));
                                     }
                                 }
                                 Ok(id) if stream_state.tls.is_none() => {
@@ -154,7 +158,7 @@ impl IoDriver {
                     if !stream_state.is_connecting
                         && let Err(e) = stream_state.pump()
                     {
-                        let cause = failure("tls", e);
+                        let cause = tls_failure(&e);
                         stream_state.fail_pending(&cause, &mut deferred);
                     }
 
@@ -181,7 +185,7 @@ impl IoDriver {
                                 stream_state.pending_write = Some(pw);
                             }
                             Err(e) => {
-                                deferred.push((pw.task, Err(failure("write", e))));
+                                deferred.push((pw.task, Err(io_failure("write", &e))));
                             }
                         }
                     }
@@ -202,7 +206,7 @@ impl IoDriver {
                                 stream_state.pending_read = Some(pr);
                             }
                             Err(e) => {
-                                deferred.push((pr.task, Err(failure("read", e))));
+                                deferred.push((pr.task, Err(io_failure("read", &e))));
                             }
                         }
                     }
@@ -222,7 +226,7 @@ impl IoDriver {
                                 break;
                             }
                             Err(e) => {
-                                deferred.push((pr.task, Err(failure("recvFrom", e))));
+                                deferred.push((pr.task, Err(io_failure("recvFrom", &e))));
                             }
                         }
                     }

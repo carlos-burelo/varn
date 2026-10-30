@@ -1,4 +1,5 @@
 use varn_macros::varn_contract;
+use varn_types::NativeError;
 use varn_types::{NativeCtx, VnArray};
 
 pub struct PathRuntime;
@@ -263,11 +264,11 @@ varn_contract! {
     module: "runtime:path",
     contract: "src/modules/runtime/path/path_runtime.vn",
     impl PathRuntime {
-        fn sep(_ctx: &mut dyn NativeCtx) -> Result<String, String> {
+        fn sep(_ctx: &mut dyn NativeCtx) -> Result<String, NativeError> {
             Ok(main_sep().to_string())
         }
 
-        fn delimiter(_ctx: &mut dyn NativeCtx) -> Result<String, String> {
+        fn delimiter(_ctx: &mut dyn NativeCtx) -> Result<String, NativeError> {
             if cfg!(windows) {
                 Ok(";".to_string())
             } else {
@@ -275,11 +276,11 @@ varn_contract! {
             }
         }
 
-        fn normalize(_ctx: &mut dyn NativeCtx, p: &str) -> Result<String, String> {
+        fn normalize(_ctx: &mut dyn NativeCtx, p: &str) -> Result<String, NativeError> {
             Ok(normalize_inner(p, main_sep()))
         }
 
-        fn dirname(_ctx: &mut dyn NativeCtx, p: &str) -> Result<String, String> {
+        fn dirname(_ctx: &mut dyn NativeCtx, p: &str) -> Result<String, NativeError> {
             Ok(dirname_inner(p))
         }
 
@@ -287,27 +288,27 @@ varn_contract! {
             _ctx: &mut dyn NativeCtx,
             p: &str,
             ext: Option<&str>,
-        ) -> Result<String, String> {
+        ) -> Result<String, NativeError> {
             Ok(basename_inner(p, ext))
         }
 
-        fn extname(_ctx: &mut dyn NativeCtx, p: &str) -> Result<String, String> {
+        fn extname(_ctx: &mut dyn NativeCtx, p: &str) -> Result<String, NativeError> {
             Ok(extname_inner(p))
         }
 
-        fn isAbsolute(_ctx: &mut dyn NativeCtx, p: &str) -> Result<bool, String> {
+        fn isAbsolute(_ctx: &mut dyn NativeCtx, p: &str) -> Result<bool, NativeError> {
             Ok(is_absolute_inner(p))
         }
 
-        fn join(ctx: &mut dyn NativeCtx, segments: VnArray) -> Result<String, String> {
-            let segs = str_array(ctx, segments)?;
+        fn join(ctx: &mut dyn NativeCtx, segments: VnArray) -> Result<String, NativeError> {
+            let segs = str_array(ctx, segments).map_err(NativeError::range_error)?;
             Ok(join_inner(&segs, main_sep()))
         }
 
-        fn resolve(ctx: &mut dyn NativeCtx, segments: VnArray) -> Result<String, String> {
-            let segs = str_array(ctx, segments)?;
+        fn resolve(ctx: &mut dyn NativeCtx, segments: VnArray) -> Result<String, NativeError> {
+            let segs = str_array(ctx, segments).map_err(NativeError::range_error)?;
             let cwd = std::env::current_dir()
-                .map_err(|e| coded("E_PATH_IO", e))?
+                .map_err(|e| coded("E_PATH_IO", e)).map_err(NativeError::range_error)?
                 .to_string_lossy()
                 .into_owned();
             Ok(resolve_inner(&segs, main_sep(), &cwd))

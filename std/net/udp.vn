@@ -1,3 +1,4 @@
+import { ClosedError } from "std:error";
 import { udpBind$, udpSendTo$, udpRecvFrom$, udpClose$ } from "runtime:net";
 
 export type UdpPacket = #{
@@ -20,20 +21,16 @@ export class UdpSocket {
 
     static bind(port: int, host?: str): UdpSocket {
         let bindHost = host ?? "0.0.0.0";
-        let id = udpBind$(bindHost, port);
-        if (id <= 0) {
-            throw new Error(`Failed to bind UDP socket on ${bindHost}:${port}`);
-        }
-        return new UdpSocket(id, bindHost, port);
+        return new UdpSocket(udpBind$(bindHost, port), bindHost, port);
     }
 
     send(host: str, port: int, data: Bytes | str): int {
-        if (!this._isOpen) throw new Error("UdpSocket is closed");
+        if (!this._isOpen) throw new ClosedError("UdpSocket is closed");
         return udpSendTo$(this._id, host, port, data);
     }
 
     async recv(maxLen?: int): Task<UdpPacket?> {
-        if (!this._isOpen) throw new Error("UdpSocket is closed");
+        if (!this._isOpen) throw new ClosedError("UdpSocket is closed");
         let raw = await udpRecvFrom$(this._id, maxLen ?? 65536);
         if (raw === null) return null;
         let parts = raw as [Bytes, str, int];

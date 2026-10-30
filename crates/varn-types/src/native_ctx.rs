@@ -238,7 +238,7 @@ pub trait NativeCtx: crate::Buffers {
     }
 
     fn resume_generator(&mut self, _generator: VmValue, _input: VmValue) -> crate::NativeFnResult {
-        Err(crate::NativeError::from(
+        Err(crate::NativeError::failure(
             "generators can only be resumed by the VM",
         ))
     }
@@ -302,6 +302,10 @@ pub trait NativeCtx: crate::Buffers {
     }
 
     fn register_class(&mut self, _name: &str, _cls: std::rc::Rc<ClassObj>) {}
+
+    fn class_from_value(&self, _value: VmValue) -> Option<std::rc::Rc<ClassObj>> {
+        None
+    }
 
     fn current_source_file(&self) -> Option<String> {
         None

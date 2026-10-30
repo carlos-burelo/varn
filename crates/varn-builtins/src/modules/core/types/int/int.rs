@@ -18,7 +18,7 @@ varn_contract! {
         fn parse(_ctx: &mut dyn NativeCtx, s: &str) -> Result<i64, NativeError> {
             s.trim()
                 .parse::<i64>()
-                .map_err(|e| NativeError::from(format!("int.parse({s:?}): {e}")))
+                .map_err(|e| NativeError::std(varn_core::StdErrorClass::Parse, format!("int.parse({s:?}): {e}")))
         }
         fn tryParse(_ctx: &mut dyn NativeCtx, s: &str) -> Option<i64> {
             s.trim().parse::<i64>().ok()
@@ -64,7 +64,7 @@ varn_contract! {
         fn toFloat(_ctx: &mut dyn NativeCtx, this: i64) -> f64 { this as f64 }
         fn pow(_ctx: &mut dyn NativeCtx, this: i64, exponent: i64) -> Result<i64, NativeError> {
             let e = u32::try_from(exponent)
-                .map_err(|_| NativeError::from(format!("pow: exponent {exponent} must be in 0..=4294967295")))?;
+                .map_err(|_| NativeError::range_error(format!("pow: exponent {exponent} must be in 0..=4294967295")))?;
             varn_core::pow_int(this, e).ok_or_else(|| overflow_error("pow", this))
         }
         fn isEven(_ctx: &mut dyn NativeCtx, this: i64) -> bool { this % 2 == 0 }

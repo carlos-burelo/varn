@@ -1,4 +1,6 @@
+use varn_core::StdErrorClass;
 use varn_macros::varn_contract;
+use varn_types::NativeError;
 use varn_types::{NativeCtx, VmValue};
 
 pub struct TimeRuntime;
@@ -59,24 +61,24 @@ varn_contract! {
     module: "runtime:time",
     contract: "src/modules/runtime/time/time_runtime.vn",
     impl TimeRuntime {
-        fn nowMs(_ctx: &mut dyn NativeCtx) -> Result<i64, String> {
-            std::time::SystemTime::now()
+        fn nowMs(_ctx: &mut dyn NativeCtx) -> Result<i64, NativeError> {
+            (std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_millis() as i64)
-                .map_err(|e| format!("time.now: the system clock is before the Unix epoch: {e}"))
+                .map_err(|e| format!("time.now: the system clock is before the Unix epoch: {e}"))).map_err(|e| NativeError::std(StdErrorClass::Std, e))
         }
-        fn parseIsoDuration(_ctx: &mut dyn NativeCtx, s: &str) -> Result<i64, String> {
-            parse_iso_duration(s)
+        fn parseIsoDuration(_ctx: &mut dyn NativeCtx, s: &str) -> Result<i64, NativeError> {
+            (parse_iso_duration(s)).map_err(|e| NativeError::std(StdErrorClass::Parse, e))
         }
-        fn parseIsoInstant(_ctx: &mut dyn NativeCtx, s: &str) -> Result<i64, String> {
-            parse_iso_instant(s)
+        fn parseIsoInstant(_ctx: &mut dyn NativeCtx, s: &str) -> Result<i64, NativeError> {
+            (parse_iso_instant(s)).map_err(|e| NativeError::std(StdErrorClass::Parse, e))
         }
-        fn msToParts(ctx: &mut dyn NativeCtx, ms: i64) -> Result<VmValue, String> {
+        fn msToParts(ctx: &mut dyn NativeCtx, ms: i64) -> Result<VmValue, NativeError> {
             use chrono::{Datelike, TimeZone, Timelike, Utc};
             let dt = Utc
                 .timestamp_millis_opt(ms)
                 .single()
-                .ok_or_else(|| "invalid timestamp".to_string())?;
+                .ok_or_else(|| "invalid timestamp".to_string()).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
             let obj = ctx.alloc_object();
             set_int(ctx, obj, "year", dt.year() as i64);
             set_int(ctx, obj, "month", dt.month() as i64);
@@ -88,7 +90,7 @@ varn_contract! {
             set_int(ctx, obj, "weekday", dt.weekday().num_days_from_sunday() as i64);
             Ok(obj)
         }
-        fn partsToMs(ctx: &mut dyn NativeCtx, parts: VmValue) -> Result<i64, String> {
+        fn partsToMs(ctx: &mut dyn NativeCtx, parts: VmValue) -> Result<i64, NativeError> {
             let get_int = |ctx: &mut dyn NativeCtx, key: &str| -> i64 {
                 ctx.get_field(parts, key)
                     .filter(|v| ctx.is_int(*v))
@@ -96,24 +98,24 @@ varn_contract! {
                     .unwrap_or(0)
             };
             let invalid = || "Invalid date parts".to_string();
-            let year = i32::try_from(get_int(ctx, "year")).map_err(|_| invalid())?;
-            let month = u32::try_from(get_int(ctx, "month")).map_err(|_| invalid())?;
-            let day = u32::try_from(get_int(ctx, "day")).map_err(|_| invalid())?;
-            let hour = u32::try_from(get_int(ctx, "hour")).map_err(|_| invalid())?;
-            let minute = u32::try_from(get_int(ctx, "minute")).map_err(|_| invalid())?;
-            let second = u32::try_from(get_int(ctx, "second")).map_err(|_| invalid())?;
+            let year = i32::try_from(get_int(ctx, "year")).map_err(|_| invalid()).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
+            let month = u32::try_from(get_int(ctx, "month")).map_err(|_| invalid()).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
+            let day = u32::try_from(get_int(ctx, "day")).map_err(|_| invalid()).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
+            let hour = u32::try_from(get_int(ctx, "hour")).map_err(|_| invalid()).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
+            let minute = u32::try_from(get_int(ctx, "minute")).map_err(|_| invalid()).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
+            let second = u32::try_from(get_int(ctx, "second")).map_err(|_| invalid()).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
             let millisecond = u32::try_from(get_int(ctx, "millisecond"))
                 .ok()
                 .filter(|ms| *ms < 1000)
-                .ok_or_else(|| "Invalid millisecond".to_string())?;
+                .ok_or_else(|| "Invalid millisecond".to_string()).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
 
             use chrono::{TimeZone, Timelike, Utc};
             let dt = Utc
                 .with_ymd_and_hms(year, month, day, hour, minute, second)
                 .single()
-                .ok_or_else(invalid)?
+                .ok_or_else(invalid).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?
                 .with_nanosecond(millisecond * 1_000_000)
-                .ok_or_else(|| "Invalid millisecond".to_string())?;
+                .ok_or_else(|| "Invalid millisecond".to_string()).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
             Ok(dt.timestamp_millis())
         }
     }

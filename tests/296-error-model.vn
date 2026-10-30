@@ -1,0 +1,144 @@
+import { describe, it, expect } from "std:test";
+import { spawnIsolate } from "std:task";
+import { Json } from "std:encoding";
+import { fromISO } from "std:time";
+import { readText } from "std:fs";
+import {
+    StdError, IoError, FsError, FsNotFoundError, FsPermissionError, FsExistsError, FsEncodingError,
+    BadDescriptorError, ClosedError, NetError, ResolveError, ConnectError, TlsError, ProtocolError,
+    CapabilityError, TimeoutError, CancelledError, ParseError, DecodeError
+} from "std:error";
+import { readsMissingFile } from "./helpers/error-workers.vn";
+
+class Expected {
+    error: StdError;
+    code: str;
+    parent: str;
+
+    constructor(error: StdError, code: str, parent: str) {
+        this.error = error;
+        this.code = code;
+        this.parent = parent;
+    }
+}
+
+function parentName(error: StdError): str {
+    if (error instanceof DecodeError) return "ParseError";
+    if (error instanceof FsNotFoundError || error instanceof FsPermissionError
+        || error instanceof FsExistsError || error instanceof FsEncodingError) return "FsError";
+    if (error instanceof ResolveError || error instanceof ConnectError
+        || error instanceof TlsError || error instanceof ProtocolError) return "NetError";
+    if (error instanceof FsError || error instanceof BadDescriptorError
+        || error instanceof ClosedError || error instanceof NetError) return "IoError";
+    if (error instanceof IoError || error instanceof CapabilityError || error instanceof TimeoutError
+        || error instanceof CancelledError || error instanceof ParseError) return "StdError";
+    return "Error";
+}
+
+await describe("296 error model", async () => {
+    await it("every class has its stable code and its place in the hierarchy", async () => {
+        const all: Expected[] = [
+            new Expected(new StdError("m"), "std", "Error"),
+            new Expected(new IoError("m"), "io", "StdError"),
+            new Expected(new FsError("/p", "m"), "fs", "IoError"),
+            new Expected(new FsNotFoundError("/p"), "fs.not_found", "FsError"),
+            new Expected(new FsPermissionError("/p"), "fs.permission_denied", "FsError"),
+            new Expected(new FsExistsError("/p"), "fs.exists", "FsError"),
+            new Expected(new FsEncodingError("/p"), "fs.encoding", "FsError"),
+            new Expected(new BadDescriptorError("m"), "io.bad_descriptor", "IoError"),
+            new Expected(new ClosedError("m"), "io.closed", "IoError"),
+            new Expected(new NetError("m"), "net", "IoError"),
+            new Expected(new ResolveError("h"), "net.resolve", "NetError"),
+            new Expected(new ConnectError("h", 1), "net.connect", "NetError"),
+            new Expected(new TlsError("m"), "net.tls", "NetError"),
+            new Expected(new ProtocolError("m"), "net.protocol", "NetError"),
+            new Expected(new CapabilityError("fs.read", "/p"), "capability", "StdError"),
+            new Expected(new TimeoutError("m"), "timeout", "StdError"),
+            new Expected(new CancelledError("m"), "cancelled", "StdError"),
+            new Expected(new ParseError("m"), "parse", "StdError"),
+            new Expected(new DecodeError("$.a", "m"), "parse.decode", "ParseError")
+        ];
+        expect(all.length).toBe(19);
+        for (const item of all) {
+            expect(item.error.code).toBe(item.code);
+            expect(parentName(item.error)).toBe(item.parent);
+            expect(item.error instanceof StdError).toBe(true);
+            expect(item.error instanceof Error).toBe(true);
+        }
+    });
+
+    await it("fields are typed and optional ones start null", async () => {
+        const connect = new ConnectError("example.org", 443);
+        expect(connect.host).toBe("example.org");
+        expect(connect.port).toBe(443);
+        expect(new NetError("m").host).toBe(null);
+        const capability = new CapabilityError("net.client", "example.org");
+        expect(capability.capability).toBe("net.client");
+        expect(capability.target).toBe("example.org");
+        expect(new ParseError("m", 7).position).toBe(7);
+    });
+
+    await it("a catch clause selects by class and lets the rest through", async () => {
+        let seen = "";
+        try {
+            try {
+                throw new ConnectError("h", 1);
+            } catch (e: FsError) {
+                seen = "wrong";
+            } catch (e: NetError) {
+                seen = e.code;
+            }
+        } catch (e) {
+            seen = "escaped";
+        }
+        expect(seen).toBe("net.connect");
+    });
+
+    await it("natives raise the class that describes the failure", async () => {
+        let parse = "";
+        try {
+            Json.parse("{");
+        } catch (e: ParseError) {
+            parse = e.code;
+        }
+        expect(parse).toBe("parse");
+
+        let time = "";
+        try {
+            fromISO("not a date");
+        } catch (e: ParseError) {
+            time = e.code;
+        }
+        expect(time).toBe("parse");
+
+        let path = "";
+        try {
+            readText("/definitely/not/here");
+        } catch (e: FsNotFoundError) {
+            path = e.path;
+        }
+        expect(path).toBe("/definitely/not/here");
+    });
+
+    await it("an error crossing an isolate keeps its class and fields", async () => {
+        const handle = await spawnIsolate(readsMissingFile, ["/definitely/not/here"]);
+        let path = "";
+        let code = "";
+        try {
+            await handle.join();
+        } catch (e: FsNotFoundError) {
+            path = e.path;
+            code = e.code;
+        }
+        expect(path).toBe("/definitely/not/here");
+        expect(code).toBe("fs.not_found");
+    });
+
+    await it("errors chain their cause", async () => {
+        const cause = new ParseError("unexpected token", 3);
+        const wrapped = new DecodeError("$.user.age", "age is not a number", cause);
+        expect(wrapped.cause !== null).toBe(true);
+        expect((wrapped.cause as ParseError).position).toBe(3);
+        expect(wrapped.path).toBe("$.user.age");
+    });
+});

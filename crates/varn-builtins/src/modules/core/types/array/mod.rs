@@ -278,7 +278,7 @@ varn_contract! {
             let (mut acc, start) = match initial {
                 Some(init) => (init, 0usize),
                 None if len > 0 => (this.get(ctx, 0).unwrap_or_else(VmValue::null), 1usize),
-                None => return Err(NativeError::from("reduce of an empty array with no initial value")),
+                None => return Err(NativeError::type_error("reduce of an empty array with no initial value")),
             };
             for i in start..len {
                 let v = this.get(ctx, i).unwrap_or_else(VmValue::null);

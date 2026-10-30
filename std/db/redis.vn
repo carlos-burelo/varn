@@ -1,3 +1,4 @@
+import { ClosedError, ProtocolError, StdError } from "std:error";
 import { TcpStream } from "std:net/socket";
 
 export type RedisValue = str | int | null | RedisValue[];
@@ -26,11 +27,11 @@ export class Redis {
     private async _fill(): Task<void> {
         let chunk = await this._stream.read(4096);
         if (chunk === null) {
-            throw new Error("Redis: connection closed");
+            throw new ClosedError("Redis: connection closed");
         }
         let bytes = chunk as Bytes;
         if (bytes.length === 0) {
-            throw new Error("Redis: connection closed");
+            throw new ClosedError("Redis: connection closed");
         }
         let next = Bytes.alloc(this._buf.length + bytes.length);
         this._buf.copy(next, 0, 0, this._buf.length);
@@ -63,7 +64,7 @@ export class Redis {
     private async _readReply(): Task<RedisValue> {
         let line = await this._takeLine();
         if (line.length === 0) {
-            throw new Error("Redis: empty reply");
+            throw new ProtocolError("Redis: empty reply");
         }
         let kind = line[0];
         let rest = line.slice(1);
@@ -71,7 +72,7 @@ export class Redis {
             return rest;
         }
         if (kind === "-") {
-            throw new Error("Redis: " + rest);
+            throw new StdError("Redis: " + rest);
         }
         if (kind === ":") {
             return int.parse(rest);
@@ -95,7 +96,7 @@ export class Redis {
             }
             return items;
         }
-        throw new Error("Redis: bad reply prefix '" + kind + "'");
+        throw new ProtocolError("Redis: bad reply prefix '" + kind + "'");
     }
 
     async command(args: str[]): Task<RedisValue> {

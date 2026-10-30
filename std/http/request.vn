@@ -1,5 +1,6 @@
 import { tcpWrite$, parseHttpRequest$, HttpMethod } from "runtime:net";
-import { WireReader, readChunkedBody } from "std:http/wire";
+import { ProtocolError } from "std:error";
+import { WireReader, readChunkedBody, LineTooLongError, BodyTooLargeError } from "std:http/wire";
 import { Headers } from "std:http/headers";
 import { Json, JsonValue } from "std:encoding";
 
@@ -23,31 +24,16 @@ export class RawRequest {
     payload: Bytes = Bytes.alloc(0);
 }
 
-export class Rejection {
+export class HttpRejection extends ProtocolError {
     status: int;
     reason: str;
 
     constructor(status: int, reason: str) {
+        super(`${status} ${reason}`);
+        this.name = "HttpRejection";
         this.status = status;
         this.reason = reason;
     }
-}
-
-function reject(status: int, reason: str): Error {
-    return new Error(`${status} ${reason}`);
-}
-
-export function rejectionOf(message: str): Rejection? {
-    if (message.length < 5 || message.charCodeAt(3) !== 32) {
-        return null;
-    }
-    for (let i = 0; i < 3; i = i + 1) {
-        const code = message.charCodeAt(i) as int;
-        if (code < 48 || code > 57) {
-            return null;
-        }
-    }
-    return new Rejection(int.parse(message.slice(0, 3)), message.slice(4));
 }
 
 async function readHead(wire: WireReader): Task<str?> {
@@ -62,10 +48,10 @@ async function readHead(wire: WireReader): Task<str?> {
     while (true) {
         const line = await wire.line(MAX_LINE);
         if (line === null) {
-            throw reject(400, "Bad Request");
+            throw new HttpRejection(400, "Bad Request");
         }
         if (head.length + (line as str).length > MAX_HEAD) {
-            throw reject(431, "Request Header Fields Too Large");
+            throw new HttpRejection(431, "Request Header Fields Too Large");
         }
         if ((line as str).length === 0) {
             break;
@@ -88,29 +74,28 @@ async function readBody(wire: WireReader, req: RawRequest, maxContentLength: int
     }
     if (chunked) {
         try {
-            return await readChunkedBody(wire, maxContentLength, "413 Payload Too Large");
-        } catch (err) {
-            if (rejectionOf(err.message) !== null) {
-                throw err;
-            }
-            throw reject(400, "Bad Request");
+            return await readChunkedBody(wire, maxContentLength);
+        } catch (err: BodyTooLargeError) {
+            throw new HttpRejection(413, "Payload Too Large");
+        } catch (err: ProtocolError) {
+            throw new HttpRejection(400, "Bad Request");
         }
     }
     let declared = -1;
     try {
         declared = int.parse(lengthText as str);
     } catch (err) {
-        throw reject(400, "Bad Request");
+        throw new HttpRejection(400, "Bad Request");
     }
     if (declared < 0) {
-        throw reject(400, "Bad Request");
+        throw new HttpRejection(400, "Bad Request");
     }
     if (declared > maxContentLength) {
-        throw reject(413, "Payload Too Large");
+        throw new HttpRejection(413, "Payload Too Large");
     }
     const data = await wire.take(declared);
     if (data === null) {
-        throw reject(400, "Bad Request");
+        throw new HttpRejection(400, "Bad Request");
     }
     return data as Bytes;
 }
@@ -119,18 +104,15 @@ export async function readHttpRequest(wire: WireReader, maxContentLength: int = 
     let head: str? = null;
     try {
         head = await readHead(wire);
-    } catch (err) {
-        if (err.message.startsWith("line exceeds")) {
-            throw reject(431, "Request Header Fields Too Large");
-        }
-        throw err;
+    } catch (err: LineTooLongError) {
+        throw new HttpRejection(431, "Request Header Fields Too Large");
     }
     if (head === null) {
         return null;
     }
     const parsed = parseHttpRequest$(head as str);
     if (parsed === null) {
-        throw reject(400, "Bad Request");
+        throw new HttpRejection(400, "Bad Request");
     }
     const req = new RawRequest();
     req.method = parsed.method;

@@ -1,6 +1,21 @@
 import { tcpRead$ } from "runtime:net";
+import { ProtocolError } from "std:error";
 
 const READ_SIZE = 16384;
+
+export class LineTooLongError extends ProtocolError {
+    constructor(limit: int) {
+        super(`line exceeds ${limit} bytes`);
+        this.name = "LineTooLongError";
+    }
+}
+
+export class BodyTooLargeError extends ProtocolError {
+    constructor(limit: int) {
+        super(`body exceeds ${limit} bytes`);
+        this.name = "BodyTooLargeError";
+    }
+}
 
 export class ByteBuilder {
     private data: Bytes;
@@ -82,7 +97,7 @@ export class WireReader {
             for (let i = scanned; i + 1 < end; i = i + 1) {
                 if (this.buffer.byteAt(i) === 13 && this.buffer.byteAt(i + 1) === 10) {
                     if (i - this.cursor > limit) {
-                        throw new Error(`line exceeds ${limit} bytes`);
+                        throw new LineTooLongError(limit);
                     }
                     const text = this.buffer.slice(this.cursor, i).toString();
                     this.cursor = i + 2;
@@ -90,7 +105,7 @@ export class WireReader {
                 }
             }
             if (end - this.cursor > limit) {
-                throw new Error(`line exceeds ${limit} bytes`);
+                throw new LineTooLongError(limit);
             }
             scanned = end - 1 > this.cursor ? end - 1 : this.cursor;
             if (!(await this.pull())) {
@@ -133,25 +148,25 @@ function parseChunkSize(line: str): int {
     const extension = line.indexOf(";");
     const digits = (extension === null ? line : line.slice(0, extension)).trim();
     if (digits.length === 0 || digits.length > 15) {
-        throw new Error("malformed chunk size line");
+        throw new ProtocolError("malformed chunk size line");
     }
     let size = 0;
     for (let i = 0; i < digits.length; i = i + 1) {
         const digit = hexDigit(digits.charCodeAt(i) as int);
         if (digit < 0) {
-            throw new Error(`malformed chunk size '${digits}'`);
+            throw new ProtocolError(`malformed chunk size '${digits}'`);
         }
         size = size * 16 + digit;
     }
     return size;
 }
 
-export async function readChunkedBody(wire: WireReader, maxBytes: int, tooLarge: str): Task<Bytes> {
+export async function readChunkedBody(wire: WireReader, maxBytes: int): Task<Bytes> {
     const body = new ByteBuilder();
     while (true) {
         const sizeLine = await wire.line();
         if (sizeLine === null) {
-            throw new Error("connection closed inside a chunked body");
+            throw new ProtocolError("connection closed inside a chunked body");
         }
         const size = parseChunkSize(sizeLine as str);
         if (size === 0) {
@@ -164,17 +179,17 @@ export async function readChunkedBody(wire: WireReader, maxBytes: int, tooLarge:
             break;
         }
         if (body.length + size > maxBytes) {
-            throw new Error(tooLarge);
+            throw new BodyTooLargeError(maxBytes);
         }
         const data = await wire.take(size);
         if (data === null) {
-            throw new Error("connection closed inside a chunk");
+            throw new ProtocolError("connection closed inside a chunk");
         }
         const bytes = data as Bytes;
         body.append(bytes, 0, bytes.length);
         const terminator = await wire.line();
         if (terminator === null || (terminator as str).length !== 0) {
-            throw new Error("a chunk is not followed by CRLF");
+            throw new ProtocolError("a chunk is not followed by CRLF");
         }
     }
     return body.slice(0, body.length);

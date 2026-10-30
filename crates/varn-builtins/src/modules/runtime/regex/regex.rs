@@ -1,5 +1,7 @@
+use varn_core::StdErrorClass;
 use parking_lot::RwLock;
 use varn_macros::varn_contract;
+use varn_types::NativeError;
 use varn_types::{NativeCtx, VmValue};
 
 static REGEX_POOL: RwLock<Vec<regex::Regex>> = RwLock::new(Vec::new());
@@ -43,7 +45,7 @@ varn_contract! {
     module: "runtime:regex",
     contract: "src/modules/runtime/regex/regex_runtime.vn",
     impl RegexRuntime {
-        fn compile(_ctx: &mut dyn NativeCtx, pattern: &str, flags: &str) -> Result<i64, String> {
+        fn compile(_ctx: &mut dyn NativeCtx, pattern: &str, flags: &str) -> Result<i64, NativeError> {
             let mut builder = regex::RegexBuilder::new(pattern);
             if flags.contains('i') {
                 builder.case_insensitive(true);
@@ -58,38 +60,38 @@ varn_contract! {
                 builder.ignore_whitespace(true);
             }
 
-            let re = builder.build().map_err(|e| format!("Invalid regex pattern: {e}"))?;
+            let re = builder.build().map_err(|e| format!("Invalid regex pattern: {e}")).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
             let mut pool = REGEX_POOL.write();
             let handle = pool.len() as i64;
             pool.push(re);
             Ok(handle)
         }
 
-        fn test(_ctx: &mut dyn NativeCtx, handle: i64, text: &str) -> Result<bool, String> {
-            let re = get_regex(handle)?;
+        fn test(_ctx: &mut dyn NativeCtx, handle: i64, text: &str) -> Result<bool, NativeError> {
+            let re = get_regex(handle).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
             Ok(re.is_match(text))
         }
 
-        fn exec(ctx: &mut dyn NativeCtx, handle: i64, text: &str) -> Result<Option<VmValue>, String> {
-            let re = get_regex(handle)?;
+        fn exec(ctx: &mut dyn NativeCtx, handle: i64, text: &str) -> Result<Option<VmValue>, NativeError> {
+            let re = get_regex(handle).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
             Ok(re.captures(text).map(|caps| match_record(ctx, &caps)))
         }
 
-        fn findAll(ctx: &mut dyn NativeCtx, handle: i64, text: &str) -> Result<Vec<VmValue>, String> {
-            let re = get_regex(handle)?;
+        fn findAll(ctx: &mut dyn NativeCtx, handle: i64, text: &str) -> Result<Vec<VmValue>, NativeError> {
+            let re = get_regex(handle).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
             Ok(re
                 .captures_iter(text)
                 .map(|caps| match_record(ctx, &caps))
                 .collect())
         }
 
-        fn replace(_ctx: &mut dyn NativeCtx, handle: i64, text: &str, replacement: &str) -> Result<String, String> {
-            let re = get_regex(handle)?;
+        fn replace(_ctx: &mut dyn NativeCtx, handle: i64, text: &str, replacement: &str) -> Result<String, NativeError> {
+            let re = get_regex(handle).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
             Ok(re.replace_all(text, replacement).into_owned())
         }
 
-        fn split(ctx: &mut dyn NativeCtx, handle: i64, text: &str) -> Result<Vec<VmValue>, String> {
-            let re = get_regex(handle)?;
+        fn split(ctx: &mut dyn NativeCtx, handle: i64, text: &str) -> Result<Vec<VmValue>, NativeError> {
+            let re = get_regex(handle).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
             Ok(re.split(text).map(|p| ctx.alloc_str(p)).collect())
         }
     }

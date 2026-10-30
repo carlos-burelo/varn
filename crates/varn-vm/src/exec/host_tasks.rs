@@ -23,19 +23,15 @@ fn open_value(ctx: &mut ExecCtx, sv: &SendValue) -> VmValue {
 }
 
 fn closed_error(ctx: &mut ExecCtx) -> VmValue {
-    SendValue::Error {
-        class: varn_types::value::CHANNEL_CLOSED_CLASS.to_string(),
-        message: "channel closed".to_string(),
-    }
-    .to_value_ctx(ctx)
+    SendValue::error(varn_types::value::CHANNEL_CLOSED_CLASS, "channel closed").to_value_ctx(ctx)
 }
 
 fn option_outcome(ctx: &mut ExecCtx, value: Option<VmValue>) -> Outcome {
     ctx.make_option(value).map_err(|e| {
-        SendValue::Error {
-            class: varn_core::RuntimeErrorKind::Error.class_name().to_string(),
-            message: e.to_string(),
-        }
+        SendValue::error(
+            varn_core::RuntimeErrorKind::Error.class_name(),
+            e.to_string(),
+        )
         .to_value_ctx(ctx)
     })
 }

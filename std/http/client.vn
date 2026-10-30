@@ -1,5 +1,6 @@
 import { tcpConnect$, tcpConnectTls$, tcpWrite$, tcpClose$, httpMethodName$, HttpMethod } from "runtime:net";
 import { Url } from "std:net";
+import { ProtocolError } from "std:error";
 import { Response, RawResponse, RequestInit, readHttpResponse } from "std:http/core";
 import { isRedirect, sameOrigin, resolveLocation, redirectedMethod, redirectedHeaders } from "std:http/redirect";
 
@@ -45,15 +46,11 @@ async function doFetch(connId: int, parsedUrl: Url, method: HttpMethod, headers:
         requestStr = requestStr + body;
     }
 
-    let writeFailure: str? = null;
     try {
         await tcpWrite$(connId, requestStr);
     } catch (e) {
-        writeFailure = e.message;
-    }
-    if (writeFailure !== null) {
         tcpClose$(connId);
-        throw new Error(`NetworkError: Failed to write request to ${parsedUrl.host}:${parsedUrl.port} (${writeFailure})`);
+        throw e;
     }
 
     let rawResp: RawResponse? = null;
@@ -61,12 +58,12 @@ async function doFetch(connId: int, parsedUrl: Url, method: HttpMethod, headers:
         rawResp = await readHttpResponse(connId, method === HttpMethod.HEAD);
     } catch (e) {
         tcpClose$(connId);
-        throw new Error(`NetworkError: Failed to read the response from ${parsedUrl.host}:${parsedUrl.port} (${e.message})`);
+        throw e;
     }
     tcpClose$(connId);
 
     if (rawResp === null) {
-        throw new Error(`NetworkError: Empty response from ${parsedUrl.host}:${parsedUrl.port}`);
+        throw new ProtocolError(`empty response from ${parsedUrl.host}:${parsedUrl.port}`);
     }
 
     const raw = rawResp as RawResponse;
@@ -85,7 +82,7 @@ async function fetchOnce(url: str, method: HttpMethod, headers: { [key: str]: st
 
     const secure = parsedUrl.protocol === "https";
     if (!secure && parsedUrl.protocol !== "http") {
-        throw new Error(`NetworkError: Unsupported protocol '${parsedUrl.protocol}' in ${url}`);
+        throw new TypeError(`unsupported protocol '${parsedUrl.protocol}' in ${url}`);
     }
 
     let port = secure ? 443 : 80;
@@ -94,16 +91,7 @@ async function fetchOnce(url: str, method: HttpMethod, headers: { [key: str]: st
         port = parsedPort;
     }
 
-    let connId = -1;
-    let connectFailure = "";
-    try {
-        connId = secure ? await tcpConnectTls$(host, port, ca) : await tcpConnect$(host, port);
-    } catch (e) {
-        connectFailure = e.message;
-    }
-    if (connId === -1) {
-        throw new Error(`NetworkError: Could not connect to ${host}:${port} (${connectFailure})`);
-    }
+    const connId = secure ? await tcpConnectTls$(host, port, ca) : await tcpConnect$(host, port);
 
     return await doFetch(connId, parsedUrl, method, headers, body);
 }
@@ -124,7 +112,7 @@ export async function fetch(url: str, init: RequestInit = {}): Task<Response> {
             return response;
         }
         if (hops >= limit) {
-            throw new Error(`NetworkError: More than ${limit} redirects starting at ${url}`);
+            throw new ProtocolError(`more than ${limit} redirects starting at ${url}`);
         }
         hops = hops + 1;
         const from = Url.parse(current);

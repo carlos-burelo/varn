@@ -1,54 +1,182 @@
-export class StdError extends Error {
-    code: str;
-    message: str;
+import { errorCode$, registerErrorClasses$ } from "runtime:error";
 
-    constructor(code: str, message: str) {
+export class StdError extends Error {
+    code: str = "";
+    cause: Error? = null;
+
+    constructor(message: str, cause?: Error) {
         super(message);
         this.name = "StdError";
-        this.code = code;
-        this.message = message;
+        this.code = errorCode$("StdError");
+        this.cause = cause ?? null;
     }
 }
 
-export const E_FS_NOT_FOUND: str = "E_FS_NOT_FOUND";
-export const E_FS_DENIED: str = "E_FS_DENIED";
-export const E_FS_EXISTS: str = "E_FS_EXISTS";
-export const E_FS_IO: str = "E_FS_IO";
-export const E_FS_BAD_FD: str = "E_FS_BAD_FD";
-export const E_FS_BAD_ARG: str = "E_FS_BAD_ARG";
-export const E_FS_ENCODING: str = "E_FS_ENCODING";
-export const E_IO: str = "E_IO";
-export const E_IO_READ: str = "E_IO_READ";
-export const E_IO_FLUSH: str = "E_IO_FLUSH";
-export const E_WS_IO: str = "E_WS_IO";
-export const E_WS_DENIED: str = "E_WS_DENIED";
-export const E_WS_CONNECT: str = "E_WS_CONNECT";
-export const E_WS_SEND: str = "E_WS_SEND";
-export const E_WS_READ: str = "E_WS_READ";
-export const E_WS_BINARY: str = "E_WS_BINARY";
-export const E_WS_CLOSED: str = "E_WS_CLOSED";
-export const E_WS_BAD_ARG: str = "E_WS_BAD_ARG";
-export const E_WS_HANDSHAKE: str = "E_WS_HANDSHAKE";
-export const E_WS_PROTOCOL: str = "E_WS_PROTOCOL";
-export const E_PATH_IO: str = "E_PATH_IO";
-export const E_PATH_BAD_ARG: str = "E_PATH_BAD_ARG";
-
-export function stdError(code: str, message: str): StdError {
-    return new StdError(code, message);
+export class IoError extends StdError {
+    constructor(message: str, cause?: Error) {
+        super(message, cause);
+        this.name = "IoError";
+        this.code = errorCode$("IoError");
+    }
 }
 
-export function toStdError(e: Error, fallback: str): StdError {
-    if (e instanceof StdError) {
-        return e;
+export class FsError extends IoError {
+    path: str = "";
+
+    constructor(path: str, message: str, cause?: Error) {
+        super(message, cause);
+        this.name = "FsError";
+        this.code = errorCode$("FsError");
+        this.path = path;
     }
-    let msg = e.message;
-    let sep = msg.indexOf("|");
-    if (sep === null) {
-        return new StdError(fallback, msg);
-    }
-    let code = msg.slice(0, sep);
-    if (!code.startsWith("E_")) {
-        return new StdError(fallback, msg);
-    }
-    return new StdError(code, msg.slice(sep + 1));
 }
+
+export class FsNotFoundError extends FsError {
+    constructor(path: str, cause?: Error) {
+        super(path, `no such file or directory: ${path}`, cause);
+        this.name = "FsNotFoundError";
+        this.code = errorCode$("FsNotFoundError");
+    }
+}
+
+export class FsPermissionError extends FsError {
+    constructor(path: str, cause?: Error) {
+        super(path, `permission denied: ${path}`, cause);
+        this.name = "FsPermissionError";
+        this.code = errorCode$("FsPermissionError");
+    }
+}
+
+export class FsExistsError extends FsError {
+    constructor(path: str, cause?: Error) {
+        super(path, `already exists: ${path}`, cause);
+        this.name = "FsExistsError";
+        this.code = errorCode$("FsExistsError");
+    }
+}
+
+export class FsEncodingError extends FsError {
+    constructor(path: str, cause?: Error) {
+        super(path, `not valid UTF-8: ${path}`, cause);
+        this.name = "FsEncodingError";
+        this.code = errorCode$("FsEncodingError");
+    }
+}
+
+export class BadDescriptorError extends IoError {
+    constructor(message: str, cause?: Error) {
+        super(message, cause);
+        this.name = "BadDescriptorError";
+        this.code = errorCode$("BadDescriptorError");
+    }
+}
+
+export class ClosedError extends IoError {
+    constructor(message: str, cause?: Error) {
+        super(message, cause);
+        this.name = "ClosedError";
+        this.code = errorCode$("ClosedError");
+    }
+}
+
+export class NetError extends IoError {
+    host: str? = null;
+    port: int? = null;
+
+    constructor(message: str, host?: str, port?: int, cause?: Error) {
+        super(message, cause);
+        this.name = "NetError";
+        this.code = errorCode$("NetError");
+        this.host = host ?? null;
+        this.port = port ?? null;
+    }
+}
+
+export class ResolveError extends NetError {
+    constructor(host: str, port?: int, cause?: Error) {
+        super(`cannot resolve ${host}`, host, port, cause);
+        this.name = "ResolveError";
+        this.code = errorCode$("ResolveError");
+    }
+}
+
+export class ConnectError extends NetError {
+    constructor(host: str, port: int, cause?: Error) {
+        super(`could not connect to ${host}:${port}`, host, port, cause);
+        this.name = "ConnectError";
+        this.code = errorCode$("ConnectError");
+    }
+}
+
+export class TlsError extends NetError {
+    constructor(message: str, host?: str, port?: int, cause?: Error) {
+        super(message, host, port, cause);
+        this.name = "TlsError";
+        this.code = errorCode$("TlsError");
+    }
+}
+
+export class ProtocolError extends NetError {
+    constructor(message: str, host?: str, port?: int, cause?: Error) {
+        super(message, host, port, cause);
+        this.name = "ProtocolError";
+        this.code = errorCode$("ProtocolError");
+    }
+}
+
+export class CapabilityError extends StdError {
+    capability: str = "";
+    target: str? = null;
+
+    constructor(capability: str, target?: str, cause?: Error) {
+        super(target === null ? `permission denied (${capability})` : `permission denied (${capability}) for ${target}`, cause);
+        this.name = "CapabilityError";
+        this.code = errorCode$("CapabilityError");
+        this.capability = capability;
+        this.target = target ?? null;
+    }
+}
+
+export class TimeoutError extends StdError {
+    constructor(message: str, cause?: Error) {
+        super(message, cause);
+        this.name = "TimeoutError";
+        this.code = errorCode$("TimeoutError");
+    }
+}
+
+export class CancelledError extends StdError {
+    constructor(message: str, cause?: Error) {
+        super(message, cause);
+        this.name = "CancelledError";
+        this.code = errorCode$("CancelledError");
+    }
+}
+
+export class ParseError extends StdError {
+    position: int? = null;
+
+    constructor(message: str, position?: int, cause?: Error) {
+        super(message, cause);
+        this.name = "ParseError";
+        this.code = errorCode$("ParseError");
+        this.position = position ?? null;
+    }
+}
+
+export class DecodeError extends ParseError {
+    path: str = "";
+
+    constructor(path: str, message: str, cause?: Error) {
+        super(message, null, cause);
+        this.name = "DecodeError";
+        this.code = errorCode$("DecodeError");
+        this.path = path;
+    }
+}
+
+registerErrorClasses$([
+    StdError, IoError, FsError, FsNotFoundError, FsPermissionError, FsExistsError,
+    FsEncodingError, BadDescriptorError, ClosedError, NetError, ResolveError, ConnectError,
+    TlsError, ProtocolError, CapabilityError, TimeoutError, CancelledError, ParseError, DecodeError
+]);

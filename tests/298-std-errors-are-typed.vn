@@ -1,0 +1,68 @@
+import { describe, it, expect } from "std:test";
+import { readDir, readText, stat } from "std:fs";
+
+function sources(dir: str): str[] {
+    let found: str[] = [];
+    for (const name of readDir(dir)) {
+        const path = dir + "/" + name;
+        if (stat(path).isDir) {
+            for (const inner of sources(path)) {
+                found.push(inner);
+            }
+        } else if (name.endsWith(".vn")) {
+            found.push(path);
+        }
+    }
+    return found;
+}
+
+function offences(text: str): int {
+    let count = 0;
+    for (const line of text.split("\n")) {
+        const at = line.indexOf("new Error(");
+        if (at === null) {
+            continue
+        }
+        const quote = line.slice(at + 10, at + 11);
+        if (quote !== "\"" && quote !== "`") {
+            continue
+        }
+        const rest = line.slice(at + 11);
+        let name = "";
+        for (let i = 0; i < rest.length; i = i + 1) {
+            const code = rest.charCodeAt(i) as int;
+            const letter = (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+            if (!letter) {
+                break
+            }
+            name = name + rest.slice(i, i + 1);
+        }
+        if (name.endsWith("Error") && rest.slice(name.length, name.length + 1) === ":") {
+            count = count + 1;
+        }
+    }
+    return count;
+}
+
+await describe("298 std errors are typed", async () => {
+    await it("no std module encodes an error type in the message text", async () => {
+        const files = sources("std");
+        expect(files.length > 100).toBeTruthy();
+        let total = 0;
+        for (const file of files) {
+            total = total + offences(readText(file));
+        }
+        expect(total).toBe(0);
+    });
+
+    await it("no std module still imports the old coded-error helpers", async () => {
+        let total = 0;
+        for (const file of sources("std")) {
+            const text = readText(file);
+            if (text.indexOf("toStdError") !== null || text.indexOf("stdError(") !== null) {
+                total = total + 1;
+            }
+        }
+        expect(total).toBe(0);
+    });
+});

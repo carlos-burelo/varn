@@ -194,7 +194,7 @@ impl NativeCtx for DummyCtx {
         _callee: VmValue,
         _args: &[VmValue],
     ) -> Result<VmValue, crate::NativeError> {
-        Err("DummyCtx".into())
+        Err(crate::NativeError::failure("DummyCtx"))
     }
     fn spawn_vm(&mut self, _callee: VmValue, _args: &[VmValue]) -> Result<VmValue, String> {
         Err("DummyCtx".into())
@@ -309,7 +309,9 @@ impl NativeCtx for StaticInitCtx {
         _callee: VmValue,
         _args: &[VmValue],
     ) -> Result<VmValue, crate::NativeError> {
-        Err("call_vm unavailable in static init context".into())
+        Err(crate::NativeError::failure(
+            "call_vm unavailable in static init context",
+        ))
     }
     fn spawn_vm(&mut self, _callee: VmValue, _args: &[VmValue]) -> Result<VmValue, String> {
         Err("spawn_vm unavailable in static init context".into())

@@ -1,7 +1,9 @@
+use varn_core::StdErrorClass;
 use parking_lot::Mutex;
 use rusqlite::types::ValueRef;
 use rusqlite::Connection;
 use varn_macros::varn_contract;
+use varn_types::NativeError;
 use varn_types::{NativeCtx, VmValue, VnArray};
 
 static DB_POOL: Mutex<Vec<Option<Connection>>> = Mutex::new(Vec::new());
@@ -41,12 +43,12 @@ varn_contract! {
     module: "runtime:sqlite",
     contract: "src/modules/runtime/sqlite/sqlite_runtime.vn",
     impl SqliteRuntime {
-        fn open(_ctx: &mut dyn NativeCtx, path: &str) -> Result<i64, String> {
+        fn open(_ctx: &mut dyn NativeCtx, path: &str) -> Result<i64, NativeError> {
             let conn = if path == ":memory:" || path.is_empty() {
                 Connection::open_in_memory()
             } else {
                 Connection::open(path)
-            }.map_err(|e| format!("SQLite open error: {e}"))?;
+            }.map_err(|e| format!("SQLite open error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
 
             let mut pool = DB_POOL.lock();
             let id = pool.len() as i64;
@@ -54,7 +56,7 @@ varn_contract! {
             Ok(id)
         }
 
-        fn close(_ctx: &mut dyn NativeCtx, db_id: i64) -> Result<bool, String> {
+        fn close(_ctx: &mut dyn NativeCtx, db_id: i64) -> Result<bool, NativeError> {
             if db_id < 0 {
                 return Ok(false);
             }
@@ -67,34 +69,34 @@ varn_contract! {
             Ok(false)
         }
 
-        fn exec(_ctx: &mut dyn NativeCtx, db_id: i64, sql: &str) -> Result<i64, String> {
+        fn exec(_ctx: &mut dyn NativeCtx, db_id: i64, sql: &str) -> Result<i64, NativeError> {
             let pool = DB_POOL.lock();
             let conn = pool.get(db_id as usize)
                 .and_then(|s| s.as_ref())
-                .ok_or_else(|| format!("SQLite DB handle {db_id} not found"))?;
+                .ok_or_else(|| format!("SQLite DB handle {db_id} not found")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
 
-            let affected = conn.execute(sql, []).map_err(|e| format!("SQLite exec error: {e}"))?;
+            let affected = conn.execute(sql, []).map_err(|e| format!("SQLite exec error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
             Ok(affected as i64)
         }
 
-        fn queryAll(ctx: &mut dyn NativeCtx, db_id: i64, sql: &str, params: VnArray) -> Result<Vec<VmValue>, String> {
+        fn queryAll(ctx: &mut dyn NativeCtx, db_id: i64, sql: &str, params: VnArray) -> Result<Vec<VmValue>, NativeError> {
             let pool = DB_POOL.lock();
             let conn = pool.get(db_id as usize)
                 .and_then(|s| s.as_ref())
-                .ok_or_else(|| format!("SQLite DB handle {db_id} not found"))?;
+                .ok_or_else(|| format!("SQLite DB handle {db_id} not found")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
 
             let sql_params = vm_params_to_sqlite(ctx, params);
-            let mut stmt = conn.prepare(sql).map_err(|e| format!("SQLite prepare error: {e}"))?;
+            let mut stmt = conn.prepare(sql).map_err(|e| format!("SQLite prepare error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
             let col_names: Vec<String> = stmt.column_names().iter().map(|s| s.to_string()).collect();
 
             let mut rows = stmt.query(rusqlite::params_from_iter(sql_params))
-                .map_err(|e| format!("SQLite query error: {e}"))?;
+                .map_err(|e| format!("SQLite query error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
 
             let mut out = Vec::new();
-            while let Some(row) = rows.next().map_err(|e| format!("SQLite row error: {e}"))? {
+            while let Some(row) = rows.next().map_err(|e| format!("SQLite row error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))? {
                 let obj = ctx.alloc_object();
                 for (i, name) in col_names.iter().enumerate() {
-                    let val_ref = row.get_ref(i).map_err(|e| format!("SQLite column error: {e}"))?;
+                    let val_ref = row.get_ref(i).map_err(|e| format!("SQLite column error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
                     let vm_val = match val_ref {
                         ValueRef::Null => VmValue::null(),
                         ValueRef::Integer(v) => VmValue::from_int(v),
@@ -116,7 +118,7 @@ varn_contract! {
             Ok(out)
         }
 
-        fn queryOne(ctx: &mut dyn NativeCtx, db_id: i64, sql: &str, params: VnArray) -> Result<VmValue, String> {
+        fn queryOne(ctx: &mut dyn NativeCtx, db_id: i64, sql: &str, params: VnArray) -> Result<VmValue, NativeError> {
             let all = Self::queryAll(ctx, db_id, sql, params)?;
             Ok(all.into_iter().next().unwrap_or_else(VmValue::null))
         }

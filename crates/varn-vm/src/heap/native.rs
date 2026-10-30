@@ -258,7 +258,9 @@ impl NativeCtx for Heap {
         _callee: VmValue,
         _args: &[VmValue],
     ) -> Result<VmValue, varn_types::NativeError> {
-        Err("call_vm unavailable on bare Heap (use ExecCtx)".into())
+        Err(varn_types::NativeError::failure(
+            "call_vm unavailable on bare Heap (use ExecCtx)",
+        ))
     }
 
     fn spawn_vm(&mut self, _callee: VmValue, _args: &[VmValue]) -> Result<VmValue, String> {

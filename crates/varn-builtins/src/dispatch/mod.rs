@@ -91,16 +91,17 @@ pub fn native_op_name_by_fn(f: varn_types::NativeFn) -> Option<&'static str> {
 pub fn check_native_fn_capability(
     f: varn_types::NativeFn,
     ctx: &dyn NativeCtx,
-) -> Result<(), String> {
+) -> Result<(), varn_types::NativeError> {
     let Some(entry) = registry().by_fn.get(&(f as usize)) else {
         return Ok(());
     };
     match entry.capability() {
-        Some(capability) if !ctx.has_capability(capability) => Err(format!(
-            "E_HOST_PERMISSION_DENIED:id={}:{}:capability={capability}",
-            entry.module_id(),
-            entry.symbol_name()
-        )),
+        Some(capability) if !ctx.has_capability(capability) => {
+            Err(varn_types::NativeError::capability(
+                capability,
+                format!("{}:{}", entry.module_id(), entry.symbol_name()),
+            ))
+        }
         Some(_) | None => Ok(()),
     }
 }

@@ -31,7 +31,7 @@ pub use native::{
 };
 pub use native_ctx::NativeCtx;
 pub use native_ctx::NativeFnResult;
-pub use native_error::NativeError;
+pub use native_error::{ErrorValue, NativeError, StdErrorInfo};
 pub use resource::ResourceStore;
 pub use task::{Completion, HostOpen, HostPromise};
 pub use value::{

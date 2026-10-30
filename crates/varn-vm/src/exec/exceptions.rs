@@ -101,6 +101,7 @@ pub fn build_thrown_error(val: VmValue, heap: &Heap, frames: &[CallFrame]) -> Ru
         frames: frame_infos,
         thrown: Some(val),
         kind: varn_core::RuntimeErrorKind::Error,
+        std: None,
     }
 }
 
@@ -109,7 +110,13 @@ pub(crate) fn thrown_value_for(err: &RuntimeError, heap: &mut Heap) -> VmValue {
         return v;
     }
     let msg = heap.alloc_str_dynamic(&err.message);
-    let class_name = err.kind.class_name();
+    let std_class = err
+        .std
+        .as_ref()
+        .filter(|info| heap.get_intrinsic_class(info.class.name()).is_some());
+    let class_name = std_class
+        .map(|info| info.class.name())
+        .unwrap_or_else(|| err.kind.class_name());
     let Some(cls) = heap.get_intrinsic_class(class_name) else {
         return msg;
     };
@@ -138,6 +145,22 @@ pub(crate) fn thrown_value_for(err: &RuntimeError, heap: &mut Heap) -> VmValue {
             std::sync::Arc::from(varn_core::MemberKey::Stack.as_str()),
             stack,
         );
+    }
+    if let Some(info) = std_class {
+        let code = heap.alloc_str_dynamic(info.class.code());
+        let mut entries = vec![(varn_core::ErrorField::Code.name(), code)];
+        for (field, value) in &info.fields {
+            let value = match value {
+                varn_types::ErrorValue::Str(text) => heap.alloc_str_dynamic(text),
+                varn_types::ErrorValue::Int(n) => VmValue::from_int(*n),
+            };
+            entries.push((field.name(), value));
+        }
+        if let Some(HeapObj::Object(oref)) = heap.get(err_obj.as_heap()) {
+            for (key, value) in entries {
+                oref.set_field(std::sync::Arc::from(key), value);
+            }
+        }
     }
     err_obj
 }

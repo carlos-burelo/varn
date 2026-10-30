@@ -50,5 +50,7 @@ fn unknown_op_native(
     _ctx: &mut dyn varn_types::NativeCtx,
     _args: &[VmValue],
 ) -> Result<VmValue, varn_types::NativeError> {
-    Err(varn_types::NativeError::from("CallNativeOp: unknown op-id"))
+    Err(varn_types::NativeError::failure(
+        "CallNativeOp: unknown op-id",
+    ))
 }

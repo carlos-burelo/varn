@@ -1,4 +1,6 @@
+use varn_core::StdErrorClass;
 use varn_macros::varn_contract;
+use varn_types::NativeError;
 use varn_types::{NativeCtx, VmValue};
 
 pub struct TextRuntime;
@@ -13,17 +15,17 @@ varn_contract! {
     module: "runtime:text",
     contract: "src/modules/runtime/text/text_runtime.vn",
     impl TextRuntime {
-        fn fontCount(_ctx: &mut dyn NativeCtx) -> Result<i64, String> {
+        fn fontCount(_ctx: &mut dyn NativeCtx) -> Result<i64, NativeError> {
             Ok(varn_text::fonts().len() as i64)
         }
-        fn fonts(ctx: &mut dyn NativeCtx) -> Result<Vec<VmValue>, String> {
+        fn fonts(ctx: &mut dyn NativeCtx) -> Result<Vec<VmValue>, NativeError> {
             Ok(varn_text::fonts()
                 .into_iter()
                 .map(|s| ctx.alloc_str_owned(s))
                 .collect())
         }
-        fn shape(ctx: &mut dyn NativeCtx, text: &str, size: f64) -> Result<VmValue, String> {
-            let run = varn_text::shape_run(text, size as f32)?;
+        fn shape(ctx: &mut dyn NativeCtx, text: &str, size: f64) -> Result<VmValue, NativeError> {
+            let run = varn_text::shape_run(text, size as f32).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
             let chars: Vec<VmValue> = run
                 .glyphs
                 .iter()
@@ -51,14 +53,14 @@ varn_contract! {
             }
             .alloc(ctx))
         }
-        fn ascent(_ctx: &mut dyn NativeCtx, size: f64) -> Result<f64, String> {
-            Ok(varn_text::font_ascent(size as f32)? as f64)
+        fn ascent(_ctx: &mut dyn NativeCtx, size: f64) -> Result<f64, NativeError> {
+            Ok(varn_text::font_ascent(size as f32).map_err(|e| NativeError::std(StdErrorClass::Parse, e))? as f64)
         }
-        fn descent(_ctx: &mut dyn NativeCtx, size: f64) -> Result<f64, String> {
-            Ok(varn_text::font_descent(size as f32)? as f64)
+        fn descent(_ctx: &mut dyn NativeCtx, size: f64) -> Result<f64, NativeError> {
+            Ok(varn_text::font_descent(size as f32).map_err(|e| NativeError::std(StdErrorClass::Parse, e))? as f64)
         }
-        fn wrap(ctx: &mut dyn NativeCtx, text: &str, size: f64, max: f64) -> Result<Vec<VmValue>, String> {
-            Ok(varn_text::wrap_lines(text, size as f32, max as f32)?
+        fn wrap(ctx: &mut dyn NativeCtx, text: &str, size: f64, max: f64) -> Result<Vec<VmValue>, NativeError> {
+            Ok(varn_text::wrap_lines(text, size as f32, max as f32).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?
                 .into_iter()
                 .map(|s| ctx.alloc_str_owned(s))
                 .collect())

@@ -4,7 +4,9 @@ use flate2::Compression;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::Path;
+use varn_core::StdErrorClass;
 use varn_macros::varn_contract;
+use varn_types::NativeError;
 use varn_types::{NativeCtx, VmValue};
 
 pub struct CompressRuntime;
@@ -52,78 +54,78 @@ varn_contract! {
     module: "runtime:compress",
     contract: "src/modules/runtime/compress/compress_runtime.vn",
     impl CompressRuntime {
-        fn gzip(ctx: &mut dyn NativeCtx, data: VmValue) -> Result<VmValue, String> {
+        fn gzip(ctx: &mut dyn NativeCtx, data: VmValue) -> Result<VmValue, NativeError> {
             let input_bytes = if let Some(b) = ctx.buffer_to_bytes(data) {
                 b
             } else if ctx.is_string(data) {
                 ctx.str_repr(data).into_bytes()
             } else {
-                return Err("gzip expects Bytes or str".to_string());
+                return Err(NativeError::type_error("gzip expects Bytes or str".to_string()));
             };
             let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-            encoder.write_all(&input_bytes).map_err(|e| format!("gzip compression error: {e}"))?;
-            let compressed = encoder.finish().map_err(|e| format!("gzip finish error: {e}"))?;
+            encoder.write_all(&input_bytes).map_err(|e| format!("gzip compression error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
+            let compressed = encoder.finish().map_err(|e| format!("gzip finish error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
             Ok(ctx.alloc_buffer_from_bytes(&compressed))
         }
 
-        fn gunzip(ctx: &mut dyn NativeCtx, bytes: VmValue) -> Result<VmValue, String> {
-            let raw_bytes = ctx.buffer_to_bytes(bytes).ok_or_else(|| "gunzip expects Bytes".to_string())?;
+        fn gunzip(ctx: &mut dyn NativeCtx, bytes: VmValue) -> Result<VmValue, NativeError> {
+            let raw_bytes = ctx.buffer_to_bytes(bytes).ok_or_else(|| "gunzip expects Bytes".to_string()).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
             let mut decoder = GzDecoder::new(&raw_bytes[..]);
             let mut decompressed = Vec::new();
-            decoder.read_to_end(&mut decompressed).map_err(|e| format!("gunzip decompression error: {e}"))?;
+            decoder.read_to_end(&mut decompressed).map_err(|e| format!("gunzip decompression error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
             Ok(ctx.alloc_buffer_from_bytes(&decompressed))
         }
 
-        fn deflate(ctx: &mut dyn NativeCtx, data: VmValue) -> Result<VmValue, String> {
+        fn deflate(ctx: &mut dyn NativeCtx, data: VmValue) -> Result<VmValue, NativeError> {
             let input_bytes = if let Some(b) = ctx.buffer_to_bytes(data) {
                 b
             } else if ctx.is_string(data) {
                 ctx.str_repr(data).into_bytes()
             } else {
-                return Err("deflate expects Bytes or str".to_string());
+                return Err(NativeError::type_error("deflate expects Bytes or str".to_string()));
             };
             let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
-            encoder.write_all(&input_bytes).map_err(|e| format!("deflate compression error: {e}"))?;
-            let compressed = encoder.finish().map_err(|e| format!("deflate finish error: {e}"))?;
+            encoder.write_all(&input_bytes).map_err(|e| format!("deflate compression error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
+            let compressed = encoder.finish().map_err(|e| format!("deflate finish error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
             Ok(ctx.alloc_buffer_from_bytes(&compressed))
         }
 
-        fn inflate(ctx: &mut dyn NativeCtx, bytes: VmValue) -> Result<VmValue, String> {
-            let raw_bytes = ctx.buffer_to_bytes(bytes).ok_or_else(|| "inflate expects Bytes".to_string())?;
+        fn inflate(ctx: &mut dyn NativeCtx, bytes: VmValue) -> Result<VmValue, NativeError> {
+            let raw_bytes = ctx.buffer_to_bytes(bytes).ok_or_else(|| "inflate expects Bytes".to_string()).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
             let mut decoder = ZlibDecoder::new(&raw_bytes[..]);
             let mut decompressed = Vec::new();
-            decoder.read_to_end(&mut decompressed).map_err(|e| format!("inflate decompression error: {e}"))?;
+            decoder.read_to_end(&mut decompressed).map_err(|e| format!("inflate decompression error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
             Ok(ctx.alloc_buffer_from_bytes(&decompressed))
         }
 
-        fn tarCreate(_ctx: &mut dyn NativeCtx, source_dir: &str, tar_path: &str) -> Result<(), String> {
-            let tar_file = File::create(tar_path).map_err(|e| format!("Tar create error: {e}"))?;
+        fn tarCreate(_ctx: &mut dyn NativeCtx, source_dir: &str, tar_path: &str) -> Result<(), NativeError> {
+            let tar_file = File::create(tar_path).map_err(|e| format!("Tar create error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
             let mut tar_builder = tar::Builder::new(tar_file);
-            tar_builder.append_dir_all(".", source_dir).map_err(|e| format!("Tar append error: {e}"))?;
-            tar_builder.finish().map_err(|e| format!("Tar finish error: {e}"))?;
+            tar_builder.append_dir_all(".", source_dir).map_err(|e| format!("Tar append error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
+            tar_builder.finish().map_err(|e| format!("Tar finish error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
             Ok(())
         }
 
-        fn tarExtract(_ctx: &mut dyn NativeCtx, tar_path: &str, dest_dir: &str) -> Result<(), String> {
-            let tar_file = File::open(tar_path).map_err(|e| format!("Tar open error: {e}"))?;
+        fn tarExtract(_ctx: &mut dyn NativeCtx, tar_path: &str, dest_dir: &str) -> Result<(), NativeError> {
+            let tar_file = File::open(tar_path).map_err(|e| format!("Tar open error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
             let mut archive = tar::Archive::new(tar_file);
-            archive.unpack(dest_dir).map_err(|e| format!("Tar unpack error: {e}"))?;
+            archive.unpack(dest_dir).map_err(|e| format!("Tar unpack error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
             Ok(())
         }
 
-        fn zipCreate(_ctx: &mut dyn NativeCtx, source_dir: &str, zip_path: &str) -> Result<(), String> {
-            let zip_file = File::create(zip_path).map_err(|e| format!("Zip create error: {e}"))?;
+        fn zipCreate(_ctx: &mut dyn NativeCtx, source_dir: &str, zip_path: &str) -> Result<(), NativeError> {
+            let zip_file = File::create(zip_path).map_err(|e| format!("Zip create error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
             let mut writer = zip::ZipWriter::new(zip_file);
             let base = Path::new(source_dir);
-            zip_dir_recursive(&mut writer, base, base)?;
-            writer.finish().map_err(|e| format!("Zip finish error: {e}"))?;
+            zip_dir_recursive(&mut writer, base, base).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
+            writer.finish().map_err(|e| format!("Zip finish error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
             Ok(())
         }
 
-        fn zipExtract(_ctx: &mut dyn NativeCtx, zip_path: &str, dest_dir: &str) -> Result<(), String> {
-            let zip_file = File::open(zip_path).map_err(|e| format!("Zip open error: {e}"))?;
-            let mut archive = zip::ZipArchive::new(zip_file).map_err(|e| format!("Zip archive error: {e}"))?;
-            archive.extract(dest_dir).map_err(|e| format!("Zip extract error: {e}"))?;
+        fn zipExtract(_ctx: &mut dyn NativeCtx, zip_path: &str, dest_dir: &str) -> Result<(), NativeError> {
+            let zip_file = File::open(zip_path).map_err(|e| format!("Zip open error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
+            let mut archive = zip::ZipArchive::new(zip_file).map_err(|e| format!("Zip archive error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
+            archive.extract(dest_dir).map_err(|e| format!("Zip extract error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
             Ok(())
         }
     }

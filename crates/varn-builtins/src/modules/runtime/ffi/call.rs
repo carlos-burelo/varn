@@ -1,5 +1,5 @@
 use std::ffi::{CStr, CString};
-use varn_types::{NativeCtx, VmValue, VnArray};
+use varn_types::{NativeCtx, NativeError, VmValue, VnArray};
 
 #[derive(Clone, Copy)]
 enum Kind {
@@ -52,14 +52,14 @@ impl Slot {
     }
 }
 
-fn read_kinds(ctx: &mut dyn NativeCtx, types: &VnArray) -> Result<Vec<Kind>, String> {
+fn read_kinds(ctx: &mut dyn NativeCtx, types: &VnArray) -> Result<Vec<Kind>, NativeError> {
     (0..types.len(ctx))
         .map(|i| {
             types
                 .get(ctx, i)
                 .filter(|v| v.is_int())
                 .and_then(|v| Kind::from_raw(v.as_int()))
-                .ok_or_else(|| format!("ffi.call: parameter {i} has an unknown type"))
+                .ok_or_else(|| NativeError::type_error(format!("ffi.call: parameter {i} has an unknown type")))
         })
         .collect()
 }
@@ -69,12 +69,12 @@ fn marshal(
     kinds: &[Kind],
     values: &[VmValue],
     keep: &mut Vec<CString>,
-) -> Result<Vec<Slot>, String> {
+) -> Result<Vec<Slot>, NativeError> {
     let mut slots = Vec::with_capacity(kinds.len());
     for (i, (kind, v)) in kinds.iter().zip(values).enumerate() {
-        let mismatch = || format!("ffi.call: argument {i} must be {}", kind.label());
+        let mismatch = || NativeError::type_error(format!("ffi.call: argument {i} must be {}", kind.label()));
         let slot = match kind {
-            Kind::Void => return Err(format!("ffi.call: parameter {i} cannot be void")),
+            Kind::Void => return Err(NativeError::type_error(format!("ffi.call: parameter {i} cannot be void"))),
             Kind::Int => {
                 if !v.is_int() {
                     return Err(mismatch());
@@ -108,7 +108,7 @@ fn marshal(
                 } else {
                     let text = ctx.str_owned(*v).ok_or_else(mismatch)?;
                     let c_text = CString::new(text)
-                        .map_err(|_| format!("ffi.call: argument {i} contains a NUL byte"))?;
+                        .map_err(|_| NativeError::type_error(format!("ffi.call: argument {i} contains a NUL byte")))?;
                     let addr = c_text.as_ptr() as usize as u64;
                     keep.push(c_text);
                     Slot::Int(addr)
@@ -123,6 +123,7 @@ fn marshal(
 #[cfg(windows)]
 mod abi {
     use super::Slot;
+    use varn_types::NativeError;
 
     pub const MAX_ARGS: usize = 8;
 
@@ -161,12 +162,12 @@ mod abi {
         )
     }
 
-    pub fn dispatch<R>(f: usize, slots: &[Slot]) -> Result<R, String> {
+    pub fn dispatch<R>(f: usize, slots: &[Slot]) -> Result<R, NativeError> {
         if slots.len() > MAX_ARGS {
-            return Err(format!(
+            return Err(NativeError::range_error(format!(
                 "ffi.call: at most {MAX_ARGS} arguments are supported, got {}",
                 slots.len()
-            ));
+            )));
         }
         let mut bits = [0u64; MAX_ARGS];
         let mut float = [false; 4];
@@ -205,11 +206,12 @@ mod abi {
 #[cfg(not(windows))]
 mod abi {
     use super::Slot;
+    use varn_types::NativeError;
 
     const MAX_INTS: usize = 6;
     const MAX_FLOATS: usize = 8;
 
-    pub fn dispatch<R>(f: usize, slots: &[Slot]) -> Result<R, String> {
+    pub fn dispatch<R>(f: usize, slots: &[Slot]) -> Result<R, NativeError> {
         let mut ints = [0usize; MAX_INTS];
         let mut floats = [0f64; MAX_FLOATS];
         let (mut int_count, mut float_count) = (0, 0);
@@ -217,13 +219,13 @@ mod abi {
             match slot {
                 Slot::Int(bits) => {
                     *ints.get_mut(int_count).ok_or_else(|| {
-                        format!("ffi.call: at most {MAX_INTS} integer arguments are supported")
+                        NativeError::range_error(format!("ffi.call: at most {MAX_INTS} integer arguments are supported"))
                     })? = *bits as usize;
                     int_count += 1;
                 }
                 Slot::Float(value) => {
                     *floats.get_mut(float_count).ok_or_else(|| {
-                        format!("ffi.call: at most {MAX_FLOATS} float arguments are supported")
+                        NativeError::range_error(format!("ffi.call: at most {MAX_FLOATS} float arguments are supported"))
                     })? = *value;
                     float_count += 1;
                 }
@@ -263,18 +265,18 @@ pub fn call(
     ret_raw: i64,
     types: VnArray,
     args: VnArray,
-) -> Result<VmValue, String> {
+) -> Result<VmValue, NativeError> {
     if fn_ptr == 0 {
-        return Err("ffi.call: null function pointer".to_string());
+        return Err(NativeError::range_error("ffi.call: null function pointer"));
     }
-    let ret = Kind::from_raw(ret_raw).ok_or_else(|| "ffi.call: unknown return type".to_string())?;
+    let ret = Kind::from_raw(ret_raw).ok_or_else(|| NativeError::type_error("ffi.call: unknown return type"))?;
     let kinds = read_kinds(ctx, &types)?;
     let argc = args.len(ctx);
     if kinds.len() != argc {
-        return Err(format!(
+        return Err(NativeError::type_error(format!(
             "ffi.call: {} parameter types declared but {argc} arguments given",
             kinds.len()
-        ));
+        )));
     }
     let values: Vec<VmValue> = (0..argc)
         .map(|i| args.get(ctx, i).unwrap_or_else(VmValue::null))

@@ -1,5 +1,6 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use varn_macros::varn_contract;
+use varn_types::NativeError;
 use varn_types::{NativeCtx, VmValue};
 
 pub struct TestingRuntime;
@@ -104,7 +105,7 @@ varn_contract! {
     module: "runtime:testing",
     contract: "src/modules/runtime/testing/testing_runtime.vn",
     impl TestingRuntime {
-        fn deepEq(ctx: &mut dyn NativeCtx, a: VmValue, b: VmValue) -> Result<bool, String> {
+        fn deepEq(ctx: &mut dyn NativeCtx, a: VmValue, b: VmValue) -> Result<bool, NativeError> {
             Ok(deep_equal(ctx, a, b))
         }
     }

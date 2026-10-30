@@ -1,3 +1,4 @@
+import { ParseError } from "std:error";
 // MessagePack binary serialization for Varn (RFC / Official MsgPack Specification)
 
 class ByteWriter {
@@ -67,7 +68,7 @@ class ByteReader {
     }
 
     readU8(): int {
-        if (this.pos >= this.buf.length) throw new Error("MsgPack: unexpected EOF");
+        if (this.pos >= this.buf.length) throw new ParseError("MsgPack: unexpected EOF");
         let b = this.buf.getByte(this.pos);
         this.pos = this.pos + 1;
         return b;
@@ -96,7 +97,7 @@ class ByteReader {
     }
 
     readBytes(len: int): Bytes {
-        if (this.pos + len > this.buf.length) throw new Error("MsgPack: unexpected EOF reading bytes");
+        if (this.pos + len > this.buf.length) throw new ParseError("MsgPack: unexpected EOF reading bytes");
         let slice = this.buf.slice(this.pos, this.pos + len);
         this.pos = this.pos + len;
         return slice;
@@ -367,7 +368,7 @@ function decodeValue(r: ByteReader): MsgPackValue {
         return map;
     }
 
-    throw new Error("MsgPack: unknown tag 0x" + tag.toHex());
+    throw new ParseError("MsgPack: unknown tag 0x" + tag.toHex());
 }
 
 export namespace MsgPack {

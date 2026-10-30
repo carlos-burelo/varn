@@ -302,10 +302,9 @@ impl NativeCtx for ExecCtx {
         generator: VmValue,
         input: VmValue,
     ) -> varn_types::NativeFnResult {
-        let state = self
-            .heap
-            .generator_of(generator)
-            .ok_or_else(|| varn_types::NativeError::from("generator.next: invalid receiver"))?;
+        let state = self.heap.generator_of(generator).ok_or_else(|| {
+            varn_types::NativeError::type_error("generator.next: invalid receiver")
+        })?;
         if state.is_async {
             return Ok(self.step_generator_task(&state));
         }
@@ -361,6 +360,16 @@ impl NativeCtx for ExecCtx {
 
     fn register_class(&mut self, name: &str, cls: std::rc::Rc<ClassObj>) {
         self.heap.set_intrinsic_class(name, cls);
+    }
+
+    fn class_from_value(&self, value: VmValue) -> Option<std::rc::Rc<ClassObj>> {
+        if !value.is_heap() {
+            return None;
+        }
+        match self.heap.get(value.as_heap()) {
+            Some(crate::heap::HeapObj::Class(cls)) => Some(cls.clone()),
+            Some(_) | None => None,
+        }
     }
 
     fn current_source_file(&self) -> Option<String> {

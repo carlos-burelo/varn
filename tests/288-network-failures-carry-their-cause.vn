@@ -2,6 +2,7 @@ import { describe, it, expect } from "std:test";
 import { delay } from "std:task";
 import { fetch, HttpServer, Request, Response } from "std:http";
 import { TcpStream, TcpListener } from "std:net";
+import { ConnectError, NetError, ResolveError } from "std:error";
 
 async function messageOf(run: () => Task<dynamic>): Task<str> {
     try {
@@ -12,27 +13,38 @@ async function messageOf(run: () => Task<dynamic>): Task<str> {
     }
 }
 
+async function connectFailure(run: () => Task<dynamic>): Task<ConnectError?> {
+    try {
+        await run()
+        return null
+    } catch (e: ConnectError) {
+        return e
+    }
+}
+
 await describe("288 network failures carry their cause", async () => {
     await it("a refused connection says why", async () => {
-        const message = await messageOf(() => TcpStream.connect("127.0.0.1", 1, 1));
-        expect(message.startsWith("TcpConnectError")).toBeTruthy();
-        expect(message.indexOf("connect:") !== null).toBeTruthy();
+        const failure = await connectFailure(() => TcpStream.connect("127.0.0.1", 1, 1));
+        expect(failure !== null).toBeTruthy();
+        expect((failure as ConnectError).code).toBe("net.connect");
+        expect((failure as ConnectError).host).toBe("127.0.0.1");
+        expect((failure as ConnectError).port).toBe(1);
     });
 
     await it("fetch never fabricates a response", async () => {
-        const message = await messageOf(() => fetch("http://127.0.0.1:1/"));
-        expect(message.startsWith("NetworkError")).toBeTruthy();
+        const failure = await connectFailure(() => fetch("http://127.0.0.1:1/"));
+        expect(failure !== null).toBeTruthy();
         expect((await messageOf(() => fetch("http://%/"))).length > 0).toBeTruthy();
     });
 
     await it("an unbindable port is an error, not a silent listener", async () => {
-        let message = "";
+        let code = "";
         try {
             TcpListener.listen(70000)
-        } catch (e) {
-            message = e.message
+        } catch (e: NetError) {
+            code = e.code
         }
-        expect(message.startsWith("TcpListenError")).toBeTruthy();
+        expect(code).toBe("net");
     });
 
     await it("a throwing handler answers 500 and the server keeps serving", async () => {

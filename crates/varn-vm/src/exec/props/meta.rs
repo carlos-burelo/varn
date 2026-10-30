@@ -304,7 +304,10 @@ pub(crate) fn resolve_meta_property(
 }
 
 fn meta_keys_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::NativeFnResult {
-    let recv = args.first().copied().ok_or("meta.keys: missing receiver")?;
+    let recv = args
+        .first()
+        .copied()
+        .ok_or_else(|| varn_types::NativeError::type_error("meta.keys: missing receiver"))?;
     let mut keys: Vec<VmValue> = Vec::new();
     if ctx.is_object(recv) {
         let mut names: Vec<String> = Vec::new();
@@ -320,7 +323,7 @@ fn meta_values_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types::
     let recv = args
         .first()
         .copied()
-        .ok_or("meta.values: missing receiver")?;
+        .ok_or_else(|| varn_types::NativeError::type_error("meta.values: missing receiver"))?;
     let mut values: Vec<VmValue> = Vec::new();
     if ctx.is_object(recv) {
         ctx.object_for_each(recv, &mut |_, v| values.push(v));
@@ -336,7 +339,7 @@ fn meta_entries_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types:
     let recv = args
         .first()
         .copied()
-        .ok_or("meta.entries: missing receiver")?;
+        .ok_or_else(|| varn_types::NativeError::type_error("meta.entries: missing receiver"))?;
     let mut pairs: Vec<(Option<String>, VmValue, VmValue)> = Vec::new();
     if ctx.is_object(recv) {
         ctx.object_for_each(recv, &mut |k, v| {
@@ -364,7 +367,7 @@ fn meta_has_own_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> varn_types:
     let recv = args
         .first()
         .copied()
-        .ok_or("meta.hasOwn: missing receiver")?;
+        .ok_or_else(|| varn_types::NativeError::type_error("meta.hasOwn: missing receiver"))?;
     let key = args.get(1).copied().unwrap_or(VmValue::null());
     let Some(key_str) = ctx.str_owned(key) else {
         return Ok(VmValue::from_bool(false));

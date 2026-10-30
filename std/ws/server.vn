@@ -8,7 +8,7 @@ import {
 
 import { wsAcceptResponse$ } from "runtime:ws";
 import { WebSocket, readHttpHead } from "std:ws/client";
-import { stdError, E_WS_IO, E_WS_HANDSHAKE } from "std:error";
+import { ProtocolError, ClosedError } from "std:error";
 
 export class WsServer {
     private _listener: int = -1;
@@ -21,11 +21,7 @@ export class WsServer {
 
     static listen(port: int, host: str = "127.0.0.1"): WsServer {
         let server = new WsServer(port);
-        try {
-            server._listener = tcpListen$(port, host);
-        } catch (e) {
-            throw stdError(E_WS_IO, "could not listen on port " + port.toString() + " (" + e.message + ")");
-        }
+        server._listener = tcpListen$(port, host);
         server._isListening = true;
         return server;
     }
@@ -40,19 +36,14 @@ export class WsServer {
 
     async accept(): Task<WebSocket> {
         if (!this._isListening) {
-            throw stdError(E_WS_IO, "server is closed");
+            throw new ClosedError("server is closed");
         }
-        let conn = -1;
-        try {
-            conn = await tcpAccept$(this._listener);
-        } catch (e) {
-            throw stdError(E_WS_IO, "accept failed (" + e.message + ")");
-        }
+        const conn = await tcpAccept$(this._listener);
         try {
             let head = await readHttpHead(conn);
             if (!head.head.toLowerCase().includes("upgrade")) {
                 tcpClose$(conn);
-                throw stdError(E_WS_HANDSHAKE, "not a websocket upgrade");
+                throw new ProtocolError("not a websocket upgrade");
             }
             let res = wsAcceptResponse$(head.head);
             await tcpWrite$(conn, res);

@@ -12,6 +12,7 @@ import {
 
 import { AsyncReader, AsyncWriter } from "std:io";
 import { delay } from "std:task";
+import { ClosedError, ConnectError, NetError } from "std:error";
 
 export class TcpStream implements AsyncReader, AsyncWriter {
     private _connId: int;
@@ -35,20 +36,20 @@ export class TcpStream implements AsyncReader, AsyncWriter {
 
     private static async open(host: str, port: int, secure: bool, ca: str?, attempts: int, baseDelayMs: int): Task<TcpStream> {
         let attempt = 0;
-        let cause = "no attempt was made";
+        let last: NetError = new ConnectError(host, port);
         while (attempt < attempts) {
             try {
                 let connId = secure ? await tcpConnectTls$(host, port, ca) : await tcpConnect$(host, port);
                 return new TcpStream(connId, host, port);
-            } catch (e) {
-                cause = e.message;
+            } catch (e: NetError) {
+                last = e;
             }
             attempt = attempt + 1;
             if (attempt < attempts) {
                 await delay(baseDelayMs + attempt * 20);
             }
         }
-        throw new Error("TcpConnectError: Could not connect to " + host + ":" + port.toString() + " (" + cause + ")");
+        throw last;
     }
 
     get connId(): int {
@@ -110,14 +111,14 @@ export class TcpStream implements AsyncReader, AsyncWriter {
 
     async write(data: Bytes | str): Task<int> {
         if (!this._isOpen) {
-            throw new Error("TcpWriteError: Socket is closed");
+            throw new ClosedError("socket is closed");
         }
         let b: Bytes = data is str ? Bytes.fromString(data) : data as Bytes;
         try {
             return await tcpWrite$(this._connId, b);
         } catch (e) {
             this.close();
-            throw new Error("TcpWriteError: " + e.message);
+            throw e;
         }
     }
 
@@ -158,19 +159,11 @@ export class TcpListener {
     }
 
     static listenTls(port: int, cert: str, key: str, host: str = "127.0.0.1"): TcpListener {
-        try {
-            return new TcpListener(tcpListenTls$(port, host, cert, key), port, host);
-        } catch (e) {
-            throw new Error(`TcpListenError: Could not bind a TLS listener to port ${port} (${e.message})`);
-        }
+        return new TcpListener(tcpListenTls$(port, host, cert, key), port, host);
     }
 
     static listen(port: int, host: str = "127.0.0.1"): TcpListener {
-        try {
-            return new TcpListener(tcpListen$(port, host), port, host);
-        } catch (e) {
-            throw new Error(`TcpListenError: Could not bind listener to port ${port} (${e.message})`);
-        }
+        return new TcpListener(tcpListen$(port, host), port, host);
     }
 
     get port(): int {
@@ -187,13 +180,9 @@ export class TcpListener {
 
     async accept(): Task<TcpStream> {
         if (!this._isListening) {
-            throw new Error("TcpAcceptError: Listener is closed");
+            throw new ClosedError("listener is closed");
         }
-        try {
-            return new TcpStream(await tcpAccept$(this._listenerId), this._host, this._port);
-        } catch (e) {
-            throw new Error("TcpAcceptError: " + e.message);
-        }
+        return new TcpStream(await tcpAccept$(this._listenerId), this._host, this._port);
     }
 
     close(): void {

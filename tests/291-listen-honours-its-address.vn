@@ -1,5 +1,6 @@
 import { describe, it, expect } from "std:test";
 import { TcpStream, TcpListener } from "std:net";
+import { NetError } from "std:error";
 
 function failure(run: () => dynamic): str {
     try {
@@ -7,6 +8,15 @@ function failure(run: () => dynamic): str {
         return ""
     } catch (e) {
         return e.message
+    }
+}
+
+function netFailure(run: () => dynamic): NetError? {
+    try {
+        run()
+        return null
+    } catch (e: NetError) {
+        return e
     }
 }
 
@@ -22,7 +32,10 @@ await describe("291 listen honours its address", async () => {
 
     await it("a second listener cannot take a port that is in use", async () => {
         const first = TcpListener.listen(19901);
-        expect(failure(() => TcpListener.listen(19901)).startsWith("TcpListenError")).toBeTruthy();
+        const second = netFailure(() => TcpListener.listen(19901));
+        expect(second !== null).toBeTruthy();
+        expect((second as NetError).port).toBe(19901);
+        expect((second as NetError).host).toBe("127.0.0.1");
         first.close();
     });
 

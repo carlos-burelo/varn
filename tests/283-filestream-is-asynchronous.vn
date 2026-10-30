@@ -1,7 +1,7 @@
 import { describe, it, expect } from "std:test";
 import { sleep, spawn } from "std:task";
 import { FileStream, FileMode, tempDir, remove } from "std:fs";
-import { StdError } from "std:error";
+import { BadDescriptorError } from "std:error";
 
 const path = tempDir() + "/varn-283-filestream.bin";
 
@@ -39,16 +39,16 @@ await describe("283 FileStream is asynchronous", async () => {
         stream.close();
     });
 
-    await it("a closed stream rejects with a coded StdError", async () => {
+    await it("a closed stream rejects with a BadDescriptorError", async () => {
         const stream = new FileStream(path, FileMode.Read);
         stream.close();
         let code = "";
         try {
             await stream.readAll();
-        } catch (e) {
-            code = (e as StdError).code;
+        } catch (e: BadDescriptorError) {
+            code = e.code;
         }
-        expect(code).toBe("E_FS_BAD_FD");
+        expect(code).toBe("io.bad_descriptor");
         remove(path);
     });
 });

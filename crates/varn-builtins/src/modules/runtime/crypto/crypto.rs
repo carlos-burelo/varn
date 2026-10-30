@@ -2,7 +2,9 @@ use base64::Engine;
 use hmac::{Hmac, Mac};
 use rand::RngCore;
 use sha2::{Digest, Sha256, Sha512};
+use varn_core::StdErrorClass;
 use varn_macros::varn_contract;
+use varn_types::NativeError;
 use varn_types::{NativeCtx, VmValue};
 
 pub struct CryptoRuntime;
@@ -11,87 +13,87 @@ varn_contract! {
     module: "runtime:crypto",
     contract: "src/modules/runtime/crypto/crypto_runtime.vn",
     impl CryptoRuntime {
-        fn sha256(_ctx: &mut dyn NativeCtx, data: &str) -> Result<String, String> {
+        fn sha256(_ctx: &mut dyn NativeCtx, data: &str) -> Result<String, NativeError> {
             Ok(hex::encode(Sha256::digest(data.as_bytes())))
         }
-        fn sha512(_ctx: &mut dyn NativeCtx, data: &str) -> Result<String, String> {
+        fn sha512(_ctx: &mut dyn NativeCtx, data: &str) -> Result<String, NativeError> {
             Ok(hex::encode(Sha512::digest(data.as_bytes())))
         }
-        fn uuid(_ctx: &mut dyn NativeCtx) -> Result<String, String> {
+        fn uuid(_ctx: &mut dyn NativeCtx) -> Result<String, NativeError> {
             Ok(uuid::Uuid::new_v4().to_string())
         }
-        fn uuidV4(_ctx: &mut dyn NativeCtx) -> Result<String, String> {
+        fn uuidV4(_ctx: &mut dyn NativeCtx) -> Result<String, NativeError> {
             Ok(uuid::Uuid::new_v4().to_string())
         }
-        fn uuidV7(_ctx: &mut dyn NativeCtx) -> Result<String, String> {
+        fn uuidV7(_ctx: &mut dyn NativeCtx) -> Result<String, NativeError> {
             Ok(uuid::Uuid::now_v7().to_string())
         }
-        fn uuidValidate(_ctx: &mut dyn NativeCtx, s: &str) -> Result<bool, String> {
+        fn uuidValidate(_ctx: &mut dyn NativeCtx, s: &str) -> Result<bool, NativeError> {
             Ok(uuid::Uuid::parse_str(s).is_ok())
         }
-        fn randomBytes(_ctx: &mut dyn NativeCtx, size: i64) -> Result<Vec<VmValue>, String> {
+        fn randomBytes(_ctx: &mut dyn NativeCtx, size: i64) -> Result<Vec<VmValue>, NativeError> {
             if size < 0 {
-                return Err("crypto.randomBytes: size must be non-negative".to_string());
+                return Err(NativeError::range_error("crypto.randomBytes: size must be non-negative".to_string()));
             }
             let mut bytes = vec![0u8; size as usize];
             rand::thread_rng().fill_bytes(&mut bytes);
             Ok(bytes.iter().map(|b| VmValue::from_int(*b as i64)).collect())
         }
-        fn randomHex(_ctx: &mut dyn NativeCtx, size: i64) -> Result<String, String> {
+        fn randomHex(_ctx: &mut dyn NativeCtx, size: i64) -> Result<String, NativeError> {
             if size < 0 {
-                return Err("crypto.randomHex: size must be non-negative".to_string());
+                return Err(NativeError::range_error("crypto.randomHex: size must be non-negative".to_string()));
             }
             let mut bytes = vec![0u8; size as usize];
             rand::thread_rng().fill_bytes(&mut bytes);
             Ok(hex::encode(bytes))
         }
-        fn base64Enc(_ctx: &mut dyn NativeCtx, data: &str) -> Result<String, String> {
+        fn base64Enc(_ctx: &mut dyn NativeCtx, data: &str) -> Result<String, NativeError> {
             Ok(base64::engine::general_purpose::STANDARD.encode(data.as_bytes()))
         }
-        fn base64Dec(_ctx: &mut dyn NativeCtx, data: &str) -> Result<String, String> {
+        fn base64Dec(_ctx: &mut dyn NativeCtx, data: &str) -> Result<String, NativeError> {
             let decoded = base64::engine::general_purpose::STANDARD
                 .decode(data.as_bytes())
-                .map_err(|e| format!("crypto.base64_dec: {e}"))?;
-            String::from_utf8(decoded).map_err(|e| format!("crypto.base64_dec: {e}"))
+                .map_err(|e| format!("crypto.base64_dec: {e}")).map_err(NativeError::range_error)?;
+            (String::from_utf8(decoded).map_err(|e| format!("crypto.base64_dec: {e}"))).map_err(|e| NativeError::std(StdErrorClass::Parse, e))
         }
-        fn base64EncBytes(ctx: &mut dyn NativeCtx, data: VmValue) -> Result<String, String> {
+        fn base64EncBytes(ctx: &mut dyn NativeCtx, data: VmValue) -> Result<String, NativeError> {
             let bytes = ctx
                 .buffer_to_bytes(data)
-                .ok_or_else(|| "crypto.base64EncBytes: expected Bytes".to_string())?;
+                .ok_or_else(|| "crypto.base64EncBytes: expected Bytes".to_string()).map_err(NativeError::range_error)?;
             Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
         }
-        fn base64DecBytes(ctx: &mut dyn NativeCtx, data: &str) -> Result<VmValue, String> {
+        fn base64DecBytes(ctx: &mut dyn NativeCtx, data: &str) -> Result<VmValue, NativeError> {
             let decoded = base64::engine::general_purpose::STANDARD
                 .decode(data.as_bytes())
-                .map_err(|e| format!("crypto.base64_dec: {e}"))?;
+                .map_err(|e| format!("crypto.base64_dec: {e}")).map_err(NativeError::range_error)?;
             Ok(ctx.alloc_buffer_from_bytes(&decoded))
         }
-        fn hmac(_ctx: &mut dyn NativeCtx, algo: &str, key: &str, data: &str) -> Result<String, String> {
+        fn hmac(_ctx: &mut dyn NativeCtx, algo: &str, key: &str, data: &str) -> Result<String, NativeError> {
             let digest = match algo.to_lowercase().as_str() {
                 "sha1" => {
                     let mut mac = Hmac::<sha1::Sha1>::new_from_slice(key.as_bytes())
-                        .map_err(|e| format!("crypto.hmac: {e}"))?;
+                        .map_err(|e| format!("crypto.hmac: {e}")).map_err(NativeError::range_error)?;
                     mac.update(data.as_bytes());
                     mac.finalize().into_bytes().to_vec()
                 }
                 "sha256" => {
                     let mut mac = Hmac::<Sha256>::new_from_slice(key.as_bytes())
-                        .map_err(|e| format!("crypto.hmac: {e}"))?;
+                        .map_err(|e| format!("crypto.hmac: {e}")).map_err(NativeError::range_error)?;
                     mac.update(data.as_bytes());
                     mac.finalize().into_bytes().to_vec()
                 }
                 "sha512" => {
                     let mut mac = Hmac::<Sha512>::new_from_slice(key.as_bytes())
-                        .map_err(|e| format!("crypto.hmac: {e}"))?;
+                        .map_err(|e| format!("crypto.hmac: {e}")).map_err(NativeError::range_error)?;
                     mac.update(data.as_bytes());
                     mac.finalize().into_bytes().to_vec()
                 }
-                other => return Err(format!("crypto.hmac: unsupported algorithm '{other}'")),
+                other => return Err(NativeError::range_error(format!("crypto.hmac: unsupported algorithm '{other}'"))),
             };
             Ok(hex::encode(digest))
         }
 
-        fn hmacBytes(ctx: &mut dyn NativeCtx, algo: &str, key: VmValue, data: VmValue) -> Result<VmValue, String> {
+        fn hmacBytes(ctx: &mut dyn NativeCtx, algo: &str, key: VmValue, data: VmValue) -> Result<VmValue, NativeError> {
             let key_bytes = if let Some(b) = ctx.buffer_to_bytes(key) {
                 b
             } else if let Some(s) = ctx.str_owned(key) {
@@ -109,30 +111,30 @@ varn_contract! {
             let digest = match algo.to_lowercase().as_str() {
                 "sha1" => {
                     let mut mac = Hmac::<sha1::Sha1>::new_from_slice(&key_bytes)
-                        .map_err(|e| format!("crypto.hmac: {e}"))?;
+                        .map_err(|e| format!("crypto.hmac: {e}")).map_err(NativeError::range_error)?;
                     mac.update(&data_bytes);
                     mac.finalize().into_bytes().to_vec()
                 }
                 "sha256" => {
                     let mut mac = Hmac::<Sha256>::new_from_slice(&key_bytes)
-                        .map_err(|e| format!("crypto.hmac: {e}"))?;
+                        .map_err(|e| format!("crypto.hmac: {e}")).map_err(NativeError::range_error)?;
                     mac.update(&data_bytes);
                     mac.finalize().into_bytes().to_vec()
                 }
                 "sha512" => {
                     let mut mac = Hmac::<Sha512>::new_from_slice(&key_bytes)
-                        .map_err(|e| format!("crypto.hmac: {e}"))?;
+                        .map_err(|e| format!("crypto.hmac: {e}")).map_err(NativeError::range_error)?;
                     mac.update(&data_bytes);
                     mac.finalize().into_bytes().to_vec()
                 }
-                other => return Err(format!("crypto.hmac: unsupported algorithm '{other}'")),
+                other => return Err(NativeError::range_error(format!("crypto.hmac: unsupported algorithm '{other}'"))),
             };
             Ok(ctx.alloc_buffer_from_bytes(&digest))
         }
 
-        fn randomBytesBuffer(ctx: &mut dyn NativeCtx, size: i64) -> Result<VmValue, String> {
+        fn randomBytesBuffer(ctx: &mut dyn NativeCtx, size: i64) -> Result<VmValue, NativeError> {
             if size < 0 {
-                return Err("crypto.randomBytes: size must be non-negative".to_string());
+                return Err(NativeError::range_error("crypto.randomBytes: size must be non-negative".to_string()));
             }
             let mut bytes = vec![0u8; size as usize];
             rand::thread_rng().fill_bytes(&mut bytes);
@@ -145,7 +147,7 @@ varn_contract! {
             salt: VmValue,
             iterations: i64,
             key_len: i64,
-        ) -> Result<VmValue, String> {
+        ) -> Result<VmValue, NativeError> {
             let salt_bytes = if let Some(b) = ctx.buffer_to_bytes(salt) {
                 b
             } else if let Some(s) = ctx.str_owned(salt) {
@@ -154,10 +156,10 @@ varn_contract! {
                 ctx.str_repr(salt).into_bytes()
             };
             if iterations <= 0 {
-                return Err("PBKDF2: iterations must be positive".to_string());
+                return Err(NativeError::range_error("PBKDF2: iterations must be positive".to_string()));
             }
             if key_len <= 0 {
-                return Err("PBKDF2: keyLen must be positive".to_string());
+                return Err(NativeError::range_error("PBKDF2: keyLen must be positive".to_string()));
             }
 
             let mut out = vec![0u8; key_len as usize];
@@ -167,7 +169,7 @@ varn_contract! {
 
             for i in 1..=num_blocks {
                 let mut mac = Hmac::<Sha256>::new_from_slice(password.as_bytes())
-                    .map_err(|e| e.to_string())?;
+                    .map_err(|e| e.to_string()).map_err(NativeError::range_error)?;
                 block_buf.clear();
                 block_buf.extend_from_slice(&salt_bytes);
                 block_buf.extend_from_slice(&(i as u32).to_be_bytes());
@@ -177,7 +179,7 @@ varn_contract! {
 
                 for _ in 1..iterations {
                     let mut next_mac = Hmac::<Sha256>::new_from_slice(password.as_bytes())
-                        .map_err(|e| e.to_string())?;
+                        .map_err(|e| e.to_string()).map_err(NativeError::range_error)?;
                     next_mac.update(&u);
                     u = next_mac.finalize().into_bytes();
                     for (tb, ub) in t.iter_mut().zip(u.iter()) {
@@ -193,7 +195,7 @@ varn_contract! {
             Ok(ctx.alloc_buffer_from_bytes(&out))
         }
 
-        fn timingSafeEqual(ctx: &mut dyn NativeCtx, a: VmValue, b: VmValue) -> Result<bool, String> {
+        fn timingSafeEqual(ctx: &mut dyn NativeCtx, a: VmValue, b: VmValue) -> Result<bool, NativeError> {
             let bytes_a = if let Some(buf) = ctx.buffer_to_bytes(a) {
                 buf
             } else {

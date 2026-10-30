@@ -18,46 +18,25 @@ import {
 } from "runtime:fs";
 
 import { Stats } from "std:fs/stats";
-import { toStdError, E_FS_IO } from "std:error";
 
 export function readBytes(path: str): Bytes {
-    try {
-        return readFileBytes$(path);
-    } catch (e) {
-        throw toStdError(e as Error, E_FS_IO);
-    }
+    return readFileBytes$(path);
 }
 
 export function writeBytes(path: str, data: Bytes): void {
-    try {
-        writeFileBytes$(path, data);
-    } catch (e) {
-        throw toStdError(e as Error, E_FS_IO);
-    }
+    writeFileBytes$(path, data);
 }
 
 export function readText(path: str): str {
-    try {
-        return readFileText$(path);
-    } catch (e) {
-        throw toStdError(e as Error, E_FS_IO);
-    }
+    return readFileText$(path);
 }
 
 export function writeText(path: str, content: str): void {
-    try {
-        writeFileText$(path, content);
-    } catch (e) {
-        throw toStdError(e as Error, E_FS_IO);
-    }
+    writeFileText$(path, content);
 }
 
 export function appendText(path: str, content: str): void {
-    try {
-        appendFileText$(path, content);
-    } catch (e) {
-        throw toStdError(e as Error, E_FS_IO);
-    }
+    appendFileText$(path, content);
 }
 
 export function exists(path: str): bool {
@@ -65,73 +44,41 @@ export function exists(path: str): bool {
 }
 
 export function stat(path: str): Stats {
-    try {
-        let raw = stat$(path);
-        return new Stats(
-            raw.size,
-            raw.isDir,
-            raw.isFile,
-            raw.mtime
-        );
-    } catch (e) {
-        throw toStdError(e as Error, E_FS_IO);
-    }
+    let raw = stat$(path);
+    return new Stats(
+        raw.size,
+        raw.isDir,
+        raw.isFile,
+        raw.mtime
+    );
 }
 
 export function mkdir(path: str): void {
-    try {
-        mkdir$(path);
-    } catch (e) {
-        throw toStdError(e as Error, E_FS_IO);
-    }
+    mkdir$(path);
 }
 
 export function mkdirAll(path: str): void {
-    try {
-        mkdirAll$(path);
-    } catch (e) {
-        throw toStdError(e as Error, E_FS_IO);
-    }
+    mkdirAll$(path);
 }
 
 export function readDir(path: str): str[] {
-    try {
-        return readDir$(path) as str[];
-    } catch (e) {
-        throw toStdError(e as Error, E_FS_IO);
-    }
+    return readDir$(path) as str[];
 }
 
 export function remove(path: str): void {
-    try {
-        remove$(path);
-    } catch (e) {
-        throw toStdError(e as Error, E_FS_IO);
-    }
+    remove$(path);
 }
 
 export function removeAll(path: str): void {
-    try {
-        removeAll$(path);
-    } catch (e) {
-        throw toStdError(e as Error, E_FS_IO);
-    }
+    removeAll$(path);
 }
 
 export function rename(from: str, to: str): void {
-    try {
-        rename$(from, to);
-    } catch (e) {
-        throw toStdError(e as Error, E_FS_IO);
-    }
+    rename$(from, to);
 }
 
 export function copy(from: str, to: str): void {
-    try {
-        copyFile$(from, to);
-    } catch (e) {
-        throw toStdError(e as Error, E_FS_IO);
-    }
+    copyFile$(from, to);
 }
 
 export function tempDir(): str {
@@ -139,9 +86,5 @@ export function tempDir(): str {
 }
 
 export function readLines(path: str): str[] {
-    try {
-        return readLines$(path);
-    } catch (e) {
-        throw toStdError(e as Error, E_FS_IO);
-    }
+    return readLines$(path);
 }

@@ -9,10 +9,7 @@ pub(super) fn spawn_isolate(
     args: Vec<varn_types::value::SendValue>,
 ) -> Result<varn_types::HostPromise, String> {
     fn worker_error(msg: &str) -> varn_types::value::SendValue {
-        varn_types::value::SendValue::Error {
-            class: varn_core::RuntimeErrorKind::Error.class_name().to_string(),
-            message: msg.to_string(),
-        }
+        varn_types::value::SendValue::error(varn_core::RuntimeErrorKind::Error.class_name(), msg)
     }
 
     let loader = ctx.loader.clone();
@@ -114,17 +111,14 @@ pub(super) fn spawn_isolate(
                         let cell = machine.ctx.run_lazy_task_sync(lazy);
                         if cell.status() == crate::task::Status::Rejected {
                             let thrown = cell.value();
-                            let (class, message) = crate::task::error_parts(
-                                &machine.ctx.heap,
-                                thrown,
-                            )
-                            .unwrap_or_else(|| {
-                                (
-                                    varn_core::RuntimeErrorKind::Error.class_name().to_string(),
-                                    machine.ctx.str_repr(thrown),
-                                )
-                            });
-                            done_t.reject(varn_types::value::SendValue::Error { class, message });
+                            let error = crate::task::error_value(&machine.ctx.heap, thrown)
+                                .unwrap_or_else(|| {
+                                    varn_types::value::SendValue::error(
+                                        varn_core::RuntimeErrorKind::Error.class_name(),
+                                        machine.ctx.str_repr(thrown),
+                                    )
+                                });
+                            done_t.reject(error);
                             return;
                         }
                     }

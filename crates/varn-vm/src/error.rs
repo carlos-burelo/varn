@@ -14,6 +14,7 @@ pub struct RuntimeError {
 
     pub thrown: Option<crate::value::VmValue>,
     pub kind: varn_core::RuntimeErrorKind,
+    pub std: Option<Box<varn_types::StdErrorInfo>>,
 }
 
 impl RuntimeError {
@@ -46,6 +47,7 @@ impl RuntimeError {
             frames: Vec::new(),
             thrown: None,
             kind,
+            std: None,
         }
     }
 }
@@ -54,6 +56,7 @@ impl From<varn_types::NativeError> for RuntimeError {
     fn from(e: varn_types::NativeError) -> Self {
         Self {
             thrown: e.thrown,
+            std: e.std,
             ..Self::of_kind(e.kind, e.message)
         }
     }
@@ -61,7 +64,10 @@ impl From<varn_types::NativeError> for RuntimeError {
 
 impl From<RuntimeError> for varn_types::NativeError {
     fn from(e: RuntimeError) -> Self {
-        varn_types::NativeError::rethrow(e.kind, e.message, e.thrown)
+        varn_types::NativeError {
+            std: e.std,
+            ..varn_types::NativeError::rethrow(e.kind, e.message, e.thrown)
+        }
     }
 }
 

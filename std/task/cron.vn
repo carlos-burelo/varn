@@ -1,3 +1,4 @@
+import { ParseError } from "std:error";
 import { sleep } from "std:task/combinators";
 import { now, toParts, fromParts, TimeParts } from "std:time";
 
@@ -98,7 +99,7 @@ export namespace Cron {
             }
         }
         if (clean.length !== 5) {
-            throw new Error("Cron: expected 5 fields, got " + clean.length.toString());
+            throw new ParseError("Cron: expected 5 fields, got " + clean.length.toString());
         }
         let wd8 = parseField(clean[4], 0, 7);
         let wd = wd8.slice(0, 7);

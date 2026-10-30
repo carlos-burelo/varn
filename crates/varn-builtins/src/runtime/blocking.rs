@@ -2,9 +2,9 @@ use std::collections::VecDeque;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::{Condvar, Mutex, OnceLock, PoisonError};
 use std::time::Duration;
-use varn_types::task::Completion;
+use varn_core::StdErrorClass;
 use varn_types::value::SendValue;
-use varn_types::{HostOpen, HostPromise, NativeCtx, VmValue};
+use varn_types::{HostOpen, HostPromise, NativeCtx, NativeError, VmValue};
 
 const MAX_WORKERS: usize = 256;
 const IDLE_EXIT: Duration = Duration::from_secs(10);
@@ -89,27 +89,27 @@ fn submit(job: Job) {
     }
 }
 
-pub fn failure(message: impl Into<String>) -> SendValue {
-    SendValue::Error {
-        class: varn_core::RuntimeErrorKind::Error.class_name().to_string(),
-        message: message.into(),
-    }
-}
-
-pub fn run(work: impl FnOnce() -> Completion + Send + 'static) -> HostPromise {
+pub fn run(work: impl FnOnce() -> Result<SendValue, NativeError> + Send + 'static) -> HostPromise {
     let promise = HostPromise::pending();
     let done = promise.clone();
-    let rejected = promise.clone();
-    detach(move || match catch_unwind(AssertUnwindSafe(work)) {
-        Ok(outcome) => done.complete(outcome),
-        Err(_) => rejected.complete(Err(failure("blocking operation panicked"))),
+    detach(move || {
+        let outcome = catch_unwind(AssertUnwindSafe(work)).unwrap_or_else(|_| {
+            Err(NativeError::std(
+                StdErrorClass::Std,
+                "blocking operation panicked",
+            ))
+        });
+        match outcome {
+            Ok(value) => done.resolve(value),
+            Err(error) => done.reject(SendValue::from_native_error(&error)),
+        }
     });
     promise
 }
 
 pub fn task(
     ctx: &mut dyn NativeCtx,
-    work: impl FnOnce() -> Result<SendValue, String> + Send + 'static,
+    work: impl FnOnce() -> Result<SendValue, NativeError> + Send + 'static,
 ) -> VmValue {
-    ctx.task_from_host(run(move || work().map_err(failure)), HostOpen::Plain)
+    ctx.task_from_host(run(work), HostOpen::Plain)
 }

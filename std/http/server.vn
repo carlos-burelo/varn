@@ -1,7 +1,7 @@
 import { tcpListen$, tcpListenTls$, tcpAccept$, tcpWrite$, tcpClose$, tcpCloseListener$, sendHttpResponse$, httpMethodName$, HttpMethod } from "runtime:net";
 import { spawn } from "std:task";
 
-import { Request, Response, RawRequest, readHttpRequest, rejectionOf, Route, Handler, Middleware } from "std:http/core";
+import { Request, Response, RawRequest, readHttpRequest, HttpRejection, Route, Handler, Middleware } from "std:http/core";
 import { AsyncReader } from "std:io";
 import { WireReader } from "std:http/wire";
 
@@ -290,12 +290,11 @@ export class HttpServer {
             let rawReq: RawRequest? = null;
             try {
                 rawReq = await readHttpRequest(wire, this._maxContentLength);
+            } catch (err: HttpRejection) {
+                let errHeaders: { [key: str]: str } = { "Content-Type": "text/plain", "Connection": "close" };
+                await this._sendBestEffort(connId, err.status, err.reason, errHeaders, err.reason);
+                break;
             } catch (err) {
-                const rejection = rejectionOf(err.message);
-                if (rejection !== null) {
-                    let errHeaders: { [key: str]: str } = { "Content-Type": "text/plain", "Connection": "close" };
-                    await this._sendBestEffort(connId, rejection.status, rejection.reason, errHeaders, rejection.reason);
-                }
                 break;
             }
             if (rawReq === null) {

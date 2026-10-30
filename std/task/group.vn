@@ -1,16 +1,17 @@
+import { CancelledError, TimeoutError } from "std:error";
 import { parallel$, sleep$ } from "runtime:task";
 import { cancel, spawn, Task } from "std:task/combinators";
 
 async function timeoutJoin<T>(ms: int): Task<T> {
     await sleep$(ms);
-    throw new Error("TaskGroup.join timed out");
+    throw new TimeoutError("TaskGroup.join timed out");
 }
 
 async function wrapTask<T>(task: Task<T>, group: TaskGroup<T>): T {
     try {
         let res = await task;
         if (group.isCancelled) {
-            throw new Error("TaskGroup cancelled");
+            throw new CancelledError("TaskGroup cancelled");
         }
         return res;
     } catch (e) {
@@ -36,7 +37,7 @@ export class TaskGroup<T> {
 
     spawn(task: Task<T>): Task<T> {
         if (this.isCancelled) {
-            throw new Error("TaskGroup is cancelled");
+            throw new CancelledError("TaskGroup is cancelled");
         }
         let wrapped = wrapTask(task, this);
         this.tasks.push(wrapped);
@@ -69,7 +70,7 @@ export class TaskGroup<T> {
 
     async join(timeoutMs?: int): Task<Array<T>> {
         if (this.isCancelled) {
-            throw new Error("TaskGroup is cancelled");
+            throw new CancelledError("TaskGroup is cancelled");
         }
         if (timeoutMs === null) {
             return await this.joinInner();

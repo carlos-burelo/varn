@@ -1,3 +1,4 @@
+use varn_core::StdErrorClass;
 use varn_macros::varn_contract;
 use varn_types::value::{endpoint_id, ChannelEndpoint, SendValue};
 use varn_types::{HostOpen, NativeCtx, NativeError, VmValue};
@@ -19,11 +20,8 @@ fn reject_with_message(ctx: &mut dyn NativeCtx, message: &str) -> VmValue {
 }
 
 fn reject_closed(ctx: &mut dyn NativeCtx) -> VmValue {
-    let error = SendValue::Error {
-        class: varn_types::value::CHANNEL_CLOSED_CLASS.to_string(),
-        message: "channel closed".to_string(),
-    }
-    .to_value_ctx(ctx);
+    let error = SendValue::error(varn_types::value::CHANNEL_CLOSED_CLASS, "channel closed")
+        .to_value_ctx(ctx);
     ctx.task_rejected(error)
 }
 
@@ -53,32 +51,32 @@ varn_contract! {
     module: "runtime:task",
     contract: "src/modules/runtime/task/task_runtime.vn",
     impl TaskRuntime {
-        fn spawn(ctx: &mut dyn NativeCtx, target: VmValue, args: &[VmValue]) -> Result<VmValue, String> {
-            ctx.spawn_vm(target, args)
+        fn spawn(ctx: &mut dyn NativeCtx, target: VmValue, args: &[VmValue]) -> Result<VmValue, NativeError> {
+            (ctx.spawn_vm(target, args)).map_err(|e| NativeError::std(StdErrorClass::Std, e))
         }
 
-        fn sleep(ctx: &mut dyn NativeCtx, ms: i64) -> Result<VmValue, String> {
+        fn sleep(ctx: &mut dyn NativeCtx, ms: i64) -> Result<VmValue, NativeError> {
             Ok(ctx.suspend_timer(ms.max(0) as u64))
         }
 
-        fn parallel(ctx: &mut dyn NativeCtx, tasks: VmValue) -> Result<VmValue, String> {
-            ctx.task_gather(tasks)
+        fn parallel(ctx: &mut dyn NativeCtx, tasks: VmValue) -> Result<VmValue, NativeError> {
+            (ctx.task_gather(tasks)).map_err(|e| NativeError::std(StdErrorClass::Std, e))
         }
 
-        fn cancelTask(ctx: &mut dyn NativeCtx, handle_nv: VmValue) -> Result<(), String> {
-            ctx.task_cancel(handle_nv)?;
+        fn cancelTask(ctx: &mut dyn NativeCtx, handle_nv: VmValue) -> Result<(), NativeError> {
+            ctx.task_cancel(handle_nv).map_err(|e| NativeError::std(StdErrorClass::Std, e))?;
             crate::runtime::timer::note_cancel();
             Ok(())
         }
 
-        fn yieldTask(ctx: &mut dyn NativeCtx) -> Result<VmValue, String> {
+        fn yieldTask(ctx: &mut dyn NativeCtx) -> Result<VmValue, NativeError> {
             Ok(ctx.task_yield())
         }
 
-        fn spawnIsolate(ctx: &mut dyn NativeCtx, func: VmValue, args: VmValue) -> Result<VmValue, String> {
+        fn spawnIsolate(ctx: &mut dyn NativeCtx, func: VmValue, args: VmValue) -> Result<VmValue, NativeError> {
             let (resolved_path, export_name) = ctx
                 .get_function_location(func)
-                .ok_or_else(|| "spawnIsolate: first argument must be a function reference".to_string())?;
+                .ok_or_else(|| "spawnIsolate: first argument must be a function reference".to_string()).map_err(|e| NativeError::std(StdErrorClass::Std, e))?;
 
             if ctx
                 .entry_module()
@@ -109,29 +107,29 @@ varn_contract! {
             }
 
             if !ctx.is_array(args) {
-                return Err("spawnIsolate: arguments must be an array".to_string());
+                return Err(NativeError::type_error("spawnIsolate: arguments must be an array".to_string()));
             }
             let mut worker_args = Vec::new();
             let len = ctx.array_len(args);
             for i in 0..len {
                 if let Some(item_nv) = ctx.array_get(args, i) {
-                    worker_args.push(ctx.to_sendable(item_nv)?);
+                    worker_args.push(ctx.to_sendable(item_nv).map_err(|e| NativeError::std(StdErrorClass::Std, e))?);
                 }
             }
 
-            let done = ctx.spawn_isolate(&resolved_path, &export_name, worker_args)?;
+            let done = ctx.spawn_isolate(&resolved_path, &export_name, worker_args).map_err(|e| NativeError::std(StdErrorClass::Std, e))?;
             let done = ctx.task_from_host(done, HostOpen::Plain);
-            IsolateHandleRecord { done }.alloc(ctx)
+            (IsolateHandleRecord { done }.alloc(ctx)).map_err(|e| NativeError::std(StdErrorClass::Std, e))
         }
 
-        fn channel(ctx: &mut dyn NativeCtx, capacity: i64) -> Result<VmValue, String> {
+        fn channel(ctx: &mut dyn NativeCtx, capacity: i64) -> Result<VmValue, NativeError> {
             if capacity < 1 {
-                return Err("channel: capacity must be >= 1".to_string());
+                return Err(NativeError::range_error("channel: capacity must be >= 1".to_string()));
             }
             let id = crate::runtime::channel::create(capacity as usize);
-            let tx = ChannelEndpoint::Sender.alloc(ctx, id)?;
-            let rx = ChannelEndpoint::Receiver.alloc(ctx, id)?;
-            ChannelRecord { tx, rx }.alloc(ctx)
+            let tx = ChannelEndpoint::Sender.alloc(ctx, id).map_err(|e| NativeError::std(StdErrorClass::Std, e))?;
+            let rx = ChannelEndpoint::Receiver.alloc(ctx, id).map_err(|e| NativeError::std(StdErrorClass::Std, e))?;
+            (ChannelRecord { tx, rx }.alloc(ctx)).map_err(|e| NativeError::std(StdErrorClass::Std, e))
         }
     }
 
@@ -185,7 +183,7 @@ varn_contract! {
     impl ReceiverImpl {
         fn next(ctx: &mut dyn NativeCtx, this: VmValue) -> Result<VmValue, NativeError> {
             let finished = |ctx: &mut dyn NativeCtx| {
-                let none = ctx.option(None).map_err(NativeError::from)?;
+                let none = ctx.option(None).map_err(NativeError::failure)?;
                 Ok(ctx.task_resolved(none))
             };
             let Some(id) = endpoint_id(ctx, this) else {
@@ -194,7 +192,7 @@ varn_contract! {
             match crate::runtime::channel::try_receive(id) {
                 crate::runtime::channel::RecvOutcome::Item(item) => {
                     let value = item.to_value_ctx(ctx);
-                    let some = ctx.option(Some(value)).map_err(NativeError::from)?;
+                    let some = ctx.option(Some(value)).map_err(NativeError::failure)?;
                     Ok(ctx.task_resolved(some))
                 }
                 crate::runtime::channel::RecvOutcome::Closed => finished(ctx),

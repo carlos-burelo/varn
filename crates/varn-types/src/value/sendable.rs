@@ -10,7 +10,11 @@ pub enum SendValue {
     Float(u64),
     Str(String),
     Bytes(Vec<u8>),
-    Error { class: String, message: String },
+    Error {
+        class: String,
+        message: String,
+        fields: Vec<(String, SendValue)>,
+    },
     BigInt(num_bigint::BigInt),
     Decimal(Decimal),
     Char(char),
@@ -32,6 +36,36 @@ pub struct SendEnumVariant {
 }
 
 impl SendValue {
+    pub fn error(class: impl Into<String>, message: impl Into<String>) -> Self {
+        SendValue::Error {
+            class: class.into(),
+            message: message.into(),
+            fields: Vec::new(),
+        }
+    }
+
+    pub fn from_native_error(e: &crate::NativeError) -> Self {
+        let Some(info) = e.std.as_ref() else {
+            return Self::error(e.kind.class_name(), e.message.clone());
+        };
+        let mut fields = vec![(
+            varn_core::ErrorField::Code.name().to_string(),
+            SendValue::Str(info.class.code().to_string()),
+        )];
+        for (field, value) in &info.fields {
+            let value = match value {
+                crate::ErrorValue::Str(text) => SendValue::Str(text.clone()),
+                crate::ErrorValue::Int(n) => SendValue::Int(*n),
+            };
+            fields.push((field.name().to_string(), value));
+        }
+        SendValue::Error {
+            class: info.class.name().to_string(),
+            message: e.message.clone(),
+            fields,
+        }
+    }
+
     pub fn to_value_ctx(&self, ctx: &mut dyn crate::NativeCtx) -> VmValue {
         match self {
             SendValue::Null => ctx.null_val(),
@@ -40,17 +74,26 @@ impl SendValue {
             SendValue::Float(bits) => VmValue::from_f64(f64::from_bits(*bits)),
             SendValue::Str(s) => ctx.alloc_str(s),
             SendValue::Bytes(b) => ctx.alloc_buffer_from_bytes(b),
-            SendValue::Error { class, message } => {
+            SendValue::Error {
+                class,
+                message,
+                fields,
+            } => {
                 let message_nv = ctx.alloc_str(message);
-                match ctx.alloc_instance(class) {
-                    Some(inst) => {
-                        ctx.set_field(inst, varn_core::MemberKey::Message.as_str(), message_nv);
-                        let name_nv = ctx.alloc_str(class);
-                        ctx.set_field(inst, varn_core::MemberKey::Name.as_str(), name_nv);
-                        inst
-                    }
-                    None => message_nv,
+                let instance = ctx.alloc_instance(class).or_else(|| {
+                    ctx.alloc_instance(varn_core::RuntimeErrorKind::Error.class_name())
+                });
+                let Some(inst) = instance else {
+                    return message_nv;
+                };
+                ctx.set_field(inst, varn_core::MemberKey::Message.as_str(), message_nv);
+                let name_nv = ctx.alloc_str(class);
+                ctx.set_field(inst, varn_core::MemberKey::Name.as_str(), name_nv);
+                for (key, value) in fields {
+                    let value_nv = value.to_value_ctx(ctx);
+                    ctx.set_field(inst, key, value_nv);
                 }
+                inst
             }
             SendValue::BigInt(b) => ctx.alloc_bigint(b.clone()),
             SendValue::Decimal(d) => ctx.alloc_decimal(d.clone()),

@@ -71,10 +71,7 @@ impl IoDriver {
         let listener_state = match reg.listeners.get_mut(&listener_id) {
             Some(l) => l,
             None => {
-                return HostPromise::rejected(failure(
-                    "accept",
-                    format!("listener {listener_id} is closed"),
-                ));
+                return HostPromise::rejected(closed("accept", format!("listener {listener_id} is closed")));
             }
         };
 
@@ -83,7 +80,7 @@ impl IoDriver {
             Ok((stream, _)) => {
                 let state = match StreamState::accepted(stream, &tls) {
                     Ok(state) => state,
-                    Err(e) => return HostPromise::rejected(failure("accept", e)),
+                    Err(e) => return HostPromise::rejected(tls_setup_failure(e)),
                 };
                 let conn_id = next_socket_id();
                 reg.streams.insert(conn_id, state);
@@ -100,7 +97,7 @@ impl IoDriver {
                 let _ = self.waker.wake();
                 task
             }
-            Err(e) => HostPromise::rejected(failure("accept", e)),
+            Err(e) => HostPromise::rejected(io_failure("accept", &e)),
         }
     }
 
@@ -111,42 +108,51 @@ impl IoDriver {
     pub fn connect_tls(&self, host: &str, port: i64, extra_roots: Option<&str>) -> HostPromise {
         match Tls::client(host, extra_roots) {
             Ok(tls) => self.open(host, port, Some(tls)),
-            Err(e) => HostPromise::rejected(failure("connect", e)),
+            Err(e) => HostPromise::rejected(tls_setup_failure(e)),
         }
     }
 
     fn open(&self, host: &str, port: i64, tls: Option<Tls>) -> HostPromise {
         let task = HostPromise::pending();
         let target = format!("{host}:{port}");
+        let Ok(port16) = u16::try_from(port) else {
+            task.reject(connect_failure(host, 0, format!("port {port} is out of range")));
+            return task;
+        };
         match target.parse::<SocketAddr>() {
-            Ok(addr) => self.connect_addr(addr, task.clone(), tls),
+            Ok(addr) => self.connect_addr(addr, host, task.clone(), tls),
             Err(_) => {
                 let pending = task.clone();
+                let host = host.to_owned();
                 crate::runtime::blocking::detach(move || {
                     let addrs: Vec<SocketAddr> = target
                         .to_socket_addrs()
                         .map(Iterator::collect)
                         .unwrap_or_default();
-                    let mut last = format!("cannot resolve {target}");
+                    if addrs.is_empty() {
+                        pending.reject(resolve_failure(&host, port16));
+                        return;
+                    }
+                    let mut last = String::new();
                     for addr in addrs {
                         match std::net::TcpStream::connect_timeout(&addr, CONNECT_TIMEOUT)
                             .and_then(|stream| stream.set_nonblocking(true).map(|()| stream))
                         {
                             Ok(stream) => {
-                                driver().adopt(TcpStream::from_std(stream), pending, tls);
+                                driver().adopt(TcpStream::from_std(stream), &host, port16, pending, tls);
                                 return;
                             }
                             Err(e) => last = format!("{addr}: {e}"),
                         }
                     }
-                    pending.reject(failure("connect", last));
+                    pending.reject(connect_failure(&host, port16, last));
                 });
             }
         }
         task
     }
 
-    fn adopt(&self, stream: TcpStream, task: HostPromise, tls: Option<Tls>) {
+    fn adopt(&self, stream: TcpStream, host: &str, port: u16, task: HostPromise, tls: Option<Tls>) {
         let conn_id = next_socket_id();
         let secure = tls.is_some();
         let mut reg = self.registry.lock().unwrap_or_else(|e| e.into_inner());
@@ -154,6 +160,7 @@ impl IoDriver {
             conn_id,
             StreamState {
                 tls,
+                target: Some((host.to_owned(), port)),
                 pending_connect: secure.then(|| task.clone()),
                 ..StreamState::plain(stream)
             },
@@ -166,11 +173,11 @@ impl IoDriver {
         }
     }
 
-    fn connect_addr(&self, addr: SocketAddr, task: HostPromise, tls: Option<Tls>) {
+    fn connect_addr(&self, addr: SocketAddr, host: &str, task: HostPromise, tls: Option<Tls>) {
         let stream = match TcpStream::connect(addr) {
             Ok(stream) => stream,
             Err(e) => {
-                task.reject(failure("connect", format!("{addr}: {e}")));
+                task.reject(connect_failure(host, addr.port(), e));
                 return;
             }
         };
@@ -180,6 +187,7 @@ impl IoDriver {
             conn_id,
             StreamState {
                 tls,
+                target: Some((host.to_owned(), addr.port())),
                 is_connecting: true,
                 pending_connect: Some(task),
                 ..StreamState::plain(stream)
@@ -218,7 +226,7 @@ impl IoDriver {
                 let _ = self.waker.wake();
                 task
             }
-            Err(e) => HostPromise::rejected(failure("read", e)),
+            Err(e) => HostPromise::rejected(io_failure("read", &e)),
         }
     }
 
@@ -227,10 +235,7 @@ impl IoDriver {
         let stream_state = match reg.streams.get_mut(&conn_id) {
             Some(s) => s,
             None => {
-                return HostPromise::rejected(failure(
-                    "write",
-                    format!("connection {conn_id} is closed"),
-                ));
+                return HostPromise::rejected(closed("write", format!("connection {conn_id} is closed")));
             }
         };
 
@@ -258,7 +263,7 @@ impl IoDriver {
                 let _ = self.waker.wake();
                 task
             }
-            Err(e) => HostPromise::rejected(failure("write", e)),
+            Err(e) => HostPromise::rejected(io_failure("write", &e)),
         }
     }
 
@@ -267,13 +272,13 @@ impl IoDriver {
         if let Some(mut stream_state) = reg.streams.remove(&conn_id) {
             stream_state.end_session();
             if let Some(task) = stream_state.pending_connect.take() {
-                task.reject(failure("connect", "connection closed"));
+                task.reject(closed("connect", "connection closed"));
             }
             if let Some(pr) = stream_state.pending_read.take() {
                 pr.task.complete(Ok(SendValue::Null));
             }
             if let Some(pw) = stream_state.pending_write.take() {
-                pw.task.reject(failure("write", "connection closed"));
+                pw.task.reject(closed("write", "connection closed"));
             }
             drop(reg);
             let _ = self
@@ -287,7 +292,7 @@ impl IoDriver {
         let mut reg = self.registry.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(mut listener_state) = reg.listeners.remove(&listener_id) {
             for task in listener_state.pending_accepts.drain(..) {
-                task.reject(failure("accept", "listener closed"));
+                task.reject(closed("accept", "listener closed"));
             }
             drop(reg);
             let _ = self

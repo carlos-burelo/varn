@@ -71,7 +71,7 @@ await describe("294 fetch follows redirects", async () => {
 
     await it("a redirect loop stops at the limit", async () => {
         const message = await failureOf(() => fetch("http://127.0.0.1:19920/loop", { maxRedirects: 3 }));
-        expect(message.indexOf("More than 3 redirects") !== null).toBeTruthy();
+        expect(message.indexOf("more than 3 redirects") !== null).toBeTruthy();
     });
 
     origin.close();

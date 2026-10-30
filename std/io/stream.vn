@@ -1,6 +1,5 @@
 import { write$, writeln$, flush$, readLine$ } from "runtime:io";
 import { Task } from "std:task";
-import { toStdError, E_IO } from "std:error";
 
 export interface Writer {
     write(content: str): void;
@@ -43,43 +42,23 @@ export class Stream {
 }
 
 export function write(...args: str[]): void {
-    try {
-        write$(...args);
-    } catch (e) {
-        throw toStdError(e as Error, E_IO);
-    }
+    write$(...args);
 }
 
 export function writeln(...args: str[]): void {
-    try {
-        writeln$(...args);
-    } catch (e) {
-        throw toStdError(e as Error, E_IO);
-    }
+    writeln$(...args);
 }
 
 export function print(...args: str[]): void {
-    try {
-        writeln$(...args);
-    } catch (e) {
-        throw toStdError(e as Error, E_IO);
-    }
+    writeln$(...args);
 }
 
 export function flush(): void {
-    try {
-        flush$();
-    } catch (e) {
-        throw toStdError(e as Error, E_IO);
-    }
+    flush$();
 }
 
 export function readLine(prompt: str = ""): str {
-    try {
-        return readLine$(prompt);
-    } catch (e) {
-        throw toStdError(e as Error, E_IO);
-    }
+    return readLine$(prompt);
 }
 
 export function readAll(): str {

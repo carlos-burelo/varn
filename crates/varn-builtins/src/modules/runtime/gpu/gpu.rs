@@ -1,4 +1,6 @@
+use varn_core::StdErrorClass;
 use varn_macros::varn_contract;
+use varn_types::NativeError;
 use varn_types::marshal::VnArray;
 use varn_types::{NativeCtx, VmValue};
 
@@ -50,97 +52,97 @@ varn_contract! {
     module: "runtime:gpu",
     contract: "src/modules/runtime/gpu/gpu_runtime.vn",
     impl GpuRuntime {
-        fn backend(_ctx: &mut dyn NativeCtx) -> Result<String, String> {
+        fn backend(_ctx: &mut dyn NativeCtx) -> Result<String, NativeError> {
             Ok(varn_gpu::backend_name().to_string())
         }
-        fn deviceCount(_ctx: &mut dyn NativeCtx) -> Result<i64, String> {
+        fn deviceCount(_ctx: &mut dyn NativeCtx) -> Result<i64, NativeError> {
             Ok(varn_gpu::device_count())
         }
-        fn adapterName(_ctx: &mut dyn NativeCtx, i: i64) -> Result<String, String> {
+        fn adapterName(_ctx: &mut dyn NativeCtx, i: i64) -> Result<String, NativeError> {
             if i < 0 {
-                return Err("gpu.adapterName: index must be non-negative".to_string());
+                return Err(NativeError::range_error("gpu.adapterName: index must be non-negative".to_string()));
             }
-            varn_gpu::adapter_name(i as usize)
+            (varn_gpu::adapter_name(i as usize)
                 .map(|s| s.to_string())
-                .ok_or_else(|| format!("gpu.adapterName: no adapter at index {i}"))
+                .ok_or_else(|| format!("gpu.adapterName: no adapter at index {i}"))).map_err(|e| NativeError::std(StdErrorClass::Std, e))
         }
-        fn engine(_ctx: &mut dyn NativeCtx) -> Result<String, String> {
+        fn engine(_ctx: &mut dyn NativeCtx) -> Result<String, NativeError> {
             Ok(varn_gpu::last_engine().to_string())
         }
-        fn create(_ctx: &mut dyn NativeCtx, len: i64) -> Result<i64, String> {
+        fn create(_ctx: &mut dyn NativeCtx, len: i64) -> Result<i64, NativeError> {
             if len < 0 {
-                return Err("gpu.create: len must be non-negative".to_string());
+                return Err(NativeError::range_error("gpu.create: len must be non-negative".to_string()));
             }
             Ok(varn_gpu::pool().lock().create(len as usize))
         }
-        fn destroy(_ctx: &mut dyn NativeCtx, id: i64) -> Result<(), String> {
-            varn_gpu::pool().lock().destroy(id)
+        fn destroy(_ctx: &mut dyn NativeCtx, id: i64) -> Result<(), NativeError> {
+            (varn_gpu::pool().lock().destroy(id)).map_err(|e| NativeError::std(StdErrorClass::Std, e))
         }
-        fn len(_ctx: &mut dyn NativeCtx, id: i64) -> Result<i64, String> {
-            Ok(varn_gpu::pool().lock().len(id)? as i64)
+        fn len(_ctx: &mut dyn NativeCtx, id: i64) -> Result<i64, NativeError> {
+            Ok(varn_gpu::pool().lock().len(id).map_err(|e| NativeError::std(StdErrorClass::Std, e))? as i64)
         }
-        fn dims(ctx: &mut dyn NativeCtx, id: i64) -> Result<Vec<VmValue>, String> {
+        fn dims(ctx: &mut dyn NativeCtx, id: i64) -> Result<Vec<VmValue>, NativeError> {
             let _ = ctx;
-            Ok(varn_gpu::pool().lock().dims(id)?
+            Ok(varn_gpu::pool().lock().dims(id).map_err(|e| NativeError::std(StdErrorClass::Std, e))?
                 .into_iter()
                 .map(|d| VmValue::from_int(d as i64))
                 .collect())
         }
-        fn reshape(ctx: &mut dyn NativeCtx, id: i64, dims: VnArray) -> Result<(), String> {
-            let dims = read_dims(ctx, dims)?;
-            varn_gpu::pool().lock().reshape(id, dims)
+        fn reshape(ctx: &mut dyn NativeCtx, id: i64, dims: VnArray) -> Result<(), NativeError> {
+            let dims = read_dims(ctx, dims).map_err(|e| NativeError::std(StdErrorClass::Std, e))?;
+            (varn_gpu::pool().lock().reshape(id, dims)).map_err(|e| NativeError::std(StdErrorClass::Std, e))
         }
-        fn upload(ctx: &mut dyn NativeCtx, data: VnArray) -> Result<i64, String> {
-            let vals = read_host(ctx, data)?;
+        fn upload(ctx: &mut dyn NativeCtx, data: VnArray) -> Result<i64, NativeError> {
+            let vals = read_host(ctx, data).map_err(|e| NativeError::std(StdErrorClass::Std, e))?;
             Ok(varn_gpu::pool().lock().upload(vals))
         }
-        fn download(ctx: &mut dyn NativeCtx, id: i64) -> Result<Vec<VmValue>, String> {
+        fn download(ctx: &mut dyn NativeCtx, id: i64) -> Result<Vec<VmValue>, NativeError> {
             let _ = ctx;
-            let vals = varn_gpu::pool().lock().data(id)?;
+            let vals = varn_gpu::pool().lock().data(id).map_err(|e| NativeError::std(StdErrorClass::Std, e))?;
             Ok(vals.into_iter().map(|x| VmValue::from_f64(x as f64)).collect())
         }
-        fn add(_ctx: &mut dyn NativeCtx, a: i64, b: i64) -> Result<i64, String> {
-            elementwise(varn_gpu::Op::Add, a, b)
+        fn add(_ctx: &mut dyn NativeCtx, a: i64, b: i64) -> Result<i64, NativeError> {
+            (elementwise(varn_gpu::Op::Add, a, b)).map_err(|e| NativeError::std(StdErrorClass::Std, e))
         }
-        fn mul(_ctx: &mut dyn NativeCtx, a: i64, b: i64) -> Result<i64, String> {
-            elementwise(varn_gpu::Op::Mul, a, b)
+        fn mul(_ctx: &mut dyn NativeCtx, a: i64, b: i64) -> Result<i64, NativeError> {
+            (elementwise(varn_gpu::Op::Mul, a, b)).map_err(|e| NativeError::std(StdErrorClass::Std, e))
         }
-        fn scale(_ctx: &mut dyn NativeCtx, a: i64, s: f64) -> Result<i64, String> {
+        fn scale(_ctx: &mut dyn NativeCtx, a: i64, s: f64) -> Result<i64, NativeError> {
             let pool = varn_gpu::pool();
             let (len, dims) = {
                 let g = pool.lock();
-                (g.len(a)?, g.dims(a)?)
+                (g.len(a).map_err(|e| NativeError::std(StdErrorClass::Std, e))?, g.dims(a).map_err(|e| NativeError::std(StdErrorClass::Std, e))?)
             };
-            varn_gpu::pool().lock().lazy(
+            (varn_gpu::pool().lock().lazy(
                 varn_gpu::Op::Scale { factor: s as f32 },
                 vec![a],
                 len,
                 dims,
-            )
+            )).map_err(|e| NativeError::std(StdErrorClass::Std, e))
         }
-        fn dot(_ctx: &mut dyn NativeCtx, a: i64, b: i64) -> Result<f64, String> {
-            let m = elementwise(varn_gpu::Op::Mul, a, b)?;
-            let vals = varn_gpu::pool().lock().data(m)?;
+        fn dot(_ctx: &mut dyn NativeCtx, a: i64, b: i64) -> Result<f64, NativeError> {
+            let m = elementwise(varn_gpu::Op::Mul, a, b).map_err(|e| NativeError::std(StdErrorClass::Std, e))?;
+            let vals = varn_gpu::pool().lock().data(m).map_err(|e| NativeError::std(StdErrorClass::Std, e))?;
             let acc: f64 = vals.iter().map(|x| *x as f64).sum();
             varn_gpu::pool().lock().destroy(m).ok();
             Ok(acc)
         }
-        fn matMul(_ctx: &mut dyn NativeCtx, a: i64, b: i64) -> Result<i64, String> {
+        fn matMul(_ctx: &mut dyn NativeCtx, a: i64, b: i64) -> Result<i64, NativeError> {
             let pool = varn_gpu::pool();
             let (da, db) = {
                 let g = pool.lock();
-                (g.dims(a)?, g.dims(b)?)
+                (g.dims(a).map_err(|e| NativeError::std(StdErrorClass::Std, e))?, g.dims(b).map_err(|e| NativeError::std(StdErrorClass::Std, e))?)
             };
             if da.len() != 2 || db.len() != 2 || da[1] != db[0] {
-                return Err(format!("gpu.matMul: shape mismatch ({da:?} vs {db:?})"));
+                return Err(NativeError::range_error(format!("gpu.matMul: shape mismatch ({da:?} vs {db:?})")));
             }
             let (m, k, n) = (da[0], da[1], db[1]);
-            varn_gpu::pool().lock().lazy(
+            (varn_gpu::pool().lock().lazy(
                 varn_gpu::Op::MatMul { m, k, n },
                 vec![a, b],
                 m * n,
                 vec![m, n],
-            )
+            )).map_err(|e| NativeError::std(StdErrorClass::Std, e))
         }
     }
 }

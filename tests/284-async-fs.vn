@@ -3,7 +3,7 @@ import {
     tempDir, readTextAsync, writeTextAsync, appendTextAsync, readLinesAsync,
     readBytesAsync, writeBytesAsync, copyAsync, readDirAsync, removeAllAsync, exists
 } from "std:fs";
-import { StdError } from "std:error";
+import { FsNotFoundError } from "std:error";
 
 const dir = tempDir() + "/varn-284-async";
 
@@ -12,7 +12,10 @@ async function codeOf(run: () => Task<str>): Task<str> {
         await run()
         return ""
     } catch (e) {
-        return (e as StdError).code
+        if (e instanceof FsNotFoundError) {
+            return e.code + ":" + e.path
+        }
+        return "other"
     }
 }
 
@@ -35,6 +38,6 @@ await describe("284 async fs", async () => {
     });
 
     await it("async failures carry the same codes as the sync API", async () => {
-        expect(await codeOf(() => readTextAsync(dir + "-missing"))).toBe("E_FS_NOT_FOUND");
+        expect(await codeOf(() => readTextAsync(dir + "-missing"))).toBe("fs.not_found:" + dir + "-missing");
     });
 });

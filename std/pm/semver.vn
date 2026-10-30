@@ -1,3 +1,4 @@
+import { ParseError } from "std:error";
 export type SemVer = #{
     major: int,
     minor: int,
@@ -92,7 +93,7 @@ export namespace Semver {
         }
         let nums = v.split(".");
         if (nums.length !== 3) {
-            throw new Error("Semver: expected major.minor.patch, got '" + text + "'");
+            throw new ParseError("Semver: expected major.minor.patch, got '" + text + "'");
         }
         return #{
             major: int.parse(nums[0]),

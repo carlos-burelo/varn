@@ -9,7 +9,7 @@ export class LRUCache<V> {
 
     constructor(capacity: int) {
         if (capacity <= 0) {
-            throw new Error("LRUCache capacity must be greater than zero");
+            throw new RangeError("LRUCache capacity must be greater than zero");
         }
         this._capacity = capacity;
         this._entries = [];

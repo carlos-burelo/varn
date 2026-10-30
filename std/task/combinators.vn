@@ -51,7 +51,7 @@ export namespace Task {
 
     export async function race<T>(tasks: Array<Task<T>>): Task<T> {
         if (tasks.length === 0) {
-            throw new Error("Task.race requires at least one task");
+            throw new RangeError("Task.race requires at least one task");
         }
         let ch = channel$<Result<T, str>>(tasks.length);
         let handles: Array<TaskHandle<T>> = [];
