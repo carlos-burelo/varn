@@ -8,6 +8,7 @@ export declare function dlclose$(libHandle: int): bool;
 export declare function dlsym$(libHandle: int, symbol: str): int;
 @permission("sys.ffi")
 export declare function call$(fnPtr: int, retType: int, paramTypes: int[], args: (int | float | str | bool | null)[]): int | float | str | bool | null;
+export declare function kindName$(raw: int): str;
 @permission("sys.ffi")
 export declare function alloc$(size: int): int;
 @permission("sys.ffi")

@@ -4,5 +4,7 @@ export enum FfiType {
     Float = 2,
     Str = 3,
     Ptr = 4,
-    Bool = 5
+    Bool = 5,
+    Int32 = 6,
+    Float32 = 7
 }

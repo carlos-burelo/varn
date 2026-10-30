@@ -79,6 +79,12 @@ varn_contract! {
             call::call(ctx, fnPtr, retType, paramTypes, args)
         }
 
+        fn kindName(_ctx: &mut dyn NativeCtx, raw: i64) -> Result<String, NativeError> {
+            varn_core::FfiKind::of_raw(raw)
+                .map(|kind| kind.name().to_owned())
+                .ok_or_else(|| NativeError::range_error(format!("ffi.kindName: {raw} is not an FFI type")))
+        }
+
         fn alloc(ctx: &mut dyn NativeCtx, size: i64) -> Result<i64, NativeError> {
             permit(ctx)?;
             memory::allocate("alloc", size).map(|addr| addr as i64)

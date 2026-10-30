@@ -7,6 +7,7 @@ pub mod debug_flags;
 pub mod diagnostics;
 pub mod doc;
 pub mod errors;
+pub mod ffi_kind;
 pub mod fingerprint;
 pub mod fmt;
 pub mod intrinsic_ops;
@@ -37,6 +38,7 @@ pub use ast::AstId;
 pub use atom::{Atom, AtomInterner};
 pub use doc::DocComment;
 pub use errors::RuntimeErrorKind;
+pub use ffi_kind::FfiKind;
 pub use std_errors::{ErrorField, StdErrorClass};
 
 pub use diagnostics::{

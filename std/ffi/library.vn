@@ -6,7 +6,8 @@ import {
     alloc$,
     free$,
     readCString$,
-    allocCString$
+    allocCString$,
+    kindName$
 } from "runtime:ffi";
 
 import { FfiType } from "std:ffi/types";
@@ -94,6 +95,10 @@ export class Ffi {
         } else {
             free$(ptr as int);
         }
+    }
+
+    static typeName(type: FfiType): str {
+        return kindName$(type.rawValue);
     }
 
     static cStr(s: str): Pointer {

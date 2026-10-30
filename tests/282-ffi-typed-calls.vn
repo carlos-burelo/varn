@@ -53,4 +53,28 @@ await describe("282 ffi typed calls", async () => {
         expect(failsWith(() => ptr.readCString(0), "not NUL-terminated")).toBeTruthy();
         ptr.free();
     });
+    await it("the FfiType numbers match the table the host decodes", () => {
+        expect(Ffi.typeName(FfiType.Void)).toBe("Void");
+        expect(Ffi.typeName(FfiType.Int)).toBe("Int");
+        expect(Ffi.typeName(FfiType.Float)).toBe("Float");
+        expect(Ffi.typeName(FfiType.Str)).toBe("Str");
+        expect(Ffi.typeName(FfiType.Ptr)).toBe("Ptr");
+        expect(Ffi.typeName(FfiType.Bool)).toBe("Bool");
+        expect(Ffi.typeName(FfiType.Int32)).toBe("Int32");
+        expect(Ffi.typeName(FfiType.Float32)).toBe("Float32");
+    });
+
+    await it("int32 arguments and results keep their sign", () => {
+        const atoi = Ffi.open(cLib).bind("atoi", FfiType.Int32, [FfiType.Str]);
+        expect(atoi.call("-12")).toBe(-12);
+        const abs = Ffi.open(cLib).bind("abs", FfiType.Int32, [FfiType.Int32]);
+        expect(abs.call(-7)).toBe(7);
+        expect(failsWith(() => abs.call(2147483648), "does not fit in int32")).toBeTruthy();
+    });
+
+    await it("float32 arguments and results travel as single precision", () => {
+        const sqrtf = Ffi.open(mathLib).bind("sqrtf", FfiType.Float32, [FfiType.Float32]);
+        expect(sqrtf.call(2.25)).toBe(1.5);
+        expect(sqrtf.call(2.0)).toBe(1.4142135381698608);
+    });
 });

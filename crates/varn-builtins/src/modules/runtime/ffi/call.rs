@@ -1,38 +1,18 @@
 use std::ffi::{CStr, CString};
 use varn_types::{NativeCtx, NativeError, VmValue, VnArray};
 
-#[derive(Clone, Copy)]
-enum Kind {
-    Void,
-    Int,
-    Float,
-    Str,
-    Ptr,
-    Bool,
-}
+use varn_core::FfiKind as Kind;
 
-impl Kind {
-    fn from_raw(raw: i64) -> Option<Kind> {
-        match raw {
-            0 => Some(Kind::Void),
-            1 => Some(Kind::Int),
-            2 => Some(Kind::Float),
-            3 => Some(Kind::Str),
-            4 => Some(Kind::Ptr),
-            5 => Some(Kind::Bool),
-            _ => None,
-        }
-    }
-
-    fn label(self) -> &'static str {
-        match self {
-            Kind::Void => "void",
-            Kind::Int => "int",
-            Kind::Float => "float",
-            Kind::Str => "str",
-            Kind::Ptr => "ptr",
-            Kind::Bool => "bool",
-        }
+fn label(kind: Kind) -> &'static str {
+    match kind {
+        Kind::Void => "void",
+        Kind::Int => "int",
+        Kind::Float => "float",
+        Kind::Str => "str",
+        Kind::Ptr => "ptr",
+        Kind::Bool => "bool",
+        Kind::Int32 => "int32",
+        Kind::Float32 => "float32",
     }
 }
 
@@ -58,7 +38,7 @@ fn read_kinds(ctx: &mut dyn NativeCtx, types: &VnArray) -> Result<Vec<Kind>, Nat
             types
                 .get(ctx, i)
                 .filter(|v| v.is_int())
-                .and_then(|v| Kind::from_raw(v.as_int()))
+                .and_then(|v| Kind::of_raw(v.as_int()))
                 .ok_or_else(|| NativeError::type_error(format!("ffi.call: parameter {i} has an unknown type")))
         })
         .collect()
@@ -72,7 +52,7 @@ fn marshal(
 ) -> Result<Vec<Slot>, NativeError> {
     let mut slots = Vec::with_capacity(kinds.len());
     for (i, (kind, v)) in kinds.iter().zip(values).enumerate() {
-        let mismatch = || NativeError::type_error(format!("ffi.call: argument {i} must be {}", kind.label()));
+        let mismatch = || NativeError::type_error(format!("ffi.call: argument {i} must be {}", label(*kind)));
         let slot = match kind {
             Kind::Void => return Err(NativeError::type_error(format!("ffi.call: parameter {i} cannot be void"))),
             Kind::Int => {
@@ -92,6 +72,21 @@ fn marshal(
                     return Err(mismatch());
                 }
                 Slot::Int(u64::from(v.as_bool()))
+            }
+            Kind::Int32 => {
+                if !v.is_int() {
+                    return Err(mismatch());
+                }
+                let narrow = i32::try_from(v.as_int()).map_err(|_| {
+                    NativeError::range_error(format!("ffi.call: argument {i} does not fit in int32"))
+                })?;
+                Slot::Int(i64::from(narrow) as u64)
+            }
+            Kind::Float32 => {
+                if !v.is_f64() {
+                    return Err(mismatch());
+                }
+                Slot::Float(f64::from_bits(u64::from((v.as_f64() as f32).to_bits())))
             }
             Kind::Ptr => {
                 if v.is_null() {
@@ -269,7 +264,7 @@ pub fn call(
     if fn_ptr == 0 {
         return Err(NativeError::range_error("ffi.call: null function pointer"));
     }
-    let ret = Kind::from_raw(ret_raw).ok_or_else(|| NativeError::type_error("ffi.call: unknown return type"))?;
+    let ret = Kind::of_raw(ret_raw).ok_or_else(|| NativeError::type_error("ffi.call: unknown return type"))?;
     let kinds = read_kinds(ctx, &types)?;
     let argc = args.len(ctx);
     if kinds.len() != argc {
@@ -295,6 +290,8 @@ pub fn call(
             let raw = abi::dispatch::<u32>(f, &slots)?;
             Ok(ctx.bool_val(raw != 0))
         }
+        Kind::Int32 => Ok(ctx.int_val(i64::from(abi::dispatch::<i32>(f, &slots)?))),
+        Kind::Float32 => Ok(VmValue::from_f64(f64::from(abi::dispatch::<f32>(f, &slots)?))),
         Kind::Str => {
             let addr = abi::dispatch::<usize>(f, &slots)?;
             if addr == 0 {
