@@ -202,10 +202,12 @@ Cada fase: re-medir filas del probe `repr_rows.vn` antes (paso 1),
 pareado ambos tiers; sin fila en bitácora no cierra. Orden lo
 decide la medición, no esta lista.
 
-- **Fase A — clave Map O(1)**: bit «internado» en `HeapStr` +
-  `canonical_map_key`; borra canonicalización por interner en cada
-  acceso (`heap/str.rs`, `heap/strings.rs`, `heap/map_keys.rs`).
-  Prueba: ampliar test 160 (misma clave por concat/slice/literal).
+- **Fase A — clave Map O(1)**: HECHA (verificado en código 2026-10-30:
+  `ascii_flag::INTERNED_BIT` en `heap/str.rs`, `canonical_map_key` en
+  `heap/map_keys.rs`). Filas del probe `repr_rows.vn` (release, ms por
+  1 M, mejor de 5): loop_only 5, instance3 24, objlit3 43, arraylit3 55,
+  map3 76, map_get_heapkey 27, strview 45, split5 47. Compuerta de la
+  Fase D (`objlit3` > 1,5× `instance3`): 1,79×, cumplida; falta B y C.
 - **Fase B — arrays/split un bloque**: elementos en cola de celda
   + derrame; `split_ranges` única fuente
   (`vm_value/{array,vm_array,vm_array_access}.rs`,
@@ -375,9 +377,11 @@ dentro del `try`; GC dentro del `try` con vivo heap.
 - **Genéricos en calls**: proyecto secuenciado (inferencia
   anidada + defaults importados + error VN3201); el error solo
   rompía 500 sitios honestos. No parche a medias.
-- **Struct en namespace**: bug real con repro (check pasa,
-  runtime rechaza `Geo::Point`): toca registro de shapes
-  cualificados.
+- **Struct en namespace**: no reproduce (2026-10-30, ambos tiers):
+  `type`, `interface`, `class`, `enum`, `Json.parse<Geo.Point>`, `as` e
+  `is` con tipos de namespace funcionan. No hay declaración `struct` en
+  el repo (la palabra está reservada en el lexer). Cerrado salvo repro
+  nuevo.
 - **Campo-sin-init**: proyecto definite-assignment (lectura
   `null` actual como ínterin documentado).
 - **Task flotante**: diferido (falta supresión + lifecycle B2).
