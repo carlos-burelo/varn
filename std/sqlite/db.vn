@@ -1,14 +1,30 @@
 import {
     open$,
     close$,
-    exec$,
-    queryAll$,
-    queryOne$
+    script$,
+    execute$,
+    executeAsync$,
+    query$,
+    queryAsync$,
+    SqlParam,
+    SqlRow
 } from "runtime:sqlite";
+import { ClosedError } from "std:error";
 
-export type SqlParam = str | int | float | bool | null;
+export { SqlParam, SqlRow, SqlValue } from "runtime:sqlite";
 
-export type SqlRow = { [key: str]: SqlParam };
+const ALL_ROWS = -1;
+
+function placeholders(strings: str[], values: SqlParam[]): str {
+    let query = "";
+    for (let i = 0; i < strings.length; i = i + 1) {
+        query = query + strings[i];
+        if (i < values.length) {
+            query = query + "?";
+        }
+    }
+    return query;
+}
 
 export class Database {
     private _id: int = -1;
@@ -16,52 +32,83 @@ export class Database {
 
     constructor(path: str = ":memory:") {
         this._id = open$(path);
-        this._isOpen = this._id >= 0;
+        this._isOpen = true;
     }
 
-    exec(sql: str): int {
-        if (!this._isOpen) return 0;
-        return exec$(this._id, sql);
+    get isOpen(): bool {
+        return this._isOpen;
+    }
+
+    private live(): int {
+        if (!this._isOpen) {
+            throw new ClosedError("sqlite: the database is closed");
+        }
+        return this._id;
+    }
+
+    exec(sql: str, ...params: SqlParam[]): int {
+        return execute$(this.live(), sql, params);
+    }
+
+    async execAsync(sql: str, ...params: SqlParam[]): Task<int> {
+        return await executeAsync$(this.live(), sql, params);
+    }
+
+    script(sql: str): void {
+        script$(this.live(), sql);
     }
 
     all(sql: str, ...params: SqlParam[]): SqlRow[] {
-        if (!this._isOpen) return [];
-        return queryAll$(this._id, sql, params);
+        return query$(this.live(), sql, params, ALL_ROWS);
+    }
+
+    async allAsync(sql: str, ...params: SqlParam[]): Task<SqlRow[]> {
+        return await queryAsync$(this.live(), sql, params, ALL_ROWS);
     }
 
     get(sql: str, ...params: SqlParam[]): SqlRow? {
-        if (!this._isOpen) return null;
-        return queryOne$(this._id, sql, params);
+        const rows = query$(this.live(), sql, params, 1);
+        return rows.length === 0 ? null : rows[0];
+    }
+
+    async getAsync(sql: str, ...params: SqlParam[]): Task<SqlRow?> {
+        const rows = await queryAsync$(this.live(), sql, params, 1);
+        return rows.length === 0 ? null : rows[0];
     }
 
     sql(strings: str[], ...values: SqlParam[]): SqlRow[] {
-        if (!this._isOpen) return [];
-        let query = "";
-        for (let i = 0; i < strings.length; i = i + 1) {
-            query = query + strings[i];
-            if (i < values.length) {
-                query = query + "?";
-            }
-        }
-        return queryAll$(this._id, query, values);
+        return query$(this.live(), placeholders(strings, values), values, ALL_ROWS);
     }
 
     sqlOne(strings: str[], ...values: SqlParam[]): SqlRow? {
-        if (!this._isOpen) return null;
-        let query = "";
-        for (let i = 0; i < strings.length; i = i + 1) {
-            query = query + strings[i];
-            if (i < values.length) {
-                query = query + "?";
-            }
-        }
-        return queryOne$(this._id, query, values);
+        const rows = query$(this.live(), placeholders(strings, values), values, 1);
+        return rows.length === 0 ? null : rows[0];
     }
 
-    run(sql: str, ...params: SqlParam[]): int {
-        if (!this._isOpen) return 0;
-        queryAll$(this._id, sql, params);
-        return 1;
+    transaction<T>(body: () => T): T {
+        const id = this.live();
+        script$(id, "BEGIN");
+        try {
+            const result = body();
+            script$(id, "COMMIT");
+            return result;
+        } catch (err) {
+            script$(id, "ROLLBACK");
+            throw err;
+        }
+    }
+
+    async transactionAsync<T>(body: () => Task<T>): Task<T> {
+        const id = this.live();
+        script$(id, "BEGIN");
+        try {
+            const result = await body();
+            script$(id, "COMMIT");
+            return result;
+        } catch (err) {
+            script$(id, "ROLLBACK");
+            throw err;
+        }
     }
 
     close(): void {

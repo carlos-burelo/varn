@@ -290,6 +290,8 @@ import "./297-deep-class-hierarchy-across-modules.vn"
 import "./298-std-errors-are-typed.vn"
 import "./294-fetch-follows-redirects.vn"
 import "./299-timeouts.vn"
+import "./300-sqlite-contract.vn"
+import "./301-rest-params-in-async-and-generator-methods.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

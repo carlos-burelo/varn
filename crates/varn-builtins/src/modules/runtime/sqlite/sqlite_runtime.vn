@@ -1,7 +1,13 @@
-// runtime:sqlite — low-level host SQLite database operations.
+// runtime:sqlite — host SQLite connections. Handles are never reused, so a closed id stays closed.
+
+export type SqlValue = str | int | float | Bytes | null;
+export type SqlParam = SqlValue | bool;
+export type SqlRow = { [key: str]: SqlValue };
 
 export declare function open$(path: str): int;
-export declare function close$(dbId: int): bool;
-export declare function exec$(dbId: int, sql: str): int;
-export declare function queryAll$(dbId: int, sql: str, params: dynamic[]): dynamic[];
-export declare function queryOne$(dbId: int, sql: str, params: dynamic[]): dynamic;
+export declare function close$(dbId: int): void;
+export declare function script$(dbId: int, sql: str): void;
+export declare function execute$(dbId: int, sql: str, params: SqlParam[]): int;
+export declare function executeAsync$(dbId: int, sql: str, params: SqlParam[]): TaskHandle<int>;
+export declare function query$(dbId: int, sql: str, params: SqlParam[], limit: int): SqlRow[];
+export declare function queryAsync$(dbId: int, sql: str, params: SqlParam[], limit: int): TaskHandle<SqlRow[]>;

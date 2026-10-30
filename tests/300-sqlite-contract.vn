@@ -1,0 +1,157 @@
+import { describe, it, expect } from "std:test";
+import { Database } from "std:sqlite";
+import { ClosedError, SqlError, SqlConstraintError } from "std:error";
+
+function seeded(): Database {
+    const db = new Database(":memory:");
+    db.script("CREATE TABLE owner (id INTEGER PRIMARY KEY); CREATE TABLE pet (id INTEGER PRIMARY KEY, name TEXT UNIQUE, owner_id INTEGER REFERENCES owner(id), photo BLOB, weight REAL)");
+    db.exec("INSERT INTO owner (id) VALUES (?)", 1);
+    return db;
+}
+
+await describe("300 sqlite contract", async () => {
+    await it("exec reports the rows it changed", async () => {
+        const db = seeded();
+        expect(db.exec("INSERT INTO pet (id, name, owner_id) VALUES (?, ?, ?)", 1, "rex", 1)).toBe(1);
+        expect(db.exec("INSERT INTO pet (id, name, owner_id) VALUES (?, ?, ?)", 2, "tom", 1)).toBe(1);
+        expect(db.exec("UPDATE pet SET weight = ?", 3.5)).toBe(2);
+        expect(db.exec("DELETE FROM pet WHERE id = ?", 99)).toBe(0);
+        db.close();
+    });
+
+    await it("rows keep the column order and the column types", async () => {
+        const db = seeded();
+        db.exec("INSERT INTO pet (id, name, owner_id, weight) VALUES (?, ?, ?, ?)", 7, "rex", 1, 2.5);
+        const row = db.get("SELECT name, id, weight, photo FROM pet WHERE id = ?", 7);
+        expect(row !== null).toBe(true);
+        let order = "";
+        for (let column in row!) {
+            order = order + (order.length === 0 ? "" : ",") + column;
+        }
+        expect(order).toBe("name,id,weight,photo");
+        expect(row!["name"]).toBe("rex");
+        expect(row!["id"]).toBe(7);
+        expect(row!["weight"]).toBe(2.5);
+        expect(row!["photo"] === null).toBe(true);
+        db.close();
+    });
+
+    await it("a blob round-trips as Bytes, not as hex text", async () => {
+        const db = seeded();
+        db.exec("INSERT INTO pet (id, name, photo) VALUES (?, ?, ?)", 1, "rex", Bytes.fromString("png!"));
+        const row = db.get("SELECT photo FROM pet WHERE id = 1");
+        expect((row!["photo"] as Bytes).toString()).toBe("png!");
+        db.close();
+    });
+
+    await it("a bool parameter is stored as 0 or 1", async () => {
+        const db = seeded();
+        db.exec("INSERT INTO pet (id, name, owner_id) VALUES (?, ?, ?)", 1, "rex", 1);
+        const row = db.get("SELECT ? AS yes, ? AS no", true, false);
+        expect(row!["yes"]).toBe(1);
+        expect(row!["no"]).toBe(0);
+        db.close();
+    });
+
+    await it("get returns null when nothing matches and stops at the first row", async () => {
+        const db = seeded();
+        expect(db.get("SELECT * FROM pet") === null).toBe(true);
+        db.exec("INSERT INTO pet (id, name) VALUES (?, ?)", 1, "a");
+        db.exec("INSERT INTO pet (id, name) VALUES (?, ?)", 2, "b");
+        expect(db.get("SELECT id FROM pet ORDER BY id")!["id"]).toBe(1);
+        expect(db.all("SELECT id FROM pet").length).toBe(2);
+        db.close();
+    });
+
+    await it("a violated constraint throws SqlConstraintError carrying the statement", async () => {
+        const db = seeded();
+        db.exec("INSERT INTO pet (id, name) VALUES (?, ?)", 1, "rex");
+        let sql = "";
+        let code = "";
+        try {
+            db.exec("INSERT INTO pet (id, name) VALUES (?, ?)", 2, "rex");
+        } catch (e: SqlConstraintError) {
+            sql = e.sql;
+            code = e.code;
+        }
+        expect(sql).toBe("INSERT INTO pet (id, name) VALUES (?, ?)");
+        expect(code).toBe("sql.constraint");
+        db.close();
+    });
+
+    await it("foreign keys are enforced", async () => {
+        const db = seeded();
+        let rejected = false;
+        try {
+            db.exec("INSERT INTO pet (id, name, owner_id) VALUES (?, ?, ?)", 1, "rex", 42);
+        } catch (e: SqlConstraintError) {
+            rejected = true;
+        }
+        expect(rejected).toBe(true);
+        db.close();
+    });
+
+    await it("bad SQL throws SqlError, which is not a constraint error", async () => {
+        const db = seeded();
+        let constraint = false;
+        let plain = false;
+        try {
+            db.all("SELEC nothing");
+        } catch (e: SqlConstraintError) {
+            constraint = true;
+        } catch (e: SqlError) {
+            plain = true;
+        }
+        expect(constraint).toBe(false);
+        expect(plain).toBe(true);
+        db.close();
+    });
+
+    await it("a closed database throws ClosedError instead of answering empty", async () => {
+        const db = seeded();
+        db.close();
+        expect(db.isOpen).toBe(false);
+        let closed = 0;
+        try { db.exec("DELETE FROM pet"); } catch (e: ClosedError) { closed = closed + 1; }
+        try { db.all("SELECT 1"); } catch (e: ClosedError) { closed = closed + 1; }
+        try { db.get("SELECT 1"); } catch (e: ClosedError) { closed = closed + 1; }
+        expect(closed).toBe(3);
+    });
+
+    await it("a transaction commits on success and rolls back on a throw", async () => {
+        const db = seeded();
+        db.transaction(() => {
+            db.exec("INSERT INTO pet (id, name) VALUES (?, ?)", 1, "kept");
+        });
+        let failed = false;
+        try {
+            db.transaction(() => {
+                db.exec("INSERT INTO pet (id, name) VALUES (?, ?)", 2, "undone");
+                db.exec("INSERT INTO pet (id, name) VALUES (?, ?)", 3, "kept");
+            });
+        } catch (e: SqlConstraintError) {
+            failed = true;
+        }
+        expect(failed).toBe(true);
+        expect(db.all("SELECT name FROM pet").length).toBe(1);
+        db.close();
+    });
+
+    await it("the async variants run off the isolate and agree with the sync ones", async () => {
+        const db = seeded();
+        expect(await db.execAsync("INSERT INTO pet (id, name) VALUES (?, ?)", 1, "rex")).toBe(1);
+        const rows = await db.allAsync("SELECT name FROM pet");
+        expect(rows.length).toBe(1);
+        expect(rows[0]["name"]).toBe("rex");
+        expect((await db.getAsync("SELECT name FROM pet WHERE id = ?", 1))!["name"]).toBe("rex");
+        expect((await db.getAsync("SELECT name FROM pet WHERE id = ?", 9)) === null).toBe(true);
+        let code = "";
+        try {
+            await db.execAsync("INSERT INTO pet (id, name) VALUES (?, ?)", 2, "rex");
+        } catch (e: SqlConstraintError) {
+            code = e.code;
+        }
+        expect(code).toBe("sql.constraint");
+        db.close();
+    });
+});

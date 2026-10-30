@@ -1,126 +1,91 @@
-use varn_core::StdErrorClass;
-use parking_lot::Mutex;
-use rusqlite::types::ValueRef;
 use rusqlite::Connection;
+use std::time::Duration;
 use varn_macros::varn_contract;
-use varn_types::NativeError;
-use varn_types::{NativeCtx, VmValue, VnArray};
+use varn_types::value::SendValue;
+use varn_types::{NativeCtx, NativeError, VmValue, VnArray};
 
-static DB_POOL: Mutex<Vec<Option<Connection>>> = Mutex::new(Vec::new());
+use crate::runtime::blocking;
 
-fn vm_params_to_sqlite(ctx: &dyn NativeCtx, params: VnArray) -> Vec<rusqlite::types::Value> {
-    if params.raw().is_null() {
-        return Vec::new();
-    }
-    let len = params.len(ctx);
-    let mut out = Vec::with_capacity(len);
-    for i in 0..len {
-        let v = params.get(ctx, i).unwrap_or_else(VmValue::null);
-        if v.is_null() {
-            out.push(rusqlite::types::Value::Null);
-        } else if v.is_bool() {
-            out.push(rusqlite::types::Value::Integer(if v.as_bool() {
-                1
-            } else {
-                0
-            }));
-        } else if v.is_int() {
-            out.push(rusqlite::types::Value::Integer(v.as_int()));
-        } else if v.is_f64() {
-            out.push(rusqlite::types::Value::Real(v.as_f64()));
-        } else if let Some(s) = ctx.str_owned(v) {
-            out.push(rusqlite::types::Value::Text(s));
-        } else {
-            out.push(rusqlite::types::Value::Null);
-        }
-    }
-    out
-}
+#[path = "handles.rs"]
+mod handles;
+#[path = "rows.rs"]
+mod rows;
+use handles::{failure, lookup, register, release};
+
+const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
+const MEMORY: &str = ":memory:";
 
 pub struct SqliteRuntime;
+
+fn open_connection(path: &str) -> Result<Connection, NativeError> {
+    let conn = if path == MEMORY {
+        Connection::open_in_memory()
+    } else {
+        Connection::open(path)
+    }
+    .map_err(|e| failure(e, path))?;
+    conn.busy_timeout(BUSY_TIMEOUT).map_err(|e| failure(e, path))?;
+    conn.pragma_update(None, "foreign_keys", true)
+        .map_err(|e| failure(e, path))?;
+    Ok(conn)
+}
+
+fn allow_path(ctx: &mut dyn NativeCtx, path: &str) -> Result<(), NativeError> {
+    if path == MEMORY {
+        return Ok(());
+    }
+    if !ctx.check_fs_read(path) {
+        return Err(NativeError::capability("fs.read", path));
+    }
+    if !ctx.check_fs_write(path) {
+        return Err(NativeError::capability("fs.write", path));
+    }
+    Ok(())
+}
 
 varn_contract! {
     module: "runtime:sqlite",
     contract: "src/modules/runtime/sqlite/sqlite_runtime.vn",
     impl SqliteRuntime {
-        fn open(_ctx: &mut dyn NativeCtx, path: &str) -> Result<i64, NativeError> {
-            let conn = if path == ":memory:" || path.is_empty() {
-                Connection::open_in_memory()
-            } else {
-                Connection::open(path)
-            }.map_err(|e| format!("SQLite open error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
-
-            let mut pool = DB_POOL.lock();
-            let id = pool.len() as i64;
-            pool.push(Some(conn));
-            Ok(id)
+        fn open(ctx: &mut dyn NativeCtx, path: &str) -> Result<i64, NativeError> {
+            allow_path(ctx, path)?;
+            Ok(register(open_connection(path)?))
         }
 
-        fn close(_ctx: &mut dyn NativeCtx, db_id: i64) -> Result<bool, NativeError> {
-            if db_id < 0 {
-                return Ok(false);
-            }
-            let mut pool = DB_POOL.lock();
-            if let Some(slot) = pool.get_mut(db_id as usize)
-                && let Some(conn) = slot.take() {
-                    let _ = conn.close();
-                    return Ok(true);
-                }
-            Ok(false)
+        fn close(_ctx: &mut dyn NativeCtx, db_id: i64) -> Result<(), NativeError> {
+            release(db_id);
+            Ok(())
         }
 
-        fn exec(_ctx: &mut dyn NativeCtx, db_id: i64, sql: &str) -> Result<i64, NativeError> {
-            let pool = DB_POOL.lock();
-            let conn = pool.get(db_id as usize)
-                .and_then(|s| s.as_ref())
-                .ok_or_else(|| format!("SQLite DB handle {db_id} not found")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
-
-            let affected = conn.execute(sql, []).map_err(|e| format!("SQLite exec error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
-            Ok(affected as i64)
+        fn script(_ctx: &mut dyn NativeCtx, db_id: i64, sql: &str) -> Result<(), NativeError> {
+            lookup(db_id)?.lock().execute_batch(sql).map_err(|e| failure(e, sql))
         }
 
-        fn queryAll(ctx: &mut dyn NativeCtx, db_id: i64, sql: &str, params: VnArray) -> Result<Vec<VmValue>, NativeError> {
-            let pool = DB_POOL.lock();
-            let conn = pool.get(db_id as usize)
-                .and_then(|s| s.as_ref())
-                .ok_or_else(|| format!("SQLite DB handle {db_id} not found")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
-
-            let sql_params = vm_params_to_sqlite(ctx, params);
-            let mut stmt = conn.prepare(sql).map_err(|e| format!("SQLite prepare error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
-            let col_names: Vec<String> = stmt.column_names().iter().map(|s| s.to_string()).collect();
-
-            let mut rows = stmt.query(rusqlite::params_from_iter(sql_params))
-                .map_err(|e| format!("SQLite query error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
-
-            let mut out = Vec::new();
-            while let Some(row) = rows.next().map_err(|e| format!("SQLite row error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))? {
-                let obj = ctx.alloc_object();
-                for (i, name) in col_names.iter().enumerate() {
-                    let val_ref = row.get_ref(i).map_err(|e| format!("SQLite column error: {e}")).map_err(|e| NativeError::std(StdErrorClass::Io, e))?;
-                    let vm_val = match val_ref {
-                        ValueRef::Null => VmValue::null(),
-                        ValueRef::Integer(v) => VmValue::from_int(v),
-                        ValueRef::Real(v) => VmValue::from_f64(v),
-                        ValueRef::Text(v) => {
-                            let s = String::from_utf8_lossy(v);
-                            ctx.alloc_str(s.as_ref())
-                        }
-                        ValueRef::Blob(v) => {
-                            let s = hex::encode(v);
-                            ctx.alloc_str_owned(s)
-                        }
-                    };
-                    ctx.set_field(obj, name, vm_val);
-                }
-                out.push(obj);
-            }
-
-            Ok(out)
+        fn execute(ctx: &mut dyn NativeCtx, db_id: i64, sql: &str, params: VnArray) -> Result<i64, NativeError> {
+            let bound = rows::params(ctx, params)?;
+            rows::execute(&lookup(db_id)?.lock(), sql, bound)
         }
 
-        fn queryOne(ctx: &mut dyn NativeCtx, db_id: i64, sql: &str, params: VnArray) -> Result<VmValue, NativeError> {
-            let all = Self::queryAll(ctx, db_id, sql, params)?;
-            Ok(all.into_iter().next().unwrap_or_else(VmValue::null))
+        fn executeAsync(ctx: &mut dyn NativeCtx, db_id: i64, sql: &str, params: VnArray) -> Result<VmValue, NativeError> {
+            let bound = rows::params(ctx, params)?;
+            let db = lookup(db_id)?;
+            let sql = sql.to_owned();
+            Ok(blocking::task(ctx, move || rows::execute(&db.lock(), &sql, bound).map(SendValue::Int)))
+        }
+
+        fn query(ctx: &mut dyn NativeCtx, db_id: i64, sql: &str, params: VnArray, limit: i64) -> Result<Vec<VmValue>, NativeError> {
+            let bound = rows::params(ctx, params)?;
+            let found = rows::select(&lookup(db_id)?.lock(), sql, bound, limit)?;
+            Ok(found.iter().map(|row| row.to_value_ctx(ctx)).collect())
+        }
+
+        fn queryAsync(ctx: &mut dyn NativeCtx, db_id: i64, sql: &str, params: VnArray, limit: i64) -> Result<VmValue, NativeError> {
+            let bound = rows::params(ctx, params)?;
+            let db = lookup(db_id)?;
+            let sql = sql.to_owned();
+            Ok(blocking::task(ctx, move || {
+                rows::select(&db.lock(), &sql, bound, limit).map(SendValue::Array)
+            }))
         }
     }
 }

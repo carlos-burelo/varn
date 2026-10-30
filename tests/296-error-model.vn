@@ -6,7 +6,8 @@ import { readText, readTextAsync } from "std:fs";
 import {
     StdError, IoError, FsError, FsNotFoundError, FsPermissionError, FsExistsError, FsEncodingError,
     BadDescriptorError, ClosedError, NetError, ResolveError, ConnectError, TlsError, ProtocolError,
-    CapabilityError, TimeoutError, CancelledError, ParseError, DecodeError
+    CapabilityError, TimeoutError, CancelledError, ParseError, DecodeError,
+    SqlError, SqlConstraintError
 } from "std:error";
 import { readsMissingFile } from "./helpers/error-workers.vn";
 
@@ -29,6 +30,7 @@ class Expected {
 
 function parentName(error: StdError): str {
     if (error instanceof DecodeError) return "ParseError";
+    if (error instanceof SqlConstraintError) return "SqlError";
     if (error instanceof FsNotFoundError || error instanceof FsPermissionError
         || error instanceof FsExistsError || error instanceof FsEncodingError) return "FsError";
     if (error instanceof ResolveError || error instanceof ConnectError
@@ -36,7 +38,8 @@ function parentName(error: StdError): str {
     if (error instanceof FsError || error instanceof BadDescriptorError
         || error instanceof ClosedError || error instanceof NetError) return "IoError";
     if (error instanceof IoError || error instanceof CapabilityError || error instanceof TimeoutError
-        || error instanceof CancelledError || error instanceof ParseError) return "StdError";
+        || error instanceof CancelledError || error instanceof ParseError
+        || error instanceof SqlError) return "StdError";
     return "Error";
 }
 
@@ -61,9 +64,11 @@ await describe("296 error model", async () => {
             new Expected(new TimeoutError("m"), "timeout", "StdError"),
             new Expected(new CancelledError("m"), "cancelled", "StdError"),
             new Expected(new ParseError("m"), "parse", "StdError"),
-            new Expected(new DecodeError("$.a", "m"), "parse.decode", "ParseError")
+            new Expected(new DecodeError("$.a", "m"), "parse.decode", "ParseError"),
+            new Expected(new SqlError("m", "SELECT 1"), "sql", "StdError"),
+            new Expected(new SqlConstraintError("m"), "sql.constraint", "SqlError")
         ];
-        expect(all.length).toBe(19);
+        expect(all.length).toBe(21);
         for (const item of all) {
             expect(item.error.code).toBe(item.code);
             expect(parentName(item.error)).toBe(item.parent);

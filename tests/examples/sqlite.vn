@@ -5,16 +5,16 @@ await describe("example std:sqlite", async () => {
     await it("creates tables and inserts rows", () => {
         let db = new Database(":memory:");
         expect(db.exec("CREATE TABLE users (id INT, name STR)")).toBe(0);
-        expect(db.run("INSERT INTO users VALUES (?, ?)", 1, "ana")).toBe(1);
-        expect(db.run("INSERT INTO users VALUES (?, ?)", 2, "bob")).toBe(1);
+        expect(db.exec("INSERT INTO users VALUES (?, ?)", 1, "ana")).toBe(1);
+        expect(db.exec("INSERT INTO users VALUES (?, ?)", 2, "bob")).toBe(1);
         db.close();
     });
 
     await it("queries with all/get", () => {
         let db = new Database(":memory:");
         db.exec("CREATE TABLE t (id INT, name STR)");
-        db.run("INSERT INTO t VALUES (?, ?)", 1, "ana");
-        db.run("INSERT INTO t VALUES (?, ?)", 2, "bob");
+        db.exec("INSERT INTO t VALUES (?, ?)", 1, "ana");
+        db.exec("INSERT INTO t VALUES (?, ?)", 2, "bob");
         let rows = db.all("SELECT * FROM t WHERE id > ?", 0);
         expect(rows.length).toBe(2);
         let row = db.get("SELECT * FROM t WHERE id = ?", 1);
@@ -27,7 +27,7 @@ await describe("example std:sqlite", async () => {
     await it("interpolates with tagged templates", () => {
         let db = new Database(":memory:");
         db.exec("CREATE TABLE t (id INT, name STR)");
-        db.run("INSERT INTO t VALUES (?, ?)", 7, "kim");
+        db.exec("INSERT INTO t VALUES (?, ?)", 7, "kim");
         let id = 7;
         let rows = db.sql`SELECT * FROM t WHERE id = ${id}`;
         expect(rows.length).toBe(1);
