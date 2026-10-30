@@ -408,6 +408,20 @@ fn plain_field(heap: &HeapInner, value: VmValue) -> Option<varn_types::value::Se
     }
 }
 
+pub(crate) fn derives_from_error(class: &Rc<ClassObj>) -> bool {
+    let root = varn_core::RuntimeErrorKind::Error.class_name();
+    let mut current = Rc::clone(class);
+    loop {
+        if current.name.as_str() == root {
+            return true;
+        }
+        let Some(parent) = current.superclass.borrow().clone() else {
+            return false;
+        };
+        current = parent;
+    }
+}
+
 pub(crate) fn error_value(
     heap: &HeapInner,
     thrown: VmValue,

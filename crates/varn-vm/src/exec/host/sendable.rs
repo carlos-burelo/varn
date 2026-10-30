@@ -38,6 +38,14 @@ pub(super) fn to_sendable(
             Some(HeapObj::Object(obj)) => {
                 let borrow = obj.borrow();
 
+                if borrow
+                    .class()
+                    .is_some_and(|cls| crate::task::derives_from_error(&cls))
+                    && let Some(error) = crate::task::error_value(&ctx.heap, val)
+                {
+                    return Ok(error);
+                }
+
                 if let Some(end) = borrow
                     .class()
                     .and_then(|cls| varn_types::value::ChannelEndpoint::of_class(&cls))

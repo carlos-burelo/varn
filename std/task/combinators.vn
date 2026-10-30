@@ -24,11 +24,11 @@ async function wrapSettledOne<T>(task: Task<T>): Task<Result<T, Error>> {
     }
 }
 
-async function raceOneHandle<T>(handle: TaskHandle<T>, ch: Channel<Result<T, str>>): Task<void> {
+async function raceOneHandle<T>(handle: TaskHandle<T>, ch: Channel<Result<T, Error>>): Task<void> {
     try {
         await ch.tx.send(Result.Ok(await handle));
     } catch (err) {
-        await ch.tx.send(Result.Err((err as Error).message));
+        await ch.tx.send(Result.Err(err as Error));
     }
 }
 
@@ -53,7 +53,7 @@ export namespace Task {
         if (tasks.length === 0) {
             throw new RangeError("Task.race requires at least one task");
         }
-        let ch = channel$<Result<T, str>>(tasks.length);
+        let ch = channel$<Result<T, Error>>(tasks.length);
         let handles: Array<TaskHandle<T>> = [];
         for (let i = 0; i < tasks.length; i = i + 1) {
             handles.push(spawn(tasks[i]));
@@ -67,8 +67,8 @@ export namespace Task {
         }
         return match (first) {
             Ok(value) => value,
-            Err(message) => {
-                throw new Error(message);
+            Err(error) => {
+                throw error;
             }
         };
     }
