@@ -1,8 +1,9 @@
 import { tcpListen$, tcpListenTls$, tcpAccept$, tcpWrite$, tcpClose$, tcpCloseListener$, sendHttpResponse$, httpMethodName$, HttpMethod } from "runtime:net";
 import { spawn } from "std:task";
 
-import { Request, Response, RawRequest, readHttpRequest, Route, Handler, Middleware } from "std:http/core";
+import { Request, Response, RawRequest, readHttpRequest, rejectionOf, Route, Handler, Middleware } from "std:http/core";
 import { AsyncReader } from "std:io";
+import { WireReader } from "std:http/wire";
 
 const ALL_METHODS: HttpMethod[] = [
     HttpMethod.GET,
@@ -238,6 +239,7 @@ export class HttpServer {
 
         let reqObj = new Request(rawReq.path, { method: method, headers: rawReq.headers, body: rawReq.body });
         reqObj.path = pathOnly;
+        reqObj.payload = rawReq.payload;
 
         let queryObj: { [key: str]: str } = {};
         if (queryStr.length > 0) {
@@ -283,14 +285,16 @@ export class HttpServer {
 
     private async _handleConnection(connId: int): Task<void> {
         let keepAlive = true;
+        const wire = new WireReader(connId);
         while (keepAlive) {
             let rawReq: RawRequest? = null;
             try {
-                rawReq = await readHttpRequest(connId, this._maxContentLength);
+                rawReq = await readHttpRequest(wire, this._maxContentLength);
             } catch (err) {
-                if (err.message.startsWith("413")) {
+                const rejection = rejectionOf(err.message);
+                if (rejection !== null) {
                     let errHeaders: { [key: str]: str } = { "Content-Type": "text/plain", "Connection": "close" };
-                    await this._sendBestEffort(connId, 413, "Payload Too Large", errHeaders, "Payload Too Large");
+                    await this._sendBestEffort(connId, rejection.status, rejection.reason, errHeaders, rejection.reason);
                 }
                 break;
             }

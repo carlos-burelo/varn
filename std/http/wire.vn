@@ -53,6 +53,10 @@ export class WireReader {
         this.conn = conn;
     }
 
+    get connId(): int {
+        return this.conn;
+    }
+
     private get buffered(): int {
         return this.buffer.length - this.cursor;
     }
@@ -71,16 +75,22 @@ export class WireReader {
         return true;
     }
 
-    async line(): Task<str?> {
+    async line(limit: int = 65536): Task<str?> {
         let scanned = this.cursor;
         while (true) {
             const end = this.buffer.length;
             for (let i = scanned; i + 1 < end; i = i + 1) {
                 if (this.buffer.byteAt(i) === 13 && this.buffer.byteAt(i + 1) === 10) {
+                    if (i - this.cursor > limit) {
+                        throw new Error(`line exceeds ${limit} bytes`);
+                    }
                     const text = this.buffer.slice(this.cursor, i).toString();
                     this.cursor = i + 2;
                     return text;
                 }
+            }
+            if (end - this.cursor > limit) {
+                throw new Error(`line exceeds ${limit} bytes`);
             }
             scanned = end - 1 > this.cursor ? end - 1 : this.cursor;
             if (!(await this.pull())) {
@@ -110,4 +120,62 @@ export class WireReader {
         this.cursor = this.buffer.length;
         return out;
     }
+}
+
+function hexDigit(code: int): int {
+    if (code >= 48 && code <= 57) return code - 48;
+    if (code >= 97 && code <= 102) return code - 87;
+    if (code >= 65 && code <= 70) return code - 55;
+    return -1;
+}
+
+function parseChunkSize(line: str): int {
+    const extension = line.indexOf(";");
+    const digits = (extension === null ? line : line.slice(0, extension)).trim();
+    if (digits.length === 0 || digits.length > 15) {
+        throw new Error("malformed chunk size line");
+    }
+    let size = 0;
+    for (let i = 0; i < digits.length; i = i + 1) {
+        const digit = hexDigit(digits.charCodeAt(i) as int);
+        if (digit < 0) {
+            throw new Error(`malformed chunk size '${digits}'`);
+        }
+        size = size * 16 + digit;
+    }
+    return size;
+}
+
+export async function readChunkedBody(wire: WireReader, maxBytes: int, tooLarge: str): Task<Bytes> {
+    const body = new ByteBuilder();
+    while (true) {
+        const sizeLine = await wire.line();
+        if (sizeLine === null) {
+            throw new Error("connection closed inside a chunked body");
+        }
+        const size = parseChunkSize(sizeLine as str);
+        if (size === 0) {
+            while (true) {
+                const trailer = await wire.line();
+                if (trailer === null || (trailer as str).length === 0) {
+                    break;
+                }
+            }
+            break;
+        }
+        if (body.length + size > maxBytes) {
+            throw new Error(tooLarge);
+        }
+        const data = await wire.take(size);
+        if (data === null) {
+            throw new Error("connection closed inside a chunk");
+        }
+        const bytes = data as Bytes;
+        body.append(bytes, 0, bytes.length);
+        const terminator = await wire.line();
+        if (terminator === null || (terminator as str).length !== 0) {
+            throw new Error("a chunk is not followed by CRLF");
+        }
+    }
+    return body.slice(0, body.length);
 }

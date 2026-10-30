@@ -1,4 +1,5 @@
-import { tcpRead$, parseHttpRequest$, HttpMethod } from "runtime:net";
+import { tcpWrite$, parseHttpRequest$, HttpMethod } from "runtime:net";
+import { WireReader, readChunkedBody } from "std:http/wire";
 import { Headers } from "std:http/headers";
 import { Json, JsonValue } from "std:encoding";
 
@@ -9,61 +10,132 @@ export interface RequestInit {
     ca?: str;
 }
 
+const MAX_LINE = 8192;
+const MAX_HEAD = 65536;
+
 export class RawRequest {
     method: HttpMethod? = null;
     path: str = "";
     headers: { [key: str]: str } = {};
     body: str = "";
+    payload: Bytes = Bytes.alloc(0);
 }
 
-export function parseRawRequest(raw: str): RawRequest? {
-    let parsed = parseHttpRequest$(raw);
-    if (parsed === null) return null;
+export class Rejection {
+    status: int;
+    reason: str;
 
-    let req = new RawRequest();
+    constructor(status: int, reason: str) {
+        this.status = status;
+        this.reason = reason;
+    }
+}
+
+function reject(status: int, reason: str): Error {
+    return new Error(`${status} ${reason}`);
+}
+
+export function rejectionOf(message: str): Rejection? {
+    if (message.length < 5 || message.charCodeAt(3) !== 32) {
+        return null;
+    }
+    for (let i = 0; i < 3; i = i + 1) {
+        const code = message.charCodeAt(i) as int;
+        if (code < 48 || code > 57) {
+            return null;
+        }
+    }
+    return new Rejection(int.parse(message.slice(0, 3)), message.slice(4));
+}
+
+async function readHead(wire: WireReader): Task<str?> {
+    let first: str? = null;
+    while (first === null || (first as str).length === 0) {
+        first = await wire.line(MAX_LINE);
+        if (first === null) {
+            return null;
+        }
+    }
+    let head = (first as str) + "\r\n";
+    while (true) {
+        const line = await wire.line(MAX_LINE);
+        if (line === null) {
+            throw reject(400, "Bad Request");
+        }
+        if (head.length + (line as str).length > MAX_HEAD) {
+            throw reject(431, "Request Header Fields Too Large");
+        }
+        if ((line as str).length === 0) {
+            break;
+        }
+        head = head + (line as str) + "\r\n";
+    }
+    return head + "\r\n";
+}
+
+async function readBody(wire: WireReader, req: RawRequest, maxContentLength: int): Task<Bytes> {
+    const expect = req.headers["expect"];
+    const coding = req.headers["transfer-encoding"];
+    const lengthText = req.headers["content-length"];
+    const chunked = coding !== null && coding.toLowerCase().indexOf("chunked") !== null;
+    if (!chunked && lengthText === null) {
+        return Bytes.alloc(0);
+    }
+    if (expect !== null && expect.toLowerCase() === "100-continue") {
+        await tcpWrite$(wire.connId, "HTTP/1.1 100 Continue\r\n\r\n");
+    }
+    if (chunked) {
+        try {
+            return await readChunkedBody(wire, maxContentLength, "413 Payload Too Large");
+        } catch (err) {
+            if (rejectionOf(err.message) !== null) {
+                throw err;
+            }
+            throw reject(400, "Bad Request");
+        }
+    }
+    let declared = -1;
+    try {
+        declared = int.parse(lengthText as str);
+    } catch (err) {
+        throw reject(400, "Bad Request");
+    }
+    if (declared < 0) {
+        throw reject(400, "Bad Request");
+    }
+    if (declared > maxContentLength) {
+        throw reject(413, "Payload Too Large");
+    }
+    const data = await wire.take(declared);
+    if (data === null) {
+        throw reject(400, "Bad Request");
+    }
+    return data as Bytes;
+}
+
+export async function readHttpRequest(wire: WireReader, maxContentLength: int = 10485760): Task<RawRequest?> {
+    let head: str? = null;
+    try {
+        head = await readHead(wire);
+    } catch (err) {
+        if (err.message.startsWith("line exceeds")) {
+            throw reject(431, "Request Header Fields Too Large");
+        }
+        throw err;
+    }
+    if (head === null) {
+        return null;
+    }
+    const parsed = parseHttpRequest$(head as str);
+    if (parsed === null) {
+        throw reject(400, "Bad Request");
+    }
+    const req = new RawRequest();
     req.method = parsed.method;
     req.path = parsed.path;
     req.headers = parsed.headers;
-    req.body = parsed.body;
-    return req;
-}
-
-export async function readHttpRequest(connId: int, maxContentLength: int = 10485760): Task<RawRequest?> {
-    let raw = "";
-    let req: RawRequest? = null;
-    let keepReading = true;
-    while (keepReading) {
-        let chunk = await tcpRead$(connId, 4096);
-        if (chunk === null) {
-            keepReading = false;
-        } else {
-            let b = chunk as Bytes;
-            if (b.length > 0) {
-                raw = raw + b.toString();
-                if (raw.length > maxContentLength + 65536) {
-                    throw new Error("413 Payload Too Large");
-                }
-                req = parseRawRequest(raw);
-                if (req !== null) {
-                    let contentLenStr = req.headers["content-length"];
-                    if (contentLenStr !== null) {
-                        let contentLen = int.parse(contentLenStr);
-                        if (contentLen > maxContentLength) {
-                            throw new Error("413 Payload Too Large");
-                        }
-                        if (req.body.length >= contentLen) {
-                            req.body = req.body.slice(0, contentLen);
-                            keepReading = false;
-                        }
-                    } else {
-                        keepReading = false;
-                    }
-                }
-            } else {
-                keepReading = false;
-            }
-        }
-    }
+    req.payload = await readBody(wire, req, maxContentLength);
+    req.body = req.payload.toString();
     return req;
 }
 
@@ -72,6 +144,7 @@ export class Request {
     method: HttpMethod = HttpMethod.GET;
     headers: Headers = new Headers({});
     body: str = "";
+    payload: Bytes? = null;
     path: str = "";
     query: { [key: str]: str } = {};
     params: { [key: str]: str } = {};
@@ -105,6 +178,10 @@ export class Request {
 
     text(): str {
         return this.body;
+    }
+
+    bytes(): Bytes {
+        return this.payload ?? Bytes.fromString(this.body);
     }
 
     json(): JsonValue {

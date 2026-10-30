@@ -1,7 +1,9 @@
-import { ByteBuilder, WireReader } from "std:http/wire";
+import { WireReader, readChunkedBody } from "std:http/wire";
 import { Headers } from "std:http/headers";
 import { Json, JsonValue } from "std:encoding";
 import { AsyncReader } from "std:io";
+
+const MAX_BODY = 1073741824;
 
 export class RawResponse {
     status: int = 200;
@@ -9,61 +11,6 @@ export class RawResponse {
     headers: { [key: str]: str } = {};
     cookies: str[] = [];
     payload: Bytes = Bytes.alloc(0);
-}
-
-function hexDigit(code: int): int {
-    if (code >= 48 && code <= 57) return code - 48;
-    if (code >= 97 && code <= 102) return code - 87;
-    if (code >= 65 && code <= 70) return code - 55;
-    return -1;
-}
-
-function parseChunkSize(line: str): int {
-    const extension = line.indexOf(";");
-    const digits = (extension === null ? line : line.slice(0, extension)).trim();
-    if (digits.length === 0) {
-        throw new Error("malformed chunk size line");
-    }
-    let size = 0;
-    for (let i = 0; i < digits.length; i = i + 1) {
-        const digit = hexDigit(digits.charCodeAt(i) as int);
-        if (digit < 0) {
-            throw new Error(`malformed chunk size '${digits}'`);
-        }
-        size = size * 16 + digit;
-    }
-    return size;
-}
-
-async function readChunked(wire: WireReader): Task<Bytes> {
-    const body = new ByteBuilder();
-    while (true) {
-        const sizeLine = await wire.line();
-        if (sizeLine === null) {
-            throw new Error("connection closed inside a chunked body");
-        }
-        const size = parseChunkSize(sizeLine as str);
-        if (size === 0) {
-            while (true) {
-                const trailer = await wire.line();
-                if (trailer === null || (trailer as str).length === 0) {
-                    break;
-                }
-            }
-            break;
-        }
-        const data = await wire.take(size);
-        if (data === null) {
-            throw new Error("connection closed inside a chunk");
-        }
-        const bytes = data as Bytes;
-        body.append(bytes, 0, bytes.length);
-        const terminator = await wire.line();
-        if (terminator === null || (terminator as str).length !== 0) {
-            throw new Error("a chunk is not followed by CRLF");
-        }
-    }
-    return body.slice(0, body.length);
 }
 
 function addHeader(resp: RawResponse, line: str): void {
@@ -114,12 +61,15 @@ export async function readHttpResponse(connId: int, headOnly: bool = false): Tas
     }
     const coding = resp.headers["transfer-encoding"];
     if (coding !== null && coding.toLowerCase().indexOf("chunked") !== null) {
-        resp.payload = await readChunked(wire);
+        resp.payload = await readChunkedBody(wire, MAX_BODY, "the response body is too large");
         return resp;
     }
     const lengthText = resp.headers["content-length"];
     if (lengthText !== null) {
         const expected = int.parse(lengthText);
+        if (expected < 0 || expected > MAX_BODY) {
+            throw new Error(`unacceptable Content-Length ${expected}`);
+        }
         const data = await wire.take(expected);
         if (data === null) {
             throw new Error(`connection closed before the ${expected} byte body arrived`);
