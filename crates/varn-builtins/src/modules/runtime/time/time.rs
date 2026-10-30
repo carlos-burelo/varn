@@ -60,10 +60,10 @@ varn_contract! {
     contract: "src/modules/runtime/time/time_runtime.vn",
     impl TimeRuntime {
         fn nowMs(_ctx: &mut dyn NativeCtx) -> Result<i64, String> {
-            Ok(std::time::SystemTime::now()
+            std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_millis() as i64)
-                .unwrap_or(0))
+                .map_err(|e| format!("time.now: the system clock is before the Unix epoch: {e}"))
         }
         fn parseIsoDuration(_ctx: &mut dyn NativeCtx, s: &str) -> Result<i64, String> {
             parse_iso_duration(s)

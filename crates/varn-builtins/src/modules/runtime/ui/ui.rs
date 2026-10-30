@@ -61,8 +61,8 @@ fn with_win<T>(id: i64, f: impl FnOnce(&mut Window) -> Result<T, String>) -> Res
     f(w)
 }
 
-fn real_poll(id: u64) -> Vec<varn_ui::RealEvent> {
-    varn_ui::take_events(id).unwrap_or_default()
+fn real_poll(id: u64) -> Result<Vec<varn_ui::RealEvent>, String> {
+    varn_ui::take_events(id)
 }
 
 fn ui_event(ctx: &mut dyn NativeCtx, e: &varn_ui::RealEvent) -> Result<VmValue, String> {
@@ -181,7 +181,7 @@ varn_contract! {
             let real = with_win(id, |w| Ok(w.real))?;
             if let Some(h) = real {
                 let _ = varn_ui::pump(h);
-                for e in real_poll(h) {
+                for e in real_poll(h)? {
                     with_win(id, |w| {
                         match e {
                             varn_ui::RealEvent::Close => w.closed = true,
@@ -255,7 +255,7 @@ varn_contract! {
                 win.canvas.set_dark(win.dark);
                 let hits = match win.real {
                     Some(h) => varn_ui::draw_now(h, &mut win.canvas, scene.clear, &scene.runs)
-                        .unwrap_or_default(),
+                        .map_err(|e| format!("ui.draw: {e}"))?,
                     None => win.canvas.interact(win.w as u32, win.h as u32, &scene.runs),
                 };
                 win.activated.extend(hits.activations);
