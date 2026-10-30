@@ -6,6 +6,7 @@ export interface RequestInit {
     method?: HttpMethod;
     headers?: { [key: str]: str };
     body?: str;
+    ca?: str;
 }
 
 export class RawRequest {

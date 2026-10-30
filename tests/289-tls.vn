@@ -1,0 +1,103 @@
+import { describe, it, expect } from "std:test";
+import { spawn, delay } from "std:task";
+import { readText } from "std:fs";
+import { TcpStream, TcpListener } from "std:net";
+import { fetch, HttpServer, Request, Response } from "std:http";
+
+const ca = readText("tests/helpers/tls/ca.pem");
+const cert = readText("tests/helpers/tls/server.pem");
+const key = readText("tests/helpers/tls/server.key");
+
+async function echoOnce(listener: TcpListener): Task<void> {
+    const conn = await listener.accept();
+    try {
+        while (true) {
+            const chunk = await conn.read(16384);
+            if (chunk === null) {
+                break
+            }
+            await conn.write(chunk as Bytes);
+        }
+    } catch (e) {
+    }
+    conn.close();
+}
+
+async function failureOf(run: () => Task<dynamic>): Task<str> {
+    try {
+        await run()
+        return ""
+    } catch (e) {
+        return e.message
+    }
+}
+
+await describe("289 tls", async () => {
+    await it("a client trusting the CA exchanges data with a TLS listener", async () => {
+        const listener = TcpListener.listenTls(19890, cert, key);
+        spawn(echoOnce(listener));
+        const client = await TcpStream.connectTls("localhost", 19890, ca, 1);
+        await client.write("hello tls");
+        const reply = await client.read(64);
+        expect((reply as Bytes).toString()).toBe("hello tls");
+        client.close();
+        listener.close();
+    });
+
+    await it("large payloads cross the record boundary intact", async () => {
+        const listener = TcpListener.listenTls(19891, cert, key);
+        spawn(echoOnce(listener));
+        const client = await TcpStream.connectTls("127.0.0.1", 19891, ca, 1);
+        const size = 300000;
+        const payload = Bytes.alloc(size);
+        for (let i = 0; i < size; i = i + 1) {
+            payload.setByte(i, i % 251);
+        }
+        const sender = spawn((async (): Task<void> => {
+            await client.write(payload);
+        })());
+        let received = 0;
+        let sum = 0;
+        while (received < size) {
+            const chunk = await client.read(65536);
+            if (chunk === null) {
+                break
+            }
+            const bytes = chunk as Bytes;
+            for (let i = 0; i < bytes.length; i = i + 1) {
+                sum = sum + bytes.getByte(i);
+            }
+            received = received + bytes.length;
+        }
+        await sender;
+        let expected = 0;
+        for (let i = 0; i < size; i = i + 1) {
+            expected = expected + i % 251;
+        }
+        expect(received).toBe(size);
+        expect(sum).toBe(expected);
+        client.close();
+        listener.close();
+    });
+
+    await it("a certificate from an unknown CA is rejected with its cause", async () => {
+        const listener = TcpListener.listenTls(19892, cert, key);
+        spawn(echoOnce(listener));
+        const message = await failureOf(() => TcpStream.connectTls("localhost", 19892, null, 1));
+        expect(message.indexOf("UnknownIssuer") !== null).toBeTruthy();
+        listener.close();
+    });
+
+    await it("fetch speaks https to an HttpServer over TLS", async () => {
+        const server = new HttpServer();
+        server.get("/secure", async (req: Request) => new Response("over tls", 200, {}));
+        server.listenTls(19893, cert, key);
+        await delay(150);
+        const res = await fetch("https://localhost:19893/secure", { ca: ca });
+        expect(res.status).toBe(200);
+        expect(res.text()).toBe("over tls");
+        const message = await failureOf(() => fetch("https://localhost:19893/secure"));
+        expect(message.indexOf("UnknownIssuer") !== null).toBeTruthy();
+        server.close();
+    });
+});

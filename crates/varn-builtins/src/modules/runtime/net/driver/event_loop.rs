@@ -83,6 +83,7 @@ impl IoDriver {
                     let mut resolved_conns: Vec<(HostPromise, i64)> = Vec::new();
                     let mut new_streams: Vec<(i64, StreamState)> = Vec::new();
 
+                    let tls = listener_state.tls.clone();
                     while let Some(task) = listener_state.pending_accepts.pop() {
                         match listener_state.listener.accept() {
                             Ok((mut stream, _)) => {
@@ -93,17 +94,13 @@ impl IoDriver {
                                     token,
                                     Interest::READABLE | Interest::WRITABLE,
                                 );
-                                resolved_conns.push((task, conn_id));
-                                new_streams.push((
-                                    conn_id,
-                                    StreamState {
-                                        stream,
-                                        is_connecting: false,
-                                        pending_connect: None,
-                                        pending_read: None,
-                                        pending_write: None,
-                                    },
-                                ));
+                                match StreamState::accepted(stream, &tls) {
+                                    Ok(state) => {
+                                        resolved_conns.push((task, conn_id));
+                                        new_streams.push((conn_id, state));
+                                    }
+                                    Err(e) => task.reject(failure("accept", e)),
+                                }
                             }
                             Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
                                 listener_state.pending_accepts.push(task);
@@ -136,22 +133,42 @@ impl IoDriver {
                                 Ok(Some(e)) | Err(e) => Some(Err(e)),
                             },
                         };
-                        if let Some(outcome) = settled
-                            && let Some(task) = stream_state.pending_connect.take()
-                        {
+                        if let Some(outcome) = settled {
                             stream_state.is_connecting = false;
-                            let completion = match outcome {
-                                Ok(id) => Ok(SendValue::Int(id)),
-                                Err(e) => Err(failure("connect", e)),
-                            };
-                            deferred.push((task, completion));
+                            match outcome {
+                                Err(e) => {
+                                    if let Some(task) = stream_state.pending_connect.take() {
+                                        deferred.push((task, Err(failure("connect", e))));
+                                    }
+                                }
+                                Ok(id) if stream_state.tls.is_none() => {
+                                    if let Some(task) = stream_state.pending_connect.take() {
+                                        deferred.push((task, Ok(SendValue::Int(id))));
+                                    }
+                                }
+                                Ok(_) => {}
+                            }
                         }
+                    }
+
+                    if !stream_state.is_connecting
+                        && let Err(e) = stream_state.pump()
+                    {
+                        let cause = failure("tls", e);
+                        stream_state.fail_pending(&cause, &mut deferred);
+                    }
+
+                    if !stream_state.is_connecting
+                        && stream_state.tls.as_ref().is_some_and(|tls| !tls.is_handshaking())
+                        && let Some(task) = stream_state.pending_connect.take()
+                    {
+                        deferred.push((task, Ok(SendValue::Int(id))));
                     }
 
                     if event.is_writable()
                         && let Some(mut pw) = stream_state.pending_write.take()
                     {
-                        match stream_state.stream.write(&pw.data[pw.written..]) {
+                        match stream_state.write_plain(&pw.data[pw.written..]) {
                             Ok(n) => {
                                 pw.written += n;
                                 if pw.written >= pw.data.len() {
@@ -169,11 +186,11 @@ impl IoDriver {
                         }
                     }
 
-                    if event.is_readable()
+                    if (event.is_readable() || stream_state.tls.is_some())
                         && let Some(pr) = stream_state.pending_read.take()
                     {
                         let mut buf = vec![0u8; pr.len];
-                        match stream_state.stream.read(&mut buf) {
+                        match stream_state.read_plain(&mut buf) {
                             Ok(0) => {
                                 deferred.push((pr.task, Ok(SendValue::Null)));
                             }

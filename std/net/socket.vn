@@ -1,7 +1,9 @@
 import {
     tcpListen$,
+    tcpListenTls$,
     tcpAccept$,
     tcpConnect$,
+    tcpConnectTls$,
     tcpRead$,
     tcpWrite$,
     tcpClose$,
@@ -24,11 +26,19 @@ export class TcpStream implements AsyncReader, AsyncWriter {
     }
 
     static async connect(host: str, port: int, attempts: int = 25, baseDelayMs: int = 50): Task<TcpStream> {
+        return await TcpStream.open(host, port, false, null, attempts, baseDelayMs);
+    }
+
+    static async connectTls(host: str, port: int, ca?: str, attempts: int = 5, baseDelayMs: int = 50): Task<TcpStream> {
+        return await TcpStream.open(host, port, true, ca, attempts, baseDelayMs);
+    }
+
+    private static async open(host: str, port: int, secure: bool, ca: str?, attempts: int, baseDelayMs: int): Task<TcpStream> {
         let attempt = 0;
         let cause = "no attempt was made";
         while (attempt < attempts) {
             try {
-                let connId = await tcpConnect$(host, port);
+                let connId = secure ? await tcpConnectTls$(host, port, ca) : await tcpConnect$(host, port);
                 return new TcpStream(connId, host, port);
             } catch (e) {
                 cause = e.message;
@@ -145,6 +155,14 @@ export class TcpListener {
         this._port = port;
         this._host = host;
         this._isListening = listenerId >= 0;
+    }
+
+    static listenTls(port: int, cert: str, key: str, host: str = "127.0.0.1"): TcpListener {
+        try {
+            return new TcpListener(tcpListenTls$(port, cert, key), port, host);
+        } catch (e) {
+            throw new Error(`TcpListenError: Could not bind a TLS listener to port ${port} (${e.message})`);
+        }
     }
 
     static listen(port: int, host: str = "127.0.0.1"): TcpListener {

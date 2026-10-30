@@ -63,6 +63,23 @@ varn_contract! {
             Ok(ctx.task_from_host(task, HostOpen::Plain))
         }
 
+        fn tcpConnectTls(ctx: &mut dyn NativeCtx, host: &str, port: i64, ca: Option<&str>) -> Result<VmValue, String> {
+            if !ctx.check_net_connect(host) {
+                return Err(format!("SecurityError: Permission denied (net.client) to host '{host}'"));
+            }
+            let task = driver().connect_tls(host, port, ca);
+            Ok(ctx.task_from_host(task, HostOpen::Plain))
+        }
+
+        fn tcpListenTls(ctx: &mut dyn NativeCtx, port: i64, cert: &str, key: &str) -> Result<i64, String> {
+            if !ctx.check_net_listen(port) {
+                return Err(format!("SecurityError: Permission denied (net.server) on port {port}"));
+            }
+            driver()
+                .listen_tls(port, cert, key)
+                .map_err(|e| format!("tcpListenTls: {e}"))
+        }
+
         fn tcpRead(ctx: &mut dyn NativeCtx, conn_id: i64, len: i64) -> Result<VmValue, String> {
             let task = driver().read(conn_id, len.max(0) as usize);
             Ok(ctx.task_from_host(task, HostOpen::Plain))

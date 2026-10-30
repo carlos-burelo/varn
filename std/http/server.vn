@@ -1,4 +1,4 @@
-import { tcpListen$, tcpAccept$, tcpWrite$, tcpClose$, tcpCloseListener$, sendHttpResponse$, httpMethodName$, HttpMethod } from "runtime:net";
+import { tcpListen$, tcpListenTls$, tcpAccept$, tcpWrite$, tcpClose$, tcpCloseListener$, sendHttpResponse$, httpMethodName$, HttpMethod } from "runtime:net";
 import { spawn } from "std:task";
 
 import { Request, Response, RawRequest, readHttpRequest, Route, Handler, Middleware } from "std:http/core";
@@ -122,6 +122,15 @@ export class HttpServer {
         if (this._isListening) return;
         this._port = port;
         this._listenerId = tcpListen$(port);
+        this._isListening = true;
+
+        spawn(this._acceptLoop());
+    }
+
+    listenTls(port: int, cert: str, key: str): void {
+        if (this._isListening) return;
+        this._port = port;
+        this._listenerId = tcpListenTls$(port, cert, key);
         this._isListening = true;
 
         spawn(this._acceptLoop());

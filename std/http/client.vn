@@ -1,4 +1,4 @@
-import { tcpConnect$, tcpWrite$, tcpClose$, httpMethodName$, HttpMethod } from "runtime:net";
+import { tcpConnect$, tcpConnectTls$, tcpWrite$, tcpClose$, httpMethodName$, HttpMethod } from "runtime:net";
 import { Url } from "std:net";
 import { Response, RequestInit, readHttpResponse } from "std:http/core";
 
@@ -63,18 +63,21 @@ export async function fetch(url: str, init: RequestInit = {}): Task<Response> {
     const parsedUrl = Url.parse(url);
     const host = parsedUrl.host;
     
-    let port = 80;
+    const secure = parsedUrl.protocol === "https";
+    if (!secure && parsedUrl.protocol !== "http") {
+        throw new Error(`NetworkError: Unsupported protocol '${parsedUrl.protocol}' in ${url}`);
+    }
+
+    let port = secure ? 443 : 80;
     const parsedPort = parsedUrl.port;
     if (parsedPort !== null) {
         port = parsedPort;
-    } else if (parsedUrl.protocol === "https") {
-        port = 443;
     }
     
     let connId = -1;
     let connectFailure = "";
     try {
-        connId = await tcpConnect$(host, port);
+        connId = secure ? await tcpConnectTls$(host, port, init.ca) : await tcpConnect$(host, port);
     } catch (e) {
         connectFailure = e.message;
     }

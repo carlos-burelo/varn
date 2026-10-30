@@ -3697,6 +3697,7 @@ dependencies = [
  "regex",
  "rusqlite",
  "rustc-hash 1.1.0",
+ "rustls",
  "sha1",
  "sha2",
  "socket2",
@@ -3712,6 +3713,7 @@ dependencies = [
  "varn-text",
  "varn-types",
  "varn-ui",
+ "webpki-roots 1.0.6",
  "zip",
 ]
 

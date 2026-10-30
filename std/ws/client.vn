@@ -8,6 +8,7 @@ import {
 
 import {
     tcpConnect$,
+    tcpConnectTls$,
     tcpRead$,
     tcpWrite$,
     tcpClose$
@@ -84,13 +85,14 @@ export class WebSocket implements AsyncReader, AsyncWriter {
 
     static async connect(url: str): Task<WebSocket> {
         let parsed = Url.parse(url);
-        if (parsed.protocol !== "" && parsed.protocol !== "ws") {
-            throw stdError(E_WS_CONNECT, "only ws:// URLs are supported");
+        const secure = parsed.protocol === "wss";
+        if (!secure && parsed.protocol !== "" && parsed.protocol !== "ws") {
+            throw stdError(E_WS_CONNECT, "only ws:// and wss:// URLs are supported");
         }
-        let port = parsed.port ?? 80;
+        let port = parsed.port ?? (secure ? 443 : 80);
         let conn = -1;
         try {
-            conn = await tcpConnect$(parsed.host, port);
+            conn = secure ? await tcpConnectTls$(parsed.host, port) : await tcpConnect$(parsed.host, port);
         } catch (e) {
             throw stdError(E_WS_CONNECT, "could not connect to " + parsed.host + ":" + port.toString() + " (" + e.message + ")");
         }

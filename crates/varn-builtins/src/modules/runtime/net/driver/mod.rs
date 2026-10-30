@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
+use tls::Tls;
 use varn_types::{value::SendValue, HostPromise};
 
 const WAKER_TOKEN: Token = Token(usize::MAX);
@@ -39,16 +40,84 @@ struct PendingWrite {
     task: HostPromise,
 }
 
+type Settled = (HostPromise, Result<SendValue, SendValue>);
+
 struct StreamState {
     stream: TcpStream,
+    tls: Option<Tls>,
     is_connecting: bool,
     pending_connect: Option<HostPromise>,
     pending_read: Option<PendingRead>,
     pending_write: Option<PendingWrite>,
 }
 
+impl StreamState {
+    fn plain(stream: TcpStream) -> Self {
+        Self {
+            stream,
+            tls: None,
+            is_connecting: false,
+            pending_connect: None,
+            pending_read: None,
+            pending_write: None,
+        }
+    }
+
+    fn accepted(
+        stream: TcpStream,
+        tls: &Option<Arc<rustls::ServerConfig>>,
+    ) -> Result<Self, String> {
+        let mut state = Self::plain(stream);
+        if let Some(config) = tls {
+            state.tls = Some(Tls::server(config)?);
+        }
+        Ok(state)
+    }
+
+    fn read_plain(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        match self.tls.as_mut() {
+            Some(tls) => tls.read(&mut self.stream, buf),
+            None => self.stream.read(buf),
+        }
+    }
+
+    fn write_plain(&mut self, data: &[u8]) -> std::io::Result<usize> {
+        match self.tls.as_mut() {
+            Some(tls) => tls.write(&mut self.stream, data),
+            None => self.stream.write(data),
+        }
+    }
+
+    fn pump(&mut self) -> std::io::Result<()> {
+        match self.tls.as_mut() {
+            Some(tls) => tls.pump(&mut self.stream),
+            None => Ok(()),
+        }
+    }
+
+    fn end_session(&mut self) {
+        if let Some(tls) = self.tls.as_mut() {
+            tls.close(&mut self.stream);
+        }
+        let _ = self.stream.shutdown(std::net::Shutdown::Both);
+    }
+
+    fn fail_pending(&mut self, cause: &SendValue, out: &mut Vec<Settled>) {
+        if let Some(task) = self.pending_connect.take() {
+            out.push((task, Err(cause.clone())));
+        }
+        if let Some(read) = self.pending_read.take() {
+            out.push((read.task, Err(cause.clone())));
+        }
+        if let Some(write) = self.pending_write.take() {
+            out.push((write.task, Err(cause.clone())));
+        }
+    }
+}
+
 struct ListenerState {
     listener: TcpListener,
+    tls: Option<Arc<rustls::ServerConfig>>,
     pending_accepts: Vec<HostPromise>,
 }
 
@@ -128,5 +197,6 @@ impl IoDriver {
 }
 
 mod event_loop;
+mod tls;
 mod tcp;
 mod udp;
