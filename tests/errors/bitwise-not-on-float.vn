@@ -1,0 +1,2 @@
+// expect: error[VN3010]
+function f(x: float): float { return ~x }

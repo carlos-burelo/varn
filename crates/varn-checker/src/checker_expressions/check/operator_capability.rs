@@ -148,27 +148,63 @@ impl Checker<'_> {
         what: &str,
         bind: &BindResult,
     ) {
-        let ty = self.infer_type(rec, operand, bind);
-        if ty.is_dynamic() {
-            return;
-        }
-        let numbers = varn_sem::types::Type::union(
+        self.require_one_of(
+            rec,
+            operand,
+            what,
+            bind,
             vec![
                 varn_sem::types::Type::Int,
                 varn_sem::types::Type::Float,
                 varn_sem::types::Type::Decimal,
                 varn_sem::types::Type::BigInt,
             ],
+            "a number",
+        );
+    }
+
+    pub(super) fn require_int(
+        &mut self,
+        rec: &mut Recorder,
+        operand: ExprId,
+        what: &str,
+        bind: &BindResult,
+    ) {
+        self.require_one_of(
+            rec,
+            operand,
+            what,
+            bind,
+            vec![varn_sem::types::Type::Int],
+            "an int",
+        );
+    }
+
+    fn require_one_of(
+        &mut self,
+        rec: &mut Recorder,
+        operand: ExprId,
+        what: &str,
+        bind: &BindResult,
+        allowed: Vec<varn_sem::types::Type>,
+        label: &str,
+    ) {
+        let ty = self.infer_type(rec, operand, bind);
+        if ty.is_dynamic() {
+            return;
+        }
+        let accepted = varn_sem::types::Type::union(
+            allowed,
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         );
-        if self.types_compatible_cached(&numbers, &ty, Some(bind)) {
+        if self.types_compatible_cached(&accepted, &ty, Some(bind)) {
             return;
         }
         self.emit(
             varn_core::Diagnostic::error(
                 varn_core::ErrorCode::InvalidTypeOperator,
                 format!(
-                    "invalid operand: {what} needs a number, got '{}'",
+                    "invalid operand: {what} needs {label}, got '{}'",
                     ty.display(&self.ty_table, &bind.interner)
                 ),
             )

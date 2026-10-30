@@ -1,0 +1,2 @@
+// expect: error[VN3010]
+function f(x: decimal): decimal { return ~x }
