@@ -26,6 +26,13 @@ pub(super) fn to_sendable(
         ));
     }
     if val.is_heap() {
+        if let Some(inst) = ctx.heap.instance_of(val)
+            && varn_types::ClassObj::find_by_id(inst.class_id)
+                .is_some_and(|cls| crate::task::derives_from_error(&cls))
+            && let Some(error) = crate::task::error_value(&ctx.heap, val)
+        {
+            return Ok(error);
+        }
         match ctx.heap.get(val.as_heap()) {
             Some(HeapObj::Str(s)) => Ok(varn_types::value::SendValue::Str(s.to_string())),
             Some(HeapObj::Array(arr)) => {
