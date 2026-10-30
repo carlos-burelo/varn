@@ -74,7 +74,7 @@ impl IoDriver {
                 let _ = self.waker.wake();
                 task
             }
-            Err(_) => HostPromise::resolved(SendValue::Null),
+            Err(e) => HostPromise::rejected(failure("recvFrom", e)),
         }
     }
 

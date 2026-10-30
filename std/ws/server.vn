@@ -21,11 +21,11 @@ export class WsServer {
 
     static listen(port: int): WsServer {
         let server = new WsServer(port);
-        let id = tcpListen$(port);
-        if (id < 0) {
-            throw stdError(E_WS_IO, "could not listen on port " + port.toString());
+        try {
+            server._listener = tcpListen$(port);
+        } catch (e) {
+            throw stdError(E_WS_IO, "could not listen on port " + port.toString() + " (" + e.message + ")");
         }
-        server._listener = id;
         server._isListening = true;
         return server;
     }
@@ -42,9 +42,11 @@ export class WsServer {
         if (!this._isListening) {
             throw stdError(E_WS_IO, "server is closed");
         }
-        let conn = await tcpAccept$(this._listener);
-        if (conn < 0) {
-            throw stdError(E_WS_IO, "accept failed");
+        let conn = -1;
+        try {
+            conn = await tcpAccept$(this._listener);
+        } catch (e) {
+            throw stdError(E_WS_IO, "accept failed (" + e.message + ")");
         }
         try {
             let head = await readHttpHead(conn);

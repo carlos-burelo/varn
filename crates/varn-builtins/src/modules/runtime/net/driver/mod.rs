@@ -12,6 +12,10 @@ use varn_types::{value::SendValue, HostPromise};
 const WAKER_TOKEN: Token = Token(usize::MAX);
 static NEXT_SOCKET_ID: AtomicI64 = AtomicI64::new(1);
 
+pub(super) fn failure(what: &str, cause: impl std::fmt::Display) -> SendValue {
+    crate::runtime::blocking::failure(format!("{what}: {cause}"))
+}
+
 pub fn next_socket_id() -> i64 {
     NEXT_SOCKET_ID.fetch_add(1, Ordering::SeqCst)
 }

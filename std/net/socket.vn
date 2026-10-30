@@ -25,17 +25,20 @@ export class TcpStream implements AsyncReader, AsyncWriter {
 
     static async connect(host: str, port: int, attempts: int = 25, baseDelayMs: int = 50): Task<TcpStream> {
         let attempt = 0;
+        let cause = "no attempt was made";
         while (attempt < attempts) {
-            let connId = await tcpConnect$(host, port);
-            if (connId !== -1) {
+            try {
+                let connId = await tcpConnect$(host, port);
                 return new TcpStream(connId, host, port);
+            } catch (e) {
+                cause = e.message;
             }
             attempt = attempt + 1;
             if (attempt < attempts) {
                 await delay(baseDelayMs + attempt * 20);
             }
         }
-        throw new Error("TcpConnectError: Could not connect to " + host + ":" + port.toString());
+        throw new Error("TcpConnectError: Could not connect to " + host + ":" + port.toString() + " (" + cause + ")");
     }
 
     get connId(): int {
@@ -100,12 +103,12 @@ export class TcpStream implements AsyncReader, AsyncWriter {
             throw new Error("TcpWriteError: Socket is closed");
         }
         let b: Bytes = data is str ? Bytes.fromString(data) : data as Bytes;
-        let written = await tcpWrite$(this._connId, b);
-        if (written < 0) {
+        try {
+            return await tcpWrite$(this._connId, b);
+        } catch (e) {
             this.close();
-            throw new Error("TcpWriteError: Failed to write to socket");
+            throw new Error("TcpWriteError: " + e.message);
         }
-        return written;
     }
 
     async writeAll(data: Bytes | str): Task<void> {
@@ -145,11 +148,11 @@ export class TcpListener {
     }
 
     static listen(port: int, host: str = "127.0.0.1"): TcpListener {
-        let listenerId = tcpListen$(port);
-        if (listenerId < 0) {
-            throw new Error(`TcpListenError: Could not bind listener to port ${port}`);
+        try {
+            return new TcpListener(tcpListen$(port), port, host);
+        } catch (e) {
+            throw new Error(`TcpListenError: Could not bind listener to port ${port} (${e.message})`);
         }
-        return new TcpListener(listenerId, port, host);
     }
 
     get port(): int {
@@ -168,11 +171,11 @@ export class TcpListener {
         if (!this._isListening) {
             throw new Error("TcpAcceptError: Listener is closed");
         }
-        let connId = await tcpAccept$(this._listenerId);
-        if (connId < 0) {
-            throw new Error("TcpAcceptError: Failed to accept connection");
+        try {
+            return new TcpStream(await tcpAccept$(this._listenerId), this._host, this._port);
+        } catch (e) {
+            throw new Error("TcpAcceptError: " + e.message);
         }
-        return new TcpStream(connId, this._host, this._port);
     }
 
     close(): void {

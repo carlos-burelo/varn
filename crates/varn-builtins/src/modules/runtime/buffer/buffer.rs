@@ -76,7 +76,7 @@ varn_contract! {
             if !ctx.is_buffer(buf) {
                 return Err("buffer.toHex: argument is not a Buffer".to_string());
             }
-            let bytes = ctx.buffer_to_bytes(buf).unwrap_or_default();
+            let bytes = ctx.buffer_to_bytes(buf).ok_or_else(|| "buffer: could not read the Bytes argument".to_string())?;
             let mut out = String::with_capacity(bytes.len() * 2);
             for b in bytes {
                 use std::fmt::Write;
@@ -89,7 +89,7 @@ varn_contract! {
             if !ctx.is_buffer(buf) {
                 return Err("buffer.toBase64: argument is not a Buffer".to_string());
             }
-            let bytes = ctx.buffer_to_bytes(buf).unwrap_or_default();
+            let bytes = ctx.buffer_to_bytes(buf).ok_or_else(|| "buffer: could not read the Bytes argument".to_string())?;
             use base64::Engine;
             Ok(base64::engine::general_purpose::STANDARD.encode(&bytes))
         }

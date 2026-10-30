@@ -8,6 +8,17 @@ use varn_types::{HostOpen, NativeCtx, VmValue};
 
 pub struct NetRuntime;
 
+fn payload(ctx: &mut dyn NativeCtx, data: VmValue) -> Result<Vec<u8>, String> {
+    if ctx.is_buffer(data) {
+        ctx.buffer_to_bytes(data)
+            .ok_or_else(|| "net: could not read the Bytes argument".to_string())
+    } else if let Some(text) = ctx.str_owned(data) {
+        Ok(text.into_bytes())
+    } else {
+        Err("net: expected Bytes or str".to_string())
+    }
+}
+
 varn_contract! {
     module: "runtime:net",
     contract: "src/modules/runtime/net/net_runtime.vn",
@@ -34,10 +45,9 @@ varn_contract! {
             if !ctx.check_net_listen(port) {
                 return Err(format!("SecurityError: Permission denied (net.server) on port {port}"));
             }
-            match driver().listen(port) {
-                Ok(id) => Ok(id),
-                Err(_) => Ok(-1),
-            }
+            driver()
+                .listen(port)
+                .map_err(|e| format!("tcpListen: cannot listen on port {port}: {e}"))
         }
 
         fn tcpAccept(ctx: &mut dyn NativeCtx, listener_id: i64) -> Result<VmValue, String> {
@@ -59,13 +69,7 @@ varn_contract! {
         }
 
         fn tcpWrite(ctx: &mut dyn NativeCtx, conn_id: i64, data: VmValue) -> Result<VmValue, String> {
-            let bytes = if ctx.is_buffer(data) {
-                ctx.buffer_to_bytes(data).unwrap_or_default()
-            } else if let Some(s) = ctx.str_owned(data) {
-                s.into_bytes()
-            } else {
-                ctx.str_repr(data).into_bytes()
-            };
+            let bytes = payload(ctx, data)?;
             let task = driver().write(conn_id, bytes);
             Ok(ctx.task_from_host(task, HostOpen::Plain))
         }
@@ -151,13 +155,7 @@ varn_contract! {
         }
 
         fn udpSendTo(ctx: &mut dyn NativeCtx, socket_id: i64, host: &str, port: i64, data: VmValue) -> Result<i64, String> {
-            let bytes = if ctx.is_buffer(data) {
-                ctx.buffer_to_bytes(data).unwrap_or_default()
-            } else if let Some(s) = ctx.str_owned(data) {
-                s.into_bytes()
-            } else {
-                ctx.str_repr(data).into_bytes()
-            };
+            let bytes = payload(ctx, data)?;
             let mut retries = 32;
             let sent = loop {
                 match driver().udp_send_to(socket_id, &bytes, host, port) {

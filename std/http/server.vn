@@ -143,12 +143,14 @@ export class HttpServer {
     }
 
     private async _acceptNext(): Task<void> {
-        let connId = await tcpAccept$(this._listenerId);
-        if (connId !== -1) {
-            spawn(this._handleConnection(connId));
-        } else {
+        let connId = -1;
+        try {
+            connId = await tcpAccept$(this._listenerId);
+        } catch (e) {
             this._isListening = false;
+            return;
         }
+        spawn(this._handleConnection(connId));
     }
 
     private async _sendWebResponse(connId: int, responseObj: Response): Task<void> {
@@ -277,8 +279,10 @@ export class HttpServer {
             try {
                 rawReq = await readHttpRequest(connId, this._maxContentLength);
             } catch (err) {
-                let errHeaders: { [key: str]: str } = { "Content-Type": "text/plain", "Connection": "close" };
-                await sendHttpResponse$(connId, 413, "Payload Too Large", errHeaders, "Payload Too Large", []);
+                if (err.message.startsWith("413")) {
+                    let errHeaders: { [key: str]: str } = { "Content-Type": "text/plain", "Connection": "close" };
+                    await this._sendBestEffort(connId, 413, "Payload Too Large", errHeaders, "Payload Too Large");
+                }
                 break;
             }
             if (rawReq === null) {
@@ -294,9 +298,22 @@ export class HttpServer {
                 await sendHttpResponse$(connId, 501, "Not Implemented", errHeaders, "Not Implemented", []);
                 break;
             }
-            await this._respond(connId, rawReq, method);
+            try {
+                await this._respond(connId, rawReq, method);
+            } catch (err) {
+                let errHeaders: { [key: str]: str } = { "Content-Type": "text/plain", "Connection": "close" };
+                await this._sendBestEffort(connId, 500, "Internal Server Error", errHeaders, "Internal Server Error");
+                break;
+            }
         }
         tcpClose$(connId);
+    }
+
+    private async _sendBestEffort(connId: int, status: int, statusText: str, headers: { [key: str]: str }, body: str): Task<void> {
+        try {
+            await sendHttpResponse$(connId, status, statusText, headers, body, []);
+        } catch (err) {
+        }
     }
 }
 

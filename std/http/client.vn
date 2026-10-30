@@ -34,15 +34,20 @@ async function doFetch(connId: int, parsedUrl: Url, method: HttpMethod, headers:
         requestStr = requestStr + body;
     }
     
-    let writeRes = await tcpWrite$(connId, requestStr);
-    if (writeRes === -1) {
+    let writeFailure: str? = null;
+    try {
+        await tcpWrite$(connId, requestStr);
+    } catch (e) {
+        writeFailure = e.message;
+    }
+    if (writeFailure !== null) {
         tcpClose$(connId);
         let urlStr = parsedUrl.toString();
         if (urlStr.startsWith("http://%/") || urlStr.startsWith("mock://")) {
             let mock_body = "<!DOCTYPE html><html><body>Offline mock response for " + urlStr + "</body></html>";
             return new Response(mock_body, 200, {});
         }
-        throw new Error(`NetworkError: Failed to write request to ${parsedUrl.host}:${parsedUrl.port}`);
+        throw new Error(`NetworkError: Failed to write request to ${parsedUrl.host}:${parsedUrl.port} (${writeFailure})`);
     }
     
     const rawResp = await readHttpResponse(connId);
@@ -76,13 +81,19 @@ export async function fetch(url: str, init: RequestInit = {}): Task<Response> {
         port = 443;
     }
     
-    let connId = await tcpConnect$(host, port);
+    let connId = -1;
+    let connectFailure = "";
+    try {
+        connId = await tcpConnect$(host, port);
+    } catch (e) {
+        connectFailure = e.message;
+    }
     if (connId === -1) {
         if (url.startsWith("http://%/") || url.startsWith("mock://")) {
             let mock_body = "<!DOCTYPE html><html><body>Offline mock response for " + url + "</body></html>";
             return new Response(mock_body, 200, {});
         }
-        throw new Error(`NetworkError: Could not connect to ${host}:${port}`);
+        throw new Error(`NetworkError: Could not connect to ${host}:${port} (${connectFailure})`);
     }
     
     return await doFetch(connId, parsedUrl, init.method ?? HttpMethod.GET, init.headers ?? {}, init.body ?? "");

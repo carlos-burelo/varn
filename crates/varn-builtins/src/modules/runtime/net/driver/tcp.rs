@@ -43,9 +43,10 @@ impl IoDriver {
         let listener_state = match reg.listeners.get_mut(&listener_id) {
             Some(l) => l,
             None => {
-                let task = HostPromise::pending();
-                task.complete(Ok(SendValue::Int(-1)));
-                return task;
+                return HostPromise::rejected(failure(
+                    "accept",
+                    format!("listener {listener_id} is closed"),
+                ));
             }
         };
 
@@ -75,7 +76,7 @@ impl IoDriver {
                 let _ = self.waker.wake();
                 task
             }
-            Err(_) => HostPromise::resolved(SendValue::Int(-1)),
+            Err(e) => HostPromise::rejected(failure("accept", e)),
         }
     }
 
@@ -89,7 +90,10 @@ impl IoDriver {
                 crate::runtime::blocking::detach(move || {
                     match target.to_socket_addrs().ok().and_then(|mut addrs| addrs.next()) {
                         Some(addr) => driver().connect_addr(addr, pending),
-                        None => pending.complete(Ok(SendValue::Int(-1))),
+                        None => pending.reject(failure(
+                            "connect",
+                            format!("cannot resolve {target}"),
+                        )),
                     }
                 });
             }
@@ -98,9 +102,12 @@ impl IoDriver {
     }
 
     fn connect_addr(&self, addr: SocketAddr, task: HostPromise) {
-        let Ok(stream) = TcpStream::connect(addr) else {
-            task.complete(Ok(SendValue::Int(-1)));
-            return;
+        let stream = match TcpStream::connect(addr) {
+            Ok(stream) => stream,
+            Err(e) => {
+                task.reject(failure("connect", format!("{addr}: {e}")));
+                return;
+            }
         };
         let conn_id = next_socket_id();
         let mut reg = self.registry.lock().unwrap_or_else(|e| e.into_inner());
@@ -147,7 +154,7 @@ impl IoDriver {
                 let _ = self.waker.wake();
                 task
             }
-            Err(_) => HostPromise::resolved(SendValue::Null),
+            Err(e) => HostPromise::rejected(failure("read", e)),
         }
     }
 
@@ -156,9 +163,10 @@ impl IoDriver {
         let stream_state = match reg.streams.get_mut(&conn_id) {
             Some(s) => s,
             None => {
-                let t = HostPromise::pending();
-                t.complete(Ok(SendValue::Int(-1)));
-                return t;
+                return HostPromise::rejected(failure(
+                    "write",
+                    format!("connection {conn_id} is closed"),
+                ));
             }
         };
 
@@ -186,7 +194,7 @@ impl IoDriver {
                 let _ = self.waker.wake();
                 task
             }
-            Err(_) => HostPromise::resolved(SendValue::Int(-1)),
+            Err(e) => HostPromise::rejected(failure("write", e)),
         }
     }
 
@@ -195,13 +203,13 @@ impl IoDriver {
         if let Some(mut stream_state) = reg.streams.remove(&conn_id) {
             let _ = stream_state.stream.shutdown(std::net::Shutdown::Both);
             if let Some(task) = stream_state.pending_connect.take() {
-                task.complete(Ok(SendValue::Int(-1)));
+                task.reject(failure("connect", "connection closed"));
             }
             if let Some(pr) = stream_state.pending_read.take() {
                 pr.task.complete(Ok(SendValue::Null));
             }
             if let Some(pw) = stream_state.pending_write.take() {
-                pw.task.complete(Ok(SendValue::Int(-1)));
+                pw.task.reject(failure("write", "connection closed"));
             }
             drop(reg);
             let _ = self
@@ -215,7 +223,7 @@ impl IoDriver {
         let mut reg = self.registry.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(mut listener_state) = reg.listeners.remove(&listener_id) {
             for task in listener_state.pending_accepts.drain(..) {
-                task.complete(Ok(SendValue::Int(-1)));
+                task.reject(failure("accept", "listener closed"));
             }
             drop(reg);
             let _ = self

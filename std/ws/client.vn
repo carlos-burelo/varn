@@ -88,9 +88,11 @@ export class WebSocket implements AsyncReader, AsyncWriter {
             throw stdError(E_WS_CONNECT, "only ws:// URLs are supported");
         }
         let port = parsed.port ?? 80;
-        let conn = await tcpConnect$(parsed.host, port);
-        if (conn < 0) {
-            throw stdError(E_WS_CONNECT, "could not connect to " + parsed.host + ":" + port.toString());
+        let conn = -1;
+        try {
+            conn = await tcpConnect$(parsed.host, port);
+        } catch (e) {
+            throw stdError(E_WS_CONNECT, "could not connect to " + parsed.host + ":" + port.toString() + " (" + e.message + ")");
         }
         try {
             let key = wsKey$();

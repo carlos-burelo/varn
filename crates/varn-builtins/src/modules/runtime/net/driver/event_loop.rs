@@ -109,8 +109,8 @@ impl IoDriver {
                                 listener_state.pending_accepts.push(task);
                                 break;
                             }
-                            Err(_) => {
-                                task.complete(Ok(SendValue::Int(-1)));
+                            Err(e) => {
+                                task.reject(failure("accept", e));
                             }
                         }
                     }
@@ -130,18 +130,21 @@ impl IoDriver {
                 if let Some(stream_state) = reg.streams.get_mut(&id) {
                     if stream_state.is_connecting && (event.is_writable() || event.is_readable()) {
                         let settled = match stream_state.stream.peer_addr() {
-                            Ok(_) => Some(true),
+                            Ok(_) => Some(Ok(id)),
                             Err(_) => match stream_state.stream.take_error() {
                                 Ok(None) => None,
-                                Ok(Some(_)) | Err(_) => Some(false),
+                                Ok(Some(e)) | Err(e) => Some(Err(e)),
                             },
                         };
-                        if let Some(ok) = settled
+                        if let Some(outcome) = settled
                             && let Some(task) = stream_state.pending_connect.take()
                         {
                             stream_state.is_connecting = false;
-                            let v = if ok { id } else { -1 };
-                            deferred.push((task, Ok(SendValue::Int(v))));
+                            let completion = match outcome {
+                                Ok(id) => Ok(SendValue::Int(id)),
+                                Err(e) => Err(failure("connect", e)),
+                            };
+                            deferred.push((task, completion));
                         }
                     }
 
@@ -160,8 +163,8 @@ impl IoDriver {
                             Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
                                 stream_state.pending_write = Some(pw);
                             }
-                            Err(_) => {
-                                deferred.push((pw.task, Ok(SendValue::Int(-1))));
+                            Err(e) => {
+                                deferred.push((pw.task, Err(failure("write", e))));
                             }
                         }
                     }
@@ -181,8 +184,8 @@ impl IoDriver {
                             Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
                                 stream_state.pending_read = Some(pr);
                             }
-                            Err(_) => {
-                                deferred.push((pr.task, Ok(SendValue::Null)));
+                            Err(e) => {
+                                deferred.push((pr.task, Err(failure("read", e))));
                             }
                         }
                     }
@@ -201,8 +204,8 @@ impl IoDriver {
                                 udp_state.pending_recvs.push_front(pr);
                                 break;
                             }
-                            Err(_) => {
-                                deferred.push((pr.task, Ok(SendValue::Null)));
+                            Err(e) => {
+                                deferred.push((pr.task, Err(failure("recvFrom", e))));
                             }
                         }
                     }
