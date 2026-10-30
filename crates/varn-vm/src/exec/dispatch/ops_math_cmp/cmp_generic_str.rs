@@ -194,7 +194,7 @@ impl ExecCtx {
                 *ip += 1;
                 let a = self.stack.box_reg(base, hi(w1));
                 let b = self.stack.box_reg(base, lo(w1));
-                let r = crate::exec::strings::str_concat(a, b, &mut self.heap);
+                let r = crate::exec::strings::str_concat(a, b, &mut self.heap)?;
                 self.stack.unbox_into_reg(base, first_reg, r)?;
             }
             OpCode::BuildStr => {
@@ -206,7 +206,7 @@ impl ExecCtx {
                     parts.push(self.stack.box_reg(base, reg_idx));
                 }
                 *ip += count;
-                let r = crate::exec::strings::str_concat_parts(&parts, &mut self.heap);
+                let r = crate::exec::strings::str_concat_parts(&parts, &mut self.heap)?;
                 self.stack.unbox_into_reg(base, first_reg, r)?;
             }
             OpCode::StrLength => {

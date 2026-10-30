@@ -102,13 +102,13 @@ pub(crate) fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
     }
 
     if a.is_sso() || b.is_sso() {
-        return Ok(crate::exec::strings::str_concat(a, b, heap));
+        return crate::exec::strings::str_concat(a, b, heap);
     }
     if a.is_heap() || b.is_heap() {
         let a_is_str = a.is_heap() && matches!(heap.get(a.as_heap()), Some(HeapObj::Str(_)));
         let b_is_str = b.is_heap() && matches!(heap.get(b.as_heap()), Some(HeapObj::Str(_)));
         if a_is_str || b_is_str {
-            return Ok(crate::exec::strings::str_concat(a, b, heap));
+            return crate::exec::strings::str_concat(a, b, heap);
         }
         if let Some(r) =
             crate::exec::arith_big::binary(crate::exec::arith_big::BigOp::Add, a, b, heap)

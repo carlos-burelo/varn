@@ -44,7 +44,38 @@ pub(crate) fn fast_length(val: VmValue, heap: &Heap) -> Option<VmValue> {
     None
 }
 
-pub(crate) fn str_concat(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+fn str_bytes(v: VmValue, heap: &Heap) -> usize {
+    if v.is_sso() {
+        return v.sso_len();
+    }
+    if v.is_heap()
+        && let Some(HeapObj::Str(s)) = heap.get(v.as_heap())
+    {
+        return s.byte_len();
+    }
+    0
+}
+
+#[cold]
+fn too_long() -> crate::error::RuntimeError {
+    crate::error::RuntimeError::range_error(format!(
+        "a string cannot exceed {} bytes",
+        varn_core::MAX_STR_BYTES
+    ))
+}
+
+pub(crate) fn str_concat(
+    a: VmValue,
+    b: VmValue,
+    heap: &mut Heap,
+) -> crate::error::VmResult<VmValue> {
+    if str_bytes(a, heap) + str_bytes(b, heap) > varn_core::MAX_STR_BYTES {
+        return Err(too_long());
+    }
+    Ok(str_concat_unchecked(a, b, heap))
+}
+
+fn str_concat_unchecked(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
     if is_empty_str(a, heap) && is_str(b, heap) {
         return b;
     }
@@ -109,12 +140,23 @@ fn is_empty_str(v: VmValue, heap: &Heap) -> bool {
     v.is_heap() && matches!(heap.get(v.as_heap()), Some(HeapObj::Str(s)) if s.byte_len() == 0)
 }
 
-pub(crate) fn str_concat_parts(parts: &[VmValue], heap: &mut Heap) -> VmValue {
+pub(crate) fn str_concat_parts(
+    parts: &[VmValue],
+    heap: &mut Heap,
+) -> crate::error::VmResult<VmValue> {
+    let total: usize = parts.iter().map(|p| str_bytes(*p, heap)).sum();
+    if total > varn_core::MAX_STR_BYTES {
+        return Err(too_long());
+    }
+    Ok(str_concat_parts_unchecked(parts, heap))
+}
+
+fn str_concat_parts_unchecked(parts: &[VmValue], heap: &mut Heap) -> VmValue {
     if parts.is_empty() {
         return VmValue::try_from_sso("").unwrap_or_else(VmValue::null);
     }
     if parts.len() == 2 {
-        return str_concat(parts[0], parts[1], heap);
+        return str_concat_unchecked(parts[0], parts[1], heap);
     }
     if let Some(v) = sso_pack(parts) {
         return v;

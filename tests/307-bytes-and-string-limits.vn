@@ -71,4 +71,11 @@ await describe("307 string builders refuse sizes they cannot hold", async () => 
         expect(outcome(() => "x".padStart(4, "ab"))).toBe("abax");
         expect(outcome(() => "x".padEnd(3, "ab"))).toBe("xab");
     });
+    await it("concatenation stops at the string limit instead of exhausting memory", async () => {
+        const half = "x".repeat(268435456);
+        const full = half + half;
+        expect(full.length).toBe(536870912);
+        expect(outcome(() => (full + "y").length.toString())).toBe("range");
+        expect(outcome(() => `${full}${half}`.length.toString())).toBe("range");
+    });
 });

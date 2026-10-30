@@ -6,8 +6,10 @@ pub(crate) extern "C" fn jit_build_str(ctx: *mut ExecCtx, parts_ptr: *const VmVa
     unsafe {
         let ctx_ref = &mut *ctx;
         let parts = std::slice::from_raw_parts(parts_ptr, count);
-        ctx_ref.jit_native_result =
-            crate::exec::strings::str_concat_parts(parts, &mut ctx_ref.heap);
+        match crate::exec::strings::str_concat_parts(parts, &mut ctx_ref.heap) {
+            Ok(v) => ctx_ref.jit_native_result = v,
+            Err(e) => super::construct::jit_propagate_error(ctx_ref, e),
+        }
     }
 }
 

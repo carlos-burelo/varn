@@ -14,7 +14,10 @@ pub(crate) extern "C" fn jit_str_concat(
         let ctx_ref = &mut *ctx;
         let a = VmValue::from_raw_parts(a_tag, a_payload);
         let b = VmValue::from_raw_parts(b_tag, b_payload);
-        ctx_ref.jit_native_result = crate::exec::strings::str_concat(a, b, &mut ctx_ref.heap);
+        match crate::exec::strings::str_concat(a, b, &mut ctx_ref.heap) {
+            Ok(v) => ctx_ref.jit_native_result = v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
     }
 }
 

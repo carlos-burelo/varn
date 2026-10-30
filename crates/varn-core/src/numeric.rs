@@ -82,7 +82,7 @@ pub fn float_to_fixed(x: f64, digits: usize) -> String {
 
 pub const MAX_ALLOC_BYTES: usize = 1 << 31;
 
-pub const MAX_STR_BYTES: usize = 1 << 30;
+pub const MAX_STR_BYTES: usize = 1 << 29;
 
 pub fn clamp_index(index: i64, len: usize) -> usize {
     if index < 0 {
