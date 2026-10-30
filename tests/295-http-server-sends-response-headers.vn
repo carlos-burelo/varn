@@ -1,0 +1,41 @@
+import { describe, it, expect } from "std:test";
+import { delay } from "std:task";
+import { TcpStream } from "std:net";
+import { HttpServer, Request, Response, json } from "std:http";
+
+async function rawGet(port: int, path: str): Task<str> {
+    const client = await TcpStream.connect("127.0.0.1", port, 1);
+    await client.write(`GET ${path} HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n`);
+    let text = "";
+    while (true) {
+        const chunk = await client.read(4096);
+        if (chunk === null) {
+            break
+        }
+        text = text + (chunk as Bytes).toString();
+    }
+    client.close();
+    return text.toLowerCase();
+}
+
+await describe("295 the http server sends the response headers it was given", async () => {
+    const server = new HttpServer();
+    server.get("/custom", async (req: Request) => new Response("x", 200, { "X-Test": "1", "Location": "/z" }));
+    server.get("/json", async (req: Request) => json({ ok: true }));
+    server.listen(19940);
+    await delay(150);
+
+    await it("custom headers reach the wire", async () => {
+        const raw = await rawGet(19940, "/custom");
+        expect(raw.indexOf("x-test: 1") !== null).toBeTruthy();
+        expect(raw.indexOf("location: /z") !== null).toBeTruthy();
+    });
+
+    await it("json() declares application/json and not text/plain", async () => {
+        const raw = await rawGet(19940, "/json");
+        expect(raw.indexOf("content-type: application/json") !== null).toBeTruthy();
+        expect(raw.indexOf("text/plain") === null).toBeTruthy();
+    });
+
+    server.close();
+});

@@ -19,11 +19,19 @@ impl ExecCtx {
         }
     }
     pub(super) fn host_object_for_each(&self, obj: VmValue, f: &mut dyn FnMut(&str, VmValue)) {
-        if obj.is_heap()
-            && let Some(HeapObj::Object(o) | HeapObj::Record(o)) = self.heap.get(obj.as_heap())
-        {
+        if !obj.is_heap() {
+            return;
+        }
+        if let Some(HeapObj::Object(o) | HeapObj::Record(o)) = self.heap.get(obj.as_heap()) {
             for (k, v) in o.borrow().iter() {
                 f(k.as_ref(), v);
+            }
+        }
+        if let Some(HeapObj::Map(m)) = self.heap.get(obj.as_heap()) {
+            for (k, v) in m.read().iter() {
+                if self.heap.is_string(k.0) {
+                    f(self.heap.str_repr_borrowed(k.0).as_ref(), *v);
+                }
             }
         }
     }
