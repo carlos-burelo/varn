@@ -41,9 +41,6 @@ pub struct CallFrame {
     pub awaited: bool,
 }
 
-unsafe impl Send for CallFrame {}
-unsafe impl Sync for CallFrame {}
-
 impl CallFrame {
     pub const NO_RETURN_REG: u16 = u16::MAX;
 
