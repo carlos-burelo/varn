@@ -1,0 +1,113 @@
+import { tcpRead$ } from "runtime:net";
+
+const READ_SIZE = 16384;
+
+export class ByteBuilder {
+    private data: Bytes;
+    private used: int = 0;
+
+    constructor(capacity: int = 4096) {
+        this.data = Bytes.alloc(capacity);
+    }
+
+    get length(): int {
+        return this.used;
+    }
+
+    append(source: Bytes, start: int, end: int): void {
+        const count = end - start;
+        if (count <= 0) {
+            return;
+        }
+        if (this.used + count > this.data.length) {
+            let capacity = this.data.length * 2;
+            while (capacity < this.used + count) {
+                capacity = capacity * 2;
+            }
+            const grown = Bytes.alloc(capacity);
+            this.data.copy(grown, 0, 0, this.used);
+            this.data = grown;
+        }
+        source.copy(this.data, this.used, start, end);
+        this.used = this.used + count;
+    }
+
+    byteAt(index: int): int {
+        return this.data.getByte(index);
+    }
+
+    slice(start: int, end: int): Bytes {
+        const out = Bytes.alloc(end - start);
+        this.data.copy(out, 0, start, end);
+        return out;
+    }
+}
+
+export class WireReader {
+    private conn: int;
+    private buffer: ByteBuilder = new ByteBuilder(READ_SIZE);
+    private cursor: int = 0;
+    private ended: bool = false;
+
+    constructor(conn: int) {
+        this.conn = conn;
+    }
+
+    private get buffered(): int {
+        return this.buffer.length - this.cursor;
+    }
+
+    async pull(): Task<bool> {
+        if (this.ended) {
+            return false;
+        }
+        const chunk = await tcpRead$(this.conn, READ_SIZE);
+        if (chunk === null) {
+            this.ended = true;
+            return false;
+        }
+        const bytes = chunk as Bytes;
+        this.buffer.append(bytes, 0, bytes.length);
+        return true;
+    }
+
+    async line(): Task<str?> {
+        let scanned = this.cursor;
+        while (true) {
+            const end = this.buffer.length;
+            for (let i = scanned; i + 1 < end; i = i + 1) {
+                if (this.buffer.byteAt(i) === 13 && this.buffer.byteAt(i + 1) === 10) {
+                    const text = this.buffer.slice(this.cursor, i).toString();
+                    this.cursor = i + 2;
+                    return text;
+                }
+            }
+            scanned = end - 1 > this.cursor ? end - 1 : this.cursor;
+            if (!(await this.pull())) {
+                return null;
+            }
+        }
+    }
+
+    async take(count: int): Task<Bytes?> {
+        while (this.buffered < count) {
+            if (!(await this.pull())) {
+                return null;
+            }
+        }
+        const out = this.buffer.slice(this.cursor, this.cursor + count);
+        this.cursor = this.cursor + count;
+        return out;
+    }
+
+    async rest(): Task<Bytes> {
+        while (true) {
+            if (!(await this.pull())) {
+                break;
+            }
+        }
+        const out = this.buffer.slice(this.cursor, this.buffer.length);
+        this.cursor = this.buffer.length;
+        return out;
+    }
+}

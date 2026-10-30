@@ -2,5 +2,5 @@ export { HttpMethod } from "runtime:net";
 export { HttpStatus } from "std:http/status";
 export { Headers } from "std:http/headers";
 export { RawRequest, RequestInit, parseRawRequest, readHttpRequest, Request } from "std:http/request";
-export { RawResponse, parseRawResponse, readHttpResponse, Response, json, redirect, error } from "std:http/response";
+export { RawResponse, readHttpResponse, Response, json, redirect, error } from "std:http/response";
 export { Route, Handler, Middleware, Next } from "std:http/route";

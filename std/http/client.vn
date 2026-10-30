@@ -1,6 +1,6 @@
 import { tcpConnect$, tcpConnectTls$, tcpWrite$, tcpClose$, httpMethodName$, HttpMethod } from "runtime:net";
 import { Url } from "std:net";
-import { Response, RequestInit, readHttpResponse } from "std:http/core";
+import { Response, RawResponse, RequestInit, readHttpResponse } from "std:http/core";
 
 async function doFetch(connId: int, parsedUrl: Url, method: HttpMethod, headers: { [key: str]: str }, body: str): Task<Response> {
     let requestStr = httpMethodName$(method) + " " + parsedUrl.path;
@@ -9,31 +9,41 @@ async function doFetch(connId: int, parsedUrl: Url, method: HttpMethod, headers:
         requestStr = requestStr + "?" + queryStr;
     }
     requestStr = requestStr + " HTTP/1.1\r\n";
-    
+
     let hasHost = false;
+    let hasConnection = false;
     for (let key in headers) {
-        if (key.toLowerCase() === "host") {
+        const lower = key.toLowerCase();
+        if (lower === "host") {
             hasHost = true;
+        }
+        if (lower === "connection") {
+            hasConnection = true;
         }
     }
     if (!hasHost) {
-        requestStr = requestStr + "Host: " + parsedUrl.host + "\r\n";
+        const explicitPort = parsedUrl.port;
+        const authority = explicitPort === null ? parsedUrl.host : `${parsedUrl.host}:${explicitPort}`;
+        requestStr = requestStr + "Host: " + authority + "\r\n";
     }
-    
+    if (!hasConnection) {
+        requestStr = requestStr + "Connection: close\r\n";
+    }
+
     if (body.length > 0) {
-        requestStr = requestStr + "Content-Length: " + body.length.toString() + "\r\n";
+        requestStr = requestStr + "Content-Length: " + Bytes.fromString(body).length.toString() + "\r\n";
     }
-    
+
     for (let key in headers) {
         requestStr = `${requestStr}${key}: ${headers[key]}\r\n`;
     }
-    
+
     requestStr = requestStr + "\r\n";
-    
+
     if (body.length > 0) {
         requestStr = requestStr + body;
     }
-    
+
     let writeFailure: str? = null;
     try {
         await tcpWrite$(connId, requestStr);
@@ -44,25 +54,34 @@ async function doFetch(connId: int, parsedUrl: Url, method: HttpMethod, headers:
         tcpClose$(connId);
         throw new Error(`NetworkError: Failed to write request to ${parsedUrl.host}:${parsedUrl.port} (${writeFailure})`);
     }
-    
-    const rawResp = await readHttpResponse(connId);
+
+    let rawResp: RawResponse? = null;
+    try {
+        rawResp = await readHttpResponse(connId, method === HttpMethod.HEAD);
+    } catch (e) {
+        tcpClose$(connId);
+        throw new Error(`NetworkError: Failed to read the response from ${parsedUrl.host}:${parsedUrl.port} (${e.message})`);
+    }
     tcpClose$(connId);
-    
+
     if (rawResp === null) {
         throw new Error(`NetworkError: Empty response from ${parsedUrl.host}:${parsedUrl.port}`);
     }
-    
-    return new Response(
-        rawResp.body,
-        rawResp.status,
-        rawResp.headers
-    );
+
+    const raw = rawResp as RawResponse;
+    const response = new Response(raw.payload.toString(), raw.status, raw.headers);
+    if (raw.statusText.length > 0) {
+        response.statusText = raw.statusText;
+    }
+    response.cookies = raw.cookies;
+    response.payload = raw.payload;
+    return response;
 }
 
 export async function fetch(url: str, init: RequestInit = {}): Task<Response> {
     const parsedUrl = Url.parse(url);
     const host = parsedUrl.host;
-    
+
     const secure = parsedUrl.protocol === "https";
     if (!secure && parsedUrl.protocol !== "http") {
         throw new Error(`NetworkError: Unsupported protocol '${parsedUrl.protocol}' in ${url}`);
@@ -73,7 +92,7 @@ export async function fetch(url: str, init: RequestInit = {}): Task<Response> {
     if (parsedPort !== null) {
         port = parsedPort;
     }
-    
+
     let connId = -1;
     let connectFailure = "";
     try {
@@ -84,7 +103,7 @@ export async function fetch(url: str, init: RequestInit = {}): Task<Response> {
     if (connId === -1) {
         throw new Error(`NetworkError: Could not connect to ${host}:${port} (${connectFailure})`);
     }
-    
+
     return await doFetch(connId, parsedUrl, init.method ?? HttpMethod.GET, init.headers ?? {}, init.body ?? "");
 }
 

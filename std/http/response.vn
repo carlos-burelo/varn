@@ -1,4 +1,4 @@
-import { tcpRead$ } from "runtime:net";
+import { ByteBuilder, WireReader } from "std:http/wire";
 import { Headers } from "std:http/headers";
 import { Json, JsonValue } from "std:encoding";
 import { AsyncReader } from "std:io";
@@ -7,74 +7,127 @@ export class RawResponse {
     status: int = 200;
     statusText: str = "";
     headers: { [key: str]: str } = {};
-    body: str = "";
+    cookies: str[] = [];
+    payload: Bytes = Bytes.alloc(0);
 }
 
-export function parseRawResponse(raw: str): RawResponse? {
-    let headerEnd = raw.indexOf("\r\n\r\n");
-    if (headerEnd === null) return null;
-
-    let headerPart = raw.slice(0, headerEnd);
-    let bodyPart = raw.slice(headerEnd + 4);
-
-    let lines = headerPart.split("\r\n");
-    if (lines.length === 0) return null;
-
-    let resp = new RawResponse();
-
-    let firstLine = lines[0];
-    let parts = firstLine.split(" ");
-    if (parts.length >= 2) {
-        resp.status = int.parse(parts[1]);
-        if (parts.length >= 3) {
-            resp.statusText = parts[2];
-        }
-    }
-
-    for (let i = 1; i < lines.length; i = i + 1) {
-        let line = lines[i];
-        let colon = line.indexOf(":");
-        if (colon !== null && colon > 0) {
-            let key = line.slice(0, colon).trim().toLowerCase();
-            let val = line.slice(colon + 1).trim();
-            resp.headers[key] = val;
-        }
-    }
-
-    resp.body = bodyPart;
-    return resp;
+function hexDigit(code: int): int {
+    if (code >= 48 && code <= 57) return code - 48;
+    if (code >= 97 && code <= 102) return code - 87;
+    if (code >= 65 && code <= 70) return code - 55;
+    return -1;
 }
 
-export async function readHttpResponse(connId: int): Task<RawResponse?> {
-    let raw = "";
-    let resp: RawResponse? = null;
-    let keepReading = true;
-    while (keepReading) {
-        let chunk = await tcpRead$(connId, 4096);
-        if (chunk !== null) {
-            let chunkStr = (chunk as Bytes).toString();
-            if (chunkStr.length > 0) {
-                raw = raw + chunkStr;
-                resp = parseRawResponse(raw);
-                if (resp !== null) {
-                    let contentLenStr = resp.headers["content-length"];
-                    if (contentLenStr !== null) {
-                        let contentLen = int.parse(contentLenStr);
-                        if (resp.body.length >= contentLen) {
-                            resp.body = resp.body.slice(0, contentLen);
-                            keepReading = false;
-                        }
-                    } else {
-                        keepReading = false;
-                    }
+function parseChunkSize(line: str): int {
+    const extension = line.indexOf(";");
+    const digits = (extension === null ? line : line.slice(0, extension)).trim();
+    if (digits.length === 0) {
+        throw new Error("malformed chunk size line");
+    }
+    let size = 0;
+    for (let i = 0; i < digits.length; i = i + 1) {
+        const digit = hexDigit(digits.charCodeAt(i) as int);
+        if (digit < 0) {
+            throw new Error(`malformed chunk size '${digits}'`);
+        }
+        size = size * 16 + digit;
+    }
+    return size;
+}
+
+async function readChunked(wire: WireReader): Task<Bytes> {
+    const body = new ByteBuilder();
+    while (true) {
+        const sizeLine = await wire.line();
+        if (sizeLine === null) {
+            throw new Error("connection closed inside a chunked body");
+        }
+        const size = parseChunkSize(sizeLine as str);
+        if (size === 0) {
+            while (true) {
+                const trailer = await wire.line();
+                if (trailer === null || (trailer as str).length === 0) {
+                    break;
                 }
-            } else {
-                keepReading = false;
             }
-        } else {
-            keepReading = false;
+            break;
+        }
+        const data = await wire.take(size);
+        if (data === null) {
+            throw new Error("connection closed inside a chunk");
+        }
+        const bytes = data as Bytes;
+        body.append(bytes, 0, bytes.length);
+        const terminator = await wire.line();
+        if (terminator === null || (terminator as str).length !== 0) {
+            throw new Error("a chunk is not followed by CRLF");
         }
     }
+    return body.slice(0, body.length);
+}
+
+function addHeader(resp: RawResponse, line: str): void {
+    const colon = line.indexOf(":");
+    if (colon === null || colon <= 0) {
+        throw new Error(`malformed header line '${line}'`);
+    }
+    const key = line.slice(0, colon).trim().toLowerCase();
+    const value = line.slice(colon + 1).trim();
+    if (key === "set-cookie") {
+        resp.cookies.push(value);
+        return;
+    }
+    const previous = resp.headers[key];
+    resp.headers[key] = previous === null ? value : `${previous}, ${value}`;
+}
+
+export async function readHttpResponse(connId: int, headOnly: bool = false): Task<RawResponse?> {
+    const wire = new WireReader(connId);
+    const statusLine = await wire.line();
+    if (statusLine === null) {
+        return null;
+    }
+    const resp = new RawResponse();
+    const status = statusLine as str;
+    const afterVersion = status.indexOf(" ");
+    if (afterVersion === null) {
+        throw new Error(`malformed status line '${status}'`);
+    }
+    const remainder = status.slice(afterVersion + 1);
+    const afterCode = remainder.indexOf(" ");
+    resp.status = int.parse(afterCode === null ? remainder : remainder.slice(0, afterCode));
+    resp.statusText = afterCode === null ? "" : remainder.slice(afterCode + 1);
+
+    while (true) {
+        const headerLine = await wire.line();
+        if (headerLine === null) {
+            throw new Error("connection closed inside the response headers");
+        }
+        if ((headerLine as str).length === 0) {
+            break;
+        }
+        addHeader(resp, headerLine as str);
+    }
+
+    if (headOnly || resp.status < 200 || resp.status === 204 || resp.status === 304) {
+        return resp;
+    }
+    const coding = resp.headers["transfer-encoding"];
+    if (coding !== null && coding.toLowerCase().indexOf("chunked") !== null) {
+        resp.payload = await readChunked(wire);
+        return resp;
+    }
+    const lengthText = resp.headers["content-length"];
+    if (lengthText !== null) {
+        const expected = int.parse(lengthText);
+        const data = await wire.take(expected);
+        if (data === null) {
+            throw new Error(`connection closed before the ${expected} byte body arrived`);
+        }
+        resp.payload = data as Bytes;
+        return resp;
+    }
+    resp.payload = await wire.rest();
     return resp;
 }
 
@@ -106,6 +159,7 @@ export class Response {
     headers: Headers = new Headers({});
     cookies: str[] = [];
     bodyStream: AsyncReader? = null;
+    payload: Bytes? = null;
     url: str = "";
 
     constructor(body: str = "", status: int = 200, headers: { [key: str]: str } = {}) {
@@ -123,7 +177,7 @@ export class Response {
     }
 
     bytes(): Bytes {
-        return Bytes.fromString(this.body);
+        return this.payload ?? Bytes.fromString(this.body);
     }
 
     json(): JsonValue {

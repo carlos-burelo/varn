@@ -1,0 +1,143 @@
+import { describe, it, expect } from "std:test";
+import { spawn, delay } from "std:task";
+import { now } from "std:time";
+import { TcpStream, TcpListener } from "std:net";
+import { fetch, HttpMethod } from "std:http";
+
+async function readRequest(conn: TcpStream): Task<str> {
+    let text = "";
+    while (true) {
+        const chunk = await conn.read(4096);
+        if (chunk === null) {
+            return text
+        }
+        text = text + (chunk as Bytes).toString();
+        const headEnd = text.indexOf("\r\n\r\n");
+        if (headEnd === null) {
+            continue
+        }
+        const lower = text.slice(0, headEnd).toLowerCase();
+        const marker = lower.indexOf("content-length:");
+        if (marker === null) {
+            return text
+        }
+        const tail = lower.slice(marker + 15);
+        const lineEnd = tail.indexOf("\r\n");
+        const declared = int.parse((lineEnd === null ? tail : tail.slice(0, lineEnd)).trim());
+        if (Bytes.fromString(text.slice(headEnd + 4)).length >= declared) {
+            return text
+        }
+    }
+}
+
+class Seen {
+    request: str = "";
+}
+
+async function serve(listener: TcpListener, seen: Seen, script: (conn: TcpStream) => Task<void>): Task<void> {
+    const conn = await listener.accept();
+    seen.request = await readRequest(conn);
+    await script(conn);
+    conn.close();
+}
+
+await describe("290 http client framing", async () => {
+    await it("a chunked body is decoded and a character split across chunks survives", async () => {
+        const listener = TcpListener.listen(19894);
+        const seen = new Seen();
+        spawn(serve(listener, seen, async (conn: TcpStream): Task<void> => {
+            const body = Bytes.fromString("héllo wörld");
+            await conn.write("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Type: text/plain\r\n\r\n");
+            await conn.write("2\r\n");
+            await conn.write(body.slice(0, 2));
+            await conn.write("\r\n");
+            await delay(30);
+            await conn.write("b\r\n");
+            await conn.write(body.slice(2));
+            await conn.write("\r\n0\r\n\r\n");
+        }));
+        const res = await fetch("http://127.0.0.1:19894/");
+        expect(res.status).toBe(200);
+        expect(res.text()).toBe("héllo wörld");
+        expect(res.bytes().length).toBe(13);
+        listener.close();
+    });
+
+    await it("a body with no length runs until the server closes", async () => {
+        const listener = TcpListener.listen(19895);
+        const seen = new Seen();
+        spawn(serve(listener, seen, async (conn: TcpStream): Task<void> => {
+            await conn.write("HTTP/1.1 200 OK\r\n\r\n");
+            for (let i = 0; i < 3; i = i + 1) {
+                await conn.write(Bytes.alloc(5000).fill(120));
+                await delay(30);
+            }
+        }));
+        const res = await fetch("http://127.0.0.1:19895/");
+        expect(res.text().length).toBe(15000);
+        listener.close();
+    });
+
+    await it("Content-Length counts bytes, not characters", async () => {
+        const listener = TcpListener.listen(19896);
+        const seen = new Seen();
+        spawn(serve(listener, seen, async (conn: TcpStream): Task<void> => {
+            let text = "";
+            for (let i = 0; i < 3000; i = i + 1) {
+                text = text + "é";
+            }
+            const body = Bytes.fromString(text);
+            await conn.write("HTTP/1.1 200 OK\r\nContent-Length: 6000\r\n\r\n");
+            await conn.write(body.slice(0, 1999));
+            await delay(30);
+            await conn.write(body.slice(1999, 4001));
+            await delay(30);
+            await conn.write(body.slice(4001));
+        }));
+        const res = await fetch("http://127.0.0.1:19896/");
+        expect(res.bytes().length).toBe(6000);
+        expect(res.text().length).toBe(3000);
+        listener.close();
+    });
+
+    await it("a response without a body does not wait for the connection to close", async () => {
+        const listener = TcpListener.listen(19897);
+        const seen = new Seen();
+        spawn(serve(listener, seen, async (conn: TcpStream): Task<void> => {
+            await conn.write("HTTP/1.1 204 No Content\r\n\r\n");
+            await delay(1500);
+        }));
+        const started = now();
+        const res = await fetch("http://127.0.0.1:19897/");
+        expect(res.status).toBe(204);
+        expect(now() - started < 1200).toBeTruthy();
+        listener.close();
+    });
+
+    await it("repeated headers are combined and cookies are kept apart", async () => {
+        const listener = TcpListener.listen(19898);
+        const seen = new Seen();
+        spawn(serve(listener, seen, async (conn: TcpStream): Task<void> => {
+            await conn.write("HTTP/1.1 404 Not Found\r\nSet-Cookie: a=1\r\nSet-Cookie: b=2\r\nX-Multi: one\r\nX-Multi: two\r\nContent-Length: 0\r\n\r\n");
+        }));
+        const res = await fetch("http://127.0.0.1:19898/");
+        expect(res.status).toBe(404);
+        expect(res.statusText).toBe("Not Found");
+        expect(res.cookies.length).toBe(2);
+        expect(res.headers.get("x-multi")).toBe("one, two");
+        listener.close();
+    });
+
+    await it("the request carries a byte length, the port in Host and Connection: close", async () => {
+        const listener = TcpListener.listen(19899);
+        const seen = new Seen();
+        spawn(serve(listener, seen, async (conn: TcpStream): Task<void> => {
+            await conn.write("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+        }));
+        await fetch("http://127.0.0.1:19899/echo", { method: HttpMethod.POST, body: "é" });
+        expect(seen.request.indexOf("Content-Length: 2\r\n") !== null).toBeTruthy();
+        expect(seen.request.indexOf("Host: 127.0.0.1:19899\r\n") !== null).toBeTruthy();
+        expect(seen.request.indexOf("Connection: close\r\n") !== null).toBeTruthy();
+        listener.close();
+    });
+});
