@@ -208,11 +208,46 @@ decide la medición, no esta lista.
   1 M, mejor de 5): loop_only 5, instance3 24, objlit3 43, arraylit3 55,
   map3 76, map_get_heapkey 27, strview 45, split5 47. Compuerta de la
   Fase D (`objlit3` > 1,5× `instance3`): 1,79×, cumplida; falta B y C.
-- **Fase B — arrays/split un bloque**: elementos en cola de celda
-  + derrame; `split_ranges` única fuente
-  (`vm_value/{array,vm_array,vm_array_access}.rs`,
-  `heap/cells/typed.rs`, `heap/jit.rs`). Prueba: suite nueva
-  (push oltre inline, I64→Boxed, pop/shift, split vacío/multi).
+- **Fase B — arrays/split un bloque** (diseño 2026-10-30, pendiente de
+  visto bueno):
+  - *Hoy* (código): cada array son dos asignaciones, la celda del heap
+    (`ArrayRepr` en `alloc_array`) y el buffer del `Vec` en malloc
+    (`ArrayRepr::{Boxed(BoxedElems),I64(Vec<i64>),F64(Vec<f64>)}`,
+    `vm_value/{array,vm_array,vm_array_access}.rs`). Filas: `arraylit3`
+    55 ms vs `instance3` 24 ms; `split5` 47 ms.
+  - *Diseño*: `ElemBuf<T>` `#[repr(C)] { ptr, len, cap }` sustituye a los
+    tres `Vec`. El buffer puede vivir en la cola de la propia celda
+    (`ptr` = dirección tras el `ArrayRepr`; `is_inline` = `ptr` coincide)
+    o derramarse a un `Vec` (idéntico a hoy). El GC no mueve celdas
+    (`promote` solo cambia el estado), así que el puntero interno es
+    estable. `Drop` libera solo si derramó.
+  - *Contrato JIT intacto*: el CLIF solo lee puntero y longitud en
+    `ELEMS_UNION_OFF + {0, 8}`; con `repr(C)` esos offsets se vuelven
+    constantes y se borra la sonda `vec_word_offsets` de `heap/jit.rs`
+    (el tripwire se conserva). `push` en JIT va por helper: sin cambio.
+  - *Construcción in situ*: `VmArray::init_inline_at(at, kind, items)`
+    (no se puede construir un `ElemBuf` inline en la pila y moverlo);
+    `CellSpace::alloc_array_inline` pide `size_of::<ArrayRepr>() + n*elem`
+    bytes. Productores con tamaño conocido (literales, `split`, `slice`,
+    `map`) usan el constructor dimensionado; los que ya traen un `Vec`
+    lo adoptan sin copiar (derramado). Cambios de representación
+    Boxed↔I64↔F64 y crecimiento derraman, como hoy.
+  - *Pasos (un commit cada uno)*: B1 `ElemBuf` derramado-solo, sin cambio
+    de comportamiento (suite 4/4 verde); B2 asignación inline para
+    literales y medir `arraylit3`; B3 `split` dimensionado con
+    `split_ranges` como única fuente y medir `split5`; B4 resto de
+    productores solo si la fila lo justifica.
+  - *Ganancia / medida / borra* (Ley 10): una malloc+free menos por array
+    pequeño; `repr_rows.vn` pareado quick y release con checksum;
+    se borra la sonda de offsets de `Vec` y el doble camino
+    `from_items(Vec)` para tamaño conocido.
+  - *Pruebas*: push más allá de la capacidad inline, I64→Boxed con
+    buffer inline, `pop`/`shift` hasta vacío y `push` (cambio de
+    representación), `split` vacío/multi, GC menor entre llenados,
+    `spawnIsolate`, JSON ida y vuelta; ambos tiers + soak.
+  - *Riesgos*: cualquier `memcpy` de un `ArrayRepr` invalidaría el
+    puntero interno (verificado: hoy solo hay asignaciones in situ);
+    espacio inline desperdiciado tras un derrame.
 - **Fase C — vistas string sin `Arc`**: vista referencia celda
   padre trazada por GC (`heap/str.rs`, `heap/children.rs`).
   Prueba: vista sobrevive a padre, realloc, GC en medio,
