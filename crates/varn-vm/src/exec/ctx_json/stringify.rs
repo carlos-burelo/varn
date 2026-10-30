@@ -81,6 +81,24 @@ pub(super) fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String, depth
             out.push_str("null");
             return;
         }
+        if let Some(inst) = ctx.heap.instance(val.as_heap())
+            && let Some(class) = varn_types::ClassObj::find_by_id(inst.class_id)
+        {
+            out.push('{');
+            let mut first = true;
+            for field in class.layout().fields.iter() {
+                if !first {
+                    out.push(',');
+                }
+                first = false;
+                write_quoted_str(field.name.as_ref(), out);
+                out.push(':');
+                let value = inst.read_field(field).unwrap_or_else(VmValue::null);
+                write_json_vm(ctx, value, out, depth + 1);
+            }
+            out.push('}');
+            return;
+        }
         match ctx.heap.get(val.as_heap()) {
             Some(HeapObj::Str(h)) => {
                 write_quoted_str(h.as_str(), out);
