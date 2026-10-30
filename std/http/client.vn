@@ -1,6 +1,7 @@
 import { tcpConnect$, tcpConnectTls$, tcpWrite$, tcpClose$, httpMethodName$, HttpMethod } from "runtime:net";
 import { Url } from "std:net";
 import { Response, RawResponse, RequestInit, readHttpResponse } from "std:http/core";
+import { isRedirect, sameOrigin, resolveLocation, redirectedMethod, redirectedHeaders } from "std:http/redirect";
 
 async function doFetch(connId: int, parsedUrl: Url, method: HttpMethod, headers: { [key: str]: str }, body: str): Task<Response> {
     let requestStr = httpMethodName$(method) + " " + parsedUrl.path;
@@ -78,7 +79,7 @@ async function doFetch(connId: int, parsedUrl: Url, method: HttpMethod, headers:
     return response;
 }
 
-export async function fetch(url: str, init: RequestInit = {}): Task<Response> {
+async function fetchOnce(url: str, method: HttpMethod, headers: { [key: str]: str }, body: str, ca: str?): Task<Response> {
     const parsedUrl = Url.parse(url);
     const host = parsedUrl.host;
 
@@ -96,7 +97,7 @@ export async function fetch(url: str, init: RequestInit = {}): Task<Response> {
     let connId = -1;
     let connectFailure = "";
     try {
-        connId = secure ? await tcpConnectTls$(host, port, init.ca) : await tcpConnect$(host, port);
+        connId = secure ? await tcpConnectTls$(host, port, ca) : await tcpConnect$(host, port);
     } catch (e) {
         connectFailure = e.message;
     }
@@ -104,7 +105,39 @@ export async function fetch(url: str, init: RequestInit = {}): Task<Response> {
         throw new Error(`NetworkError: Could not connect to ${host}:${port} (${connectFailure})`);
     }
 
-    return await doFetch(connId, parsedUrl, init.method ?? HttpMethod.GET, init.headers ?? {}, init.body ?? "");
+    return await doFetch(connId, parsedUrl, method, headers, body);
+}
+
+export async function fetch(url: str, init: RequestInit = {}): Task<Response> {
+    const follow = init.followRedirects ?? true;
+    const limit = init.maxRedirects ?? 20;
+    let current = url;
+    let method = init.method ?? HttpMethod.GET;
+    let body = init.body ?? "";
+    let headers = init.headers ?? {};
+    let hops = 0;
+    while (true) {
+        const response = await fetchOnce(current, method, headers, body, init.ca);
+        response.url = current;
+        const location = response.headers.get("location");
+        if (!follow || location === null || !isRedirect(response.status)) {
+            return response;
+        }
+        if (hops >= limit) {
+            throw new Error(`NetworkError: More than ${limit} redirects starting at ${url}`);
+        }
+        hops = hops + 1;
+        const from = Url.parse(current);
+        const next = resolveLocation(from, location as str);
+        const nextMethod = redirectedMethod(response.status, method);
+        const dropBody = nextMethod !== method;
+        headers = redirectedHeaders(headers, dropBody, !sameOrigin(from, Url.parse(next)));
+        if (dropBody) {
+            body = "";
+        }
+        method = nextMethod;
+        current = next;
+    }
 }
 
 export async function get(url: str, headers: { [key: str]: str } = {}): Task<Response> {

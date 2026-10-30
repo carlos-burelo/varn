@@ -1,0 +1,120 @@
+import { HttpMethod } from "runtime:net";
+import { Url } from "std:net";
+
+const BODY_HEADERS: str[] = [
+    "content-type",
+    "content-length",
+    "content-encoding",
+    "content-language",
+    "content-location",
+    "transfer-encoding"
+];
+
+const CREDENTIAL_HEADERS: str[] = ["authorization", "cookie", "proxy-authorization"];
+
+export function isRedirect(status: int): bool {
+    return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
+}
+
+function effectivePort(url: Url): int {
+    const explicit = url.port;
+    if (explicit !== null) {
+        return explicit as int;
+    }
+    return url.protocol === "https" ? 443 : 80;
+}
+
+export function sameOrigin(a: Url, b: Url): bool {
+    return a.protocol === b.protocol && a.host === b.host && effectivePort(a) === effectivePort(b);
+}
+
+function origin(url: Url): str {
+    const explicit = url.port;
+    return explicit === null ? `${url.protocol}://${url.host}` : `${url.protocol}://${url.host}:${explicit}`;
+}
+
+function lastSlash(text: str): int {
+    let found = -1;
+    for (let i = 0; i < text.length; i = i + 1) {
+        if (text.charCodeAt(i) === 47) {
+            found = i;
+        }
+    }
+    return found;
+}
+
+function normalizePath(path: str): str {
+    const kept: str[] = [];
+    const segments = path.split("/");
+    for (let i = 0; i < segments.length; i = i + 1) {
+        const segment = segments[i];
+        if (segment === "..") {
+            if (kept.length > 1) {
+                kept.pop();
+            }
+        } else if (segment !== "." && !(segment.length === 0 && i > 0 && i < segments.length - 1)) {
+            kept.push(segment);
+        }
+    }
+    return kept.join("/");
+}
+
+export function resolveLocation(base: Url, location: str): str {
+    const hash = location.indexOf("#");
+    const target = hash === null ? location : location.slice(0, hash);
+    if (target.indexOf("://") !== null) {
+        return target;
+    }
+    if (target.startsWith("//")) {
+        return `${base.protocol}:${target}`;
+    }
+    if (target.startsWith("/")) {
+        const query = target.indexOf("?");
+        const path = query === null ? target : target.slice(0, query);
+        return origin(base) + normalizePath(path) + (query === null ? "" : target.slice(query));
+    }
+    if (target.startsWith("?")) {
+        return origin(base) + base.path + target;
+    }
+    const slash = lastSlash(base.path);
+    const directory = slash < 0 ? "/" : base.path.slice(0, slash + 1);
+    const joined = directory + target;
+    const query = joined.indexOf("?");
+    const path = query === null ? joined : joined.slice(0, query);
+    return origin(base) + normalizePath(path) + (query === null ? "" : joined.slice(query));
+}
+
+export function redirectedMethod(status: int, method: HttpMethod): HttpMethod {
+    if (status === 303 && method !== HttpMethod.HEAD) {
+        return HttpMethod.GET;
+    }
+    if ((status === 301 || status === 302) && method === HttpMethod.POST) {
+        return HttpMethod.GET;
+    }
+    return method;
+}
+
+export function redirectedHeaders(
+    headers: { [key: str]: str },
+    dropBody: bool,
+    crossOrigin: bool
+): { [key: str]: str } {
+    const out: { [key: str]: str } = {};
+    for (let key in headers) {
+        const lower = key.toLowerCase();
+        if (lower === "host") {
+            continue;
+        }
+        if (dropBody && BODY_HEADERS.includes(lower)) {
+            continue;
+        }
+        if (crossOrigin && CREDENTIAL_HEADERS.includes(lower)) {
+            continue;
+        }
+        const value = headers[key];
+        if (value !== null) {
+            out[key] = value;
+        }
+    }
+    return out;
+}
