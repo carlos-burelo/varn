@@ -104,7 +104,7 @@ impl<'a> FnEmitter<'a> {
                 }
                 TemplatePart::Interpolation(e) => {
                     let le = self.lower_expr(*e);
-                    self.to_str(le)
+                    self.coerce_to_str(le)
                 }
             };
             acc = Some(match acc {

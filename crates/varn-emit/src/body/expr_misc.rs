@@ -30,7 +30,7 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
-    pub(super) fn to_str(&mut self, e: TirExpr) -> TirExpr {
+    pub(super) fn coerce_to_str(&mut self, e: TirExpr) -> TirExpr {
         if e.ty.representation() == BackendTy::Str {
             return self.cast_to(e, BackendTy::Str);
         }

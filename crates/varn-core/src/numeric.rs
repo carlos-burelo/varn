@@ -129,6 +129,22 @@ pub fn binary_operand_kind(
     }
 }
 
+pub fn float_to_string(f: f64) -> String {
+    if f.is_nan() {
+        "NaN".to_owned()
+    } else if f.is_infinite() {
+        if f > 0.0 { "Infinity" } else { "-Infinity" }.to_owned()
+    } else if f != 0.0 && (f.abs() >= 1e21 || f.abs() < 1e-6) {
+        format!("{f:e}")
+    } else {
+        let mut text = f.to_string();
+        if !text.contains('.') {
+            text.push_str(".0");
+        }
+        text
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -173,21 +189,5 @@ mod tests {
         assert_eq!(rem_int(7, -2), Ok(1));
         assert_eq!(rem_int(i64::MIN, -1), Ok(0));
         assert_eq!(rem_int(1, 0), Err(IntDivFault::DivisionByZero));
-    }
-}
-
-pub fn float_to_string(f: f64) -> String {
-    if f.is_nan() {
-        "NaN".to_owned()
-    } else if f.is_infinite() {
-        if f > 0.0 { "Infinity" } else { "-Infinity" }.to_owned()
-    } else if f != 0.0 && (f.abs() >= 1e21 || f.abs() < 1e-6) {
-        format!("{f:e}")
-    } else {
-        let mut text = f.to_string();
-        if !text.contains('.') {
-            text.push_str(".0");
-        }
-        text
     }
 }

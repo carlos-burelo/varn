@@ -1,5 +1,8 @@
 use std::fmt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(all(windows, target_arch = "x86_64"))]
+use std::path::PathBuf;
+#[cfg(all(windows, target_arch = "x86_64"))]
 use std::process::Command;
 
 #[derive(Debug)]

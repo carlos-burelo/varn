@@ -156,7 +156,7 @@ impl<'a> FnEmitter<'a> {
             l
         };
         let (lhs, rhs) = if op == TirBinOp::Add && common == BackendTy::Str {
-            (self.to_str(lhs), self.to_str(rhs))
+            (self.coerce_to_str(lhs), self.coerce_to_str(rhs))
         } else {
             (self.cast_to(lhs, common), self.cast_to(rhs, common))
         };
