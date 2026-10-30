@@ -56,7 +56,10 @@ pub(super) fn emit_method_call(
     }
     let argc = args.len() as u8;
     let cs = ic_slot.ok_or(OptError::Unsupported("ssa-emit: cache site without a slot"))?;
-    let op = if matches!(value_tys.get(recv.0 as usize), Some(BackendTy::Class(_))) {
+    let op = if matches!(
+        value_tys.get(recv.0 as usize),
+        Some(BackendTy::Class(_) | BackendTy::Enum(_))
+    ) {
         OpCode::InvokeVirtual
     } else {
         OpCode::CallMethod
