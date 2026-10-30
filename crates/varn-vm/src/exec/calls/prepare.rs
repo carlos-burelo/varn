@@ -156,6 +156,7 @@ pub(crate) fn prepare_call(
                             let start = staging.len().saturating_sub(full_arg_count);
                             staging[start] = recv_nv;
                         }
+                        bundle_rest_args(&nc.proto, &mut full_arg_count, staging, heap);
                         if nc.proto.is_generator {
                             return Ok(describe_generator(
                                 &nc,
@@ -178,7 +179,6 @@ pub(crate) fn prepare_call(
                             }));
                         }
                         if !nc.proto.is_generator && !nc.proto.is_async {
-                            bundle_rest_args(&nc.proto, &mut full_arg_count, staging, heap);
                             let window: Vec<VmValue> =
                                 stage_window(staging, full_arg_count).to_vec();
                             let _ = full_arg_count;
