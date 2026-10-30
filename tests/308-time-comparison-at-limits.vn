@@ -1,0 +1,27 @@
+import { describe, it, expect } from "std:test";
+import { Duration, Instant, PlainDateTime } from "std:time";
+
+const MAX: int = 9223372036854775807;
+const MIN: int = -9223372036854775807 - 1;
+
+await describe("308 time comparisons do not overflow", async () => {
+    await it("Duration.compare orders the extremes", async () => {
+        expect(new Duration(MAX).compare(new Duration(MIN))).toBe(1);
+        expect(new Duration(MIN).compare(new Duration(MAX))).toBe(-1);
+        expect(new Duration(5).compare(5)).toBe(0);
+        expect(new Duration(5).compare(7)).toBe(-1);
+    });
+
+    await it("Instant.compare orders the extremes", async () => {
+        expect(Instant.compare(new Instant(MAX), new Instant(MIN))).toBe(1);
+        expect(Instant.compare(new Instant(MIN), new Instant(MAX))).toBe(-1);
+        expect(Instant.compare(new Instant(3), new Instant(3))).toBe(0);
+    });
+
+    await it("PlainDateTime.compare orders by the first differing field", async () => {
+        expect(PlainDateTime.compare(new PlainDateTime(MAX, 1, 1), new PlainDateTime(MIN, 1, 1))).toBe(1);
+        expect(PlainDateTime.compare(new PlainDateTime(2020, 5, 1), new PlainDateTime(2020, 5, 2))).toBe(-1);
+        expect(PlainDateTime.compare(new PlainDateTime(2020, 5, 2, 1), new PlainDateTime(2020, 5, 2, 1))).toBe(0);
+        expect(PlainDateTime.compare(new PlainDateTime(2020, 5, 2, 1, 0, 0, 1), new PlainDateTime(2020, 5, 2, 1, 0, 0, 0))).toBe(1);
+    });
+});

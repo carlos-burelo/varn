@@ -298,6 +298,7 @@ import "./304-large-array-literals.vn"
 import "./305-number-conversions-and-formatting.vn"
 import "./306-range-limits.vn"
 import "./307-bytes-and-string-limits.vn"
+import "./308-time-comparison-at-limits.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {
