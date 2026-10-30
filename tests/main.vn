@@ -277,6 +277,7 @@ import "./283-filestream-is-asynchronous.vn"
 import "./284-async-fs.vn"
 import "./285-async-process.vn"
 import "./286-env-distinguishes-unset-from-empty.vn"
+import "./287-fs-exists-and-stat-tell-the-truth.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

@@ -1,0 +1,16 @@
+import { describe, it, expect } from "std:test";
+import { exists, stat, tempDir } from "std:fs";
+
+await describe("287 fs exists and stat tell the truth", async () => {
+    await it("exists reports presence and absence", async () => {
+        expect(exists(tempDir())).toBe(true);
+        expect(exists(tempDir() + "/varn-287-does-not-exist")).toBe(false);
+    });
+
+    await it("stat reports a real modification time", async () => {
+        const info = stat(tempDir());
+        expect(info.isDir).toBe(true);
+        expect(info.mtime !== null).toBeTruthy();
+        expect((info.mtime as int) > 0).toBeTruthy();
+    });
+});

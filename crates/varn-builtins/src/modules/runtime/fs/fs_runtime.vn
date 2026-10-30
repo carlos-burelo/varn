@@ -14,7 +14,7 @@ export interface RawStats {
     size: int;
     isDir: bool;
     isFile: bool;
-    mtime: int;
+    mtime: int?;
 }
 
 export declare function open$(path: str, mode: FileMode): int;

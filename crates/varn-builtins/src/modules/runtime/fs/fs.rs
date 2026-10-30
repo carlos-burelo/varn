@@ -162,10 +162,8 @@ varn_contract! {
         }
 
         fn exists(ctx: &mut dyn NativeCtx, path: &str) -> Result<bool, String> {
-            if !ctx.check_fs_read(path) {
-                return Ok(false);
-            }
-            Ok(std::path::Path::new(path).exists())
+            allow_read(ctx, path)?;
+            std::path::Path::new(path).try_exists().map_err(fs_io_err)
         }
 
         fn stat(ctx: &mut dyn NativeCtx, path: &str) -> Result<VmValue, String> {
@@ -177,13 +175,12 @@ varn_contract! {
                 .modified()
                 .ok()
                 .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_millis() as i64)
-                .unwrap_or(0);
+                .map(|d| d.as_millis() as i64);
             Ok(RawStats {
                 size: meta.len() as i64,
                 is_dir: meta.is_dir(),
                 is_file: meta.is_file(),
-                mtime,
+                mtime: mtime.map_or_else(VmValue::null, VmValue::from_int),
             }
             .alloc(ctx))
         }
