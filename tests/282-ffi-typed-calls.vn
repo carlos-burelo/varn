@@ -1,0 +1,56 @@
+import { describe, it, expect } from "std:test";
+import { Ffi, FfiType } from "std:ffi";
+import { platform } from "std:sys";
+
+function failsWith(run: () => dynamic, fragment: str): bool {
+    try {
+        run()
+        return false
+    } catch (e) {
+        return e.message.indexOf(fragment) !== null
+    }
+}
+
+const os = platform();
+const cLib = os == "windows" ? "ucrtbase.dll" : os == "macos" ? "libSystem.B.dylib" : "libc.so.6";
+const mathLib = os == "windows" ? "ucrtbase.dll" : os == "macos" ? "libSystem.B.dylib" : "libm.so.6";
+
+await describe("282 ffi typed calls", async () => {
+    await it("floats travel in float registers", () => {
+        const sqrt = Ffi.open(mathLib).bind("sqrt", FfiType.Float, [FfiType.Float]);
+        expect(sqrt.call(2.0)).toBe(1.4142135623730951);
+        const pow = Ffi.open(mathLib).bind("pow", FfiType.Float, [FfiType.Float, FfiType.Float]);
+        expect(pow.call(2.0, 10.0)).toBe(1024.0);
+    });
+
+    await it("strings are marshalled as C strings", () => {
+        const strlen = Ffi.open(cLib).bind("strlen", FfiType.Int, [FfiType.Str]);
+        expect(strlen.call("hello")).toBe(5);
+    });
+
+    await it("arguments must match the declared parameter types", () => {
+        const sqrt = Ffi.open(mathLib).bind("sqrt", FfiType.Float, [FfiType.Float]);
+        expect(failsWith(() => sqrt.call(2), "argument 0 must be float")).toBeTruthy();
+        expect(failsWith(() => sqrt.call(), "1 arguments") || failsWith(() => sqrt.call(), "arguments given")).toBeTruthy();
+    });
+
+    await it("allocations are bounds checked and freed once", () => {
+        const ptr = Ffi.alloc(8);
+        expect(failsWith(() => ptr.writeI64(1, 4), "outside the 8-byte allocation")).toBeTruthy();
+        expect(failsWith(() => ptr.readI8(8), "outside the 8-byte allocation")).toBeTruthy();
+        ptr.writeI64(7, 0);
+        expect(ptr.readI64(0)).toBe(7);
+        ptr.free();
+        expect(failsWith(() => ptr.free(), "already freed")).toBeTruthy();
+    });
+
+    await it("a C string without terminator is reported, not overread", () => {
+        const ptr = Ffi.alloc(4);
+        ptr.writeI8(65, 0);
+        ptr.writeI8(66, 1);
+        ptr.writeI8(67, 2);
+        ptr.writeI8(68, 3);
+        expect(failsWith(() => ptr.readCString(0), "not NUL-terminated")).toBeTruthy();
+        ptr.free();
+    });
+});

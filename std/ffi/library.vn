@@ -27,6 +27,14 @@ function marshal(args: FfiValue[]): FfiScalar[] {
     return out;
 }
 
+function rawTypes(types: FfiType[]): int[] {
+    let out: int[] = [];
+    for (let type of types) {
+        out.push(type.rawValue);
+    }
+    return out;
+}
+
 export class FfiFunction {
     fnPtr: int;
     returnType: FfiType;
@@ -39,7 +47,7 @@ export class FfiFunction {
     }
 
     invoke(args: FfiValue[] = []): FfiScalar {
-        return call$(this.fnPtr, this.returnType.rawValue, marshal(args));
+        return call$(this.fnPtr, this.returnType.rawValue, rawTypes(this.paramTypes), marshal(args));
     }
 
     call(...args: FfiValue[]): FfiScalar {
@@ -100,16 +108,16 @@ export class Ffi {
         return readCString$(ptr as int, offset);
     }
 
-    static call(fnPtr: Pointer | int, returnType: FfiType, args: FfiValue[] = []): FfiScalar {
+    static call(fnPtr: Pointer | int, returnType: FfiType, paramTypes: FfiType[], args: FfiValue[] = []): FfiScalar {
         let addr = fnPtr is Pointer ? fnPtr.address : fnPtr;
-        return call$(addr, returnType.rawValue, marshal(args));
+        return call$(addr, returnType.rawValue, rawTypes(paramTypes), marshal(args));
     }
 
     static callInt(fnPtr: Pointer | int, a1: int, a2: int): int {
-        return Ffi.call(fnPtr, FfiType.Int, [a1, a2]) as int;
+        return Ffi.call(fnPtr, FfiType.Int, [FfiType.Int, FfiType.Int], [a1, a2]) as int;
     }
 
     static callFloat(fnPtr: Pointer | int, a1: float, a2: float): float {
-        return Ffi.call(fnPtr, FfiType.Float, [a1, a2]) as float;
+        return Ffi.call(fnPtr, FfiType.Float, [FfiType.Float, FfiType.Float], [a1, a2]) as float;
     }
 }
