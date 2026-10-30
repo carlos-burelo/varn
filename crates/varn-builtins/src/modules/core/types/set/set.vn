@@ -3,11 +3,11 @@
  */
 export declare class Set<T> {
     constructor();
-    @fallible add(value: T): void;
-    @fallible has(value: T): bool;
-    @fallible delete(value: T): bool;
+    @throws(TypeError) add(value: T): void;
+    @throws(TypeError) has(value: T): bool;
+    @throws(TypeError) delete(value: T): bool;
     clear(): void;
     values(): T[];
-    @fallible forEach(callback: (value: T, value2: T, s: Set<T>) => void): void;
+    @throws(Error) forEach(callback: (value: T, value2: T, s: Set<T>) => void): void;
     readonly size: int;
 }

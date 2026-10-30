@@ -1,5 +1,5 @@
 use bigdecimal::{BigDecimal, RoundingMode};
-use num_traits::{One, Signed, ToPrimitive, Zero};
+use num_traits::{Signed, ToPrimitive, Zero};
 use varn_macros::varn_contract;
 use varn_types::{NativeCtx, NativeError, VmValue};
 
@@ -28,21 +28,12 @@ fn not_decimal() -> NativeError {
 }
 
 fn pow_decimal(d: &BigDecimal, exp: i64) -> Result<BigDecimal, NativeError> {
-    let mut result = BigDecimal::one();
-    let mut base = d.clone();
-    let mut e = exp.unsigned_abs();
-    while e > 0 {
-        if e & 1 == 1 {
-            result = &result * &base;
-        }
-        base = &base * &base;
-        e >>= 1;
-    }
-    if exp >= 0 {
-        return Ok(result);
-    }
-    varn_core::numeric_big::div_decimal(&BigDecimal::one(), &result)
-        .map_err(|_| NativeError::division_by_zero("decimal.pow: zero to a negative power"))
+    use varn_core::numeric_big::DecimalPowFault;
+    varn_core::numeric_big::pow_decimal(d, &BigDecimal::from(exp)).map_err(|fault| match fault {
+        DecimalPowFault::NonIntegral => NativeError::range_error("the exponent of a decimal power must be an integer"),
+        DecimalPowFault::TooLarge => NativeError::range_error("the result of this decimal power would have too many digits"),
+        DecimalPowFault::ZeroToNegative => NativeError::division_by_zero("zero cannot be raised to a negative power"),
+    })
 }
 
 varn_contract! {

@@ -47,16 +47,16 @@ impl BuiltinDecorator {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ContractDecorator {
-    Fallible,
+    Throws,
     Permission,
 }
 
 impl ContractDecorator {
-    const ALL: [Self; 2] = [Self::Fallible, Self::Permission];
+    const ALL: [Self; 2] = [Self::Throws, Self::Permission];
 
     pub const fn name(self) -> &'static str {
         match self {
-            Self::Fallible => "fallible",
+            Self::Throws => "throws",
             Self::Permission => "permission",
         }
     }

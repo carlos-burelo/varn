@@ -68,7 +68,7 @@ fn expand_section(
     let contract =
         match crate::contract_parse::lookup(source, &input.contract, section.class.as_deref()) {
             Ok(contract) => contract,
-            Err(LookupFailure::Unparsable(reason)) | Err(LookupFailure::BadCapability(reason)) => {
+            Err(LookupFailure::Unparsable(reason)) | Err(LookupFailure::BadDecorator(reason)) => {
                 return Err(reason)
             }
             Err(LookupFailure::ClassNotFound) => {

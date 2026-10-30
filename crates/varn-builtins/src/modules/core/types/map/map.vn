@@ -3,14 +3,14 @@
  */
 export declare class Map<K, V> {
     constructor();
-    @fallible get(key: K): V?;
-    @fallible set(key: K, value: V): void;
-    @fallible has(key: K): bool;
-    @fallible delete(key: K): bool;
+    @throws(TypeError) get(key: K): V?;
+    @throws(TypeError) set(key: K, value: V): void;
+    @throws(TypeError) has(key: K): bool;
+    @throws(TypeError) delete(key: K): bool;
     clear(): void;
     keys(): K[];
     values(): V[];
     entries(): [K, V][];
-    @fallible forEach(callback: (value: V, key: K, map: Map<K, V>) => void): void;
+    @throws(Error) forEach(callback: (value: V, key: K, map: Map<K, V>) => void): void;
     readonly size: int;
 }

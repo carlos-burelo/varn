@@ -4,7 +4,7 @@
  */
 export declare class decimal {
     toString(): str;
-    @fallible toFixed(digits?: int): str;
+    @throws(RangeError) toFixed(digits?: int): str;
     abs(): decimal;
     sign(): int;
     negate(): decimal;
@@ -17,10 +17,10 @@ export declare class decimal {
     isZero(): bool;
     isPositive(): bool;
     isNegative(): bool;
-    @fallible pow(exp: int): decimal;
-    @fallible toInt(): int;
+    @throws(RangeError, DivisionByZero) pow(exp: int): decimal;
+    @throws(IntegerOverflow) toInt(): int;
     toFloat(): float;
 
-    @fallible static parse(s: str): decimal;
+    @throws(ParseError) static parse(s: str): decimal;
     static tryParse(s: str): decimal?;
 }

@@ -5,26 +5,26 @@
 export declare class int {
     static MAX_VALUE: int;
     static MIN_VALUE: int;
-    @fallible static parse(s: str): int;
+    @throws(ParseError) static parse(s: str): int;
     static tryParse(s: str): int?;
     static isSafeInteger(val: int): bool;
 
     toString(): str;
     valueOf(): int;
     toLocaleString(): str;
-    @fallible toFixed(digits?: int): str;
-    @fallible abs(): int;
+    @throws(RangeError) toFixed(digits?: int): str;
+    @throws(IntegerOverflow) abs(): int;
     sign(): int;
-    @fallible negate(): int;
+    @throws(IntegerOverflow) negate(): int;
     bitwiseNot(): int;
     min(other: int): int;
     max(other: int): int;
-    @fallible clamp(lo: int, hi: int): int;
+    @throws(RangeError) clamp(lo: int, hi: int): int;
     toHex(): str;
     toBinary(): str;
     toOctal(): str;
     toFloat(): float;
-    @fallible pow(exponent: int): int;
+    @throws(RangeError, IntegerOverflow) pow(exponent: int): int;
     isEven(): bool;
     isOdd(): bool;
 
@@ -37,9 +37,9 @@ export declare class int {
     checkedAdd(other: int): int?;
     checkedSub(other: int): int?;
     checkedMul(other: int): int?;
-    @fallible div(other: int): int;
-    @fallible floorDiv(other: int): int;
-    @fallible ceilDiv(other: int): int;
-    @fallible rem(other: int): int;
-    @fallible mod(other: int): int;
+    @throws(DivisionByZero, IntegerOverflow) div(other: int): int;
+    @throws(DivisionByZero, IntegerOverflow) floorDiv(other: int): int;
+    @throws(DivisionByZero, IntegerOverflow) ceilDiv(other: int): int;
+    @throws(DivisionByZero, IntegerOverflow) rem(other: int): int;
+    @throws(DivisionByZero, IntegerOverflow) mod(other: int): int;
 }

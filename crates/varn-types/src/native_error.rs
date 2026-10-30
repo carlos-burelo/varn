@@ -31,6 +31,34 @@ impl NativeError {
         }
     }
 
+    pub fn class(&self) -> varn_core::ErrorClass {
+        match &self.std {
+            Some(info) => varn_core::ErrorClass::Std(info.class),
+            None => varn_core::ErrorClass::Runtime(self.kind),
+        }
+    }
+
+    pub fn within(self, declared: &[&str], symbol: &str) -> Self {
+        if self.thrown.is_some() {
+            return self;
+        }
+        let raised = self.class();
+        let allowed = declared
+            .iter()
+            .filter_map(|name| varn_core::ErrorClass::of_name(name))
+            .any(|class| raised.is_a(class));
+        if allowed {
+            self
+        } else {
+            Self::failure(format!(
+                "{symbol} raised {}, which its contract does not declare ({}): {}",
+                raised.name(),
+                declared.join(", "),
+                self.message
+            ))
+        }
+    }
+
     pub fn failure(message: impl Into<String>) -> Self {
         Self::of_kind(RuntimeErrorKind::Error, message)
     }

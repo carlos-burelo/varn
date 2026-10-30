@@ -160,6 +160,12 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
     });
 
     let call = quote!(<__T>::#method_ident(ctx, #(#call_args),*));
+    let call = if m.throws.is_empty() {
+        call
+    } else {
+        let declared = &m.throws;
+        quote!(#call.map_err(|__e| ::varn_types::NativeError::within(__e, &[#(#declared),*], #sym)))
+    };
     let ret_encode = match (is_fn || m.fallible, is_void) {
         (true, true) => quote! { #call?; Ok(::varn_types::VmValue::null()) },
         (true, false) => quote! {

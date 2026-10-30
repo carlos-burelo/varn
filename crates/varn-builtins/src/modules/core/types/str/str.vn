@@ -21,7 +21,7 @@ export declare class str {
     endsWith(search: str): bool;
     indexOf(search: str): int?;
     lastIndexOf(search: str): int?;
-    @fallible substring(start: int, end?: int): str;
+    @throws(RangeError) substring(start: int, end?: int): str;
     slice(start: int, end?: int): str;
     at(index: int): str?;
     replace(from: str, to: str): str;
@@ -33,7 +33,7 @@ export declare class str {
     codePointAt(pos: int): int;
     lines(): str[];
     words(): str[];
-    @fallible repeat(n: int): str;
+    @throws(RangeError) repeat(n: int): str;
     padStart(target: int, pad?: str): str;
     padLeft(target: int, pad?: str): str; // ALIAS
     padEnd(target: int, pad?: str): str;

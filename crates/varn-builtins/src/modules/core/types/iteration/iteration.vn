@@ -5,7 +5,7 @@ import { Option } from "core:types/option";
  * to its next `yield` and returns `Some(value)`, or `None` once it finishes.
  */
 export declare class Generator<T> {
-    @fallible next(): Option<T>;
+    @throws(Error) next(): Option<T>;
     close(): void;
 }
 

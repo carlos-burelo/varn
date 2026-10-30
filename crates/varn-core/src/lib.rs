@@ -37,7 +37,7 @@ pub mod well_known;
 pub use ast::AstId;
 pub use atom::{Atom, AtomInterner};
 pub use doc::DocComment;
-pub use errors::RuntimeErrorKind;
+pub use errors::{ErrorClass, RuntimeErrorKind};
 pub use ffi_kind::FfiKind;
 pub use std_errors::{ErrorField, StdErrorClass};
 

@@ -1,0 +1,59 @@
+import { describe, it, expect } from "std:test";
+
+const MAX: int = 9223372036854775807;
+const MIN: int = -9223372036854775807 - 1;
+
+function items(r: Range<int>): str {
+    let out = "";
+    let n = 0;
+    for (const i of r) {
+        out = out + i.toString() + ",";
+        n = n + 1;
+        if (n > 12) { return out + "..."; }
+    }
+    return out;
+}
+
+function outcome(f: () => str): str {
+    try { return f(); } catch (e) {
+        return e instanceof IntegerOverflow ? "overflow" : e instanceof RangeError ? "range" : "other:" + e.name;
+    }
+}
+
+await describe("306 ranges at the limits of int", async () => {
+    await it("an inclusive range ending at MAX includes MAX", async () => {
+        expect(items((MAX - 2)..=MAX)).toBe("9223372036854775805,9223372036854775806,9223372036854775807,");
+        expect(items((MAX - 2)..MAX)).toBe("9223372036854775805,9223372036854775806,");
+        expect(items(MIN..=(MIN + 2))).toBe("-9223372036854775808,-9223372036854775807,-9223372036854775806,");
+        expect(items(((MAX - 5)..=MAX).step(2))).toBe("9223372036854775802,9223372036854775804,9223372036854775806,");
+        expect(items((0..=MAX).step(MAX))).toBe("0,9223372036854775807,");
+    });
+
+    await it("a length that does not fit int is an overflow, not a wrong number", async () => {
+        expect(outcome(() => (MIN..MAX).length.toString())).toBe("overflow");
+        expect(outcome(() => (0..=MAX).length.toString())).toBe("overflow");
+        expect(outcome(() => (0..10).length.toString())).toBe("10");
+        expect(outcome(() => (5..0).length.toString())).toBe("0");
+        expect(outcome(() => (0..10).step(3).length.toString())).toBe("4");
+        expect(outcome(() => (0..=9).length.toString())).toBe("10");
+    });
+
+    await it("steps are positive and cannot overflow", async () => {
+        expect(outcome(() => items((10..0).step(-3)))).toBe("range");
+        expect(outcome(() => items((0..10).step(0)))).toBe("range");
+        expect(outcome(() => items((0..=MAX).step(MAX).step(2)))).toBe("overflow");
+    });
+
+    await it("an enormous range refuses to become an array", async () => {
+        expect(outcome(() => (0..=MAX).toArray().length.toString())).toBe("range");
+        expect(outcome(() => (0..5).toArray().length.toString())).toBe("5");
+    });
+
+    await it("contains is exact at the limits", async () => {
+        expect(((MAX - 1)..=MAX).contains(MAX)).toBe(true);
+        expect(((MAX - 1)..MAX).contains(MAX)).toBe(false);
+        expect((MIN..=MIN).contains(MIN)).toBe(true);
+        expect((0..10).step(3).contains(9)).toBe(true);
+        expect((0..10).step(3).contains(8)).toBe(false);
+    });
+});

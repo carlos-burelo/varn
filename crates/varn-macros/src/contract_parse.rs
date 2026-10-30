@@ -13,7 +13,7 @@ use crate::varn_contract::Mapped;
 
 pub(crate) enum LookupFailure {
     Unparsable(String),
-    BadCapability(String),
+    BadDecorator(String),
     ClassNotFound,
     NoFunctions,
 }
@@ -186,14 +186,43 @@ fn params(params: &[Param], interner: &AtomInterner) -> Vec<ParamInfo> {
         .collect()
 }
 
-fn is_fallible(
+fn throws(
     decorators: &[varn_core::ast::Decorator],
     arena: &AstArena,
     interner: &AtomInterner,
-) -> bool {
-    decorators.iter().any(|d| {
-        matches!(&arena.expr(d.expression).kind, ExprKind::Identifier { name } if ContractDecorator::of(interner.resolve(*name)) == Some(ContractDecorator::Fallible))
-    })
+) -> Result<Vec<String>, LookupFailure> {
+    use varn_core::ast::Arg;
+    let bad = || LookupFailure::BadDecorator("`@throws` takes error class names".to_string());
+    let mut out = Vec::new();
+    for d in decorators {
+        let ExprKind::Call { callee, args, .. } = &arena.expr(d.expression).kind else {
+            continue;
+        };
+        let ExprKind::Identifier { name } = &arena.expr(*callee).kind else {
+            continue;
+        };
+        if ContractDecorator::of(interner.resolve(*name)) != Some(ContractDecorator::Throws) {
+            continue;
+        }
+        for arg in args {
+            let Arg::Positional(arg) = arg else {
+                return Err(bad());
+            };
+            let ExprKind::Identifier { name } = &arena.expr(*arg).kind else {
+                return Err(bad());
+            };
+            let class = interner.resolve(*name).to_string();
+            if varn_core::ErrorClass::of_name(&class).is_none() {
+                return Err(LookupFailure::BadDecorator(format!(
+                    "`@throws({class})`: `{class}` is not an error class of the canonical tables"
+                )));
+            }
+            if !out.contains(&class) {
+                out.push(class);
+            }
+        }
+    }
+    Ok(out)
 }
 
 fn capability(
@@ -202,9 +231,8 @@ fn capability(
     interner: &AtomInterner,
 ) -> Result<Option<String>, LookupFailure> {
     use varn_core::ast::Arg;
-    let bad = || {
-        LookupFailure::BadCapability("`@permission` takes exactly one string domain".to_string())
-    };
+    let bad =
+        || LookupFailure::BadDecorator("`@permission` takes exactly one string domain".to_string());
     for d in decorators {
         let ExprKind::Call { callee, args, .. } = &arena.expr(d.expression).kind else {
             continue;
@@ -241,61 +269,76 @@ fn class_members(
                 modifiers,
                 decorators,
                 ..
-            } => out.push(Member {
-                symbol: interner.resolve(*key).to_string(),
-                kind: if modifiers.is_static {
-                    Kind::StaticMethod
-                } else {
-                    Kind::Method
-                },
-                params: params(ps, interner),
-                ret: classify_or(return_type.as_ref(), interner, Mapped::Void),
-                fallible: is_fallible(decorators, arena, interner),
-                capability: capability(decorators, arena, interner)?,
-            }),
+            } => {
+                let declared = throws(decorators, arena, interner)?;
+                out.push(Member {
+                    symbol: interner.resolve(*key).to_string(),
+                    kind: if modifiers.is_static {
+                        Kind::StaticMethod
+                    } else {
+                        Kind::Method
+                    },
+                    params: params(ps, interner),
+                    ret: classify_or(return_type.as_ref(), interner, Mapped::Void),
+                    fallible: !declared.is_empty(),
+                    throws: declared,
+                    capability: capability(decorators, arena, interner)?,
+                })
+            }
             ClassMember::Getter {
                 key,
                 return_type,
                 modifiers,
+                decorators,
                 ..
-            } => out.push(Member {
-                symbol: interner.resolve(*key).to_string(),
-                kind: if modifiers.is_static {
-                    Kind::StaticGetter
-                } else {
-                    Kind::Getter
-                },
-                params: Vec::new(),
-                ret: classify_or(return_type.as_ref(), interner, Mapped::Dynamic),
-                fallible: false,
-                capability: None,
-            }),
+            } => {
+                let declared = throws(decorators, arena, interner)?;
+                out.push(Member {
+                    symbol: interner.resolve(*key).to_string(),
+                    kind: if modifiers.is_static {
+                        Kind::StaticGetter
+                    } else {
+                        Kind::Getter
+                    },
+                    params: Vec::new(),
+                    ret: classify_or(return_type.as_ref(), interner, Mapped::Dynamic),
+                    fallible: !declared.is_empty(),
+                    throws: declared,
+                    capability: None,
+                })
+            }
             ClassMember::Property {
                 key,
                 type_ann,
                 init: None,
                 modifiers,
+                decorators,
                 ..
-            } => out.push(Member {
-                symbol: interner.resolve(*key).to_string(),
-                kind: if modifiers.is_static {
-                    Kind::StaticGetter
-                } else if modifiers.is_readonly {
-                    Kind::Getter
-                } else {
-                    Kind::Property
-                },
-                params: Vec::new(),
-                ret: classify_or(type_ann.as_ref(), interner, Mapped::Dynamic),
-                fallible: false,
-                capability: None,
-            }),
+            } => {
+                let declared = throws(decorators, arena, interner)?;
+                out.push(Member {
+                    symbol: interner.resolve(*key).to_string(),
+                    kind: if modifiers.is_static {
+                        Kind::StaticGetter
+                    } else if modifiers.is_readonly {
+                        Kind::Getter
+                    } else {
+                        Kind::Property
+                    },
+                    params: Vec::new(),
+                    ret: classify_or(type_ann.as_ref(), interner, Mapped::Dynamic),
+                    fallible: !declared.is_empty(),
+                    throws: declared,
+                    capability: None,
+                })
+            }
             ClassMember::Constructor { params: ps, .. } => out.push(Member {
                 symbol: ::varn_core::TokenKind::Constructor.as_str().to_string(),
                 kind: Kind::Constructor,
                 params: params(ps, interner),
                 ret: Mapped::Dynamic,
                 fallible: false,
+                throws: Vec::new(),
                 capability: None,
             }),
             ClassMember::Destructor { .. }
@@ -318,6 +361,7 @@ fn function_member(
         params: params(&f.params, interner),
         ret: classify_or(f.return_type.as_ref(), interner, Mapped::Void),
         fallible: false,
+        throws: Vec::new(),
         capability: capability(&f.decorators, arena, interner)?,
     })
 }

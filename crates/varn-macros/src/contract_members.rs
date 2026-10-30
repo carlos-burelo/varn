@@ -25,5 +25,7 @@ pub(crate) struct Member {
 
     pub(crate) fallible: bool,
 
+    pub(crate) throws: Vec<String>,
+
     pub(crate) capability: Option<String>,
 }

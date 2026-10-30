@@ -23,7 +23,7 @@ export declare class Sender<T = dynamic> {
 
 export declare class Receiver<T = dynamic> {
     receive(): TaskHandle<T>;
-    @fallible next(): TaskHandle<Option<T>>;
+    @throws(Error) next(): TaskHandle<Option<T>>;
     dispose(): void;
 }
 

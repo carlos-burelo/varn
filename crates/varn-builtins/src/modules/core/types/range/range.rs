@@ -8,11 +8,26 @@ fn get_range(ctx: &dyn NativeCtx, this: VmValue) -> Option<RangeData> {
     ctx.as_range(this)
 }
 
-fn elements(ctx: &mut dyn NativeCtx, r: &RangeData) -> Vec<VmValue> {
-    (0..r.len())
+const MAX_MATERIALIZED: u128 = 1 << 28;
+
+fn length_of(r: &RangeData) -> Result<i64, NativeError> {
+    r.len().ok_or_else(|| {
+        NativeError::integer_overflow(format!("integer overflow: the length of {r} does not fit int"))
+    })
+}
+
+fn elements(ctx: &mut dyn NativeCtx, r: &RangeData) -> Result<Vec<VmValue>, NativeError> {
+    if r.count() > MAX_MATERIALIZED {
+        return Err(NativeError::range_error(format!(
+            "{r} has {} elements, more than the {MAX_MATERIALIZED} that can be materialized",
+            r.count()
+        )));
+    }
+    let len = length_of(r)?;
+    Ok((0..len)
         .filter_map(|i| r.nth(i))
         .map(|raw| ctx.range_element(r, raw))
-        .collect()
+        .collect())
 }
 
 fn raw_of(ctx: &dyn NativeCtx, r: &RangeData, val: VmValue) -> Option<i64> {
@@ -43,8 +58,8 @@ varn_contract! {
         fn inclusive(ctx: &mut dyn NativeCtx, this: VmValue) -> bool {
             get_range(ctx, this).map(|r| r.inclusive).unwrap_or(false)
         }
-        fn length(ctx: &mut dyn NativeCtx, this: VmValue) -> i64 {
-            get_range(ctx, this).map(|r| r.len()).unwrap_or(0)
+        fn length(ctx: &mut dyn NativeCtx, this: VmValue) -> Result<i64, NativeError> {
+            get_range(ctx, this).map_or(Ok(0), |r| length_of(&r))
         }
         fn stride(ctx: &mut dyn NativeCtx, this: VmValue) -> i64 {
             get_range(ctx, this).map(|r| r.step).unwrap_or(1)
@@ -58,10 +73,10 @@ varn_contract! {
                 None => false,
             }
         }
-        fn toArray(ctx: &mut dyn NativeCtx, this: VmValue) -> Vec<VmValue> {
+        fn toArray(ctx: &mut dyn NativeCtx, this: VmValue) -> Result<Vec<VmValue>, NativeError> {
             match get_range(ctx, this) {
                 Some(r) => elements(ctx, &r),
-                None => Vec::new(),
+                None => Ok(Vec::new()),
             }
         }
         fn step(ctx: &mut dyn NativeCtx, this: VmValue, n: i64) -> Result<VmValue, NativeError> {
@@ -69,11 +84,14 @@ varn_contract! {
                 return Err(NativeError::range_error(format!("range step must be positive, got {n}")));
             }
             let r = get_range(ctx, this).ok_or_else(|| NativeError::type_error("range.step: not a range"))?;
-            Ok(ctx.alloc_range_data(r.with_step(r.step * n)))
+            let step = r.step.checked_mul(n).ok_or_else(|| {
+                NativeError::integer_overflow(format!("integer overflow: the step {} * {n} does not fit int", r.step))
+            })?;
+            Ok(ctx.alloc_range_data(r.with_step(step)))
         }
         fn forEach(ctx: &mut dyn NativeCtx, this: VmValue, callback: VmValue) -> Result<(), NativeError> {
             if let Some(r) = get_range(ctx, this) {
-                for item in elements(ctx, &r) {
+                for item in elements(ctx, &r)? {
                     ctx.call_vm(callback, &[item])?;
                 }
             }
@@ -83,7 +101,7 @@ varn_contract! {
             let Some(r) = get_range(ctx, this) else {
                 return Ok(Vec::new());
             };
-            elements(ctx, &r)
+            elements(ctx, &r)?
                 .into_iter()
                 .map(|item| ctx.call_vm(callback, &[item]))
                 .collect()

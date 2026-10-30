@@ -5,7 +5,7 @@ export declare class float {
     static MAX_VALUE: float;
     static MIN_VALUE: float;
     static EPSILON: float;
-    @fallible static parse(s: str): float;
+    @throws(ParseError) static parse(s: str): float;
     static tryParse(s: str): float?;
     isNaN(): bool;
     isFinite(): bool;
@@ -13,18 +13,18 @@ export declare class float {
 
     toString(): str;
     valueOf(): float;
-    @fallible toFixed(digits?: int): str;
+    @throws(RangeError) toFixed(digits?: int): str;
     abs(): float;
     sign(): float;
     negate(): float;
     min(other: float): float;
     max(other: float): float;
-    @fallible clamp(lo: float, hi: float): float;
+    @throws(RangeError) clamp(lo: float, hi: float): float;
     pow(exponent: float): float;
     isInteger(): bool;
     floor(): float;
     ceil(): float;
     round(): float;
     trunc(): float;
-    @fallible toInt(): int;
+    @throws(IntegerOverflow) toInt(): int;
 }

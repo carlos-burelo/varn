@@ -2,15 +2,15 @@ export declare class Range<T> {
     readonly start: T;
     readonly end: T;
     readonly inclusive: bool;
-    readonly length: int;
+    @throws(IntegerOverflow) get length(): int;
     readonly stride: int;
 
     toString(): str;
     contains(val: T): bool;
-    toArray(): T[];
-    @fallible step(n: int): Range<T>;
-    @fallible forEach(callback: (val: T) => void): void;
-    @fallible map<U>(callback: (val: T) => U): U[];
+    @throws(RangeError, IntegerOverflow) toArray(): T[];
+    @throws(RangeError, IntegerOverflow) step(n: int): Range<T>;
+    @throws(Error) forEach(callback: (val: T) => void): void;
+    @throws(Error) map<U>(callback: (val: T) => U): U[];
 
     static from(start: int, end: int): Range<int>;
     static fromInclusive(start: int, end: int): Range<int>;
