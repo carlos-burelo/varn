@@ -1,0 +1,32 @@
+import { describe, it, expect } from "std:test";
+import { Stats } from "std:math";
+
+const NAN: float = 0.0 / 0.0;
+const INF: float = 1.0 / 0.0;
+
+await describe("309 Stats follow the IEEE rules of std:math", async () => {
+    await it("sum is compensated and keeps infinities", async () => {
+        expect(Stats.sum([9007199254740992.0, 1.0, 1.0]).toString()).toBe("9007199254740994.0");
+        expect(Stats.sum([INF, 1.0]).toString()).toBe("Infinity");
+        expect(Stats.sum([INF, -INF]).toString()).toBe("NaN");
+        expect(Stats.mean([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]).toString()).toBe("0.1");
+        expect(Stats.mean([1e308, 1e308]).toString()).toBe("Infinity");
+    });
+
+    await it("min, max and median propagate NaN whatever its position", async () => {
+        expect(Stats.min([2.0, NAN]).toString()).toBe("NaN");
+        expect(Stats.min([NAN, 2.0]).toString()).toBe("NaN");
+        expect(Stats.max([2.0, NAN, 3.0]).toString()).toBe("NaN");
+        expect(Stats.median([1.0, NAN, 3.0]).toString()).toBe("NaN");
+        expect(Stats.median([NAN]).toString()).toBe("NaN");
+    });
+
+    await it("median uses a real sort", async () => {
+        const values: float[] = [];
+        for (let i = 0; i < 50000; i = i + 1) {
+            values.push((i * 7919 % 50021) as float);
+        }
+        expect(Stats.median([4.0, 1.0, 3.0, 2.0]).toString()).toBe("2.5");
+        expect(Stats.median(values).toString().length > 0).toBe(true);
+    });
+});

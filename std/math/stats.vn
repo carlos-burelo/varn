@@ -1,26 +1,26 @@
-import { sqrt } from "std:math/intrinsics";
+import { sqrt, abs, min as lesser, max as greater } from "std:math/intrinsics";
 
 function sortedCopy(values: float[]): float[] {
-    let out = values.slice();
-    for (let i = 1; i < out.length; i = i + 1) {
-        let key = out[i];
-        let j = i - 1;
-        while (j >= 0 && out[j] > key) {
-            out[j + 1] = out[j];
-            j = j - 1;
-        }
-        out[j + 1] = key;
-    }
-    return out;
+    return values.slice().sort((a: float, b: float): int => a < b ? -1 : a > b ? 1 : 0);
 }
 
 export namespace Stats {
     export function sum(values: float[]): float {
         let total = 0.0;
+        let lost = 0.0;
         for (let v of values) {
-            total = total + v;
+            const next = total + v;
+            if (abs(total) >= abs(v)) {
+                lost = lost + ((total - next) + v);
+            } else {
+                lost = lost + ((v - next) + total);
+            }
+            total = next;
         }
-        return total;
+        if (total - total !== 0.0) {
+            return total;
+        }
+        return total + lost;
     }
 
     export function mean(values: float[]): float {
@@ -36,9 +36,7 @@ export namespace Stats {
         }
         let best = values[0];
         for (let v of values) {
-            if (v < best) {
-                best = v;
-            }
+            best = lesser(best, v);
         }
         return best;
     }
@@ -49,9 +47,7 @@ export namespace Stats {
         }
         let best = values[0];
         for (let v of values) {
-            if (v > best) {
-                best = v;
-            }
+            best = greater(best, v);
         }
         return best;
     }
@@ -76,6 +72,11 @@ export namespace Stats {
     export function median(values: float[]): float {
         if (values.length === 0) {
             throw new RangeError("Stats.median requires at least one value");
+        }
+        for (let v of values) {
+            if (v !== v) {
+                return v;
+            }
         }
         let ordered = sortedCopy(values);
         let mid = ordered.length >> 1;
