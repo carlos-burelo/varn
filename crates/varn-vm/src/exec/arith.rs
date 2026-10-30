@@ -234,6 +234,11 @@ pub(crate) fn pow(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
     {
         return r;
     }
+    if let Some((x, y)) = decimal_pair(a, b, heap) {
+        return varn_core::numeric_big::pow_decimal(&x, &y)
+            .map(|r| heap.alloc_decimal(r))
+            .map_err(decimal_pow_fault);
+    }
     Ok(VmValue::from_f64(
         heap.to_f64_val(a).powf(heap.to_f64_val(b)),
     ))
@@ -284,6 +289,31 @@ fn shift_out_of_range(op: &str, a: i64, n: i64) -> RuntimeError {
     RuntimeError::range_error(format!(
         "{a} {op} {n}: the shift amount must be within 0..={SHIFT_MAX}"
     ))
+}
+
+#[cold]
+#[inline(never)]
+pub(crate) fn negative_exponent_big(exp: &num_bigint::BigInt) -> RuntimeError {
+    RuntimeError::range_error(format!(
+        "the exponent of a bigint power must not be negative, got {exp}"
+    ))
+}
+
+#[cold]
+#[inline(never)]
+fn decimal_pow_fault(fault: varn_core::numeric_big::DecimalPowFault) -> RuntimeError {
+    use varn_core::numeric_big::DecimalPowFault;
+    match fault {
+        DecimalPowFault::NonIntegral => {
+            RuntimeError::range_error("the exponent of a decimal power must be an integer")
+        }
+        DecimalPowFault::TooLarge => {
+            RuntimeError::range_error("the result of this decimal power would have too many digits")
+        }
+        DecimalPowFault::ZeroToNegative => {
+            RuntimeError::division_by_zero("zero cannot be raised to a negative power")
+        }
+    }
 }
 
 #[cold]

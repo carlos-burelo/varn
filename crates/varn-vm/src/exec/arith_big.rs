@@ -70,6 +70,30 @@ fn fault(f: varn_core::IntDivFault, op: &str) -> RuntimeError {
     }
 }
 
+const MAX_BITS: u64 = 1 << 30;
+
+fn unit_power(x: &BigInt, y: &BigInt) -> BigInt {
+    let one = BigInt::from(1);
+    if *x == one {
+        one
+    } else if x.sign() == num_bigint::Sign::NoSign {
+        if y.sign() == num_bigint::Sign::NoSign {
+            one
+        } else {
+            x.clone()
+        }
+    } else if y.bit(0) {
+        x.clone()
+    } else {
+        one
+    }
+}
+
+#[cold]
+fn too_large() -> RuntimeError {
+    RuntimeError::range_error(format!("a bigint cannot exceed {MAX_BITS} bits"))
+}
+
 #[cold]
 pub(crate) fn binary(
     op: BigOp,
@@ -85,16 +109,22 @@ pub(crate) fn binary(
     let r = match op {
         BigOp::Add => Ok(x + y),
         BigOp::Sub => Ok(x - y),
+        BigOp::Mul if x.bits() + y.bits() > MAX_BITS => Err(too_large()),
         BigOp::Mul => Ok(x * y),
         BigOp::Div => div_big(&x, &y).map_err(|f| fault(f, "/")),
         BigOp::Rem => rem_big(&x, &y).map_err(|f| fault(f, "%")),
         BigOp::Pow => {
             if y.is_negative() {
-                Err(RuntimeError::new("negative exponent in bigint power"))
+                Err(crate::exec::arith::negative_exponent_big(&y))
+            } else if x.bits() <= 1 {
+                Ok(unit_power(&x, &y))
             } else {
-                y.to_u32()
-                    .map(|e| num_traits::pow::Pow::pow(&x, e))
-                    .ok_or_else(|| RuntimeError::new("bigint exponent too large"))
+                match y.to_u32() {
+                    Some(e) if x.bits().saturating_mul(u64::from(e)) <= MAX_BITS => {
+                        Ok(num_traits::pow::Pow::pow(&x, e))
+                    }
+                    Some(_) | None => Err(too_large()),
+                }
             }
         }
     };

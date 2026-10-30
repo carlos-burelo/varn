@@ -1,7 +1,7 @@
 use crate::IntDivFault;
 use bigdecimal::{BigDecimal, RoundingMode};
 use num_bigint::BigInt;
-use num_traits::{Num, Zero};
+use num_traits::{Num, One, ToPrimitive, Zero};
 
 pub fn parse_bigint_literal(text: &str) -> Option<BigInt> {
     let clean: String = text.chars().filter(|c| *c != '_').collect();
@@ -50,6 +50,61 @@ pub fn rem_decimal(a: &BigDecimal, b: &BigDecimal) -> Result<BigDecimal, IntDivF
         return Err(IntDivFault::DivisionByZero);
     }
     Ok(a % b)
+}
+
+pub const DECIMAL_POW_MAX_DIGITS: u64 = 1 << 22;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DecimalPowFault {
+    NonIntegral,
+    TooLarge,
+    ZeroToNegative,
+}
+
+pub fn pow_decimal(base: &BigDecimal, exp: &BigDecimal) -> Result<BigDecimal, DecimalPowFault> {
+    if !exp.is_integer() {
+        return Err(DecimalPowFault::NonIntegral);
+    }
+    let e = exp.to_i64().ok_or(DecimalPowFault::TooLarge)?;
+    let one = BigDecimal::one();
+    if base.is_zero() {
+        return match e {
+            0 => Ok(one),
+            n if n > 0 => Ok(BigDecimal::zero()),
+            _ => Err(DecimalPowFault::ZeroToNegative),
+        };
+    }
+    let magnitude = e.unsigned_abs();
+    if *base == one || e == 0 {
+        return Ok(one);
+    }
+    if *base == -one.clone() {
+        return Ok(if magnitude % 2 == 0 {
+            one
+        } else {
+            base.clone()
+        });
+    }
+    if base.digits().saturating_mul(magnitude) > DECIMAL_POW_MAX_DIGITS {
+        return Err(DecimalPowFault::TooLarge);
+    }
+    let mut result = one.clone();
+    let mut square = base.clone();
+    let mut bits = magnitude;
+    while bits > 0 {
+        if bits & 1 == 1 {
+            result = &result * &square;
+        }
+        bits >>= 1;
+        if bits > 0 {
+            square = &square * &square;
+        }
+    }
+    if e < 0 {
+        div_decimal(&one, &result).map_err(|_| DecimalPowFault::ZeroToNegative)
+    } else {
+        Ok(result)
+    }
 }
 
 trait NormalizedIfExact {
