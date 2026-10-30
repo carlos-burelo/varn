@@ -1,7 +1,11 @@
 # ADR 0022: Modelo de errores de la std
 
 ## Estado
-En implementación (2026-10-30).
+Implementado (2026-10-30).
+
+`ChannelClosed` queda fuera de la taxonomía a propósito: es la señal de control
+del runtime de tareas (declarada en `runtime:task`, que no puede importar
+`std:error`), no un fallo de E/S. `AssertionError` pertenece a `std:test`.
 
 ## Contexto
 La std tenía dos modelos incompatibles. 90 sitios hacían
