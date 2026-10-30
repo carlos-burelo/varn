@@ -82,16 +82,15 @@ pub fn sample() -> Option<CpuFreq> {
             Err(_) => break,
         }
     }
-    if cur == 0 {
-        if let Ok(txt) = std::fs::read_to_string("/proc/cpuinfo") {
-            for line in txt.lines() {
-                if line.starts_with("cpu MHz") {
-                    if let Some(val) = line.split(':').nth(1) {
-                        if let Ok(f) = val.trim().parse::<f64>() {
-                            cur = cur.max(f as u32);
-                        }
-                    }
-                }
+    if cur == 0
+        && let Ok(txt) = std::fs::read_to_string("/proc/cpuinfo")
+    {
+        for line in txt.lines() {
+            if line.starts_with("cpu MHz")
+                && let Some(val) = line.split(':').nth(1)
+                && let Ok(f) = val.trim().parse::<f64>()
+            {
+                cur = cur.max(f as u32);
             }
         }
     }
