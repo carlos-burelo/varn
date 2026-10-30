@@ -175,8 +175,28 @@ export class DecodeError extends ParseError {
     }
 }
 
+export class SqlError extends StdError {
+    sql: str = "";
+
+    constructor(message: str, sql?: str, cause?: Error) {
+        super(message, cause);
+        this.name = "SqlError";
+        this.code = errorCode$("SqlError");
+        this.sql = sql ?? "";
+    }
+}
+
+export class SqlConstraintError extends SqlError {
+    constructor(message: str, sql?: str, cause?: Error) {
+        super(message, sql, cause);
+        this.name = "SqlConstraintError";
+        this.code = errorCode$("SqlConstraintError");
+    }
+}
+
 registerErrorClasses$([
     StdError, IoError, FsError, FsNotFoundError, FsPermissionError, FsExistsError,
     FsEncodingError, BadDescriptorError, ClosedError, NetError, ResolveError, ConnectError,
-    TlsError, ProtocolError, CapabilityError, TimeoutError, CancelledError, ParseError, DecodeError
+    TlsError, ProtocolError, CapabilityError, TimeoutError, CancelledError, ParseError, DecodeError,
+    SqlError, SqlConstraintError
 ]);
