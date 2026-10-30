@@ -4,6 +4,9 @@ import {
     readFdBytes$,
     readFdAll$,
     readFdAllBytes$,
+    readFdBytesAsync$,
+    readFdAllBytesAsync$,
+    writeFdBytesAsync$,
     writeFd$,
     writeFdBytes$,
     seek$,
@@ -161,7 +164,7 @@ export class FileStream implements AsyncReader, AsyncWriter {
     async read(size?: int): Task<Bytes?> {
         try {
             let readSize = size ?? 8192;
-            let b = readFdBytes$(this._fd, readSize);
+            let b = await readFdBytesAsync$(this._fd, readSize);
             if (b.length === 0) {
                 return null;
             }
@@ -173,7 +176,7 @@ export class FileStream implements AsyncReader, AsyncWriter {
 
     async write(data: Bytes): Task<int> {
         try {
-            return writeFdBytes$(this._fd, data);
+            return await writeFdBytesAsync$(this._fd, data);
         } catch (e) {
             throw toStdError(e as Error, E_FS_IO);
         }
@@ -181,7 +184,7 @@ export class FileStream implements AsyncReader, AsyncWriter {
 
     async readAll(): Task<Bytes> {
         try {
-            return readFdAllBytes$(this._fd);
+            return await readFdAllBytesAsync$(this._fd);
         } catch (e) {
             throw toStdError(e as Error, E_FS_IO);
         }
@@ -189,7 +192,7 @@ export class FileStream implements AsyncReader, AsyncWriter {
 
     async pumpTo(writer: AsyncWriter): Task<int> {
         try {
-            let data = readFdAllBytes$(this._fd);
+            let data = await readFdAllBytesAsync$(this._fd);
             if (data.length === 0) {
                 await writer.flush();
                 return 0;

@@ -1,31 +1,13 @@
-use rustc_hash::FxHashMap;
 use std::fs;
-use std::sync::atomic::{AtomicI64, Ordering};
-use std::sync::{Arc, LazyLock, Mutex, RwLock};
 use varn_macros::varn_contract;
-use varn_types::{NativeCtx, VmValue};
+use varn_types::value::SendValue;
+use varn_types::{HostOpen, NativeCtx, VmValue};
 
-static NEXT_FD: AtomicI64 = AtomicI64::new(1);
-static FILES: LazyLock<RwLock<FxHashMap<i64, Arc<Mutex<fs::File>>>>> =
-    LazyLock::new(|| RwLock::new(FxHashMap::default()));
+use crate::runtime::blocking;
 
-fn coded(code: &str, msg: impl std::fmt::Display) -> String {
-    format!("{code}|{msg}")
-}
-
-fn fs_io_err(e: std::io::Error) -> String {
-    let kind = e.kind();
-    let code = if kind == std::io::ErrorKind::NotFound {
-        "E_FS_NOT_FOUND"
-    } else if kind == std::io::ErrorKind::PermissionDenied {
-        "E_FS_DENIED"
-    } else if kind == std::io::ErrorKind::AlreadyExists {
-        "E_FS_EXISTS"
-    } else {
-        "E_FS_IO"
-    };
-    coded(code, e)
-}
+#[path = "descriptors.rs"]
+mod descriptors;
+use descriptors::{coded, fs_io_err};
 
 fn denied(action: &str, path: &str) -> String {
     coded(
@@ -76,61 +58,27 @@ varn_contract! {
                 FileMode::Append => OpenOptions::new().create(true).append(true).open(path),
             }.map_err(fs_io_err)?;
 
-            let fd = NEXT_FD.fetch_add(1, Ordering::Relaxed);
-            FILES.write().unwrap_or_else(|e| e.into_inner()).insert(fd, Arc::new(Mutex::new(file)));
-            Ok(fd)
+            Ok(descriptors::register(file))
         }
 
         fn readFd(_ctx: &mut dyn NativeCtx, fd: i64, len: i64) -> Result<String, String> {
-            let file_arc = {
-                let map = FILES.read().unwrap_or_else(|e| e.into_inner());
-                map.get(&fd).cloned().ok_or_else(|| coded("E_FS_BAD_FD", format!("invalid file descriptor {fd}")))?
-            };
-            let mut file = file_arc.lock().unwrap_or_else(|e| e.into_inner());
-
-            use std::io::Read;
-            let mut buf = vec![0u8; len as usize];
-            let bytes_read = file.read(&mut buf).map_err(fs_io_err)?;
-            buf.truncate(bytes_read);
+            let buf = descriptors::read_some(&descriptors::handle(fd)?, len)?;
             String::from_utf8(buf).map_err(|e| coded("E_FS_ENCODING", e))
         }
 
         fn readFdBytes(ctx: &mut dyn NativeCtx, fd: i64, len: i64) -> Result<VmValue, String> {
-            let file_arc = {
-                let map = FILES.read().unwrap_or_else(|e| e.into_inner());
-                map.get(&fd).cloned().ok_or_else(|| coded("E_FS_BAD_FD", format!("invalid file descriptor {fd}")))?
-            };
-            let mut file = file_arc.lock().unwrap_or_else(|e| e.into_inner());
-
-            use std::io::Read;
-            let mut buf = vec![0u8; len as usize];
-            let bytes_read = file.read(&mut buf).map_err(fs_io_err)?;
-            buf.truncate(bytes_read);
+            let buf = descriptors::read_some(&descriptors::handle(fd)?, len)?;
             Ok(ctx.alloc_buffer_from_bytes(&buf))
         }
 
         fn writeFd(_ctx: &mut dyn NativeCtx, fd: i64, data: &str) -> Result<i64, String> {
-            let file_arc = {
-                let map = FILES.read().unwrap_or_else(|e| e.into_inner());
-                map.get(&fd).cloned().ok_or_else(|| coded("E_FS_BAD_FD", format!("invalid file descriptor {fd}")))?
-            };
-            let mut file = file_arc.lock().unwrap_or_else(|e| e.into_inner());
-
-            use std::io::Write;
-            file.write_all(data.as_bytes()).map_err(fs_io_err)?;
+            descriptors::write_all(&descriptors::handle(fd)?, data.as_bytes())?;
             Ok(data.len() as i64)
         }
 
         fn writeFdBytes(ctx: &mut dyn NativeCtx, fd: i64, data: VmValue) -> Result<i64, String> {
-            let file_arc = {
-                let map = FILES.read().unwrap_or_else(|e| e.into_inner());
-                map.get(&fd).cloned().ok_or_else(|| coded("E_FS_BAD_FD", format!("invalid file descriptor {fd}")))?
-            };
-            let mut file = file_arc.lock().unwrap_or_else(|e| e.into_inner());
-
             let bytes = ctx.buffer_to_bytes(data).ok_or_else(|| coded("E_FS_BAD_ARG", "expected Bytes"))?;
-            use std::io::Write;
-            file.write_all(&bytes).map_err(fs_io_err)?;
+            descriptors::write_all(&descriptors::handle(fd)?, &bytes)?;
             Ok(bytes.len() as i64)
         }
 
@@ -153,10 +101,7 @@ varn_contract! {
         fn seek(ctx: &mut dyn NativeCtx, fd: i64, offset: i64, origin: VmValue) -> Result<i64, String> {
             let origin = SeekOrigin::from_value(ctx, origin)
                 .ok_or_else(|| coded("E_FS_BAD_ARG", "expected a SeekOrigin"))?;
-            let file_arc = {
-                let map = FILES.read().unwrap_or_else(|e| e.into_inner());
-                map.get(&fd).cloned().ok_or_else(|| coded("E_FS_BAD_FD", format!("invalid file descriptor {fd}")))?
-            };
+            let file_arc = descriptors::handle(fd)?;
             let mut file = file_arc.lock().unwrap_or_else(|e| e.into_inner());
 
             use std::io::{Seek, SeekFrom};
@@ -170,11 +115,7 @@ varn_contract! {
         }
 
         fn close(_ctx: &mut dyn NativeCtx, fd: i64) -> Result<(), String> {
-            if FILES.write().unwrap_or_else(|e| e.into_inner()).remove(&fd).is_some() {
-                Ok(())
-            } else {
-                Err(coded("E_FS_BAD_FD", format!("invalid file descriptor {fd}")))
-            }
+            descriptors::unregister(fd)
         }
 
         fn exists(ctx: &mut dyn NativeCtx, path: &str) -> Result<bool, String> {
@@ -307,27 +248,44 @@ varn_contract! {
         }
 
         fn readFdAll(_ctx: &mut dyn NativeCtx, fd: i64) -> Result<String, String> {
-            let file_arc = {
-                let map = FILES.read().unwrap_or_else(|e| e.into_inner());
-                map.get(&fd).cloned().ok_or_else(|| coded("E_FS_BAD_FD", format!("invalid file descriptor {fd}")))?
-            };
-            let mut file = file_arc.lock().unwrap_or_else(|e| e.into_inner());
-            use std::io::Read;
-            let mut buf = Vec::new();
-            file.read_to_end(&mut buf).map_err(fs_io_err)?;
+            let buf = descriptors::read_all(&descriptors::handle(fd)?)?;
             String::from_utf8(buf).map_err(|e| coded("E_FS_ENCODING", e))
         }
 
         fn readFdAllBytes(ctx: &mut dyn NativeCtx, fd: i64) -> Result<VmValue, String> {
-            let file_arc = {
-                let map = FILES.read().unwrap_or_else(|e| e.into_inner());
-                map.get(&fd).cloned().ok_or_else(|| coded("E_FS_BAD_FD", format!("invalid file descriptor {fd}")))?
-            };
-            let mut file = file_arc.lock().unwrap_or_else(|e| e.into_inner());
-            use std::io::Read;
-            let mut buf = Vec::new();
-            file.read_to_end(&mut buf).map_err(fs_io_err)?;
+            let buf = descriptors::read_all(&descriptors::handle(fd)?)?;
             Ok(ctx.alloc_buffer_from_bytes(&buf))
+        }
+
+        fn readFdBytesAsync(ctx: &mut dyn NativeCtx, fd: i64, len: i64) -> Result<VmValue, String> {
+            let file = descriptors::handle(fd)?;
+            let promise = blocking::run(move || {
+                descriptors::read_some(&file, len)
+                    .map(SendValue::Bytes)
+                    .map_err(blocking::failure)
+            });
+            Ok(ctx.task_from_host(promise, HostOpen::Plain))
+        }
+
+        fn readFdAllBytesAsync(ctx: &mut dyn NativeCtx, fd: i64) -> Result<VmValue, String> {
+            let file = descriptors::handle(fd)?;
+            let promise = blocking::run(move || {
+                descriptors::read_all(&file)
+                    .map(SendValue::Bytes)
+                    .map_err(blocking::failure)
+            });
+            Ok(ctx.task_from_host(promise, HostOpen::Plain))
+        }
+
+        fn writeFdBytesAsync(ctx: &mut dyn NativeCtx, fd: i64, data: VmValue) -> Result<VmValue, String> {
+            let file = descriptors::handle(fd)?;
+            let bytes = ctx.buffer_to_bytes(data).ok_or_else(|| coded("E_FS_BAD_ARG", "expected Bytes"))?;
+            let promise = blocking::run(move || {
+                descriptors::write_all(&file, &bytes)
+                    .map(|()| SendValue::Int(bytes.len() as i64))
+                    .map_err(blocking::failure)
+            });
+            Ok(ctx.task_from_host(promise, HostOpen::Plain))
         }
 
         fn tempDir(_ctx: &mut dyn NativeCtx) -> Result<String, String> {
