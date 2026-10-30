@@ -49,35 +49,38 @@ impl RangeData {
         }
     }
 
-    pub fn end_exclusive(&self) -> i64 {
-        if self.inclusive {
-            self.end.saturating_add(1)
-        } else {
-            self.end
-        }
+    fn span(&self) -> i128 {
+        i128::from(self.end) + i128::from(self.inclusive) - i128::from(self.start)
     }
 
-    pub fn len(&self) -> i64 {
-        let span = self.end_exclusive() - self.start;
+    pub fn count(&self) -> u128 {
+        let span = self.span();
         if span <= 0 {
             0
         } else {
-            (span + self.step - 1) / self.step
+            let step = i128::from(self.step);
+            ((span + step - 1) / step) as u128
         }
     }
 
+    pub fn len(&self) -> Option<i64> {
+        i64::try_from(self.count()).ok()
+    }
+
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.count() == 0
     }
 
     pub fn nth(&self, i: i64) -> Option<i64> {
-        (0..self.len())
-            .contains(&i)
-            .then(|| self.start + i * self.step)
+        let index = u128::try_from(i)
+            .ok()
+            .filter(|index| *index < self.count())?;
+        i64::try_from(i128::from(self.start) + index as i128 * i128::from(self.step)).ok()
     }
 
     pub fn contains(&self, raw: i64) -> bool {
-        raw >= self.start && raw < self.end_exclusive() && (raw - self.start) % self.step == 0
+        let offset = i128::from(raw) - i128::from(self.start);
+        offset >= 0 && offset < self.span() && offset % i128::from(self.step) == 0
     }
 
     pub fn char_of(raw: i64) -> char {

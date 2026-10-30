@@ -231,7 +231,10 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
                         heap.alloc_char(varn_types::value::RangeData::char_of(raw))
                     }
                 }),
-                None => Err(RuntimeError::out_of_range(at, r.len() as usize)),
+                None => Err(RuntimeError::out_of_range(
+                    at,
+                    usize::try_from(r.count()).unwrap_or(usize::MAX),
+                )),
             }
         }
         Some(HeapObj::Map(m)) => {

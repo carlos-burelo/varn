@@ -234,7 +234,7 @@ pub(super) fn resolve_own_data_property(obj: VmValue, key: &str, heap: &Heap) ->
             } else if int_bounds && key == MemberKey::End.as_str() {
                 Some(VmValue::from_int(r.end))
             } else if key == MemberKey::Length.as_str() {
-                Some(VmValue::from_int(r.len()))
+                r.len().map(VmValue::from_int)
             } else {
                 None
             }
