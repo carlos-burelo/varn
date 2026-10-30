@@ -1,5 +1,6 @@
 import { tcpListen$, tcpListenTls$, tcpAccept$, tcpWrite$, tcpClose$, tcpCloseListener$, sendHttpResponse$, httpMethodName$, HttpMethod } from "runtime:net";
-import { spawn } from "std:task";
+import { spawn, Task } from "std:task";
+import { TimeoutError } from "std:error";
 
 import { Request, Response, RawRequest, readHttpRequest, HttpRejection, Route, Handler, Middleware } from "std:http/core";
 import { AsyncReader } from "std:io";
@@ -28,6 +29,7 @@ export class HttpServer {
     private _middlewares: Middleware[] = [];
     private _fetchHandler: Handler? = null;
     private _maxContentLength: int = 10485760;
+    private _readTimeoutMs: int = 30000;
 
     constructor(fetchHandler?: Handler) {
         this._staticRoutes = {};
@@ -44,6 +46,11 @@ export class HttpServer {
 
     maxContentLength(limitBytes: int): HttpServer {
         this._maxContentLength = limitBytes;
+        return this;
+    }
+
+    readTimeout(ms: int): HttpServer {
+        this._readTimeoutMs = ms;
         return this;
     }
 
@@ -289,7 +296,11 @@ export class HttpServer {
         while (keepAlive) {
             let rawReq: RawRequest? = null;
             try {
-                rawReq = await readHttpRequest(wire, this._maxContentLength);
+                rawReq = await Task.timeout(readHttpRequest(wire, this._maxContentLength), this._readTimeoutMs);
+            } catch (err: TimeoutError) {
+                let errHeaders: { [key: str]: str } = { "Content-Type": "text/plain", "Connection": "close" };
+                await this._sendBestEffort(connId, 408, "Request Timeout", errHeaders, "Request Timeout");
+                break;
             } catch (err: HttpRejection) {
                 let errHeaders: { [key: str]: str } = { "Content-Type": "text/plain", "Connection": "close" };
                 await this._sendBestEffort(connId, err.status, err.reason, errHeaders, err.reason);

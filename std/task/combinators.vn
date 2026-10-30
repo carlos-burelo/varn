@@ -1,4 +1,5 @@
 import { spawn$, sleep$, parallel$, cancelTask$, yieldTask$, channel$, Channel } from "runtime:task";
+import { TimeoutError } from "std:error";
 
 export function parallel<T>(tasks: Array<Task<T>>): TaskHandle<Array<T>> {
     return parallel$(tasks);
@@ -32,6 +33,16 @@ async function raceOneHandle<T>(handle: TaskHandle<T>, ch: Channel<Result<T, Err
     }
 }
 
+class Deadline {
+    expired: bool = false;
+}
+
+async function expire<T>(deadline: Deadline, target: TaskHandle<T>, ms: int): Task<void> {
+    await sleep$(ms);
+    deadline.expired = true;
+    cancelTask$(target);
+}
+
 export namespace Task {
     export async function yield(): Task<void> {
         await yieldTask$();
@@ -47,6 +58,22 @@ export namespace Task {
             wrappedTasks.push(wrapSettledOne(tasks[i]));
         }
         return await parallel$(wrappedTasks);
+    }
+
+    export async function timeout<T>(task: Task<T>, ms: int): Task<T> {
+        const deadline = new Deadline();
+        const target = spawn$(task);
+        const timer = spawn$(expire(deadline, target, ms));
+        try {
+            return await target;
+        } catch (err) {
+            if (deadline.expired) {
+                throw new TimeoutError(`timed out after ${ms}ms`);
+            }
+            throw err;
+        } finally {
+            cancelTask$(timer);
+        }
     }
 
     export async function race<T>(tasks: Array<Task<T>>): Task<T> {

@@ -1,0 +1,53 @@
+import { describe, it, expect } from "std:test";
+import { Task, delay } from "std:task";
+import { TcpStream } from "std:net";
+import { HttpServer, Request, Response } from "std:http";
+import { TimeoutError } from "std:error";
+
+async function slow(): Task<int> {
+    await delay(500);
+    return 1;
+}
+
+async function fast(): Task<int> {
+    await delay(5);
+    return 7;
+}
+
+await describe("299 timeouts", async () => {
+    await it("Task.timeout returns the value of a task that finishes in time", async () => {
+        expect(await Task.timeout(fast(), 1000)).toBe(7);
+    });
+
+    await it("Task.timeout throws TimeoutError when the task is too slow", async () => {
+        let code = "";
+        try {
+            await Task.timeout(slow(), 30);
+        } catch (e: TimeoutError) {
+            code = e.code;
+        }
+        expect(code).toBe("timeout");
+    });
+
+    await it("the server answers 408 and closes a connection that never finishes its request", async () => {
+        const server = new HttpServer();
+        server.readTimeout(100);
+        server.get("/hello", async (req: Request) => new Response("hello", 200, {}));
+        server.listen(18931);
+        await delay(150);
+
+        const client = await TcpStream.connect("127.0.0.1", 18931, 1);
+        await client.write(Bytes.fromString("GET /hello HTTP/1.1\r\nHost: x\r\n"));
+        let reply = "";
+        while (true) {
+            const chunk = await client.read(8192);
+            if (chunk === null) {
+                break;
+            }
+            reply = reply + (chunk as Bytes).toString();
+        }
+        client.close();
+        server.close();
+        expect(reply.startsWith("HTTP/1.1 408")).toBeTruthy();
+    });
+});
