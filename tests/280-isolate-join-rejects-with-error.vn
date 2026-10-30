@@ -1,0 +1,17 @@
+import { describe, it, expect } from "std:test";
+import { spawnIsolate, channel } from "std:task";
+import { workerThrows } from "./helpers/isolate-workers.vn";
+
+await describe("280 isolate join rejects with the worker error", async () => {
+    await it("join carries the thrown message", async () => {
+        const out = channel<int>(1)
+        const handle = await spawnIsolate(workerThrows, [out.tx])
+        let message = ""
+        try {
+            await handle.join()
+        } catch (e) {
+            message = e.message
+        }
+        expect(message).toBe("worker-failed")
+    });
+});

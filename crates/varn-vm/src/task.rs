@@ -395,11 +395,11 @@ pub(crate) fn outcome_of_cell(cell: &TaskCell) -> Outcome {
     outcome_of(cell)
 }
 
-fn rejection_text(heap: &HeapInner, thrown: VmValue) -> String {
-    if let Some(inst) = thrown
-        .is_heap()
-        .then(|| heap.instance(thrown.as_heap()))
-        .flatten()
+pub(crate) fn error_parts(heap: &HeapInner, thrown: VmValue) -> Option<(String, String)> {
+    if !thrown.is_heap() {
+        return None;
+    }
+    if let Some(inst) = heap.instance(thrown.as_heap())
         && let Some(class) = ClassObj::find_by_id(inst.class_id)
     {
         let message = class
@@ -410,7 +410,22 @@ fn rejection_text(heap: &HeapInner, thrown: VmValue) -> String {
             .and_then(|f| inst.read_field(f))
             .map(|m| heap.str_repr(m))
             .unwrap_or_default();
-        return format!("{}: {message}", class.name);
+        return Some((class.name.to_string(), message));
     }
-    heap.str_repr(thrown)
+    let entries = crate::exec::value_views::object_entries(heap, thrown)?;
+    let field = |name: &str| {
+        entries
+            .iter()
+            .find(|(key, _)| key == name)
+            .map(|(_, value)| heap.str_repr(*value))
+    };
+    let message = field("message")?;
+    Some((field("name").unwrap_or_else(|| "Error".to_owned()), message))
+}
+
+fn rejection_text(heap: &HeapInner, thrown: VmValue) -> String {
+    match error_parts(heap, thrown) {
+        Some((class, message)) => format!("{class}: {message}"),
+        None => heap.str_repr(thrown),
+    }
 }

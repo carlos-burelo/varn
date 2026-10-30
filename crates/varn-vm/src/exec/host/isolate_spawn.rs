@@ -113,8 +113,18 @@ pub(super) fn spawn_isolate(
                     if let Some(lazy) = lazy {
                         let cell = machine.ctx.run_lazy_task_sync(lazy);
                         if cell.status() == crate::task::Status::Rejected {
-                            let reason = machine.ctx.str_repr(cell.value());
-                            done_t.reject(worker_error(&reason));
+                            let thrown = cell.value();
+                            let (class, message) = crate::task::error_parts(
+                                &machine.ctx.heap,
+                                thrown,
+                            )
+                            .unwrap_or_else(|| {
+                                (
+                                    varn_core::RuntimeErrorKind::Error.class_name().to_string(),
+                                    machine.ctx.str_repr(thrown),
+                                )
+                            });
+                            done_t.reject(varn_types::value::SendValue::Error { class, message });
                             return;
                         }
                     }
