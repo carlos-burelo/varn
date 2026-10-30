@@ -1,0 +1,77 @@
+import { describe, it, expect } from "std:test";
+import { Math, max, min, sign } from "std:math";
+
+const BASE: int[] = [-1, 1, 0, 2, -2];
+const EXPS: int[] = [0, 1, 2, 3, 2147483648, 4294967296, 4294967297, 9007199254740992, 9007199254740993, 4611686018427387904, 9223372036854775807];
+const FL: float[] = [0.0, 1.0, -0.0, 2.0];
+
+function kind(f: () => int): str {
+    try { return f().toString(); } catch (e) {
+        return e instanceof RangeError ? "range" : e instanceof IntegerOverflow ? "overflow" : "other:" + e.name;
+    }
+}
+
+function floatKind(v: float): str { return v.toString(); }
+
+await describe("303 power, shifts and float extremes", async () => {
+    await it("an integer power uses the whole exponent, not its low 32 bits", async () => {
+        const minusOne = BASE[0];
+        expect(kind(() => minusOne ** EXPS[4])).toBe("1");
+        expect(kind(() => minusOne ** EXPS[5])).toBe("1");
+        expect(kind(() => minusOne ** EXPS[6])).toBe("-1");
+        expect(kind(() => minusOne ** EXPS[7])).toBe("1");
+        expect(kind(() => minusOne ** EXPS[8])).toBe("-1");
+        expect(kind(() => minusOne ** EXPS[9])).toBe("1");
+        expect(kind(() => minusOne ** EXPS[10])).toBe("-1");
+        expect(kind(() => BASE[1] ** EXPS[10])).toBe("1");
+        expect(kind(() => BASE[2] ** EXPS[10])).toBe("0");
+        expect(kind(() => BASE[2] ** EXPS[0])).toBe("1");
+    });
+
+    await it("a power that does not fit int overflows instead of wrapping", async () => {
+        expect(kind(() => BASE[3] ** EXPS[5])).toBe("overflow");
+        expect(kind(() => BASE[3] ** EXPS[10])).toBe("overflow");
+        expect(kind(() => BASE[4] ** EXPS[6])).toBe("overflow");
+    });
+
+    await it("a negative exponent is a RangeError", async () => {
+        const negative = -BASE[3];
+        expect(kind(() => BASE[3] ** negative)).toBe("range");
+    });
+
+    await it("a shift amount outside 0..=63 is a RangeError", async () => {
+        const sixtyFour = 64;
+        const negative = -1;
+        expect(kind(() => BASE[1] << sixtyFour)).toBe("range");
+        expect(kind(() => BASE[1] >> negative)).toBe("range");
+        expect(kind(() => BASE[1] >>> sixtyFour)).toBe("range");
+        expect(kind(() => BASE[1] << 63)).toBe("-9223372036854775808");
+    });
+
+    await it("max and min propagate NaN whatever the argument order", async () => {
+        const nan = FL[0] / FL[0];
+        expect(floatKind(max(nan, FL[1]))).toBe("NaN");
+        expect(floatKind(max(FL[1], nan))).toBe("NaN");
+        expect(floatKind(max(FL[1], FL[3], nan))).toBe("NaN");
+        expect(floatKind(min(nan, FL[1]))).toBe("NaN");
+        expect(floatKind(min(FL[1], nan))).toBe("NaN");
+    });
+
+    await it("max and min order the two zeros", async () => {
+        expect(floatKind(max(FL[2], FL[0]))).toBe("0.0");
+        expect(floatKind(max(FL[0], FL[2]))).toBe("0.0");
+        expect(floatKind(min(FL[2], FL[0]))).toBe("-0.0");
+        expect(floatKind(min(FL[0], FL[2]))).toBe("-0.0");
+    });
+
+    await it("the Math statics and the module functions agree", async () => {
+        const nan = FL[0] / FL[0];
+        expect(floatKind(Math.max(nan, FL[1]))).toBe(floatKind(max(nan, FL[1])));
+        expect(floatKind(Math.max(FL[2], FL[0]))).toBe(floatKind(max(FL[2], FL[0])));
+        expect(floatKind(Math.min(FL[0], FL[2]))).toBe(floatKind(min(FL[0], FL[2])));
+        expect(floatKind(Math.sign(nan))).toBe("NaN");
+        expect(floatKind(sign(nan))).toBe("NaN");
+        expect(floatKind(sign(FL[2]))).toBe("-0.0");
+        expect(floatKind(Math.sign(-FL[3]))).toBe("-1.0");
+    });
+});

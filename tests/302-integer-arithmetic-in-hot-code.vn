@@ -1,0 +1,133 @@
+import { describe, it, expect } from "std:test";
+function outcome(f: () => int): str {
+    try { return f().toString(); } catch (e) { return e.message.indexOf("shift") !== null ? "range" : e.message.indexOf("overflow") !== null ? "overflow" : "other:" + e.message; }
+}
+function hot(f: () => int): str {
+    let last = "";
+    for (let i = 0; i < 3; i = i + 1) { last = outcome(f); }
+    return last;
+}
+function factorial(n: int): int {
+    let r = 1;
+    for (let i = 2; i <= n; i = i + 1) { r = r * i; }
+    return r;
+}
+function fibo(n: int): int {
+    let a = 0; let b = 1;
+    for (let i = 0; i < n; i = i + 1) { const t = a + b; a = b; b = t; }
+    return a;
+}
+function sumSquares(n: int): int {
+    let s = 0;
+    for (let i = 0; i <= n; i = i + 1) { s = s + i * i; }
+    return s;
+}
+function countFromMax(start: int, steps: int): int {
+    let i = start; let n = 0;
+    while (n < steps) { i = i + 1; n = n + 1; }
+    return i;
+}
+function inclusiveToMax(): int {
+    let n = 0;
+    for (let i = 9223372036854775805; i <= 9223372036854775807; i = i + 1) { n = n + 1; }
+    return n;
+}
+function countDown(start: int, steps: int): int {
+    let i = start; let n = 0;
+    while (n < steps) { i = i - 1; n = n + 1; }
+    return i;
+}
+function doubling(times: int): int {
+    const a: int[] = [1];
+    for (let i = 0; i < times; i = i + 1) { a[0] = a[0] * 2; }
+    return a[0];
+}
+function arraySum(k: int): int {
+    const a: int[] = [4611686018427387904, 4611686018427387903, 1];
+    let s = 0;
+    for (let i = 0; i < k; i = i + 1) { s = s + a[i]; }
+    return s;
+}
+function plusEquals(times: int): int {
+    const a: int[] = [9223372036854775800];
+    for (let i = 0; i < times; i = i + 1) { a[0] += 3; }
+    return a[0];
+}
+class Counter {
+    x: int = 9223372036854775805;
+    bump(times: int): int {
+        for (let i = 0; i < times; i = i + 1) { this.x += 1; }
+        return this.x;
+    }
+}
+function fieldBump(times: int): int { return new Counter().bump(times); }
+function makeCounter(start: int): () => int {
+    let c = start;
+    return (): int => { c += 1; return c; };
+}
+function viaClosure(times: int): int {
+    const next = makeCounter(9223372036854775805);
+    let last = 0;
+    for (let i = 0; i < times; i = i + 1) { last = next(); }
+    return last;
+}
+function postfix(times: int): int {
+    let i = 9223372036854775805;
+    for (let k = 0; k < times; k++) { i++; }
+    return i;
+}
+function truncSum(n: int): int {
+    let s = 0;
+    for (let i = 0; i < n; i = i + 1) { s = s + (-i) / 3 + (-i) % 3; }
+    return s;
+}
+function shiftSum(): int {
+    let s = 0;
+    for (let i = 0; i < 63; i = i + 1) { s = s + (1 << i); }
+    return s;
+}
+function shiftBy(n: int): int {
+    let s = 0;
+    for (let i = 0; i <= n; i = i + 1) { s = s ^ (1 << i); }
+    return s;
+}
+function nested(n: int): int {
+    let s = 0;
+    for (let i = 1; i <= n; i = i + 1) { for (let j = 1; j <= n; j = j + 1) { s = s + i * j; } }
+    return s;
+}
+function absDiff(a: int, b: int): int { return a > b ? a - b : b - a; }
+function absDiffHot(): int { let s = 0; for (let i = 0; i < 1000; i = i + 1) { s = s + absDiff(i, 1000 - i); } return s; }
+await describe("302 integer arithmetic in hot code", async () => {
+    await it("factorial 20", async () => { expect(hot(() => factorial(20))).toBe("2432902008176640000"); });
+    await it("factorial 21", async () => { expect(hot(() => factorial(21))).toBe("overflow"); });
+    await it("fib 91", async () => { expect(hot(() => fibo(91))).toBe("4660046610375530309"); });
+    await it("fib 92 overflows computing the next term", async () => { expect(hot(() => fibo(92))).toBe("overflow"); });
+    await it("sumsq fits", async () => { expect(hot(() => sumSquares(2000000))).toBe("2666668666667000000"); });
+    await it("sumsq overflows", async () => { expect(hot(() => sumSquares(3100000))).toBe("overflow"); });
+    await it("count to max", async () => { expect(hot(() => countFromMax(9223372036854775805, 2))).toBe("9223372036854775807"); });
+    await it("count past max", async () => { expect(hot(() => countFromMax(9223372036854775805, 3))).toBe("overflow"); });
+    await it("for until max inclusive", async () => { expect(hot(() => inclusiveToMax())).toBe("overflow"); });
+    await it("down past min", async () => { expect(hot(() => countDown(-9223372036854775806, 2))).toBe("-9223372036854775808"); });
+    await it("down past min 3", async () => { expect(hot(() => countDown(-9223372036854775806, 3))).toBe("overflow"); });
+    await it("array doubling 62", async () => { expect(hot(() => doubling(62))).toBe("4611686018427387904"); });
+    await it("array doubling 63", async () => { expect(hot(() => doubling(63))).toBe("overflow"); });
+    await it("array sum", async () => { expect(hot(() => arraySum(2))).toBe("9223372036854775807"); });
+    await it("array sum overflow", async () => { expect(hot(() => arraySum(3))).toBe("overflow"); });
+    await it("compound on array element", async () => { expect(hot(() => plusEquals(2))).toBe("9223372036854775806"); });
+    await it("compound on array element overflow", async () => { expect(hot(() => plusEquals(3))).toBe("overflow"); });
+    await it("field increment", async () => { expect(hot(() => fieldBump(2))).toBe("9223372036854775807"); });
+    await it("field increment overflow", async () => { expect(hot(() => fieldBump(3))).toBe("overflow"); });
+    await it("closure upvalue", async () => { expect(hot(() => viaClosure(2))).toBe("9223372036854775807"); });
+    await it("closure upvalue overflow", async () => { expect(hot(() => viaClosure(3))).toBe("overflow"); });
+    await it("postfix on local", async () => { expect(hot(() => postfix(2))).toBe("9223372036854775807"); });
+    await it("postfix overflow", async () => { expect(hot(() => postfix(3))).toBe("overflow"); });
+    await it("negative division loop", async () => { expect(hot(() => truncSum(100))).toBe("-1716"); });
+    await it("shift sum", async () => { expect(hot(() => shiftSum())).toBe("9223372036854775807"); });
+    await it("shift by variable out of range", async () => { expect(hot(() => shiftBy(63))).toBe("-1"); });
+    await it("shift by variable too far", async () => { expect(hot(() => shiftBy(64))).toBe("range"); });
+    await it("multiply in nested loop", async () => { expect(hot(() => nested(2000))).toBe("4004001000000"); });
+    await it("abs diff", async () => { expect(hot(() => absDiffHot())).toBe("500000"); });
+    await it("abs diff overflow", async () => { expect(hot(() => absDiff(9223372036854775807, -1))).toBe("overflow"); });
+    await it("min minus one", async () => { expect(hot(() => absDiff(-9223372036854775807 - 1, 1))).toBe("overflow"); });
+});
