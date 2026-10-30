@@ -20,3 +20,6 @@ export declare function log2$(x: float): float;
 export declare function pow$(x: float, y: float): float;
 export declare function cbrt$(x: float): float;
 export declare function hypot$(x: float, y: float): float;
+export declare function max2$(x: float, y: float): float;
+export declare function min2$(x: float, y: float): float;
+export declare function sign$(x: float): float;

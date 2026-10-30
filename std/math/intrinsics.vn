@@ -18,7 +18,10 @@ import {
     log2$,
     pow$,
     cbrt$,
-    hypot$
+    hypot$,
+    max2$,
+    min2$,
+    sign$
 } from "runtime:math";
 
 export function abs(x: float): float {
@@ -105,9 +108,7 @@ export function max(first: float, ...rest: float[]): float {
     let current = first;
     for (let i = 0; i < rest.length; i = i + 1) {
         let v = rest[i];
-        if (v > current) {
-            current = v;
-        }
+        current = max2$(current, v);
     }
     return current;
 }
@@ -116,17 +117,13 @@ export function min(first: float, ...rest: float[]): float {
     let current = first;
     for (let i = 0; i < rest.length; i = i + 1) {
         let v = rest[i];
-        if (v < current) {
-            current = v;
-        }
+        current = min2$(current, v);
     }
     return current;
 }
 
 export function sign(x: float): float {
-    if (x > 0.0) return 1.0;
-    if (x < 0.0) return -1.0;
-    return 0.0;
+    return sign$(x);
 }
 
 export function trunc(x: float): float {

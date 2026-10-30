@@ -18,8 +18,10 @@ import {
     log2$,
     pow$,
     cbrt$,
-    hypot$
+    hypot$,
+    sign$
 } from "runtime:math";
+import { min, max, trunc } from "std:math/intrinsics";
 
 export class Math {
     static E: float = 2.718281828459045;
@@ -51,35 +53,8 @@ export class Math {
     static asin(x: float): float { return asin$(x); }
     static atan(x: float): float { return atan$(x); }
     static atan2(y: float, x: float): float { return atan2$(y, x); }
-    static sign(x: float): float {
-        if (x > 0.0) return 1.0;
-        if (x < 0.0) return -1.0;
-        return 0.0;
-    }
-    static trunc(x: float): float {
-        if (x >= 0.0) {
-            return floor$(x);
-        }
-        return ceil$(x);
-    }
-    static min(first: float, ...rest: float[]): float {
-        let current = first;
-        for (let i = 0; i < rest.length; i = i + 1) {
-            let v = rest[i];
-            if (v < current) {
-                current = v;
-            }
-        }
-        return current;
-    }
-    static max(first: float, ...rest: float[]): float {
-        let current = first;
-        for (let i = 0; i < rest.length; i = i + 1) {
-            let v = rest[i];
-            if (v > current) {
-                current = v;
-            }
-        }
-        return current;
-    }
+    static sign(x: float): float { return sign$(x); }
+    static trunc(x: float): float { return trunc(x); }
+    static min(first: float, ...rest: float[]): float { return min(first, ...rest); }
+    static max(first: float, ...rest: float[]): float { return max(first, ...rest); }
 }

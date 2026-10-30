@@ -1,38 +1,33 @@
-use crate::error::VmResult;
+use crate::error::{RuntimeError, VmResult};
 use crate::value::VmValue;
 use varn_core::intrinsic_ops::math::MathOp;
+use varn_core::{fmax, fmin};
 
 pub(crate) fn dispatch(op: u8, args: &[VmValue]) -> VmResult<VmValue> {
+    let op = MathOp::of_wire(op)
+        .ok_or_else(|| RuntimeError::new(format!("unknown math intrinsic {op:#x}")))?;
     let Some(arg1) = args.get(1) else {
-        return Ok(VmValue::null());
+        return Err(RuntimeError::type_error(format!(
+            "{} needs an operand",
+            op.name()
+        )));
     };
     let x = arg1.to_f64();
+    let rest = args.get(2..).unwrap_or(&[]);
     let result = match op {
-        v if v == MathOp::Abs as u8 => x.abs(),
-        v if v == MathOp::Sqrt as u8 => x.sqrt(),
-        v if v == MathOp::Floor as u8 => x.floor(),
-        v if v == MathOp::Ceil as u8 => x.ceil(),
-        v if v == MathOp::Round as u8 => x.round(),
-        v if v == MathOp::Sin as u8 => x.sin(),
-        v if v == MathOp::Cos as u8 => x.cos(),
-        v if v == MathOp::Tan as u8 => x.tan(),
-        v if v == MathOp::Log as u8 => x.ln(),
-        v if v == MathOp::Exp as u8 => x.exp(),
-        v if v == MathOp::Pow as u8 => {
-            let y = args.get(2).map(|v| v.to_f64()).unwrap_or(1.0);
-            x.powf(y)
-        }
-        v if v == MathOp::Min as u8 => args[2..].iter().fold(x, |acc, v| acc.min(v.to_f64())),
-        v if v == MathOp::Max as u8 => args[2..].iter().fold(x, |acc, v| acc.max(v.to_f64())),
-        _ => return Ok(VmValue::null()),
+        MathOp::Abs => x.abs(),
+        MathOp::Sqrt => x.sqrt(),
+        MathOp::Floor => x.floor(),
+        MathOp::Ceil => x.ceil(),
+        MathOp::Round => x.round(),
+        MathOp::Sin => x.sin(),
+        MathOp::Cos => x.cos(),
+        MathOp::Tan => x.tan(),
+        MathOp::Log => x.ln(),
+        MathOp::Exp => x.exp(),
+        MathOp::Pow => x.powf(rest.first().map_or(1.0, |v| v.to_f64())),
+        MathOp::Min => rest.iter().fold(x, |acc, v| fmin(acc, v.to_f64())),
+        MathOp::Max => rest.iter().fold(x, |acc, v| fmax(acc, v.to_f64())),
     };
-    if arg1.is_int()
-        && result.fract() == 0.0
-        && result >= i64::MIN as f64
-        && result <= i64::MAX as f64
-    {
-        Ok(VmValue::from_int(result as i64))
-    } else {
-        Ok(VmValue::from_f64(result))
-    }
+    Ok(VmValue::from_f64(result))
 }

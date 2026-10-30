@@ -30,5 +30,8 @@ varn_contract! {
         fn pow(_ctx: &mut dyn NativeCtx, x: f64, y: f64) -> Result<f64, NativeError> { Ok(x.powf(y)) }
         fn cbrt(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, NativeError> { Ok(x.cbrt()) }
         fn hypot(_ctx: &mut dyn NativeCtx, x: f64, y: f64) -> Result<f64, NativeError> { Ok(x.hypot(y)) }
+        fn max2(_ctx: &mut dyn NativeCtx, x: f64, y: f64) -> Result<f64, NativeError> { Ok(varn_core::fmax(x, y)) }
+        fn min2(_ctx: &mut dyn NativeCtx, x: f64, y: f64) -> Result<f64, NativeError> { Ok(varn_core::fmin(x, y)) }
+        fn sign(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, NativeError> { Ok(varn_core::fsign(x)) }
     }
 }

@@ -60,6 +60,10 @@ impl MathOp {
     pub fn of(name: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|op| op.name() == name)
     }
+
+    pub fn of_wire(wire: u8) -> Option<Self> {
+        Self::ALL.into_iter().find(|op| op.wire() == wire)
+    }
 }
 
 pub fn is_unary_math(wire_byte: u8) -> bool {
