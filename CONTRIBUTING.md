@@ -111,7 +111,7 @@ Para simplificar la validación y asegurar cero roturas antes de hacer commit/pu
 
 - **Cross-check sin Docker**:
   ```powershell
-  .\scriptserify-ci-local.ps1   # cfg(unix/macos) vía `cargo check --target` + finales de línea CRLF/LF
+  .\scripts\verify-ci-local.ps1   # cfg(unix/macos) vía `cargo check --target` + finales de línea CRLF/LF
   ```
   Red rápida (<5 min) para código de otras plataformas; no corre la suite. Requiere `rustup target add x86_64-unknown-linux-gnu aarch64-apple-darwin`.
 
