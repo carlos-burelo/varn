@@ -12,6 +12,37 @@ use varn_core::AtomInterner;
 use varn_sem::bind::BindResult;
 use varn_tir::{BackendTy, DynReason, EnumId, EnumInfo, TyTable};
 
+pub(super) fn core_static_ops(bind: &BindResult) -> FxHashMap<(Arc<str>, Arc<str>), u64> {
+    let mut out = FxHashMap::default();
+    let Some(provider) = varn_modules::provider::get() else {
+        return out;
+    };
+    let Some(core) = bind.core.as_ref() else {
+        return out;
+    };
+    for tag in varn_core::op_id::CORE_CLASSES {
+        let Some(cname) = varn_core::op_id::core_class_name(tag) else {
+            continue;
+        };
+        let Some(info) = core.class_members.get(cname) else {
+            continue;
+        };
+        for m in &info.members {
+            let is_plain_static = m.is_static
+                && !m.is_async
+                && !m.is_generator
+                && m.kind == varn_sem::types::ClassMemberKind::Method;
+            if !is_plain_static {
+                continue;
+            }
+            if let Some(id) = provider.native_op_id(varn_core::op_id::CORE_MODULE, cname, &m.name) {
+                out.insert((Arc::from(cname), m.name.clone()), id);
+            }
+        }
+    }
+    out
+}
+
 pub(super) fn core_method_ops(bind: &BindResult) -> FxHashMap<(Arc<str>, Arc<str>), u64> {
     let mut out = FxHashMap::default();
     let Some(provider) = varn_modules::provider::get() else {

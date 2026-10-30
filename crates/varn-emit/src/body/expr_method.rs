@@ -33,6 +33,37 @@ impl<'a> FnEmitter<'a> {
             };
         }
 
+        if all_positional
+            && matches!(recv.kind, TirExprKind::Var)
+            && matches!(recv.res, Resolution::NativeGlobal(_))
+            && let Some(cls) = self.core_class_name(recv.ty)
+            && let Some(&op_id) = self
+                .m
+                .core_static_ops
+                .get(&(Arc::from(cls), Arc::clone(&name)))
+        {
+            let mut operands = targs.into_iter();
+            let head = match operands.next() {
+                Some(TirArg::Expr(first)) => first,
+                Some(TirArg::Spread(_)) | Some(TirArg::Named { .. }) | None => TirExpr {
+                    kind: TirExprKind::NullLit,
+                    ty: BackendTy::Dynamic(DynReason::Boxed),
+                    res: Resolution::None,
+                    span,
+                },
+            };
+            return TirExpr {
+                kind: TirExprKind::MethodCall {
+                    recv: Box::new(head),
+                    name,
+                    args: operands.collect(),
+                },
+                ty,
+                res: Resolution::NativeOp(op_id),
+                span,
+            };
+        }
+
         self.method_call(recv, name, targs, ty, checked, span)
     }
 

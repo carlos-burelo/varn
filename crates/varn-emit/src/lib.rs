@@ -70,6 +70,7 @@ pub fn emit_module(
     );
 
     let core_ops = module_globals::core_method_ops(bind);
+    let core_static_ops = module_globals::core_static_ops(bind);
     let math_intrinsics = math_intrinsic_imports(program, ast_arena, interner);
 
     let free_functions::FreeFunctions {
@@ -103,6 +104,7 @@ pub fn emit_module(
         call_mappings,
         desugar,
         core_ops: &core_ops,
+        core_static_ops: &core_static_ops,
         math_intrinsics: &math_intrinsics,
         interner,
         checker_table: &bind.ty_table,
