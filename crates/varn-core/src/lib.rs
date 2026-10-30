@@ -25,6 +25,7 @@ pub mod paths;
 pub mod runtime_kind;
 pub mod runtime_ops;
 pub mod source;
+pub mod std_errors;
 pub mod term;
 pub mod text_repr;
 pub mod token;
@@ -36,6 +37,7 @@ pub use ast::AstId;
 pub use atom::{Atom, AtomInterner};
 pub use doc::DocComment;
 pub use errors::RuntimeErrorKind;
+pub use std_errors::{ErrorField, StdErrorClass};
 
 pub use diagnostics::{
     Diagnostic, DiagnosticBag, DiagnosticKind, ErrorCode, RelatedInformation, Suggestion,
