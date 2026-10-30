@@ -27,19 +27,19 @@ export class TcpStream implements AsyncReader, AsyncWriter {
     }
 
     static async connect(host: str, port: int, attempts: int = 25, baseDelayMs: int = 50): Task<TcpStream> {
-        return await TcpStream.open(host, port, false, null, attempts, baseDelayMs);
+        return await TcpStream.open(host, port, false, null, null, attempts, baseDelayMs);
     }
 
-    static async connectTls(host: str, port: int, ca?: str, attempts: int = 5, baseDelayMs: int = 50): Task<TcpStream> {
-        return await TcpStream.open(host, port, true, ca, attempts, baseDelayMs);
+    static async connectTls(host: str, port: int, ca?: str, identity?: str, attempts: int = 5, baseDelayMs: int = 50): Task<TcpStream> {
+        return await TcpStream.open(host, port, true, ca, identity, attempts, baseDelayMs);
     }
 
-    private static async open(host: str, port: int, secure: bool, ca: str?, attempts: int, baseDelayMs: int): Task<TcpStream> {
+    private static async open(host: str, port: int, secure: bool, ca: str?, identity: str?, attempts: int, baseDelayMs: int): Task<TcpStream> {
         let attempt = 0;
         let last: NetError = new ConnectError(host, port);
         while (attempt < attempts) {
             try {
-                let connId = secure ? await tcpConnectTls$(host, port, ca) : await tcpConnect$(host, port);
+                let connId = secure ? await tcpConnectTls$(host, port, ca, identity) : await tcpConnect$(host, port);
                 return new TcpStream(connId, host, port);
             } catch (e: NetError) {
                 last = e;
@@ -158,8 +158,8 @@ export class TcpListener {
         this._isListening = listenerId >= 0;
     }
 
-    static listenTls(port: int, cert: str, key: str, host: str = "127.0.0.1"): TcpListener {
-        return new TcpListener(tcpListenTls$(port, host, cert, key), port, host);
+    static listenTls(port: int, cert: str, key: str, host: str = "127.0.0.1", clientCa?: str): TcpListener {
+        return new TcpListener(tcpListenTls$(port, host, cert, key, clientCa), port, host);
     }
 
     static listen(port: int, host: str = "127.0.0.1"): TcpListener {

@@ -28,8 +28,9 @@ impl IoDriver {
         host: &str,
         cert_pem: &str,
         key_pem: &str,
+        client_ca: Option<&str>,
     ) -> Result<i64, String> {
-        let config = tls::server_config(cert_pem, key_pem)?;
+        let config = tls::server_config(cert_pem, key_pem, client_ca)?;
         self.listen_with(port, host, Some(config))
             .map_err(|e| format!("cannot listen on {host}:{port}: {e}"))
     }
@@ -105,8 +106,14 @@ impl IoDriver {
         self.open(host, port, None)
     }
 
-    pub fn connect_tls(&self, host: &str, port: i64, extra_roots: Option<&str>) -> HostPromise {
-        match Tls::client(host, extra_roots) {
+    pub fn connect_tls(
+        &self,
+        host: &str,
+        port: i64,
+        extra_roots: Option<&str>,
+        identity: Option<&str>,
+    ) -> HostPromise {
+        match Tls::client(host, extra_roots, identity) {
             Ok(tls) => self.open(host, port, Some(tls)),
             Err(e) => HostPromise::rejected(tls_setup_failure(e)),
         }

@@ -1,6 +1,7 @@
 use mio::net::TcpStream;
 use rustls::pki_types::pem::PemObject;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, ServerName};
+use rustls::server::WebPkiClientVerifier;
 use rustls::{
     ClientConfig, ClientConnection, Connection, RootCertStore, ServerConfig, ServerConnection,
 };
@@ -25,7 +26,12 @@ fn certificates(pem: &str, what: &str) -> Result<Vec<CertificateDer<'static>>, S
     Ok(certs)
 }
 
-fn build_client(extra_roots: Option<&str>) -> Result<Arc<ClientConfig>, String> {
+fn private_key(pem: &str, what: &str) -> Result<PrivateKeyDer<'static>, String> {
+    PrivateKeyDer::from_pem_slice(pem.as_bytes())
+        .map_err(|e| format!("{what}: invalid PEM private key: {e}"))
+}
+
+fn build_client(extra_roots: Option<&str>, identity: Option<&str>) -> Result<Arc<ClientConfig>, String> {
     let mut roots = web_roots();
     if let Some(pem) = extra_roots {
         for cert in certificates(pem, "ca")? {
@@ -37,31 +43,52 @@ fn build_client(extra_roots: Option<&str>) -> Result<Arc<ClientConfig>, String> 
     ClientConfig::builder_with_provider(provider())
         .with_safe_default_protocol_versions()
         .map_err(|e| format!("tls: {e}"))
-        .map(|builder| {
-            Arc::new(
-                builder
-                    .with_root_certificates(roots)
-                    .with_no_client_auth(),
-            )
+        .and_then(|builder| {
+            let builder = builder.with_root_certificates(roots);
+            match identity {
+                Some(pem) => builder
+                    .with_client_auth_cert(certificates(pem, "identity")?, private_key(pem, "identity")?)
+                    .map_err(|e| format!("identity: {e}")),
+                None => Ok(builder.with_no_client_auth()),
+            }
         })
+        .map(Arc::new)
 }
 
 fn default_client() -> Result<&'static Arc<ClientConfig>, String> {
     static CONFIG: OnceLock<Result<Arc<ClientConfig>, String>> = OnceLock::new();
     CONFIG
-        .get_or_init(|| build_client(None))
+        .get_or_init(|| build_client(None, None))
         .as_ref()
         .map_err(Clone::clone)
 }
 
-pub fn server_config(cert_pem: &str, key_pem: &str) -> Result<Arc<ServerConfig>, String> {
+pub fn server_config(
+    cert_pem: &str,
+    key_pem: &str,
+    client_ca: Option<&str>,
+) -> Result<Arc<ServerConfig>, String> {
     let chain = certificates(cert_pem, "cert")?;
-    let key = PrivateKeyDer::from_pem_slice(key_pem.as_bytes())
-        .map_err(|e| format!("key: invalid PEM private key: {e}"))?;
-    ServerConfig::builder_with_provider(provider())
+    let key = private_key(key_pem, "key")?;
+    let builder = ServerConfig::builder_with_provider(provider())
         .with_safe_default_protocol_versions()
-        .map_err(|e| format!("tls: {e}"))?
-        .with_no_client_auth()
+        .map_err(|e| format!("tls: {e}"))?;
+    let builder = match client_ca {
+        Some(pem) => {
+            let mut roots = RootCertStore::empty();
+            for cert in certificates(pem, "clientCa")? {
+                roots
+                    .add(cert)
+                    .map_err(|e| format!("clientCa: the certificate cannot be a trust anchor: {e}"))?;
+            }
+            let verifier = WebPkiClientVerifier::builder_with_provider(Arc::new(roots), provider())
+                .build()
+                .map_err(|e| format!("clientCa: {e}"))?;
+            builder.with_client_cert_verifier(verifier)
+        }
+        None => builder.with_no_client_auth(),
+    };
+    builder
         .with_single_cert(chain, key)
         .map(Arc::new)
         .map_err(|e| format!("cert/key: {e}"))
@@ -73,12 +100,12 @@ pub struct Tls {
 }
 
 impl Tls {
-    pub fn client(host: &str, extra_roots: Option<&str>) -> Result<Self, String> {
+    pub fn client(host: &str, extra_roots: Option<&str>, identity: Option<&str>) -> Result<Self, String> {
         let name = ServerName::try_from(host.to_owned())
             .map_err(|e| format!("'{host}' is not a valid server name: {e}"))?;
-        let config = match extra_roots {
-            Some(pem) => build_client(Some(pem))?,
-            None => Arc::clone(default_client()?),
+        let config = match (extra_roots, identity) {
+            (None, None) => Arc::clone(default_client()?),
+            (roots, identity) => build_client(roots, identity)?,
         };
         let conn = ClientConnection::new(config, name)
             .map_err(|e| format!("cannot start the TLS session: {e}"))?;

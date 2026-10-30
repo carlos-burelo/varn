@@ -65,20 +65,20 @@ varn_contract! {
             Ok(ctx.task_from_host(task, HostOpen::Plain))
         }
 
-        fn tcpConnectTls(ctx: &mut dyn NativeCtx, host: &str, port: i64, ca: Option<&str>) -> Result<VmValue, NativeError> {
+        fn tcpConnectTls(ctx: &mut dyn NativeCtx, host: &str, port: i64, ca: Option<&str>, identity: Option<&str>) -> Result<VmValue, NativeError> {
             if !ctx.check_net_connect(host) {
                 return Err(NativeError::capability("net.client", host));
             }
-            let task = driver().connect_tls(host, port, ca);
+            let task = driver().connect_tls(host, port, ca, identity);
             Ok(ctx.task_from_host(task, HostOpen::Plain))
         }
 
-        fn tcpListenTls(ctx: &mut dyn NativeCtx, port: i64, host: &str, cert: &str, key: &str) -> Result<i64, NativeError> {
+        fn tcpListenTls(ctx: &mut dyn NativeCtx, port: i64, host: &str, cert: &str, key: &str, client_ca: Option<&str>) -> Result<i64, NativeError> {
             if !ctx.check_net_listen(port) {
                 return Err(NativeError::capability("net.server", port.to_string()));
             }
             driver()
-                .listen_tls(port, host, cert, key)
+                .listen_tls(port, host, cert, key, client_ca)
                 .map_err(|e| NativeError::std(StdErrorClass::Net, e).with_str(ErrorField::Host, host).with_int(ErrorField::Port, port))
         }
 

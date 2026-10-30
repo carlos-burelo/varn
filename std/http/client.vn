@@ -76,7 +76,7 @@ async function doFetch(connId: int, parsedUrl: Url, method: HttpMethod, headers:
     return response;
 }
 
-async function fetchOnce(url: str, method: HttpMethod, headers: { [key: str]: str }, body: str, ca: str?): Task<Response> {
+async function fetchOnce(url: str, method: HttpMethod, headers: { [key: str]: str }, body: str, ca: str?, identity: str?): Task<Response> {
     const parsedUrl = Url.parse(url);
     const host = parsedUrl.host;
 
@@ -91,7 +91,7 @@ async function fetchOnce(url: str, method: HttpMethod, headers: { [key: str]: st
         port = parsedPort;
     }
 
-    const connId = secure ? await tcpConnectTls$(host, port, ca) : await tcpConnect$(host, port);
+    const connId = secure ? await tcpConnectTls$(host, port, ca, identity) : await tcpConnect$(host, port);
 
     return await doFetch(connId, parsedUrl, method, headers, body);
 }
@@ -105,7 +105,7 @@ export async function fetch(url: str, init: RequestInit = {}): Task<Response> {
     let headers = init.headers ?? {};
     let hops = 0;
     while (true) {
-        const response = await fetchOnce(current, method, headers, body, init.ca);
+        const response = await fetchOnce(current, method, headers, body, init.ca, init.identity);
         response.url = current;
         const location = response.headers.get("location");
         if (!follow || location === null || !isRedirect(response.status)) {

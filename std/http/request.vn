@@ -9,6 +9,7 @@ export interface RequestInit {
     headers?: { [key: str]: str };
     body?: str;
     ca?: str;
+    identity?: str;
     followRedirects?: bool;
     maxRedirects?: int;
 }

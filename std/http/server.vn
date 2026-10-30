@@ -135,10 +135,10 @@ export class HttpServer {
         spawn(this._acceptLoop());
     }
 
-    listenTls(port: int, cert: str, key: str, host: str = "127.0.0.1"): void {
+    listenTls(port: int, cert: str, key: str, host: str = "127.0.0.1", clientCa?: str): void {
         if (this._isListening) return;
         this._port = port;
-        this._listenerId = tcpListenTls$(port, host, cert, key);
+        this._listenerId = tcpListenTls$(port, host, cert, key, clientCa);
         this._isListening = true;
 
         spawn(this._acceptLoop());
