@@ -35,20 +35,16 @@ await describe("85 stdlib sqlite ws archive", async () => {
         }
         writeText(Path.join(testDir, "test.txt"), "Archive content 123");
         let tarPath = "./tmp_test.tar";
-        let tarCreated = Tar.create(testDir, tarPath);
-        expect(tarCreated).toBe(true);
+        Tar.create(testDir, tarPath);
         expect(exists(tarPath)).toBe(true);
         let tarExtractDir = "./tmp_test_tar_out";
-        let tarExtracted = Tar.extract(tarPath, tarExtractDir);
-        expect(tarExtracted).toBe(true);
+        Tar.extract(tarPath, tarExtractDir);
         expect(exists(Path.join(tarExtractDir, "test.txt"))).toBe(true);
         let zipPath = "./tmp_test.zip";
-        let zipCreated = Zip.create(testDir, zipPath);
-        expect(zipCreated).toBe(true);
+        Zip.create(testDir, zipPath);
         expect(exists(zipPath)).toBe(true);
         let zipExtractDir = "./tmp_test_zip_out";
-        let zipExtracted = Zip.extract(zipPath, zipExtractDir);
-        expect(zipExtracted).toBe(true);
+        Zip.extract(zipPath, zipExtractDir);
         expect(exists(Path.join(zipExtractDir, "test.txt"))).toBe(true);
         let text = "Varn programming language high-performance computing!";
         let gz = Compress.gzip(text);

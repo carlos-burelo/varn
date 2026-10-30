@@ -96,35 +96,35 @@ varn_contract! {
             Ok(ctx.alloc_buffer_from_bytes(&decompressed))
         }
 
-        fn tarCreate(_ctx: &mut dyn NativeCtx, source_dir: &str, tar_path: &str) -> Result<bool, String> {
+        fn tarCreate(_ctx: &mut dyn NativeCtx, source_dir: &str, tar_path: &str) -> Result<(), String> {
             let tar_file = File::create(tar_path).map_err(|e| format!("Tar create error: {e}"))?;
             let mut tar_builder = tar::Builder::new(tar_file);
             tar_builder.append_dir_all(".", source_dir).map_err(|e| format!("Tar append error: {e}"))?;
             tar_builder.finish().map_err(|e| format!("Tar finish error: {e}"))?;
-            Ok(true)
+            Ok(())
         }
 
-        fn tarExtract(_ctx: &mut dyn NativeCtx, tar_path: &str, dest_dir: &str) -> Result<bool, String> {
+        fn tarExtract(_ctx: &mut dyn NativeCtx, tar_path: &str, dest_dir: &str) -> Result<(), String> {
             let tar_file = File::open(tar_path).map_err(|e| format!("Tar open error: {e}"))?;
             let mut archive = tar::Archive::new(tar_file);
             archive.unpack(dest_dir).map_err(|e| format!("Tar unpack error: {e}"))?;
-            Ok(true)
+            Ok(())
         }
 
-        fn zipCreate(_ctx: &mut dyn NativeCtx, source_dir: &str, zip_path: &str) -> Result<bool, String> {
+        fn zipCreate(_ctx: &mut dyn NativeCtx, source_dir: &str, zip_path: &str) -> Result<(), String> {
             let zip_file = File::create(zip_path).map_err(|e| format!("Zip create error: {e}"))?;
             let mut writer = zip::ZipWriter::new(zip_file);
             let base = Path::new(source_dir);
             zip_dir_recursive(&mut writer, base, base)?;
             writer.finish().map_err(|e| format!("Zip finish error: {e}"))?;
-            Ok(true)
+            Ok(())
         }
 
-        fn zipExtract(_ctx: &mut dyn NativeCtx, zip_path: &str, dest_dir: &str) -> Result<bool, String> {
+        fn zipExtract(_ctx: &mut dyn NativeCtx, zip_path: &str, dest_dir: &str) -> Result<(), String> {
             let zip_file = File::open(zip_path).map_err(|e| format!("Zip open error: {e}"))?;
             let mut archive = zip::ZipArchive::new(zip_file).map_err(|e| format!("Zip archive error: {e}"))?;
             archive.extract(dest_dir).map_err(|e| format!("Zip extract error: {e}"))?;
-            Ok(true)
+            Ok(())
         }
     }
 }

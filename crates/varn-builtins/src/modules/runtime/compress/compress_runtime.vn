@@ -5,7 +5,7 @@ export declare function gunzip$(bytes: Bytes): Bytes;
 export declare function deflate$(data: Bytes | str): Bytes;
 export declare function inflate$(bytes: Bytes): Bytes;
 
-export declare function tarCreate$(sourceDir: str, tarPath: str): bool;
-export declare function tarExtract$(tarPath: str, destDir: str): bool;
-export declare function zipCreate$(sourceDir: str, zipPath: str): bool;
-export declare function zipExtract$(zipPath: str, destDir: str): bool;
+export declare function tarCreate$(sourceDir: str, tarPath: str): void;
+export declare function tarExtract$(tarPath: str, destDir: str): void;
+export declare function zipCreate$(sourceDir: str, zipPath: str): void;
+export declare function zipExtract$(zipPath: str, destDir: str): void;

@@ -27,8 +27,8 @@ await describe("example std:compress", async () => {
         mkdirAll(join(base, "data"));
         mkdirAll(join(base, "out"));
         writeText(join(base, "data", "a.txt"), "tar-content");
-        expect(Tar.create(join(base, "data"), join(base, "a.tar"))).toBe(true);
-        expect(Tar.extract(join(base, "a.tar"), join(base, "out"))).toBe(true);
+        Tar.create(join(base, "data"), join(base, "a.tar"));
+        Tar.extract(join(base, "a.tar"), join(base, "out"));
         expect(readText(join(base, "out", "a.txt"))).toBe("tar-content");
         clean(base);
     });
@@ -39,8 +39,8 @@ await describe("example std:compress", async () => {
         mkdirAll(join(base, "data"));
         mkdirAll(join(base, "out"));
         writeText(join(base, "data", "b.txt"), "zip-content");
-        expect(Zip.create(join(base, "data"), join(base, "b.zip"))).toBe(true);
-        expect(Zip.extract(join(base, "b.zip"), join(base, "out"))).toBe(true);
+        Zip.create(join(base, "data"), join(base, "b.zip"));
+        Zip.extract(join(base, "b.zip"), join(base, "out"));
         expect(readText(join(base, "out", "b.txt"))).toBe("zip-content");
         clean(base);
     });
