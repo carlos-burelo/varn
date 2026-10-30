@@ -30,6 +30,10 @@ impl RuntimeError {
         Self::of_kind(varn_core::RuntimeErrorKind::DivisionByZero, message)
     }
 
+    pub(crate) fn range_error(message: impl Into<String>) -> Self {
+        Self::of_kind(varn_core::RuntimeErrorKind::RangeError, message)
+    }
+
     pub(crate) fn type_error(message: impl Into<String>) -> Self {
         Self::of_kind(varn_core::RuntimeErrorKind::TypeError, message)
     }

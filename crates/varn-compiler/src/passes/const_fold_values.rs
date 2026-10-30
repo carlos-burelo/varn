@@ -46,7 +46,7 @@ pub(super) fn fold_binary(
 
             Pow => {
                 if *y >= 0 && *y <= 30 {
-                    pow_int(*x, *y as u32).map(InstKind::ConstInt)
+                    pow_int(*x, *y as u64).map(InstKind::ConstInt)
                 } else {
                     None
                 }

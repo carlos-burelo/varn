@@ -222,11 +222,10 @@ pub(crate) fn pow(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
     if heap.is_int(a) && heap.is_int(b) {
         let exp = heap.as_int(b);
         if exp < 0 {
-            return Err(RuntimeError::new("negative exponent in integer power"));
+            return Err(negative_exponent(exp));
         }
         let base = heap.as_int(a);
-        let e = u32::try_from(exp).unwrap_or(u32::MAX);
-        return match pow_int(base, e) {
+        return match pow_int(base, exp as u64) {
             Some(r) => Ok(VmValue::from_int(r)),
             None => Err(overflow("**", base, exp)),
         };
@@ -282,8 +281,16 @@ pub(crate) fn bit_xor(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
 #[cold]
 #[inline(never)]
 fn shift_out_of_range(op: &str, a: i64, n: i64) -> RuntimeError {
-    RuntimeError::integer_overflow(format!(
-        "integer overflow: {a} {op} {n} has a shift amount outside 0..={SHIFT_MAX}"
+    RuntimeError::range_error(format!(
+        "{a} {op} {n}: the shift amount must be within 0..={SHIFT_MAX}"
+    ))
+}
+
+#[cold]
+#[inline(never)]
+pub(crate) fn negative_exponent(exp: i64) -> RuntimeError {
+    RuntimeError::range_error(format!(
+        "the exponent of an integer power must not be negative, got {exp}"
     ))
 }
 

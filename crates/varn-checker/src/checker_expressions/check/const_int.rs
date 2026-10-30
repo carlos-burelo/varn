@@ -85,7 +85,7 @@ pub(super) fn const_int_expr(e: ExprId, arena: &varn_core::ast::AstArena) -> Con
                 BinaryOp::Add => lift(varn_core::add_int(a, b)),
                 BinaryOp::Sub => lift(varn_core::sub_int(a, b)),
                 BinaryOp::Mul => lift(varn_core::mul_int(a, b)),
-                BinaryOp::Pow => match u32::try_from(b) {
+                BinaryOp::Pow => match u64::try_from(b) {
                     Ok(e) => lift(varn_core::pow_int(a, e)),
                     Err(_) => NotConst,
                 },

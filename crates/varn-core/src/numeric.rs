@@ -22,8 +22,58 @@ pub fn mul_int(a: i64, b: i64) -> Option<i64> {
 }
 
 #[inline(always)]
-pub fn pow_int(a: i64, e: u32) -> Option<i64> {
-    a.checked_pow(e)
+pub fn pow_int(a: i64, e: u64) -> Option<i64> {
+    match a {
+        0 => Some(i64::from(e == 0)),
+        1 => Some(1),
+        -1 => Some(if e.is_multiple_of(2) { 1 } else { -1 }),
+        _ => u32::try_from(e).ok().and_then(|e| a.checked_pow(e)),
+    }
+}
+
+#[inline]
+pub fn fmax(a: f64, b: f64) -> f64 {
+    if a.is_nan() || b.is_nan() {
+        f64::NAN
+    } else if a == b {
+        if a.is_sign_negative() {
+            b
+        } else {
+            a
+        }
+    } else if a > b {
+        a
+    } else {
+        b
+    }
+}
+
+#[inline]
+pub fn fmin(a: f64, b: f64) -> f64 {
+    if a.is_nan() || b.is_nan() {
+        f64::NAN
+    } else if a == b {
+        if a.is_sign_negative() {
+            a
+        } else {
+            b
+        }
+    } else if a < b {
+        a
+    } else {
+        b
+    }
+}
+
+#[inline]
+pub fn fsign(x: f64) -> f64 {
+    if x.is_nan() || x == 0.0 {
+        x
+    } else if x > 0.0 {
+        1.0
+    } else {
+        -1.0
+    }
 }
 
 #[inline(always)]

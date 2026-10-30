@@ -150,12 +150,9 @@ impl ExecCtx {
             OpCode::PowInt => {
                 if let Some((a_val, b_val)) = self.stack.int_pair(base, r1, r2) {
                     if b_val < 0 {
-                        return Err(crate::error::RuntimeError::new(
-                            "negative exponent in integer power",
-                        ));
+                        return Err(crate::exec::arith::negative_exponent(b_val));
                     }
-                    let e = u32::try_from(b_val).unwrap_or(u32::MAX);
-                    match varn_core::pow_int(a_val, e) {
+                    match varn_core::pow_int(a_val, b_val as u64) {
                         Some(r) => {
                             self.stack
                                 .unbox_into_reg(base, first_reg, VmValue::from_int(r))?
@@ -169,12 +166,9 @@ impl ExecCtx {
                         let a_val = a.as_int();
                         let b_val = b.as_int();
                         if b_val < 0 {
-                            return Err(crate::error::RuntimeError::new(
-                                "negative exponent in integer power",
-                            ));
+                            return Err(crate::exec::arith::negative_exponent(b_val));
                         }
-                        let e = u32::try_from(b_val).unwrap_or(u32::MAX);
-                        match varn_core::pow_int(a_val, e) {
+                        match varn_core::pow_int(a_val, b_val as u64) {
                             Some(r) => {
                                 self.stack
                                     .unbox_into_reg(base, first_reg, VmValue::from_int(r))?
