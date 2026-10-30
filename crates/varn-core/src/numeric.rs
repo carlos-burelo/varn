@@ -80,6 +80,24 @@ pub fn float_to_fixed(x: f64, digits: usize) -> String {
     out
 }
 
+pub const MAX_ALLOC_BYTES: usize = 1 << 31;
+
+pub const MAX_STR_BYTES: usize = 1 << 30;
+
+pub fn clamp_index(index: i64, len: usize) -> usize {
+    if index < 0 {
+        usize::try_from(index.saturating_add(len as i64)).unwrap_or(0)
+    } else {
+        usize::try_from(index).map_or(len, |i| i.min(len))
+    }
+}
+
+pub fn slice_bounds(len: usize, start: Option<i64>, end: Option<i64>) -> (usize, usize) {
+    let from = clamp_index(start.unwrap_or(0), len);
+    let to = clamp_index(end.unwrap_or(len as i64), len).max(from);
+    (from, to)
+}
+
 #[inline]
 pub fn fmax(a: f64, b: f64) -> f64 {
     if a.is_nan() || b.is_nan() {

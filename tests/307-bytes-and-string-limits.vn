@@ -1,0 +1,74 @@
+import { describe, it, expect } from "std:test";
+
+const MAX: int = 9223372036854775807;
+const MIN: int = -9223372036854775807 - 1;
+
+function outcome(f: () => str): str {
+    try { return f(); } catch (e) {
+        return e instanceof RangeError ? "range" : e instanceof TypeError ? "type" : "other:" + e.name;
+    }
+}
+
+function bytes(text: str): Bytes {
+    return Bytes.fromString(text);
+}
+
+await describe("307 Bytes indices, values and sizes are checked", async () => {
+    await it("getByte and setByte refuse an index outside the buffer", async () => {
+        const b = bytes("abc");
+        expect(outcome(() => b.getByte(1).toString())).toBe("98");
+        expect(outcome(() => b.getByte(3).toString())).toBe("range");
+        expect(outcome(() => b.getByte(-1).toString())).toBe("range");
+        expect(outcome(() => b.getByte(MAX).toString())).toBe("range");
+        expect(outcome(() => { b.setByte(3, 1); return "set"; })).toBe("range");
+        expect(outcome(() => { b.setByte(MIN, 1); return "set"; })).toBe("range");
+        expect(outcome(() => { b.setByte(0, 65); return b.toString(); })).toBe("Abc");
+    });
+
+    await it("a byte value outside 0..=255 is refused, not truncated", async () => {
+        const b = bytes("abc");
+        expect(outcome(() => { b.setByte(0, 256); return "set"; })).toBe("range");
+        expect(outcome(() => { b.setByte(0, -1); return "set"; })).toBe("range");
+        expect(outcome(() => { b.fill(300); return "fill"; })).toBe("range");
+        expect(outcome(() => Bytes.fromBytes([1, 2, 256]).length.toString())).toBe("range");
+        expect(outcome(() => Bytes.fromBytes([1, 2, 3]).length.toString())).toBe("3");
+    });
+
+    await it("slice, fill and copy normalize their bounds like Array.slice", async () => {
+        const b = bytes("abcdef");
+        expect(b.slice(1, 3).toString()).toBe("bc");
+        expect(b.slice(-2).toString()).toBe("ef");
+        expect(b.slice(4, 1).length).toBe(0);
+        expect(b.slice(2, MAX).toString()).toBe("cdef");
+        expect(b.slice(MIN, 2).toString()).toBe("ab");
+        const filled = bytes("abcdef");
+        filled.fill(122, 1, -1);
+        expect(filled.toString()).toBe("azzzzf");
+        filled.fill(120, MIN, MAX);
+        expect(filled.toString()).toBe("xxxxxx");
+        const target = bytes("......");
+        expect(b.copy(target, 2, 0, 3)).toBe(3);
+        expect(target.toString()).toBe("..abc.");
+        expect(b.copy(target, 5, 0, MAX)).toBe(1);
+        expect(b.copy(target, MAX)).toBe(0);
+    });
+
+    await it("alloc refuses a negative or unbounded size", async () => {
+        expect(outcome(() => Bytes.alloc(-1).length.toString())).toBe("range");
+        expect(outcome(() => Bytes.alloc(MAX).length.toString())).toBe("range");
+        expect(outcome(() => Bytes.alloc(16).length.toString())).toBe("16");
+    });
+});
+
+await describe("307 string builders refuse sizes they cannot hold", async () => {
+    await it("repeat and pad raise RangeError instead of aborting the process", async () => {
+        expect(outcome(() => "hello world".repeat(MAX))).toBe("range");
+        expect(outcome(() => "hello world".repeat(-1))).toBe("range");
+        expect(outcome(() => "ab".repeat(3))).toBe("ababab");
+        expect(outcome(() => "".repeat(MAX))).toBe("");
+        expect(outcome(() => "x".padStart(MAX, "ab"))).toBe("range");
+        expect(outcome(() => "x".padEnd(MAX))).toBe("range");
+        expect(outcome(() => "x".padStart(4, "ab"))).toBe("abax");
+        expect(outcome(() => "x".padEnd(3, "ab"))).toBe("xab");
+    });
+});

@@ -1,7 +1,20 @@
 use varn_macros::varn_contract;
-use varn_types::{NativeCtx, VmValue, VnArray};
+use varn_types::{NativeCtx, NativeError, VmValue, VnArray};
 
 pub struct Bytes;
+
+fn byte_value(value: i64, what: &str) -> Result<u8, NativeError> {
+    u8::try_from(value)
+        .map_err(|_| NativeError::range_error(format!("{what}: {value} is not a byte (0..=255)")))
+}
+
+fn byte_index(ctx: &mut dyn NativeCtx, this: VmValue, index: i64) -> Result<usize, NativeError> {
+    let len = ctx.buffer_len(this);
+    usize::try_from(index)
+        .ok()
+        .filter(|i| *i < len)
+        .ok_or_else(|| NativeError::range_error(format!("index {index} is out of range for length {len}")))
+}
 
 varn_contract! {
     module: "globals",
@@ -12,19 +25,24 @@ varn_contract! {
             ctx.buffer_len(this) as i64
         }
 
-        fn getByte(ctx: &mut dyn NativeCtx, this: VmValue, index: i64) -> i64 {
-            ctx.buffer_get_byte(this, index as usize).unwrap_or(0) as i64
+        fn getByte(ctx: &mut dyn NativeCtx, this: VmValue, index: i64) -> Result<i64, NativeError> {
+            let at = byte_index(ctx, this, index)?;
+            ctx.buffer_get_byte(this, at)
+                .map(i64::from)
+                .ok_or_else(|| NativeError::type_error("getByte: not a Bytes"))
         }
 
-        fn setByte(ctx: &mut dyn NativeCtx, this: VmValue, index: i64, value: i64) {
-            ctx.buffer_set_byte(this, index as usize, value as u8);
+        fn setByte(ctx: &mut dyn NativeCtx, this: VmValue, index: i64, value: i64) -> Result<(), NativeError> {
+            let at = byte_index(ctx, this, index)?;
+            let byte = byte_value(value, "setByte")?;
+            ctx.buffer_set_byte(this, at, byte);
+            Ok(())
         }
 
-        fn slice(ctx: &mut dyn NativeCtx, this: VmValue, start: Option<i64>, end: Option<i64>) -> VmValue {
-            let len = ctx.buffer_len(this);
-            let s = start.unwrap_or(0).max(0) as usize;
-            let e = end.unwrap_or(len as i64).max(0) as usize;
-            ctx.buffer_slice(this, s, e).unwrap_or_else(VmValue::null)
+        fn slice(ctx: &mut dyn NativeCtx, this: VmValue, start: Option<i64>, end: Option<i64>) -> Result<VmValue, NativeError> {
+            let (from, to) = varn_core::slice_bounds(ctx.buffer_len(this), start, end);
+            ctx.buffer_slice(this, from, to)
+                .ok_or_else(|| NativeError::type_error("slice: not a Bytes"))
         }
 
         fn toString(ctx: &mut dyn NativeCtx, this: VmValue) -> String {
@@ -53,51 +71,57 @@ varn_contract! {
             }
         }
 
-        fn fill(ctx: &mut dyn NativeCtx, this: VmValue, value: i64, start: Option<i64>, end: Option<i64>) -> VmValue {
-            let len = ctx.buffer_len(this);
-            let s = start.unwrap_or(0).max(0) as usize;
-            let e = end.unwrap_or(len as i64).min(len as i64) as usize;
-            for idx in s..e {
-                ctx.buffer_set_byte(this, idx, value as u8);
+        fn fill(ctx: &mut dyn NativeCtx, this: VmValue, value: i64, start: Option<i64>, end: Option<i64>) -> Result<VmValue, NativeError> {
+            let byte = byte_value(value, "fill")?;
+            let (from, to) = varn_core::slice_bounds(ctx.buffer_len(this), start, end);
+            for idx in from..to {
+                ctx.buffer_set_byte(this, idx, byte);
             }
-            this
+            Ok(this)
         }
 
         fn copy(ctx: &mut dyn NativeCtx, this: VmValue, target: VmValue, target_start: Option<i64>, source_start: Option<i64>, source_end: Option<i64>) -> i64 {
-            let s_len = ctx.buffer_len(this);
-            let t_len = ctx.buffer_len(target);
-            let mut s = source_start.unwrap_or(0).max(0) as usize;
-            let mut t = target_start.unwrap_or(0).max(0) as usize;
-            let end = source_end.unwrap_or(s_len as i64).min(s_len as i64) as usize;
-            let mut copied = 0;
-            while s < end && t < t_len {
-                if let Some(byte) = ctx.buffer_get_byte(this, s) {
-                    ctx.buffer_set_byte(target, t, byte);
-                    copied += 1;
+            let target_len = ctx.buffer_len(target);
+            let (from, to) = varn_core::slice_bounds(ctx.buffer_len(this), source_start, source_end);
+            let at = varn_core::clamp_index(target_start.unwrap_or(0), target_len);
+            let count = (to - from).min(target_len - at);
+            for offset in 0..count {
+                if let Some(byte) = ctx.buffer_get_byte(this, from + offset) {
+                    ctx.buffer_set_byte(target, at + offset, byte);
                 }
-                s += 1;
-                t += 1;
             }
-            copied
+            count as i64
         }
 
-        fn alloc(ctx: &mut dyn NativeCtx, size: i64) -> VmValue {
-            ctx.alloc_buffer(size.max(0) as usize)
+        fn alloc(ctx: &mut dyn NativeCtx, size: i64) -> Result<VmValue, NativeError> {
+            let bytes = usize::try_from(size)
+                .ok()
+                .filter(|n| *n <= varn_core::MAX_ALLOC_BYTES)
+                .ok_or_else(|| {
+                    NativeError::range_error(format!(
+                        "alloc: size {size} must be within 0..={}",
+                        varn_core::MAX_ALLOC_BYTES
+                    ))
+                })?;
+            Ok(ctx.alloc_buffer(bytes))
         }
 
         fn fromString(ctx: &mut dyn NativeCtx, s: &str) -> VmValue {
             ctx.alloc_buffer_from_bytes(s.as_bytes())
         }
 
-        fn fromBytes(ctx: &mut dyn NativeCtx, bytes: VnArray) -> VmValue {
+        fn fromBytes(ctx: &mut dyn NativeCtx, bytes: VnArray) -> Result<VmValue, NativeError> {
             let len = bytes.len(ctx);
             let mut raw = Vec::with_capacity(len);
             for i in 0..len {
-                if let Some(v) = bytes.get(ctx, i) {
-                    raw.push(ctx.as_int(v) as u8);
-                }
+                let item = bytes
+                    .get(ctx, i)
+                    .filter(|v| ctx.is_int(*v))
+                    .ok_or_else(|| NativeError::type_error(format!("fromBytes: element {i} is not an int")))?;
+                let value = ctx.as_int(item);
+                raw.push(byte_value(value, &format!("fromBytes: element {i}"))?);
             }
-            ctx.alloc_buffer_from_bytes(&raw)
+            Ok(ctx.alloc_buffer_from_bytes(&raw))
         }
     }
 }

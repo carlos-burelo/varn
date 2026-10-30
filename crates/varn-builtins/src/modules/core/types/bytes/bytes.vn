@@ -1,16 +1,16 @@
 export declare class Bytes {
     readonly length: int;
 
-    getByte(index: int): int;
-    setByte(index: int, value: int): void;
-    slice(start?: int, end?: int): Bytes;
+    @throws(RangeError, TypeError) getByte(index: int): int;
+    @throws(RangeError) setByte(index: int, value: int): void;
+    @throws(TypeError) slice(start?: int, end?: int): Bytes;
     toString(): str;
     toHex(): str;
     toBase64(): str;
-    fill(value: int, start?: int, end?: int): Bytes;
+    @throws(RangeError) fill(value: int, start?: int, end?: int): Bytes;
     copy(target: Bytes, targetStart?: int, sourceStart?: int, sourceEnd?: int): int;
 
-    static alloc(size: int): Bytes;
+    @throws(RangeError) static alloc(size: int): Bytes;
     static fromString(s: str): Bytes;
-    static fromBytes(bytes: int[]): Bytes;
+    @throws(RangeError, TypeError) static fromBytes(bytes: int[]): Bytes;
 }

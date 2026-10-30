@@ -218,19 +218,29 @@ varn_contract! {
                     None,
                 )
             })?;
+            if this.len().checked_mul(count).is_none_or(|bytes| bytes > varn_core::MAX_STR_BYTES) {
+                return Err(varn_types::NativeError::range_error(format!(
+                    "repeat: the result would exceed {} bytes",
+                    varn_core::MAX_STR_BYTES
+                )));
+            }
             Ok(this.repeat(count))
         }
-        fn padStart(_ctx: &mut dyn NativeCtx, this: &VnStr, target: i64, pad: Option<&str>) -> String {
-            pad_start(this, target, pad)
+        fn padStart(_ctx: &mut dyn NativeCtx, this: &VnStr, target: i64, pad: Option<&str>) -> Result<String, varn_types::NativeError> {
+            pad_target(target)?;
+            Ok(pad_start(this, target, pad))
         }
-        fn padLeft(_ctx: &mut dyn NativeCtx, this: &VnStr, target: i64, pad: Option<&str>) -> String {
-            pad_start(this, target, pad)
+        fn padLeft(_ctx: &mut dyn NativeCtx, this: &VnStr, target: i64, pad: Option<&str>) -> Result<String, varn_types::NativeError> {
+            pad_target(target)?;
+            Ok(pad_start(this, target, pad))
         }
-        fn padEnd(_ctx: &mut dyn NativeCtx, this: &VnStr, target: i64, pad: Option<&str>) -> String {
-            pad_end(this, target, pad)
+        fn padEnd(_ctx: &mut dyn NativeCtx, this: &VnStr, target: i64, pad: Option<&str>) -> Result<String, varn_types::NativeError> {
+            pad_target(target)?;
+            Ok(pad_end(this, target, pad))
         }
-        fn padRight(_ctx: &mut dyn NativeCtx, this: &VnStr, target: i64, pad: Option<&str>) -> String {
-            pad_end(this, target, pad)
+        fn padRight(_ctx: &mut dyn NativeCtx, this: &VnStr, target: i64, pad: Option<&str>) -> Result<String, varn_types::NativeError> {
+            pad_target(target)?;
+            Ok(pad_end(this, target, pad))
         }
         fn concat(_ctx: &mut dyn NativeCtx, this: &VnStr, other: &str) -> String {
             format!("{this}{other}")
@@ -265,6 +275,16 @@ varn_contract! {
             this.trim().parse::<f64>().unwrap_or(0.0)
         }
     }
+}
+
+fn pad_target(target: i64) -> Result<(), varn_types::NativeError> {
+    let limit = (varn_core::MAX_STR_BYTES / 4) as i64;
+    if target > limit {
+        return Err(varn_types::NativeError::range_error(format!(
+            "pad: the target length {target} exceeds {limit}"
+        )));
+    }
+    Ok(())
 }
 
 fn pad_start(s: &str, target: i64, pad: Option<&str>) -> String {

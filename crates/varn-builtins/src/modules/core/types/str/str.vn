@@ -34,10 +34,10 @@ export declare class str {
     lines(): str[];
     words(): str[];
     @throws(RangeError) repeat(n: int): str;
-    padStart(target: int, pad?: str): str;
-    padLeft(target: int, pad?: str): str; // ALIAS
-    padEnd(target: int, pad?: str): str;
-    padRight(target: int, pad?: str): str; // ALIAS
+    @throws(RangeError) padStart(target: int, pad?: str): str;
+    @throws(RangeError) padLeft(target: int, pad?: str): str; // ALIAS
+    @throws(RangeError) padEnd(target: int, pad?: str): str;
+    @throws(RangeError) padRight(target: int, pad?: str): str; // ALIAS
     concat(other: str): str;
     substr(start: int, length?: int): str;
     isEmpty(): bool;

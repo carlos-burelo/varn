@@ -12,11 +12,7 @@ fn vm_eq(ctx: &dyn NativeCtx, a: VmValue, b: VmValue) -> bool {
 }
 
 fn norm_idx(idx: i64, len: i64) -> usize {
-    if idx < 0 {
-        (len + idx).max(0) as usize
-    } else {
-        (idx as usize).min(len as usize)
-    }
+    varn_core::clamp_index(idx, usize::try_from(len).unwrap_or(0))
 }
 
 fn flatten(ctx: &mut dyn NativeCtx, arr: VmValue, depth: i64, out: &mut Vec<VmValue>) {
