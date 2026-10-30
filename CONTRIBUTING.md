@@ -101,6 +101,17 @@ Para simplificar la validación y asegurar cero roturas antes de hacer commit/pu
 > [!NOTE]
 > Los flags son distintos por shell: `verify.ps1` usa mayúscula inicial (`-Fast`, `-Quick`, `-SkipLint`, `-CleanCache`); `verify.sh` usa minúsculas (`--fast`, `--skip-lint`, `--clean-cache`) y no tiene equivalente de `-Quick`.
 
+`verify.ps1` ejecuta también el corpus de errores (`cargo test -p varn-cli --test error_corpus`), igual que el CI.
+
+- **Linux limpio desde Windows (Docker)**:
+  ```powershell
+  .\scripts\ci-linux.ps1            # cargo clippy --workspace --all-targets + corpus de errores en rust:<toolchain>
+  ```
+  Reproduce lo que solo falla en Linux (código bajo `cfg`, imports sin usar, lints). Requiere Docker Desktop en ejecución.
+
+> [!IMPORTANT]
+> **Antes de `git push`**: el resumen final de `verify.ps1 -Fast` debe decir `[TODO CORRECTO]` (se lee ese resumen, no solo los totales de tests: clippy, el corpus de errores y la gobernanza de tamaño fallan sin tocar `PASSED/FAILED`). Si el cambio toca código dependiente de la plataforma, se corre además `ci-linux.ps1`. Tras el push se vigila el CI (`gh run list`, `gh run watch`) hasta verde; un CI rojo se arregla antes que cualquier trabajo nuevo.
+
 ---
 
 ## CI/CD en GitHub Actions

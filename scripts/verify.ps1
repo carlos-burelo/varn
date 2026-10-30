@@ -206,6 +206,16 @@ $q5 = Run-Quadrant "5: [cache JIT] + [VARN_JIT_CACHE=verify]" @{ "VARN_JIT_CACHE
 if (-not $q5) { $failedSteps += "Cuadrante 5 (cache JIT verify)" }
 }
 
+# 5b. Corpus de errores (lo ejecuta el CI; sin esto un fixture obsoleto solo falla alli)
+Write-StepHeader "5b: Corpus de errores (cargo test -p varn-cli --test error_corpus)"
+cargo test --profile $BuildProfile -p varn-cli --test error_corpus
+if ($LASTEXITCODE -ne 0) {
+    Write-Failure "El corpus de errores fallo."
+    $failedSteps += "Corpus de errores"
+} else {
+    Write-Success "Corpus de errores correcto."
+}
+
 # 6. Benchmark de Estabilidad
 if (-not $Fast) {
     Write-StepHeader "6/6: Benchmark de Estabilidad (vn bench tests/benchmarks/vn/bench_fib.vn -v)"
