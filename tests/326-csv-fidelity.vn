@@ -1,0 +1,52 @@
+import { describe, it, expect } from "std:test";
+import { Csv, Json } from "std:encoding";
+import { ParseError } from "std:error";
+
+function parseFails(text: str): bool {
+    try {
+        Csv.parse<dynamic>(text);
+        return false;
+    } catch (e) {
+        return e instanceof ParseError;
+    }
+}
+
+await describe("326 csv keeps what it reads", async () => {
+    await it("a byte order mark does not become part of the first column name", async () => {
+        const rows = Csv.parse<dynamic>("\u{FEFF}name,age\nAda,36\n");
+        expect(Json.stringify(rows)).toBe("[{\"name\":\"Ada\",\"age\":36}]");
+    });
+
+    await it("a repeated column name is an error instead of a lost column", async () => {
+        expect(parseFails("a,a\n1,2\n")).toBe(true);
+    });
+
+    await it("a row that does not match the header is an error instead of lost data", async () => {
+        expect(parseFails("a,b\n1,2,3\n")).toBe(true);
+        expect(parseFails("a,b\n1\n")).toBe(true);
+        expect(Csv.parse<dynamic>("a,b\n1,2\n\n3,4\n").length).toBe(2);
+        expect(Json.stringify(Csv.parse<dynamic>("a\n1\n2,3\n", { hasHeader: false }))).toBe("[[\"a\"],[1],[2,3]]");
+    });
+
+    await it("only a canonical JSON number becomes a number", async () => {
+        const row = Csv.parse<dynamic>("zip,phone,n,neg,float,exp,plus,dot,tail\n00501,0123,0,-12,3.5,1e3,+7,.5,5.\n")[0];
+        expect(row.zip).toBe("00501");
+        expect(row.phone).toBe("0123");
+        expect(row.n).toBe(0);
+        expect(row.neg).toBe(-12);
+        expect(row.float).toBe(3.5);
+        expect(row.exp).toBe(1000.0);
+        expect(row.plus).toBe("+7");
+        expect(row.dot).toBe(".5");
+        expect(row.tail).toBe("5.");
+    });
+
+    await it("quoted fields keep commas, quotes and line breaks and round-trip", async () => {
+        const text = "a,b,c\n\"x,y\",\"q\"\"r\",\"l1\nl2\"\n";
+        const rows = Csv.parse<dynamic>(text);
+        expect(rows[0].a).toBe("x,y");
+        expect(rows[0].b).toBe("q\"r");
+        expect(rows[0].c).toBe("l1\nl2");
+        expect(Json.stringify(Csv.parse<dynamic>(Csv.stringify(rows)))).toBe(Json.stringify(rows));
+    });
+});
