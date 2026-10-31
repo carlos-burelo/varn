@@ -63,11 +63,32 @@ async function readHead(wire: WireReader): Task<str?> {
     return head + "\r\n";
 }
 
+function isDigits(text: str): bool {
+    if (text.length === 0) {
+        return false;
+    }
+    for (let i = 0; i < text.length; i = i + 1) {
+        const code = text.charCodeAt(i) as int;
+        if (code < 48 || code > 57) {
+            return false;
+        }
+    }
+    return true;
+}
+
 async function readBody(wire: WireReader, req: RawRequest, maxContentLength: int): Task<Bytes> {
     const expect = req.headers["expect"];
     const coding = req.headers["transfer-encoding"];
     const lengthText = req.headers["content-length"];
-    const chunked = coding !== null && coding.toLowerCase().indexOf("chunked") !== null;
+    if (coding !== null) {
+        if (lengthText !== null) {
+            throw new HttpRejection(400, "Bad Request");
+        }
+        if (coding.trim().toLowerCase() !== "chunked") {
+            throw new HttpRejection(501, "Not Implemented");
+        }
+    }
+    const chunked = coding !== null;
     if (!chunked && lengthText === null) {
         return Bytes.alloc(0);
     }
@@ -84,6 +105,9 @@ async function readBody(wire: WireReader, req: RawRequest, maxContentLength: int
         }
     }
     let declared = -1;
+    if (!isDigits(lengthText as str)) {
+        throw new HttpRejection(400, "Bad Request");
+    }
     try {
         declared = int.parse(lengthText as str);
     } catch (err) {

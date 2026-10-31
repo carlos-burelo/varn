@@ -3,8 +3,11 @@ import { WireReader, readChunkedBody } from "std:http/wire";
 import { Headers } from "std:http/headers";
 import { Json, JsonValue } from "std:encoding";
 import { AsyncReader } from "std:io";
+import { isHttpToken$, isHttpFieldValue$ } from "runtime:net";
 
 const MAX_BODY = 1073741824;
+const MAX_HEADERS = 200;
+const MAX_HEAD = 131072;
 
 export class RawResponse {
     status: int = 200;
@@ -19,7 +22,11 @@ function addHeader(resp: RawResponse, line: str): void {
     if (colon === null || colon <= 0) {
         throw new ProtocolError(`malformed header line '${line}'`);
     }
-    const key = line.slice(0, colon).trim().toLowerCase();
+    const name = line.slice(0, colon);
+    if (!isHttpToken$(name)) {
+        throw new ProtocolError(`malformed header name '${name}'`);
+    }
+    const key = name.toLowerCase();
     const value = line.slice(colon + 1).trim();
     if (key === "set-cookie") {
         resp.cookies.push(value);
@@ -38,14 +45,21 @@ export async function readHttpResponse(connId: int, headOnly: bool = false): Tas
     const resp = new RawResponse();
     const status = statusLine as str;
     const afterVersion = status.indexOf(" ");
-    if (afterVersion === null) {
+    if (afterVersion === null || !status.startsWith("HTTP/")) {
         throw new ProtocolError(`malformed status line '${status}'`);
     }
     const remainder = status.slice(afterVersion + 1);
     const afterCode = remainder.indexOf(" ");
-    resp.status = int.parse(afterCode === null ? remainder : remainder.slice(0, afterCode));
+    const codeText = afterCode === null ? remainder : remainder.slice(0, afterCode);
+    const code = int.tryParse(codeText);
+    if (codeText.length !== 3 || code === null || code < 100 || code > 599) {
+        throw new ProtocolError(`malformed status code '${codeText}'`);
+    }
+    resp.status = code;
     resp.statusText = afterCode === null ? "" : remainder.slice(afterCode + 1);
 
+    let headBytes = status.length;
+    let headerCount = 0;
     while (true) {
         const headerLine = await wire.line();
         if (headerLine === null) {
@@ -54,6 +68,11 @@ export async function readHttpResponse(connId: int, headOnly: bool = false): Tas
         if ((headerLine as str).length === 0) {
             break;
         }
+        headerCount = headerCount + 1;
+        headBytes = headBytes + (headerLine as str).length;
+        if (headerCount > MAX_HEADERS || headBytes > MAX_HEAD) {
+            throw new ProtocolError("the response headers are too large");
+        }
         addHeader(resp, headerLine as str);
     }
 
@@ -61,15 +80,18 @@ export async function readHttpResponse(connId: int, headOnly: bool = false): Tas
         return resp;
     }
     const coding = resp.headers["transfer-encoding"];
-    if (coding !== null && coding.toLowerCase().indexOf("chunked") !== null) {
+    if (coding !== null) {
+        if (coding.trim().toLowerCase() !== "chunked") {
+            throw new ProtocolError(`unsupported Transfer-Encoding '${coding}'`);
+        }
         resp.payload = await readChunkedBody(wire, MAX_BODY);
         return resp;
     }
     const lengthText = resp.headers["content-length"];
     if (lengthText !== null) {
-        const expected = int.parse(lengthText);
-        if (expected < 0 || expected > MAX_BODY) {
-            throw new ProtocolError(`unacceptable Content-Length ${expected}`);
+        const expected = int.tryParse(lengthText);
+        if (expected === null || expected < 0 || expected > MAX_BODY || lengthText.trim().startsWith("+")) {
+            throw new ProtocolError(`unacceptable Content-Length '${lengthText}'`);
         }
         const data = await wire.take(expected);
         if (data === null) {
@@ -78,8 +100,22 @@ export async function readHttpResponse(connId: int, headOnly: bool = false): Tas
         resp.payload = data as Bytes;
         return resp;
     }
-    resp.payload = await wire.rest();
+    resp.payload = await wire.rest(MAX_BODY);
     return resp;
+}
+
+function requireCookiePart(what: str, text: str, token: bool): void {
+    const valid = token ? isHttpToken$(text) : isHttpFieldValue$(text);
+    let clean = valid;
+    for (let i = 0; clean && i < text.length; i = i + 1) {
+        const code = text.charCodeAt(i) as int;
+        if (code <= 32 || code === 127 || code === 59 || code === 44 || code === 34 || code === 92) {
+            clean = false;
+        }
+    }
+    if (!clean || (!token && text.length === 0 && what === "path")) {
+        throw new TypeError(`invalid cookie ${what} '${text}'`);
+    }
 }
 
 function getHttpStatusText(status: int): str {
@@ -136,6 +172,14 @@ export class Response {
     }
 
     setCookie(name: str, value: str, options?: { maxAge?: int, path?: str, secure?: bool, httpOnly?: bool, sameSite?: str }): Response {
+        requireCookiePart("name", name, true);
+        requireCookiePart("value", value, false);
+        if (options !== null && options.path !== null) {
+            requireCookiePart("path", options.path as str, false);
+        }
+        if (options !== null && options.sameSite !== null && ["Strict", "Lax", "None"].indexOf(options.sameSite as str) === null) {
+            throw new TypeError(`invalid cookie SameSite '${options.sameSite}'`);
+        }
         let cookieStr = name + "=" + value;
         if (options !== null) {
             if (options.maxAge !== null) {

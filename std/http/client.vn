@@ -1,4 +1,4 @@
-import { tcpConnect$, tcpConnectTls$, tcpWrite$, tcpClose$, httpMethodName$, HttpMethod } from "runtime:net";
+import { tcpConnect$, tcpConnectTls$, tcpWrite$, tcpClose$, httpMethodName$, isHttpToken$, isHttpFieldValue$, HttpMethod } from "runtime:net";
 import { Url } from "std:net";
 import { ProtocolError, TimeoutError } from "std:error";
 import { Task } from "std:task";
@@ -6,16 +6,22 @@ import { Response, RawResponse, RequestInit, readHttpResponse } from "std:http/c
 import { isRedirect, sameOrigin, resolveLocation, redirectedMethod, redirectedHeaders } from "std:http/redirect";
 
 async function doFetch(connId: int, parsedUrl: Url, method: HttpMethod, headers: { [key: str]: str }, body: str): Task<Response> {
-    let requestStr = httpMethodName$(method) + " " + parsedUrl.path;
+    let target = parsedUrl.path;
     const queryStr = parsedUrl.query.toString();
     if (queryStr.length > 0) {
-        requestStr = requestStr + "?" + queryStr;
+        target = target + "?" + queryStr;
     }
-    requestStr = requestStr + " HTTP/1.1\r\n";
+    if (!isHttpFieldValue$(target) || target.indexOf(" ") !== null) {
+        throw new TypeError(`invalid request target '${target}'`);
+    }
+    let requestStr = httpMethodName$(method) + " " + target + " HTTP/1.1\r\n";
 
     let hasHost = false;
     let hasConnection = false;
     for (let key in headers) {
+        if (!isHttpToken$(key) || !isHttpFieldValue$(headers[key]!)) {
+            throw new TypeError(`invalid HTTP header '${key}'`);
+        }
         const lower = key.toLowerCase();
         if (lower === "host") {
             hasHost = true;
@@ -38,6 +44,10 @@ async function doFetch(connId: int, parsedUrl: Url, method: HttpMethod, headers:
     }
 
     for (let key in headers) {
+        const lower = key.toLowerCase();
+        if (lower === "content-length" || lower === "transfer-encoding") {
+            continue;
+        }
         requestStr = `${requestStr}${key}: ${headers[key]}\r\n`;
     }
 

@@ -2,6 +2,7 @@ import { tcpRead$ } from "runtime:net";
 import { ProtocolError } from "std:error";
 
 const READ_SIZE = 16384;
+const MAX_TRAILERS = 100;
 
 export class LineTooLongError extends ProtocolError {
     constructor(limit: int) {
@@ -51,6 +52,10 @@ export class ByteBuilder {
         return this.data.getByte(index);
     }
 
+    clear(): void {
+        this.used = 0;
+    }
+
     slice(start: int, end: int): Bytes {
         const out = Bytes.alloc(end - start);
         this.data.copy(out, 0, start, end);
@@ -76,6 +81,13 @@ export class WireReader {
         return this.buffer.length - this.cursor;
     }
 
+    private compact(): void {
+        if (this.cursor > 0 && this.cursor === this.buffer.length) {
+            this.buffer.clear();
+            this.cursor = 0;
+        }
+    }
+
     async pull(): Task<bool> {
         if (this.ended) {
             return false;
@@ -91,6 +103,7 @@ export class WireReader {
     }
 
     async line(limit: int = 65536): Task<str?> {
+        this.compact();
         let scanned = this.cursor;
         while (true) {
             const end = this.buffer.length;
@@ -115,6 +128,7 @@ export class WireReader {
     }
 
     async take(count: int): Task<Bytes?> {
+        this.compact();
         while (this.buffered < count) {
             if (!(await this.pull())) {
                 return null;
@@ -125,11 +139,18 @@ export class WireReader {
         return out;
     }
 
-    async rest(): Task<Bytes> {
+    async rest(limit: int): Task<Bytes> {
+        this.compact();
         while (true) {
+            if (this.buffer.length - this.cursor > limit) {
+                throw new BodyTooLargeError(limit);
+            }
             if (!(await this.pull())) {
                 break;
             }
+        }
+        if (this.buffer.length - this.cursor > limit) {
+            throw new BodyTooLargeError(limit);
         }
         const out = this.buffer.slice(this.cursor, this.buffer.length);
         this.cursor = this.buffer.length;
@@ -170,10 +191,15 @@ export async function readChunkedBody(wire: WireReader, maxBytes: int): Task<Byt
         }
         const size = parseChunkSize(sizeLine as str);
         if (size === 0) {
+            let trailers = 0;
             while (true) {
                 const trailer = await wire.line();
                 if (trailer === null || (trailer as str).length === 0) {
                     break;
+                }
+                trailers = trailers + 1;
+                if (trailers > MAX_TRAILERS) {
+                    throw new ProtocolError("too many trailer fields");
                 }
             }
             break;

@@ -1,4 +1,4 @@
-import { tcpListen$, tcpListenTls$, tcpAccept$, tcpWrite$, tcpClose$, tcpCloseListener$, sendHttpResponse$, httpMethodName$, HttpMethod } from "runtime:net";
+import { tcpListen$, tcpListenTls$, tcpAccept$, tcpWrite$, tcpClose$, tcpCloseListener$, sendHttpResponse$, sendHttpHead$, httpMethodName$, HttpMethod } from "runtime:net";
 import { spawn, Task } from "std:task";
 import { TimeoutError } from "std:error";
 
@@ -181,16 +181,7 @@ export class HttpServer {
     }
 
     private async _sendChunked(connId: int, responseObj: Response, reader: AsyncReader): Task<void> {
-        let head = "HTTP/1.1 " + responseObj.status.toString() + " " + responseObj.statusText + "\r\n";
-        let hdrs = responseObj.headers.toObject();
-        for (let name in hdrs) {
-            head = `${head}${name}: ${hdrs[name]}\r\n`;
-        }
-        for (let c of responseObj.cookies) {
-            head = head + "Set-Cookie: " + c + "\r\n";
-        }
-        head = head + "Transfer-Encoding: chunked\r\n\r\n";
-        await tcpWrite$(connId, head);
+        await sendHttpHead$(connId, responseObj.status, responseObj.statusText, responseObj.headers.toObject(), responseObj.cookies);
         let reading = true;
         while (reading) {
             let chunk = await reader.read(8192);
