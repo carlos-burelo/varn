@@ -2,6 +2,8 @@
  * Contiguous, indexable, growable sequence of `T`.
  */
 export declare class Array<T> {
+    constructor();
+    @throws(RangeError) static filled<U>(length: int, value: U): U[];
     readonly length: int;
     @throws(RangeError) push(item: T): void;
     pop(): T?;

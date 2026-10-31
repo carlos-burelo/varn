@@ -42,6 +42,21 @@ varn_contract! {
     class: "Array",
     contract: "src/modules/core/types/array/array.vn",
     impl Array {
+        fn constructor(ctx: &mut dyn NativeCtx, _this: VmValue) -> VmValue {
+            ctx.alloc_array(Vec::new())
+        }
+
+        fn filled(_ctx: &mut dyn NativeCtx, length: i64, value: VmValue) -> Result<Vec<VmValue>, NativeError> {
+            let len = usize::try_from(length)
+                .ok()
+                .filter(|&n| n <= varn_core::MAX_ARRAY_LEN)
+                .ok_or_else(|| NativeError::range_error(format!(
+                    "an array length must be between 0 and {}, got {length}",
+                    varn_core::MAX_ARRAY_LEN
+                )))?;
+            Ok(vec![value; len])
+        }
+
 
         fn length(ctx: &mut dyn NativeCtx, this: VnArray) -> i64 {
             this.len(ctx) as i64
