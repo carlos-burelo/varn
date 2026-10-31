@@ -45,4 +45,19 @@ await describe("316 Array construction, regex flags and never in unions", async 
         const s = (null as int?) ?? load();
         expect(s + 1).toBe(5);
     });
+
+    await it("fill, reverse and sort return the array they changed", async () => {
+        const a = [3, 1, 2];
+        const sorted = a.sort();
+        sorted.push(9);
+        expect(a.join(",")).toBe("1,2,3,9");
+        const b = [1, 2];
+        b.reverse().push(0);
+        expect(b.join(",")).toBe("2,1,0");
+        const c = [1, 2, 3];
+        c.fill(7, 1).push(5);
+        expect(c.join(",")).toBe("1,7,7,5");
+        const chained: int[] = [3, 1, 2].sort().reverse();
+        expect(chained.join(",")).toBe("3,2,1");
+    });
 });

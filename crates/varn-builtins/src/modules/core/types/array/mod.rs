@@ -206,14 +206,14 @@ varn_contract! {
             }
             Ok(out)
         }
-        fn fill(ctx: &mut dyn NativeCtx, this: VnArray, value: VmValue, start: Option<i64>, end: Option<i64>) -> Vec<VmValue> {
+        fn fill(ctx: &mut dyn NativeCtx, this: VnArray, value: VmValue, start: Option<i64>, end: Option<i64>) -> VmValue {
             let len = this.len(ctx) as i64;
             let si = norm_idx(start.unwrap_or(0), len);
             let ei = norm_idx(end.unwrap_or(len), len);
             for i in si..ei {
                 this.set(ctx, i, value);
             }
-            this.to_vec(ctx)
+            this.raw()
         }
         fn flat(ctx: &mut dyn NativeCtx, this: VnArray, depth: Option<i64>) -> Vec<VmValue> {
             let d = depth.unwrap_or(1);
@@ -221,13 +221,13 @@ varn_contract! {
             flatten(ctx, this.raw(), d, &mut out);
             out
         }
-        fn reverse(ctx: &mut dyn NativeCtx, this: VnArray) -> Vec<VmValue> {
+        fn reverse(ctx: &mut dyn NativeCtx, this: VnArray) -> VmValue {
             let mut items = this.to_vec(ctx);
             items.reverse();
             for (i, v) in items.iter().enumerate() {
                 this.set(ctx, i, *v);
             }
-            items
+            this.raw()
         }
 
 
@@ -316,7 +316,7 @@ varn_contract! {
             }
             Ok(acc)
         }
-        fn sort(ctx: &mut dyn NativeCtx, this: VnArray, compareFn: Option<VmValue>) -> Result<Vec<VmValue>, NativeError> {
+        fn sort(ctx: &mut dyn NativeCtx, this: VnArray, compareFn: Option<VmValue>) -> Result<VmValue, NativeError> {
             let mut items = this.to_vec(ctx);
             match compareFn.filter(|v| !v.is_null()) {
                 Some(cb) => ordering::merge_sort(&mut items, &mut |a, b| ordering::sign(ctx, cb, &[a, b]))?,
@@ -325,7 +325,7 @@ varn_contract! {
             for (i, v) in items.iter().enumerate() {
                 this.set(ctx, i, *v);
             }
-            Ok(items)
+            Ok(this.raw())
         }
         fn splice(ctx: &mut dyn NativeCtx, this: VnArray, start: i64, deleteCount: Option<i64>, items: &[VmValue]) -> Vec<VmValue> {
             let len = this.len(ctx) as i64;

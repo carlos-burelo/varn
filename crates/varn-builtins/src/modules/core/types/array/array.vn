@@ -13,7 +13,7 @@ export declare class Array<T> {
     slice(start?: int, end?: int): T[];
     at(index: int): T?;
     @throws(RangeError) concat(...items: T[][]): T[];
-    fill(value: T, start?: int, end?: int): T[];
+    fill(value: T, start?: int, end?: int): this;
     @throws(Error) filter(predicate: (item: T, index: int, array: T[]) => bool): T[];
     @throws(Error) find(predicate: (item: T, index: int, array: T[]) => bool): T?;
     @throws(Error) findIndex(predicate: (item: T, index: int, array: T[]) => bool): int?;
@@ -22,8 +22,8 @@ export declare class Array<T> {
     @throws(Error) forEach(callback: (item: T, index: int, array: T[]) => void): void;
     @throws(Error) map<U>(callback: (item: T, index: int, array: T[]) => U): U[];
     @throws(Error) reduce<U>(callback: (acc: U, item: T, index: int, array: T[]) => U, initial?: U): U;
-    reverse(): T[];
-    @throws(Error) sort(compareFn?: (a: T, b: T) => int): T[];
+    reverse(): this;
+    @throws(Error) sort(compareFn?: (a: T, b: T) => int): this;
     splice(start: int, deleteCount?: int, ...items: T[]): T[];
     @throws(Error) every(predicate: (item: T, index: int, array: T[]) => bool): bool;
     @throws(Error) some(predicate: (item: T, index: int, array: T[]) => bool): bool;
