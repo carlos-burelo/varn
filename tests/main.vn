@@ -301,6 +301,9 @@ import "./307-bytes-and-string-limits.vn"
 import "./308-time-comparison-at-limits.vn"
 import "./309-stats-follow-ieee.vn"
 import "./310-duration-components.vn"
+import "./311-task-race-any-result.vn"
+import "./312-time-validation.vn"
+import "./313-crypto-sizes-and-decoding.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

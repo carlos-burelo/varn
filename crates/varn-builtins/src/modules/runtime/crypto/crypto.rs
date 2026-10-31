@@ -7,6 +7,18 @@ use varn_macros::varn_contract;
 use varn_types::NativeError;
 use varn_types::{NativeCtx, VmValue};
 
+fn random_size(what: &str, size: i64) -> Result<usize, NativeError> {
+    usize::try_from(size)
+        .ok()
+        .filter(|n| *n <= varn_core::MAX_ALLOC_BYTES)
+        .ok_or_else(|| {
+            NativeError::range_error(format!(
+                "{what}: size must be within 0..={}",
+                varn_core::MAX_ALLOC_BYTES
+            ))
+        })
+}
+
 pub struct CryptoRuntime;
 
 varn_contract! {
@@ -32,18 +44,14 @@ varn_contract! {
             Ok(uuid::Uuid::parse_str(s).is_ok())
         }
         fn randomBytes(_ctx: &mut dyn NativeCtx, size: i64) -> Result<Vec<VmValue>, NativeError> {
-            if size < 0 {
-                return Err(NativeError::range_error("crypto.randomBytes: size must be non-negative".to_string()));
-            }
-            let mut bytes = vec![0u8; size as usize];
+            let size = random_size("crypto.randomBytes", size)?;
+            let mut bytes = vec![0u8; size];
             rand::thread_rng().fill_bytes(&mut bytes);
             Ok(bytes.iter().map(|b| VmValue::from_int(*b as i64)).collect())
         }
         fn randomHex(_ctx: &mut dyn NativeCtx, size: i64) -> Result<String, NativeError> {
-            if size < 0 {
-                return Err(NativeError::range_error("crypto.randomHex: size must be non-negative".to_string()));
-            }
-            let mut bytes = vec![0u8; size as usize];
+            let size = random_size("crypto.randomHex", size)?;
+            let mut bytes = vec![0u8; size];
             rand::thread_rng().fill_bytes(&mut bytes);
             Ok(hex::encode(bytes))
         }
@@ -53,19 +61,19 @@ varn_contract! {
         fn base64Dec(_ctx: &mut dyn NativeCtx, data: &str) -> Result<String, NativeError> {
             let decoded = base64::engine::general_purpose::STANDARD
                 .decode(data.as_bytes())
-                .map_err(|e| format!("crypto.base64_dec: {e}")).map_err(NativeError::range_error)?;
+                .map_err(|e| NativeError::std(StdErrorClass::Parse, format!("crypto.base64_dec: {e}")))?;
             (String::from_utf8(decoded).map_err(|e| format!("crypto.base64_dec: {e}"))).map_err(|e| NativeError::std(StdErrorClass::Parse, e))
         }
         fn base64EncBytes(ctx: &mut dyn NativeCtx, data: VmValue) -> Result<String, NativeError> {
             let bytes = ctx
                 .buffer_to_bytes(data)
-                .ok_or_else(|| "crypto.base64EncBytes: expected Bytes".to_string()).map_err(NativeError::range_error)?;
+                .ok_or_else(|| NativeError::type_error("crypto.base64EncBytes: expected Bytes"))?;
             Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
         }
         fn base64DecBytes(ctx: &mut dyn NativeCtx, data: &str) -> Result<VmValue, NativeError> {
             let decoded = base64::engine::general_purpose::STANDARD
                 .decode(data.as_bytes())
-                .map_err(|e| format!("crypto.base64_dec: {e}")).map_err(NativeError::range_error)?;
+                .map_err(|e| NativeError::std(StdErrorClass::Parse, format!("crypto.base64_dec: {e}")))?;
             Ok(ctx.alloc_buffer_from_bytes(&decoded))
         }
         fn hmac(_ctx: &mut dyn NativeCtx, algo: &str, key: &str, data: &str) -> Result<String, NativeError> {
@@ -133,10 +141,8 @@ varn_contract! {
         }
 
         fn randomBytesBuffer(ctx: &mut dyn NativeCtx, size: i64) -> Result<VmValue, NativeError> {
-            if size < 0 {
-                return Err(NativeError::range_error("crypto.randomBytes: size must be non-negative".to_string()));
-            }
-            let mut bytes = vec![0u8; size as usize];
+            let size = random_size("crypto.randomBytes", size)?;
+            let mut bytes = vec![0u8; size];
             rand::thread_rng().fill_bytes(&mut bytes);
             Ok(ctx.alloc_buffer_from_bytes(&bytes))
         }
@@ -158,13 +164,14 @@ varn_contract! {
             if iterations <= 0 {
                 return Err(NativeError::range_error("PBKDF2: iterations must be positive".to_string()));
             }
-            if key_len <= 0 {
-                return Err(NativeError::range_error("PBKDF2: keyLen must be positive".to_string()));
-            }
+            let key_len = usize::try_from(key_len)
+                .ok()
+                .filter(|n| (1..=varn_core::MAX_ALLOC_BYTES).contains(n))
+                .ok_or_else(|| NativeError::range_error(format!("PBKDF2: keyLen must be within 1..={}", varn_core::MAX_ALLOC_BYTES)))?;
 
-            let mut out = vec![0u8; key_len as usize];
+            let mut out = vec![0u8; key_len];
             let hmac_len = 32usize;
-            let num_blocks = (key_len as usize).div_ceil(hmac_len);
+            let num_blocks = key_len.div_ceil(hmac_len);
             let mut block_buf = Vec::with_capacity(salt_bytes.len() + 4);
 
             for i in 1..=num_blocks {
@@ -188,7 +195,7 @@ varn_contract! {
                 }
 
                 let start = (i - 1) * hmac_len;
-                let end = (i * hmac_len).min(key_len as usize);
+                let end = (i * hmac_len).min(key_len);
                 let take = end - start;
                 out[start..end].copy_from_slice(&t[..take]);
             }

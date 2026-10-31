@@ -1,0 +1,27 @@
+import { describe, it, expect } from "std:test";
+import { randomBytes, randomHex } from "std:crypto";
+import { Base64 } from "std:encoding";
+import { ParseError } from "std:error";
+
+const MAX: int = 9223372036854775807;
+
+function outcome(f: () => str): str {
+    try { return f(); } catch (e) {
+        return e instanceof RangeError ? "range" : e instanceof ParseError ? "parse" : "other:" + e.name;
+    }
+}
+
+await describe("313 crypto sizes are bounded and malformed input is a ParseError", async () => {
+    await it("random sizes outside 0..=2^31 are RangeError, not a process abort", async () => {
+        expect(outcome(() => randomBytes(-1).length.toString())).toBe("range");
+        expect(outcome(() => randomBytes(MAX).length.toString())).toBe("range");
+        expect(outcome(() => randomHex(MAX)) ).toBe("range");
+        expect(outcome(() => randomBytes(16).length.toString())).toBe("16");
+        expect(outcome(() => randomHex(8).length.toString())).toBe("16");
+        expect(outcome(() => randomBytes(0).length.toString())).toBe("0");
+    });
+
+    await it("a malformed base64 text is a ParseError", async () => {
+        expect(outcome(() => Base64.decode("!!not base64!!"))).toBe("parse");
+    });
+});
