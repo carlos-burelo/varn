@@ -32,7 +32,7 @@ impl<'r> Checker<'r> {
             self.emit(
                 Diagnostic::error(
                     ErrorCode::TypeMismatch,
-                    format!("operator 'try' can only be applied to 'Result', 'Option', or nullable types, found '{expr_ty_s}'{note}"),
+                    format!("operator 'try' can only be applied to 'Result' or nullable types, found '{expr_ty_s}'{note}"),
                 )
                 .with_range(range),
             );

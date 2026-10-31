@@ -1,6 +1,6 @@
 import { describe, it, expect } from "std:test";
 
-// `try` works on the core Result and Option.
+// `try` works on the core Result and on nullable types.
 function parse_positive(n: int): Result<int, str> {
     if (n <= 0) {
         return Result.Err("must be positive");
@@ -24,16 +24,16 @@ let ok_res = compute_result(5, 10);
 
 let err_res = compute_result(-2, 10);
 
-function find_user_id(name: str): Option<int> {
+function find_user_id(name: str): int? {
     if (name == "alice") {
-        return Option.Some(101);
+        return 101;
     }
-    return Option.None;
+    return null;
 }
 
-function get_user_score(name: str): Option<int> {
+function get_user_score(name: str): int? {
     let uid: int = try find_user_id(name);
-    return Option.Some(uid + 50);
+    return uid + 50;
 }
 
 let some_opt = get_user_score("alice");
@@ -71,14 +71,8 @@ await describe("109 try operator", async () => {
     });
 
     await it("group 1 part 1b", async () => {
-        let some_val = match (some_opt) {
-            Some(s) => s,
-            None => -1
-        };
-        let is_none = match (none_opt) {
-            Some(_) => false,
-            None => true
-        };
+        let some_val = some_opt ?? -1;
+        let is_none = none_opt === null;
         expect(some_val).toBe(151);
         expect(is_none).toBe(true);
         expect(suffixed_ok).toBe("test_suffix");

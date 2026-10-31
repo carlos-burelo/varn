@@ -31,8 +31,8 @@ await describe("242 async generator next() is a task", async () => {
     await it("next() returns a task that settles with the option", async () => {
         const gen = ticks();
         const pending = gen.next();
-        expect((await pending).unwrap()).toBe(1);
-        expect((await gen.next()).unwrap()).toBe(2);
-        expect((await gen.next()).isNone()).toBeTruthy();
+        expect((await pending)!).toBe(1);
+        expect((await gen.next())!).toBe(2);
+        expect((await gen.next()) === null).toBeTruthy();
     });
 });

@@ -52,7 +52,7 @@ export class Changes<T> {
         this._watcher = watcher;
     }
 
-    next(): TaskHandle<Option<T>> {
+    next(): TaskHandle<T?> {
         return this._queue.rx.next();
     }
 

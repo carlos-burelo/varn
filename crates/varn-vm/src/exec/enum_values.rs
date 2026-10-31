@@ -1,7 +1,6 @@
 use crate::error::{RuntimeError, VmResult};
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
-use varn_core::CoreSum;
 use varn_types::NativeCtx;
 
 type TemplateKey = (usize, usize, usize);
@@ -44,13 +43,5 @@ impl ExecCtx {
             template.instantiate(payload)
         };
         Ok(self.heap.alloc_enum_variant_vm(data))
-    }
-
-    pub(crate) fn make_option(&mut self, value: Option<VmValue>) -> VmResult<VmValue> {
-        let sum = CoreSum::Option;
-        match value {
-            Some(v) => self.enum_variant(sum.module(), sum.name(), sum.success_variant(), &[v]),
-            None => self.enum_variant(sum.module(), sum.name(), sum.failure_variant(), &[]),
-        }
     }
 }

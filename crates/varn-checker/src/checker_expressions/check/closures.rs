@@ -334,8 +334,28 @@ impl<'r> Checker<'r> {
                         .with_range(self.ast_arena.expr(arg).range),
                     );
             }
+            if given == Type::Null || (!given.is_dynamic() && given.is_nullable(&self.ty_table)) {
+                let given_s = given.display(&self.ty_table, &bind.interner);
+                self.emit(
+                    varn_core::Diagnostic::error(
+                        varn_core::ErrorCode::TypeMismatch,
+                        format!(
+                            "a generator cannot yield '{given_s}': null marks the end of the iteration"
+                        ),
+                    )
+                    .with_range(self.ast_arena.expr(arg).range),
+                );
+            }
             given
         } else {
+            self.emit(
+                varn_core::Diagnostic::error(
+                    varn_core::ErrorCode::TypeMismatch,
+                    "a yield needs the value it produces: null marks the end of the iteration"
+                        .to_string(),
+                )
+                .with_range(range),
+            );
             Type::Void
         };
         if let Some(yields) = &mut self.yielded_types {

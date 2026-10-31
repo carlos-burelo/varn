@@ -167,19 +167,18 @@ async function runComprehensiveTest(): Task<void> {
     }
     expect(dispObj.disposed).toBe(true);
 
-    // 15. std:result (Option) — the ADT, so `Some(x)` is a constructor and the
-    // variants can be matched on, not a nullable in disguise.
-    let optSome = Some<int>(99);
-    let optNone = None;
-    expect(optSome.isSome()).toBeTruthy();
-    expect(!optNone.isSome()).toBeTruthy();
-    expect(optNone.isNone()).toBeTruthy();
-    expect(optSome.unwrap()).toBe(99);
-    expect(optSome.unwrapOr(50)).toBe(99);
-    expect(optNone.unwrapOr(50)).toBe(50);
-    match (optSome) {
-        Some(v) => expect(v).toBe(99),
-        None => expect(false).toBeTruthy(),
+    // 15. null is the single absent value: `T?`, `??` and a binding condition.
+    let optSome: int? = 99;
+    let optNone: int? = null;
+    expect(optSome !== null).toBeTruthy();
+    expect(optNone === null).toBeTruthy();
+    expect(optSome!).toBe(99);
+    expect(optSome ?? 50).toBe(99);
+    expect(optNone ?? 50).toBe(50);
+    if (const v = optSome) {
+        expect(v).toBe(99);
+    } else {
+        expect(false).toBeTruthy();
     }
 
     // 16. std:result (Result)

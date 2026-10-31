@@ -70,7 +70,7 @@ export class Computed<T> extends Readable<T> implements Observer {
     private _derive: () => T;
     private _equals: ((a: T, b: T) => bool)?;
     private _source: Source = new Source();
-    private _cached: Option<T> = Option.None;
+    private _cache: T[] = [];
     private _stale: bool = true;
     private _computing: bool = false;
 
@@ -94,12 +94,12 @@ export class Computed<T> extends Readable<T> implements Observer {
     override get value(): T {
         this.settle();
         track(this._source);
-        return this._cached.unwrap();
+        return this._cache[0];
     }
 
     override peek(): T {
         this.settle();
-        return this._cached.unwrap();
+        return this._cache[0];
     }
 
     dispose(): void {
@@ -111,7 +111,7 @@ export class Computed<T> extends Readable<T> implements Observer {
         if (!this._stale || !this.alive) {
             return;
         }
-        if (this._cached.isSome() && !changed(this)) {
+        if (this._cache.length > 0 && !changed(this)) {
             this._stale = false;
             return;
         }
@@ -123,8 +123,8 @@ export class Computed<T> extends Readable<T> implements Observer {
             unlink(this);
             const next = runTracked(this, this._derive);
             const equals = this._equals;
-            const unchanged = this._cached.isSome() && (equals === null ? sameValue(next, this._cached.unwrap()) : equals(this._cached.unwrap(), next));
-            this._cached = Option.Some(next);
+            const unchanged = this._cache.length > 0 && (equals === null ? sameValue(next, this._cache[0]) : equals(this._cache[0], next));
+            this._cache = [next];
             this._stale = false;
             if (!unchanged) {
                 this._source.version = this._source.version + 1;

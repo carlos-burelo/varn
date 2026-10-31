@@ -26,25 +26,12 @@ fn closed_error(ctx: &mut ExecCtx) -> VmValue {
     SendValue::error(varn_types::value::CHANNEL_CLOSED_CLASS, "channel closed").to_value_ctx(ctx)
 }
 
-fn option_outcome(ctx: &mut ExecCtx, value: Option<VmValue>) -> Outcome {
-    ctx.make_option(value).map_err(|e| {
-        SendValue::error(
-            varn_core::RuntimeErrorKind::Error.class_name(),
-            e.to_string(),
-        )
-        .to_value_ctx(ctx)
-    })
-}
-
 fn materialize(ctx: &mut ExecCtx, done: Completion, open: HostOpen) -> Outcome {
     match (open, done) {
         (HostOpen::Plain, Ok(sv)) => Ok(open_value(ctx, &sv)),
         (HostOpen::Plain, Err(sv)) => Err(sv.to_value_ctx(ctx)),
-        (HostOpen::ReceiveNext, Ok(sv)) => {
-            let value = open_value(ctx, &sv);
-            option_outcome(ctx, Some(value))
-        }
-        (HostOpen::ReceiveNext, Err(_)) => option_outcome(ctx, None),
+        (HostOpen::ReceiveNext, Ok(sv)) => Ok(open_value(ctx, &sv)),
+        (HostOpen::ReceiveNext, Err(_)) => Ok(VmValue::null()),
         (HostOpen::Receive, Ok(sv)) => Ok(open_value(ctx, &sv)),
         (HostOpen::Receive, Err(_)) => Err(closed_error(ctx)),
         (HostOpen::SendAck, Ok(SendValue::Bool(true))) => Ok(VmValue::null()),

@@ -9,13 +9,13 @@ class AsyncCounter {
     constructor() {
         this.i = 0;
     }
-    async next(): Option<int> {
+    async next(): int? {
         if (this.i < 3) {
             let val = this.i;
             this.i = this.i + 1;
-            return Some(val);
+            return val;
         }
-        return None;
+        return null;
     }
 }
 

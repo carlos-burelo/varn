@@ -118,7 +118,7 @@ impl ExecCtx {
         match phase {
             Phase::Done => {
                 *generator.phase.borrow_mut() = Phase::Done;
-                Ok(Entry::Done(self.make_option(None)?))
+                Ok(Entry::Done(VmValue::null()))
             }
             Phase::Running => Err(RuntimeError::new("generator is already running")),
             Phase::Fresh {
@@ -174,7 +174,7 @@ impl ExecCtx {
                 Some(VmSuspend::DebugBreak) => {}
                 None => {
                     *generator.phase.borrow_mut() = Phase::Done;
-                    return self.make_option(None);
+                    return Ok(VmValue::null());
                 }
             }
         }
@@ -208,14 +208,14 @@ impl ExecCtx {
         match suspend {
             Some(VmSuspend::Yield { .. }) if generator.closing.get() => {
                 generator.close();
-                self.make_option(None)
+                Ok(VmValue::null())
             }
             Some(VmSuspend::Yield { value, dest_reg }) => {
                 self.park_generator(generator, 0, value, dest_reg)
             }
             Some(VmSuspend::Await { .. }) | Some(VmSuspend::DebugBreak) | None => {
                 generator.close();
-                self.make_option(None)
+                Ok(VmValue::null())
             }
         }
     }
@@ -250,7 +250,7 @@ impl ExecCtx {
             }
             Some(VmSuspend::Await { .. }) | Some(VmSuspend::DebugBreak) | None => {
                 self.abandon_generator(generator, depth);
-                self.make_option(None)
+                Ok(VmValue::null())
             }
         }
     }
@@ -262,12 +262,18 @@ impl ExecCtx {
         value: VmValue,
         dest_reg: u8,
     ) -> VmResult<VmValue> {
+        if value.is_null() {
+            self.abandon_generator(generator, depth);
+            return Err(RuntimeError::new(
+                "a generator cannot yield null: null marks the end of the iteration",
+            ));
+        }
         let buffers = std::mem::take(&mut *generator.spare.borrow_mut());
         let frame = freeze_frame(self, depth, false, buffers).map_err(RuntimeError::new)?;
         self.frames.pop();
         self.stack.pop_frame();
         *generator.phase.borrow_mut() = Phase::Suspended { frame, dest_reg };
-        self.make_option(Some(value))
+        Ok(value)
     }
 
     pub(crate) fn abandon_generator(&mut self, generator: &GenState, depth: usize) {

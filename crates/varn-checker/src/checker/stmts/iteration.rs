@@ -1,5 +1,5 @@
 use super::super::Checker;
-use varn_core::{BuiltinType, CoreSum, LangPrimitive, MemberKey, TypeKind};
+use varn_core::{BuiltinType, LangPrimitive, MemberKey, TypeKind};
 use varn_sem::bind::BindResult;
 use varn_sem::output::ForOfPlan;
 use varn_sem::types::Type;
@@ -121,10 +121,10 @@ impl Checker<'_> {
         } else {
             next
         };
-        let (sum, args) = step.core_sum(&self.ty_table)?;
-        let elem = (sum == CoreSum::Option)
-            .then(|| args.first().copied())
-            .flatten()?;
+        if !step.is_nullable(&self.ty_table) {
+            return None;
+        }
+        let elem = step.non_nullified(std::sync::Arc::make_mut(&mut self.ty_table));
         Some((
             ForOfPlan::Protocol {
                 iterator: iter_result,

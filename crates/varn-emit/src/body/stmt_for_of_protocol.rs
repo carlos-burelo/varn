@@ -1,13 +1,13 @@
 use super::context::FnEmitter;
 use super::finally_splice;
-use super::small_utils::{bool_lit, int_lit};
-use super::stmt_for_of::{binary, local_var};
+use super::small_utils::bool_lit;
+use super::stmt_for_of::local_var;
 use std::sync::Arc;
 use varn_core::ast::{Pattern, StmtId};
-use varn_core::{CoreSum, MemberKey};
+use varn_core::MemberKey;
 use varn_sem::types::Type;
 use varn_tir::{
-    BackendTy, DynReason, LocalId, Resolution, Span, TirBinOp, TirExpr, TirExprKind, TirStmt,
+    BackendTy, DynReason, LocalId, Resolution, Span, TirExpr, TirExprKind, TirStmt, TirUnOp,
 };
 
 pub(super) struct Protocol {
@@ -15,12 +15,6 @@ pub(super) struct Protocol {
     pub(super) next: Type,
     pub(super) step: Type,
     pub(super) is_await: bool,
-}
-
-struct OptionTags {
-    some: u16,
-    none: u16,
-    payload: BackendTy,
 }
 
 impl FnEmitter<'_> {
@@ -71,21 +65,6 @@ impl FnEmitter<'_> {
         out
     }
 
-    fn option_tags(&mut self, step: BackendTy) -> Option<OptionTags> {
-        let BackendTy::Enum(eid) = step.non_nullable(self.tt) else {
-            return None;
-        };
-        let info = self.m.enums.get(eid.0 as usize)?;
-        let variant = |name: &str| info.variants.iter().find(|v| v.name.as_ref() == name);
-        let some = variant(CoreSum::Option.success_variant())?;
-        let none = variant(CoreSum::Option.failure_variant())?;
-        Some(OptionTags {
-            some: some.tag,
-            none: none.tag,
-            payload: some.payload.first().copied()?,
-        })
-    }
-
     pub(super) fn for_of_protocol(
         &mut self,
         left: &Pattern,
@@ -95,9 +74,6 @@ impl FnEmitter<'_> {
     ) -> Vec<TirStmt> {
         let mut out = Vec::new();
         let step_ty = self.lower_checked(&plan.step);
-        let Some(tags) = self.option_tags(step_ty) else {
-            return out;
-        };
         let iterator = match &plan.iterator {
             Some(ty) => {
                 let ty = self.lower_checked(ty);
@@ -142,29 +118,16 @@ impl FnEmitter<'_> {
         }
         let step = self.fresh_local(step_ty);
         let step_var = || local_var(step, step_ty);
-        let finished = binary(
-            TirBinOp::Eq,
-            TirExpr {
-                kind: TirExprKind::Discriminant {
-                    value: Box::new(step_var()),
-                },
-                ty: BackendTy::Int,
-                res: Resolution::None,
-                span: Span::EMPTY,
+        let finished = TirExpr {
+            kind: TirExprKind::Unary {
+                op: TirUnOp::IsNull,
+                operand: Box::new(step_var()),
             },
-            int_lit(i64::from(tags.none)),
-            BackendTy::Bool,
-        );
-        let value = TirExpr {
-            kind: TirExprKind::VariantPayload {
-                value: Box::new(step_var()),
-                tag: tags.some,
-                field: 0,
-            },
-            ty: tags.payload,
+            ty: BackendTy::Bool,
             res: Resolution::None,
             span: Span::EMPTY,
         };
+        let value = self.cast_to(step_var(), step_ty.non_nullable(self.tt));
         let mut loop_body = std::mem::take(&mut self.pending);
         loop_body.push(TirStmt::Let {
             local: step,

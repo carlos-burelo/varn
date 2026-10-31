@@ -182,18 +182,14 @@ varn_contract! {
     class: "Receiver",
     impl ReceiverImpl {
         fn next(ctx: &mut dyn NativeCtx, this: VmValue) -> Result<VmValue, NativeError> {
-            let finished = |ctx: &mut dyn NativeCtx| {
-                let none = ctx.option(None).map_err(NativeError::failure)?;
-                Ok(ctx.task_resolved(none))
-            };
+            let finished = |ctx: &mut dyn NativeCtx| Ok(ctx.task_resolved(VmValue::null()));
             let Some(id) = endpoint_id(ctx, this) else {
                 return finished(ctx);
             };
             match crate::runtime::channel::try_receive(id) {
                 crate::runtime::channel::RecvOutcome::Item(item) => {
                     let value = item.to_value_ctx(ctx);
-                    let some = ctx.option(Some(value)).map_err(NativeError::failure)?;
-                    Ok(ctx.task_resolved(some))
+                    Ok(ctx.task_resolved(value))
                 }
                 crate::runtime::channel::RecvOutcome::Closed => finished(ctx),
                 crate::runtime::channel::RecvOutcome::Parked(promise) => {

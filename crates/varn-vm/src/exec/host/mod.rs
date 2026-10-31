@@ -176,10 +176,6 @@ impl NativeCtx for ExecCtx {
         self.heap.alloc_class_vm(class)
     }
 
-    fn option(&mut self, value: Option<VmValue>) -> Result<VmValue, String> {
-        self.make_option(value).map_err(|e| e.to_string())
-    }
-
     fn enum_variant(
         &mut self,
         module: &'static str,

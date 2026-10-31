@@ -201,37 +201,32 @@ impl std::fmt::Display for BuiltinType {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum CoreSum {
-    Option,
     Result,
 }
 
 impl CoreSum {
-    pub const ALL: [Self; 2] = [Self::Option, Self::Result];
+    pub const ALL: [Self; 1] = [Self::Result];
 
     pub const fn name(self) -> &'static str {
         match self {
-            Self::Option => "Option",
             Self::Result => "Result",
         }
     }
 
     pub const fn module(self) -> &'static str {
         match self {
-            Self::Option => "core:types/option",
             Self::Result => "core:types/result",
         }
     }
 
     pub const fn failure_variant(self) -> &'static str {
         match self {
-            Self::Option => "None",
             Self::Result => "Err",
         }
     }
 
     pub const fn success_variant(self) -> &'static str {
         match self {
-            Self::Option => "Some",
             Self::Result => "Ok",
         }
     }

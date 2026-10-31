@@ -42,12 +42,12 @@ await describe("70 result extensions", async () => {
         };
         expect(matchedVal).toBe(42);
         
-        // 2. Option ADT
-        const someOpt: Option<str> = Some("varn");
-        const noneOpt: Option<str> = None;
+        // 2. null is the single absent value
+        const someOpt: str? = "varn";
+        const noneOpt: str? = null;
         
-        expect(someOpt.isSome()).toBeTruthy();
-        expect(noneOpt.isNone()).toBeTruthy();
+        expect(someOpt !== null).toBeTruthy();
+        expect(noneOpt === null).toBeTruthy();
         
         // 3. Failure paths
         const caught = Result.catching<int>(() => {
@@ -62,7 +62,7 @@ await describe("70 result extensions", async () => {
         
         let unwrapNoneThrew = false;
         try {
-            noneOpt.unwrap();
+            const forced: str = noneOpt!;
         } catch (e) {
             unwrapNoneThrew = true;
         }

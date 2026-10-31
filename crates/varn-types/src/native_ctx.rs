@@ -64,9 +64,6 @@ pub trait NativeCtx: crate::Buffers {
     ) -> VmValue {
         self.alloc_object()
     }
-    fn option(&mut self, _value: Option<VmValue>) -> Result<VmValue, String> {
-        Err("this context cannot build core Option values".to_string())
-    }
     fn enum_variant(
         &mut self,
         _module: &'static str,

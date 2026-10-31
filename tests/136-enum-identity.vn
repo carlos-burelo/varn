@@ -41,9 +41,9 @@ await describe("136 enum identity", async () => {
             Good(v) => v,
             Bad(_) => 0
         };
-        const core: Option<int> = Some(2);
+        const core: int? = 2;
         expect(matched).toBe(1);
-        expect(core.unwrapOr(0)).toBe(2);
+        expect(core ?? 0).toBe(2);
     });
 
 
