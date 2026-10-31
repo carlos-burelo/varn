@@ -65,15 +65,8 @@ impl Shape {
                 if i > 0 {
                     p.push(',');
                 }
-                p.push('"');
-                for b in name.as_bytes() {
-                    match b {
-                        b'"' => p.push_str("\\\""),
-                        b'\\' => p.push_str("\\\\"),
-                        _ => p.push(*b as char),
-                    }
-                }
-                p.push_str("\":");
+                varn_core::text_repr::write_quoted_str(name, &mut p);
+                p.push(':');
                 json_prefixes.push(p);
             }
             json_prefixes

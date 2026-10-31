@@ -85,102 +85,145 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
         }
     }
 
-    #[inline]
-    fn parse_string(&mut self) -> Option<VmValue> {
-        self.pos += 1;
-        let start = self.pos;
-        let rem = &self.bytes[start..];
-        let end_rel = memchr::memchr(b'"', rem)?;
-        let candidate = &rem[..end_rel];
-        if memchr::memchr(b'\\', candidate).is_none() {
-            self.pos = start + end_rel + 1;
-            let s = std::str::from_utf8(candidate).ok()?;
-            if let Some(sso) = VmValue::try_from_sso(s) {
-                return Some(sso);
-            }
-            return Some(self.ctx.heap.alloc_str_dynamic(s));
+    fn read_string_text(&mut self) -> Option<std::borrow::Cow<'a, str>> {
+        let bytes: &'a [u8] = self.bytes;
+        let start = self.pos + 1;
+        let first = memchr::memchr2(b'"', b'\\', &bytes[start..])? + start;
+        if bytes[first] == b'"' {
+            self.pos = first + 1;
+            return Some(std::borrow::Cow::Borrowed(
+                std::str::from_utf8(&bytes[start..first]).ok()?,
+            ));
         }
-
-        let mut out = String::with_capacity(end_rel);
-        let mut i = start;
-        while i < self.bytes.len() {
-            let b = self.bytes[i];
-            if b == b'"' {
-                self.pos = i + 1;
-                return Some(self.ctx.heap.alloc_str_dynamic(&out));
-            } else if b == b'\\' {
-                i += 1;
-                let esc = self.bytes.get(i).copied()?;
-                match esc {
-                    b'"' => out.push('"'),
-                    b'\\' => out.push('\\'),
-                    b'/' => out.push('/'),
-                    b'b' => out.push('\x08'),
-                    b'f' => out.push('\x0c'),
-                    b'n' => out.push('\n'),
-                    b'r' => out.push('\r'),
-                    b't' => out.push('\t'),
-                    b'u' => {
-                        if i + 4 >= self.bytes.len() {
+        let mut out = String::with_capacity(first - start + 16);
+        let mut chunk = start;
+        let mut at = first;
+        loop {
+            out.push_str(std::str::from_utf8(&bytes[chunk..at]).ok()?);
+            if bytes[at] == b'"' {
+                self.pos = at + 1;
+                return Some(std::borrow::Cow::Owned(out));
+            }
+            let mut next = at + 2;
+            match *bytes.get(at + 1)? {
+                b'"' => out.push('"'),
+                b'\\' => out.push('\\'),
+                b'/' => out.push('/'),
+                b'b' => out.push('\x08'),
+                b'f' => out.push('\x0c'),
+                b'n' => out.push('\n'),
+                b'r' => out.push('\r'),
+                b't' => out.push('\t'),
+                b'u' => {
+                    let high = Self::hex4(bytes, at + 2)?;
+                    next = at + 6;
+                    let code = if (0xD800..0xDC00).contains(&high) {
+                        if bytes.get(next) != Some(&b'\\') || bytes.get(next + 1) != Some(&b'u') {
                             return None;
                         }
-                        let hex_str = std::str::from_utf8(&self.bytes[i + 1..i + 5]).ok()?;
-                        let code = u32::from_str_radix(hex_str, 16).ok()?;
-                        let c = std::char::from_u32(code)?;
-                        out.push(c);
-                        i += 4;
-                    }
-                    _ => return None,
+                        let low = Self::hex4(bytes, next + 2)?;
+                        if !(0xDC00..0xE000).contains(&low) {
+                            return None;
+                        }
+                        next += 6;
+                        0x10000 + ((high - 0xD800) << 10) + (low - 0xDC00)
+                    } else {
+                        high
+                    };
+                    out.push(std::char::from_u32(code)?);
                 }
-                i += 1;
-            } else {
-                out.push(b as char);
-                i += 1;
+                _ => return None,
             }
+            chunk = next;
+            at = memchr::memchr2(b'"', b'\\', &bytes[chunk..])? + chunk;
         }
-        None
+    }
+
+    fn hex4(bytes: &[u8], at: usize) -> Option<u32> {
+        let digits = bytes.get(at..at + 4)?;
+        std::str::from_utf8(digits)
+            .ok()
+            .filter(|text| text.bytes().all(|b| b.is_ascii_hexdigit()))
+            .and_then(|text| u32::from_str_radix(text, 16).ok())
+    }
+
+    #[inline]
+    fn parse_string(&mut self) -> Option<VmValue> {
+        let text = self.read_string_text()?;
+        if let Some(sso) = VmValue::try_from_sso(&text) {
+            return Some(sso);
+        }
+        Some(self.ctx.heap.alloc_str_dynamic(&text))
     }
 
     #[inline]
     fn parse_number(&mut self) -> Option<VmValue> {
         let start = self.pos;
         let mut i = start;
-        let mut is_float = false;
-        let negative = if i < self.bytes.len() && self.bytes[i] == b'-' {
+        let negative = self.bytes.get(i) == Some(&b'-');
+        if negative {
             i += 1;
-            true
-        } else {
-            false
-        };
-        let digits_start = i;
-        let mut int_val: i64 = 0;
-        let mut overflow = false;
-        while i < self.bytes.len() {
-            let b = self.bytes[i];
-            if b.is_ascii_digit() {
-                if !is_float && !overflow {
-                    let d = (b - b'0') as i64;
-                    if let Some(next) = int_val.checked_mul(10).and_then(|v| v.checked_add(d)) {
-                        int_val = next;
-                    } else {
-                        overflow = true;
-                    }
-                }
-                i += 1;
-            } else if b == b'.' || b == b'e' || b == b'E' || b == b'+' || b == b'-' {
-                is_float = true;
-                i += 1;
-            } else {
-                break;
-            }
         }
-        if i == digits_start {
+        let digits_start = i;
+        while self.bytes.get(i).is_some_and(u8::is_ascii_digit) {
+            i += 1;
+        }
+        let int_end = i;
+        if int_end == digits_start
+            || (self.bytes[digits_start] == b'0' && int_end - digits_start > 1)
+        {
             return None;
         }
+        let mut is_float = false;
+        if self.bytes.get(i) == Some(&b'.') {
+            is_float = true;
+            i += 1;
+            let frac = i;
+            while self.bytes.get(i).is_some_and(u8::is_ascii_digit) {
+                i += 1;
+            }
+            if i == frac {
+                return None;
+            }
+        }
+        if matches!(self.bytes.get(i), Some(b'e' | b'E')) {
+            is_float = true;
+            i += 1;
+            if matches!(self.bytes.get(i), Some(b'+' | b'-')) {
+                i += 1;
+            }
+            let exp = i;
+            while self.bytes.get(i).is_some_and(u8::is_ascii_digit) {
+                i += 1;
+            }
+            if i == exp {
+                return None;
+            }
+        }
         self.pos = i;
-        if !is_float && !overflow {
-            let val = if negative { -int_val } else { int_val };
-            return Some(VmValue::from_int(val));
+        if !is_float {
+            let mut value: i64 = 0;
+            let mut fits = true;
+            for &b in &self.bytes[digits_start..int_end] {
+                let d = i64::from(b - b'0');
+                let next = value.checked_mul(10).and_then(|v| {
+                    if negative {
+                        v.checked_sub(d)
+                    } else {
+                        v.checked_add(d)
+                    }
+                });
+                match next {
+                    Some(n) => value = n,
+                    None => {
+                        fits = false;
+                        break;
+                    }
+                }
+            }
+            if fits {
+                return Some(VmValue::from_int(value));
+            }
         }
         let f = fast_parse_f64(&self.bytes[start..i])?;
         Some(VmValue::from_f64(f))
@@ -244,14 +287,8 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
             if self.pos >= self.bytes.len() || self.bytes[self.pos] != b'"' {
                 return None;
             }
-            self.pos += 1;
-            let k_start = self.pos;
-            let rem = &self.bytes[k_start..];
-            let k_end_rel = memchr::memchr(b'"', rem)?;
-            let k_bytes = &rem[..k_end_rel];
-            self.pos = k_start + k_end_rel + 1;
-
-            let key_str = std::str::from_utf8(k_bytes).ok()?;
+            let key_text = self.read_string_text()?;
+            let key_str: &str = &key_text;
 
             self.skip_whitespace();
             if self.pos >= self.bytes.len() || self.bytes[self.pos] != b':' {

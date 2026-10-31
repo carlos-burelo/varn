@@ -1,0 +1,70 @@
+import { describe, it, expect } from "std:test";
+import { Json } from "std:encoding";
+
+function roundTrip(text: str): str {
+    return Json.stringify(Json.parse(text));
+}
+
+function parses(text: str): bool {
+    try {
+        Json.parse(text);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+await describe("314 JSON keeps its text and its integers exactly", async () => {
+    await it("object keys round-trip with non-ASCII characters", async () => {
+        expect(roundTrip("{\"\u00e9\u20ac\":1}")).toBe("{\"\u00e9\u20ac\":1}");
+        expect(Json.stringify({ "\u00e9": 1, "plain": 2 })).toBe("{\"\u00e9\":1,\"plain\":2}");
+    });
+
+    await it("string literals process their escapes in object keys too", async () => {
+        const keys: str[] = [];
+        for (const k in { "\u00e9": 1, "a\u0041": 2, "\n": 3, "\x41": 4, "\u{1F600}": 5 }) {
+            keys.push(k);
+        }
+        expect(keys.length).toBe(5);
+        expect(keys[0].length).toBe(1);
+        expect(keys[1]).toBe("aA");
+        expect(keys[2].charCodeAt(0)).toBe(10);
+        expect(keys[3]).toBe("A");
+        expect(keys[4].length).toBe(1);
+    });
+
+    await it("keys and values are escaped by the same rules", async () => {
+        expect(Json.stringify({ "a\nb": 1 })).toBe("{\"a\\nb\":1}");
+        expect(Json.stringify({ "q\"r": 1 })).toBe("{\"q\\\"r\":1}");
+        expect(Json.stringify({ "\u0001c": 1 })).toBe("{\"\\u0001c\":1}");
+        expect(Json.stringify("tab\there")).toBe("\"tab\\there\"");
+    });
+
+    await it("escapes in a text that also holds non-ASCII are decoded as UTF-8", async () => {
+        expect(Json.parse("\"\u00e9\\n\u20ac\"") as str).toBe("\u00e9\n\u20ac");
+        expect(roundTrip("{\"k\\\\\":\"\u00e9\\t\"}")).toBe("{\"k\\\\\":\"\u00e9\\t\"}");
+    });
+
+    await it("escaped surrogate pairs become one character, in keys too", async () => {
+        expect(Json.parse("\"\\ud83d\\ude00\"") as str).toBe("\u{1F600}");
+        expect(roundTrip("{\"\\ud83d\\ude00\":1}")).toBe("{\"\u{1F600}\":1}");
+        expect(parses("\"\\ud83d\"")).toBe(false);
+        expect(parses("\"\\ude00\"")).toBe(false);
+    });
+
+    await it("the whole int range survives, including int.MIN", async () => {
+        expect(roundTrip("[9223372036854775807,-9223372036854775808,0,-1]")).toBe("[9223372036854775807,-9223372036854775808,0,-1]");
+        expect(roundTrip("[9007199254740993]")).toBe("[9007199254740993]");
+    });
+
+    await it("numbers outside the JSON grammar are refused", async () => {
+        expect(parses("01")).toBe(false);
+        expect(parses("1.")).toBe(false);
+        expect(parses("-")).toBe(false);
+        expect(parses("1e")).toBe(false);
+        expect(parses("+1")).toBe(false);
+        expect(parses(".5")).toBe(false);
+        expect(parses("[1,2]")).toBe(true);
+        expect(parses("-0.5e-3")).toBe(true);
+    });
+});
