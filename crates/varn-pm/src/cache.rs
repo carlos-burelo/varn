@@ -3,12 +3,7 @@ use std::path::PathBuf;
 use crate::origin::DepOrigin;
 
 pub fn global_cache_root() -> PathBuf {
-    let home = std::env::var("HOME")
-        .or_else(|_| std::env::var("USERPROFILE"))
-        .unwrap_or_else(|_| ".".to_owned());
-    PathBuf::from(home)
-        .join(varn_project::ENV_DIR_NAME)
-        .join("cache")
+    varn_core::paths::varn_cache_dir()
 }
 
 pub fn cached_package_path(origin: &DepOrigin, version: &str) -> PathBuf {

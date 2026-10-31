@@ -186,21 +186,8 @@ impl std::fmt::Display for ArtifactError {
     }
 }
 
-pub fn global_varn_dir() -> PathBuf {
-    if let Ok(dir) = std::env::var("VARN_HOME") {
-        return PathBuf::from(dir);
-    }
-    if let Some(home) = dirs_home() {
-        return home.join(".varn");
-    }
-    PathBuf::from(".varn")
-}
-
 pub fn get_cache_dir() -> PathBuf {
-    if let Ok(dir) = std::env::var("VARN_CACHE_DIR") {
-        return PathBuf::from(dir);
-    }
-    global_varn_dir().join(CACHE_DIR_NAME)
+    varn_core::paths::varn_cache_dir()
 }
 
 pub fn get_bytecode_cache_dir() -> PathBuf {
@@ -258,19 +245,6 @@ pub fn read_module_artifact(
     let path = module_artifact_path(dir, kind, id, fingerprint);
     let bytes = std::fs::read(path).ok()?;
     read_artifact(kind, &bytes).ok().map(|p| p.to_vec())
-}
-
-fn dirs_home() -> Option<PathBuf> {
-    #[cfg(windows)]
-    {
-        std::env::var_os("USERPROFILE")
-            .or_else(|| std::env::var_os("HOME"))
-            .map(PathBuf::from)
-    }
-    #[cfg(not(windows))]
-    {
-        std::env::var_os("HOME").map(PathBuf::from)
-    }
 }
 
 const HEADER_LEN: usize = 25;
