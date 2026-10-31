@@ -66,12 +66,9 @@ pub(super) fn try_print(
             print_expr(argument, arena, child_indent, true, interner);
             true
         }
-        ExprKind::Yield {
-            argument, delegate, ..
-        } => {
-            let (argument, delegate) = (*argument, *delegate);
-            let d = if delegate { "*" } else { "" };
-            terminal::log(format!("{indent}{marker}{}{d}", chalk("Yield").bold()));
+        ExprKind::Yield { argument } => {
+            let argument = *argument;
+            terminal::log(format!("{indent}{marker}{}", chalk("Yield").bold()));
             if let Some(a) = argument {
                 print_expr(a, arena, child_indent, true, interner);
             }

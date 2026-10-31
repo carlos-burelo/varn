@@ -132,7 +132,6 @@ pub enum ExprKind {
     },
     Yield {
         argument: Option<ExprId>,
-        delegate: bool,
     },
     Spread {
         argument: ExprId,

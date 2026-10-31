@@ -90,7 +90,6 @@ fn yield_in_a_non_generator_is_rejected() {
     let body = vec![TirStmt::Expr(expr(
         TirExprKind::Yield {
             value: Some(Box::new(int(1))),
-            delegate: false,
         },
         BackendTy::Dynamic(DynReason::Unrecorded),
         Resolution::None,

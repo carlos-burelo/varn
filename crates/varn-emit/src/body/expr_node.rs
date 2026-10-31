@@ -105,8 +105,8 @@ impl<'a> FnEmitter<'a> {
             ExprKind::Await { argument } => {
                 return self.lower_await(*argument, ty, span);
             }
-            ExprKind::Yield { argument, delegate } => {
-                return self.lower_yield(*argument, *delegate, span);
+            ExprKind::Yield { argument } => {
+                return self.lower_yield(*argument, span);
             }
 
             ExprKind::Call {

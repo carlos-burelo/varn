@@ -8,7 +8,7 @@ pub(crate) use literal_text::parse_literal_atom;
 mod logical_ops;
 mod precedence;
 mod primary;
-mod yield_expr;
+pub(crate) mod yield_expr;
 
 pub use calls::{parse_call_args, parse_call_args_pub, parse_new_callee_expr, parse_unary_expr};
 
@@ -23,7 +23,6 @@ use arrow_lookahead::could_be_arrow;
 use arrow_parse::try_parse_arrow;
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::{ContextualKeyword, TokenKind};
-use yield_expr::parse_yield_expr;
 
 pub fn parse_expr(s: &mut TokenStream) -> Result<ExprId, String> {
     parse_assign_expr(s)
@@ -49,7 +48,9 @@ pub fn parse_seq_expr(s: &mut TokenStream) -> Result<ExprId, String> {
 
 pub(super) fn parse_assign_expr(s: &mut TokenStream) -> Result<ExprId, String> {
     if s.check(TokenKind::Yield) {
-        return parse_yield_expr(s);
+        return Err(String::from(
+            "`yield` produces no value, so it is a statement of its own and cannot be used inside an expression",
+        ));
     }
 
     if could_be_arrow(s)

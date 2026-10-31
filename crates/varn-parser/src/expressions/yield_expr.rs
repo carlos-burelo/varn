@@ -1,9 +1,9 @@
 use super::parse_assign_expr;
 use crate::stream::TokenStream;
-use varn_core::ast::{ExprId, ExprKind};
+use varn_core::ast::{ExprKind, Pattern, StmtId, StmtKind, VarKind};
 use varn_core::TokenKind;
 
-pub(super) fn parse_yield_expr(s: &mut TokenStream) -> Result<ExprId, String> {
+pub(crate) fn parse_yield_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     let start_range = s.range();
     s.advance();
     let delegate = s.eat(TokenKind::Star);
@@ -12,6 +12,48 @@ pub(super) fn parse_yield_expr(s: &mut TokenStream) -> Result<ExprId, String> {
     } else {
         None
     };
-    let full_range = s.span_from(start_range);
-    Ok(s.expr(full_range, ExprKind::Yield { argument, delegate }))
+    s.eat_semicolon();
+    let range = s.span_from(start_range);
+    let Some(source) = argument.filter(|_| delegate) else {
+        if delegate {
+            return Err(String::from("`yield*` needs the iterable it delegates to"));
+        }
+        let yielded = s.expr(range, ExprKind::Yield { argument });
+        return Ok(s.stmt(
+            range,
+            StmtKind::Expr {
+                expression: yielded,
+            },
+        ));
+    };
+    let item = s.interner.intern(varn_core::intrinsics::DELEGATED_ITEM);
+    let item_expr = s.expr(range, ExprKind::Identifier { name: item });
+    let yielded = s.expr(
+        range,
+        ExprKind::Yield {
+            argument: Some(item_expr),
+        },
+    );
+    let forward = s.stmt(
+        range,
+        StmtKind::Expr {
+            expression: yielded,
+        },
+    );
+    let body = s.stmt(
+        range,
+        StmtKind::Block {
+            stmts: vec![forward],
+        },
+    );
+    Ok(s.stmt(
+        range,
+        StmtKind::ForOf {
+            kind: VarKind::Const,
+            left: Pattern::Identifier { name: item, range },
+            right: source,
+            body,
+            is_await: false,
+        },
+    ))
 }

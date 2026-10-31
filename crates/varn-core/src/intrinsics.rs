@@ -22,6 +22,8 @@ macro_rules! member_keys {
     };
 }
 
+pub const DELEGATED_ITEM: &str = "<yield*>";
+
 member_keys! {
     Tag => "__tag",
     Value0 => "value0",

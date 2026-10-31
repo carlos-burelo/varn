@@ -160,7 +160,6 @@ pub enum TirExprKind {
 
     Yield {
         value: Option<Box<TirExpr>>,
-        delegate: bool,
     },
 
     Discriminant {

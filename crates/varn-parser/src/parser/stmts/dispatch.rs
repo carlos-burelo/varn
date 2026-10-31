@@ -217,6 +217,9 @@ pub fn parse_stmt_or_decl_inner(s: &mut TokenStream) -> Result<StmtId, String> {
         | TokenKind::Parallel
         | TokenKind::Start
         | TokenKind::RawStr => {
+            if s.check(TokenKind::Yield) {
+                return crate::expressions::yield_expr::parse_yield_stmt(s);
+            }
             let start_range = s.range();
             let expr = crate::expressions::parse_expr(s)?;
             s.eat_semicolon();

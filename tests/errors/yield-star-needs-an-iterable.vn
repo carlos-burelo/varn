@@ -1,0 +1,4 @@
+// expect: error[VN2002]
+function* numbers(): Generator<int> {
+    yield*;
+}
