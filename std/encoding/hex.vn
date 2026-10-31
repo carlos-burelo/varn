@@ -1,18 +1,4 @@
 import { ParseError } from "std:error";
-import { toString$, fromBytes$ } from "runtime:buffer";
-
-const HEX_CHARS: str = "0123456789abcdef";
-
-function byteToHex(byteValue: int): str {
-    let remainder = byteValue;
-    let high = 0;
-    while (remainder >= 16) {
-        remainder = remainder - 16;
-        high = high + 1;
-    }
-    let low = remainder;
-    return HEX_CHARS[high] + HEX_CHARS[low];
-}
 
 function hexCharToNibble(character: str): int {
     let code = character.charCodeAt(0);
@@ -30,16 +16,14 @@ function hexCharToNibble(character: str): int {
 
 export namespace Hex {
     export function encode(data: str): str {
-        let result: str = "";
-        let length: int = data.length;
-        for (let index = 0; index < length; index = index + 1) {
-            let charCode = data.charCodeAt(index);
-            result = result + byteToHex(charCode);
-        }
-        return result;
+        return Bytes.fromString(data).toHex();
     }
 
-    export function decode(hexString: str): str {
+    export function encodeBytes(data: Bytes): str {
+        return data.toHex();
+    }
+
+    export function decodeBytes(hexString: str): Bytes {
         if (hexString.length % 2 !== 0) {
             throw new ParseError("invalid hex string length");
         }
@@ -48,9 +32,12 @@ export namespace Hex {
         for (let index = 0; index < length; index = index + 2) {
             let high = hexCharToNibble(hexString[index]);
             let low = hexCharToNibble(hexString[index + 1]);
-            let byteVal = high * 16 + low;
-            bytes.push(byteVal);
+            bytes.push(high * 16 + low);
         }
-        return toString$(fromBytes$(bytes));
+        return Bytes.fromBytes(bytes);
+    }
+
+    export function decode(hexString: str): str {
+        return decodeBytes(hexString).toString();
     }
 }

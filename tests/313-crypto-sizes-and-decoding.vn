@@ -1,6 +1,6 @@
 import { describe, it, expect } from "std:test";
-import { randomBytes, randomHex } from "std:crypto";
-import { Base64 } from "std:encoding";
+import { randomBytes, randomHex, sha256, hmac, pbkdf2 } from "std:crypto";
+import { Base64, Hex } from "std:encoding";
 import { ParseError } from "std:error";
 
 const MAX: int = 9223372036854775807;
@@ -23,5 +23,22 @@ await describe("313 crypto sizes are bounded and malformed input is a ParseError
 
     await it("a malformed base64 text is a ParseError", async () => {
         expect(outcome(() => Base64.decode("!!not base64!!"))).toBe("parse");
+    });
+    await it("Hex works on the UTF-8 bytes of a text, not on its code points", async () => {
+        expect(Hex.encode("abc")).toBe("616263");
+        expect(Hex.encode("é")).toBe("c3a9");
+        expect(Hex.encode("€")).toBe("e282ac");
+        expect(Hex.decode("c3a9e282ac")).toBe("é€");
+        expect(Hex.encodeBytes(Bytes.fromBytes([0, 15, 16, 255]))).toBe("000f10ff");
+        expect(Hex.decodeBytes("000f10ff").length).toBe(4);
+        expect(outcome(() => Hex.decode("abc"))).toBe("parse");
+        expect(outcome(() => Hex.decode("zz"))).toBe("parse");
+    });
+
+    await it("hashes and key derivation match published vectors", async () => {
+        expect(sha256("abc")).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+        expect(sha256("")).toBe("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+        expect(hmac("sha256", "key", "The quick brown fox jumps over the lazy dog")).toBe("f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8");
+        expect(pbkdf2("password", "salt", 2, 32).toHex()).toBe("ae4d0c95af6b46d32d0adff928f06dd02a303f8ef3c251dfd6e2d85a95474c43");
     });
 });
