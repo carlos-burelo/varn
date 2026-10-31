@@ -17,9 +17,16 @@ pub fn raw(var: EnvVar) -> Option<String> {
     process_lookup(var.name())
 }
 
+static LOADED: OnceLock<(Settings, Vec<EnvError>)> = OnceLock::new();
+
 fn loaded() -> &'static (Settings, Vec<EnvError>) {
-    static LOADED: OnceLock<(Settings, Vec<EnvError>)> = OnceLock::new();
     LOADED.get_or_init(|| Settings::read(&process_lookup))
+}
+
+pub fn install(settings: Settings) -> Result<(), Settings> {
+    LOADED
+        .set((settings, Vec::new()))
+        .map_err(|(rejected, _)| rejected)
 }
 
 pub fn settings() -> &'static Settings {
