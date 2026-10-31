@@ -77,7 +77,8 @@ export function toParts(ms: int): TimeParts {
         hour: parts.hour,
         minute: parts.minute,
         second: parts.second,
-        millisecond: parts.millisecond
+        millisecond: parts.millisecond,
+        weekday: parts.weekday
     };
 }
 
