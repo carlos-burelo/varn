@@ -28,7 +28,6 @@ native_modules! {
     path = "runtime/path/path.rs" => [path::NATIVE_ENTRIES];
     process = "runtime/process/process.rs" => [process::NATIVE_ENTRIES];
     reflect = "runtime/reflect/reflect.rs" => [reflect::NATIVE_ENTRIES];
-    regex = "runtime/regex/regex.rs" => [regex::NATIVE_ENTRIES];
     sqlite = "runtime/sqlite/sqlite.rs" => [sqlite::NATIVE_ENTRIES];
     stderror = "runtime/error/error.rs" => [stderror::NATIVE_ENTRIES];
     sys = "runtime/sys/sys.rs" => [sys::NATIVE_ENTRIES];
@@ -48,6 +47,7 @@ native_modules! {
         types::iteration::NATIVE_ENTRIES,
         types::map::NATIVE_ENTRIES,
         types::range::NATIVE_ENTRIES,
+        types::regex::NATIVE_ENTRIES,
         types::set::NATIVE_ENTRIES,
         types::string::NATIVE_ENTRIES,
     ];

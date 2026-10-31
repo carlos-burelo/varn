@@ -102,6 +102,7 @@ impl<'r> Binder<'r> {
         }
 
         b.bind_stmts(&program.body);
+        b.check_regex_literal_hygiene(program);
         b.resolve_decorator_roles();
         Arc::make_mut(&mut b.ty_table).absorb_names(&b.interner);
         let type_param_variance = super::variance::compute_type_param_variance(&b);

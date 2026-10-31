@@ -1,7 +1,6 @@
 use super::TokenStream;
 use varn_core::ast::{
-    Arg, Decl, ExprKind, ImportDecl, ImportSpecifier, Pattern, StmtId, StmtKind, VarDeclarator,
-    VarKind, VariableDecl,
+    Arg, Decl, ExprKind, Pattern, StmtId, StmtKind, VarDeclarator, VarKind, VariableDecl,
 };
 use varn_core::{Atom, SourceRange};
 
@@ -37,30 +36,14 @@ impl TokenStream {
 
     pub fn hoist_regex_literals(&mut self) -> Vec<StmtId> {
         let literals = std::mem::take(&mut self.regex_literals);
-        let Some(first) = literals.first() else {
+        if literals.is_empty() {
             return Vec::new();
-        };
-        let at = first.range;
-        let class = self.interner.intern(varn_core::regex_pattern::STD_CLASS);
-        let alias = self
-            .interner
-            .intern(varn_core::intrinsics::REGEX_CLASS_ALIAS);
-        let source = self.interner.intern(varn_core::regex_pattern::STD_MODULE);
-        let import = ImportDecl {
-            ast_id: self.next_ast_id(),
-            specifiers: vec![ImportSpecifier::Named {
-                local: alias,
-                imported: class,
-                range: at,
-            }],
-            source,
-            is_type: false,
-            range: at,
-        };
-        let mut hoisted = vec![self.stmt(at, StmtKind::Decl(Box::new(Decl::Import(import))))];
+        }
+        let class = self.interner.intern(varn_core::regex_pattern::CLASS);
+        let mut hoisted = Vec::new();
         for literal in literals {
             let range = literal.range;
-            let callee = self.expr(range, ExprKind::Identifier { name: alias });
+            let callee = self.expr(range, ExprKind::Identifier { name: class });
             let pattern = self.expr(
                 range,
                 ExprKind::StrLiteral {

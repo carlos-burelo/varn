@@ -27,7 +27,6 @@ runtime = [
     "dep:rustls",
     "dep:webpki-roots",
     "dep:httparse",
-    "dep:regex",
     "dep:flate2",
     "dep:rusqlite",
     "dep:tar",
@@ -55,7 +54,7 @@ base64       = { version = "0.21", optional = true }
 hex          = { workspace = true, optional = true }
 urlencoding  = { version = "2", optional = true }
 chrono       = { version = "0.4", optional = true }
-regex        = { workspace = true, optional = true }
+regex        = { workspace = true }
 flate2       = { workspace = true, optional = true }
 rusqlite     = { workspace = true, optional = true }
 tar          = { workspace = true, optional = true }

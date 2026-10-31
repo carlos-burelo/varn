@@ -1,12 +1,11 @@
 import { describe, it, expect, summary } from "std:test";
-import { Regex } from "std:regex";
 
-await describe("example std:regex", async () => {
+await describe("example Regex", async () => {
     await it("tests patterns", () => {
         let digits = new Regex("\\d+");
         expect(digits.test("abc123")).toBe(true);
         expect(digits.test("no digits")).toBe(false);
-        expect(Regex.compile("foo", "i").test("FOO")).toBe(true);
+        expect(new Regex("foo", "i").test("FOO")).toBe(true);
     });
 
     await it("execs first match with groups", () => {
@@ -26,7 +25,7 @@ await describe("example std:regex", async () => {
     });
 
     await it("replaces and splits", () => {
-        expect(new Regex("\\d+").replace("a1 b2", "X")).toBe("aX bX");
+        expect(new Regex("\\d+").replaceAll("a1 b2", "X")).toBe("aX bX");
         let parts = new Regex(",\\s*").split("a, b,c");
         expect(parts.length).toBe(3);
         expect(parts[1]).toBe("b");

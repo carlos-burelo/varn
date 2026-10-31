@@ -12,8 +12,8 @@ pub const FLAGS: [char; 4] = [
     IGNORE_WHITESPACE,
 ];
 
-pub const STD_MODULE: &str = "std:regex";
-pub const STD_CLASS: &str = "Regex";
+pub const MODULE: &str = "core:types/regex";
+pub const CLASS: &str = "Regex";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PatternError {

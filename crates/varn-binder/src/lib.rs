@@ -27,6 +27,7 @@ mod heritage;
 mod imports;
 mod interface;
 pub mod paths;
+mod regex_hygiene;
 mod type_names;
 mod variance;
 

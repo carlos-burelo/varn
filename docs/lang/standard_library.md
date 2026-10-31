@@ -35,7 +35,7 @@ Este archivo no duplica esa lista; solo ancla lo ejercitado por la suite.
 ## Formatos, red, sistema
 
 - `std:encoding` (`Csv`, `Json`): `tests/82-std-csv.vn`.
-- `std:regex`, `std:crypto` (UUID), `std:time`:
+- `Regex` (tipo del núcleo, sin import), `std:crypto` (UUID), `std:time`:
   `tests/83-canonical-types-regex-uuid-time.vn`.
 - `std:process`, `std:compress`, `std:cli`, `std:env`, `std:path`:
   `tests/84-stdlib-process-compress-cli-env.vn`.

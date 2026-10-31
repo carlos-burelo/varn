@@ -1,0 +1,32 @@
+/**
+ * What a successful match reports: the matched text, where it starts counted
+ * in code points like every other `str` index, and the capture groups (`null`
+ * for a group that did not take part).
+ */
+export interface RegexMatch {
+    match: str;
+    index: int;
+    groups: (str?)[];
+}
+
+/**
+ * A compiled regular expression: linear time, without backreferences or
+ * lookaround. The flags are `i`, `m`, `s` and `x`; matching is always global,
+ * so `findAll` returns every match and `replaceAll` rewrites every one. A
+ * `/pattern/flags` literal builds one per module.
+ */
+export declare class Regex {
+    private handle: int;
+
+    get pattern(): str;
+    get flags(): str;
+
+    @throws(ParseError) constructor(pattern: str, flags?: str);
+
+    test(text: str): bool;
+    exec(text: str): RegexMatch?;
+    findAll(text: str): RegexMatch[];
+    replace(text: str, replacement: str): str;
+    replaceAll(text: str, replacement: str): str;
+    split(text: str): str[];
+}

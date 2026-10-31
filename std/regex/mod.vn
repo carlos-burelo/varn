@@ -1,2 +1,0 @@
-
-export { RegexMatch, Regex } from "std:regex/regex";

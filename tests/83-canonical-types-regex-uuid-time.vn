@@ -1,4 +1,3 @@
-import { Regex } from "std:regex";
 import { Uuid } from "std:crypto";
 import { DateTime, Duration, Instant, PlainDateTime } from "std:time";
 import { describe, it, expect } from "std:test";
@@ -7,25 +6,25 @@ import { describe, it, expect } from "std:test";
 // 1. Regex (Inmutable & Stateless)
 // ==========================================
 
-let reEmail = Regex.compile("^([a-zA-Z0-9_\\.-]+)@([a-zA-Z0-9\\.-]+)\\.([a-zA-Z]{2,6})$");
+let reEmail = new Regex("^([a-zA-Z0-9_\\.-]+)@([a-zA-Z0-9\\.-]+)\\.([a-zA-Z]{2,6})$");
 
 // Exec with capture groups
 let matchRes = reEmail.exec("contact@google.com");
 
 // FindAll
-let reDigits = Regex.compile("[0-9]+");
+let reDigits = new Regex("[0-9]+");
 let allDigits = reDigits.findAll("order 1024 has 42 items and cost 99 dollars");
 
 // Replace
-let reSpaces = Regex.compile("\\s+");
-let normalized = reSpaces.replace("hello    world\tfrom   varn", " ");
+let reSpaces = new Regex("\\s+");
+let normalized = reSpaces.replaceAll("hello    world\tfrom   varn", " ");
 
 // Split
-let reDelim = Regex.compile("[,;\\s]+");
+let reDelim = new Regex("[,;\\s]+");
 let parts = reDelim.split("alpha,beta; gamma   delta");
 
 // Stateless test (calling .test multiple times has NO side-effect state mutations)
-let reWord = Regex.compile("test");
+let reWord = new Regex("test");
 
 // ==========================================
 // 2. UUID (v4 & v7)

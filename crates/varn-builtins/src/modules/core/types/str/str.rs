@@ -2,6 +2,7 @@ use varn_macros::varn_contract;
 use varn_types::str_util::{
     char_len, char_range_to_bytes, find_bytes,
 };
+use crate::modules::types::regex::regex_argument;
 use varn_types::{NativeCtx, NativeFnResult, VmValue, VnStr};
 
 pub struct Str;
@@ -169,22 +170,41 @@ varn_contract! {
         }
 
 
-        fn replace(_ctx: &mut dyn NativeCtx, this: &VnStr, from: &str, to: &str) -> String {
-            this.replacen(from, to, 1)
+        fn replace(ctx: &mut dyn NativeCtx, this: &VnStr, from: VmValue, to: &str) -> String {
+            if let Some(re) = regex_argument(ctx, from) {
+                return re.replacen(this.as_str(), 1, to).into_owned();
+            }
+            let from = ctx.str_repr_borrowed(from);
+            this.replacen(from.as_ref(), to, 1)
         }
-        fn replaceAll(_ctx: &mut dyn NativeCtx, this: &VnStr, from: &str, to: &str) -> String {
+        fn replaceAll(ctx: &mut dyn NativeCtx, this: &VnStr, from: VmValue, to: &str) -> String {
+            if let Some(re) = regex_argument(ctx, from) {
+                return re.replace_all(this.as_str(), to).into_owned();
+            }
+            let from = ctx.str_repr_borrowed(from);
             if from.is_empty() {
                 return this.to_string();
             }
-            this.replace(from, to)
+            this.replace(from.as_ref(), to)
         }
         fn chars(ctx: &mut dyn NativeCtx, this: &VnStr) -> Vec<VmValue> {
             this.as_str().chars().map(|c| ctx.alloc_char(c)).collect()
         }
 
-        fn split(ctx: &mut dyn NativeCtx, this: &VnStr, separator: Option<&str>) -> Vec<VmValue> {
+        fn split(ctx: &mut dyn NativeCtx, this: &VnStr, separator: Option<VmValue>) -> Vec<VmValue> {
+            if let Some(sep) = separator
+                && let Some(re) = regex_argument(ctx, sep)
+            {
+                let base = this.as_str().as_ptr() as usize;
+                let parts: Vec<(usize, usize)> = re
+                    .split(this.as_str())
+                    .map(|p| (p.as_ptr() as usize - base, p.len()))
+                    .collect();
+                return parts.into_iter().map(|(off, len)| ctx.str_sub(this, off, len)).collect();
+            }
+            let separator = separator.map(|s| ctx.str_repr_borrowed(s).into_owned());
             let mut ranges = Vec::new();
-            varn_types::str_util::split_ranges(this.as_str(), separator, &mut ranges);
+            varn_types::str_util::split_ranges(this.as_str(), separator.as_deref(), &mut ranges);
             ranges.into_iter().map(|(off, len)| ctx.str_sub(this, off, len)).collect()
         }
         fn lines(ctx: &mut dyn NativeCtx, this: &VnStr) -> Vec<VmValue> {

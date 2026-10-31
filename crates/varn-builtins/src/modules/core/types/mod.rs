@@ -20,6 +20,8 @@ pub mod iteration;
 pub mod map;
 #[path = "range/range.rs"]
 pub mod range;
+#[path = "regex/regex.rs"]
+pub mod regex;
 #[path = "set/set.rs"]
 pub mod set;
 #[path = "str/str.rs"]

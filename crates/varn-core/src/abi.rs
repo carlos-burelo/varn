@@ -97,6 +97,7 @@ pub const NATIVE_GLOBALS: &[NativeGlobal] = {
         native("NaN", Float),
         native(B::Range.name(), Class),
         native(E::RangeError.class_name(), Class),
+        native(crate::regex_pattern::CLASS, Class),
         native(B::Set.name(), Class),
         native(E::TypeError.class_name(), Class),
         native("assertSummary", Function),

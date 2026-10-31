@@ -174,7 +174,11 @@ const m = fecha.exec("el 2026-10")
 const ok = /^ab+c$/i.test("ABBC")
 ```
 
-- Un literal `/cuerpo/flags` tiene tipo `Regex` de `std:regex`; no hace falta importarlo.
+- Un literal `/cuerpo/flags` tiene tipo `Regex`, un tipo del núcleo como `Array` o `Range`: no se importa.
+  `new Regex(patrón, flags?)` es la otra forma de construirlo (lanza `ParseError` si el patrón es inválido).
+- `str.replace`, `str.replaceAll` y `str.split` aceptan un `Regex` donde aceptan un `str`: `replace` reescribe
+  la primera coincidencia, `replaceAll` todas, y `$1`, `${nombre}` y `$$` expanden grupos en el reemplazo.
+- Un módulo que declara su propia `Regex` no puede usar literales (`VN2021`): el literal construiría esa clase.
 - El cuerpo y los flags se validan al **parsear**: un patrón inválido, un flag desconocido o una
   construcción que el motor no admite (retroreferencias, lookaround) es el error `VN2021`.
 - Flags admitidos: `i`, `m`, `s`, `x`. No existe `g`: `findAll` y `replace` son siempre globales.

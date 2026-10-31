@@ -1,0 +1,8 @@
+// expect: error[VN2021]
+class Regex {
+    pattern: str
+    constructor(pattern: str) {
+        this.pattern = pattern
+    }
+}
+const literal = /a+/

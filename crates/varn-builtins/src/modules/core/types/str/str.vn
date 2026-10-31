@@ -1,3 +1,5 @@
+import { Regex } from "core:types/regex";
+
 /**
  * Immutable UTF-8 text.
  */
@@ -24,9 +26,9 @@ export declare class str {
     @throws(RangeError) substring(start: int, end?: int): str;
     slice(start: int, end?: int): str;
     at(index: int): str?;
-    replace(from: str, to: str): str;
-    replaceAll(from: str, to: str): str;
-    split(separator?: str): str[];
+    replace(from: str | Regex, to: str): str;
+    replaceAll(from: str | Regex, to: str): str;
+    split(separator?: str | Regex): str[];
     chars(): char[];
     charCodeAt(pos: int): int;
     charCode(): int;
