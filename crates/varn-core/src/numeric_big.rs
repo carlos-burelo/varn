@@ -35,6 +35,16 @@ pub fn rem_big(a: &BigInt, b: &BigInt) -> Result<BigInt, IntDivFault> {
 
 pub const DECIMAL_DIV_DIGITS: u64 = 34;
 
+pub fn mul_decimal(a: &BigDecimal, b: &BigDecimal) -> BigDecimal {
+    let wanted = a.fractional_digit_count() + b.fractional_digit_count();
+    let product = a * b;
+    if wanted > 0 && product.fractional_digit_count() < wanted {
+        product.with_scale(wanted)
+    } else {
+        product
+    }
+}
+
 pub fn div_decimal(a: &BigDecimal, b: &BigDecimal) -> Result<BigDecimal, IntDivFault> {
     if b.is_zero() {
         return Err(IntDivFault::DivisionByZero);
@@ -75,15 +85,24 @@ pub fn pow_decimal(base: &BigDecimal, exp: &BigDecimal) -> Result<BigDecimal, De
         };
     }
     let magnitude = e.unsigned_abs();
-    if *base == one || e == 0 {
+    if e == 0 {
         return Ok(one);
     }
-    if *base == -one.clone() {
-        return Ok(if magnitude % 2 == 0 {
-            one
+    let unit = base.abs() == one;
+    let scale = base.fractional_digit_count().max(0) as u64;
+    if unit {
+        let target = scale.saturating_mul(magnitude);
+        if target > DECIMAL_POW_MAX_DIGITS {
+            return Err(DecimalPowFault::TooLarge);
+        }
+        let sign_kept = *base < BigDecimal::zero() && magnitude % 2 == 1;
+        let value = if sign_kept { -one.clone() } else { one };
+        let result = value.with_scale(target as i64);
+        return if e < 0 {
+            div_decimal(&BigDecimal::one(), &result).map_err(|_| DecimalPowFault::ZeroToNegative)
         } else {
-            base.clone()
-        });
+            Ok(result)
+        };
     }
     if base.digits().saturating_mul(magnitude) > DECIMAL_POW_MAX_DIGITS {
         return Err(DecimalPowFault::TooLarge);
@@ -93,11 +112,11 @@ pub fn pow_decimal(base: &BigDecimal, exp: &BigDecimal) -> Result<BigDecimal, De
     let mut bits = magnitude;
     while bits > 0 {
         if bits & 1 == 1 {
-            result = &result * &square;
+            result = mul_decimal(&result, &square);
         }
         bits >>= 1;
         if bits > 0 {
-            square = &square * &square;
+            square = mul_decimal(&square, &square);
         }
     }
     if e < 0 {

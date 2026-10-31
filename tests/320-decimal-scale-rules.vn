@@ -1,0 +1,32 @@
+import { describe, it, expect } from "std:test";
+
+function product(a: decimal, b: decimal): str { return (a * b).toString(); }
+function power(a: decimal, n: int): str { return a.pow(n).toString(); }
+
+await describe("320 decimal results keep the scale their operands imply", async () => {
+    await it("a product has the sum of the operand scales, even when one operand is one", async () => {
+        expect(product(1.0d, 1415.259566d)).toBe("1415.2595660");
+        expect(product(1.50d, 2.0d)).toBe("3.000");
+        expect((1.0d * 1415.259566d).toString()).toBe("1415.2595660");
+        expect(product(2.5d, 4d)).toBe("10.0");
+    });
+
+    await it("a power has the scale of the base times the exponent", async () => {
+        expect(power(2.50d, 2)).toBe("6.2500");
+        expect(power(1.0d, 3)).toBe("1.000");
+        expect(power(-1.0d, 3)).toBe("-1.000");
+        expect(power(87629692283371016338.960d, 1)).toBe("87629692283371016338.960");
+        expect(power(1.5d, 0)).toBe("1");
+    });
+
+    await it("powers of one stay cheap for huge exponents", async () => {
+        expect((1d ** 1000000000).toString()).toBe("1");
+        expect(((-1d) ** 1000000001).toString()).toBe("-1");
+    });
+
+    await it("division of exact quotients drops the zeros, inexact ones round to 34 digits half-even", async () => {
+        expect((1d / 4d).toString()).toBe("0.25");
+        expect((1d / 3d).toString()).toBe("0.3333333333333333333333333333333333");
+        expect((2d / 3d).toString()).toBe("0.6666666666666666666666666666666667");
+    });
+});

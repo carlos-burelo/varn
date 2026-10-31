@@ -161,7 +161,7 @@ pub(crate) fn mul(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
             return r;
         }
         if let Some((x, y)) = decimal_pair(a, b, heap) {
-            return Ok(heap.alloc_decimal(x * y));
+            return Ok(heap.alloc_decimal(varn_core::numeric_big::mul_decimal(&x, &y)));
         }
     }
     Ok(VmValue::from_f64(heap.to_f64_val(a) * heap.to_f64_val(b)))

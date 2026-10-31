@@ -101,7 +101,9 @@ pub(super) fn fold_binary(
         (InstKind::ConstDecimal(x), InstKind::ConstDecimal(y)) => match op {
             Add => Some(InstKind::ConstDecimal(x + y)),
             Sub => Some(InstKind::ConstDecimal(x - y)),
-            Mul => Some(InstKind::ConstDecimal(x * y)),
+            Mul => Some(InstKind::ConstDecimal(varn_core::numeric_big::mul_decimal(
+                x, y,
+            ))),
             Div => varn_core::numeric_big::div_decimal(x, y)
                 .ok()
                 .map(InstKind::ConstDecimal),
