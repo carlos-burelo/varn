@@ -396,3 +396,27 @@ assertTrue("int add", 1 + 2 === 3)
 assertTrue("trim",    s.trim() === "Hello, World!")
 ```
 
+---
+
+## `if` y `while` con binding
+
+La condición puede ser una declaración sobre un valor anulable. El cuerpo corre solo si el valor no es `null`, y el nombre ya llega estrechado a su tipo sin `null`:
+
+```varn
+if (const i = items.indexOf(x)) {
+    print(i + 1)          // i: int
+} else {
+    print("no está")      // i no existe aquí
+}
+
+while (const next = queue.shift()) {
+    handle(next)
+}
+```
+
+Se acepta `const` o `let`, y cualquier patrón de destructuring (`if (const { a, b } = lookup())`). Es azúcar: `if (const v = e) A else B` equivale a `{ const t = e; if (t !== null) { const v = t; A } else B }`, y `while` equivale a un bucle que sale cuando `e` es `null`. El valor debe ser anulable; si no lo es, el compilador lo rechaza igual que `x !== null` sobre un `int`. Para `Option<T>` usa `match`.
+
+Para recorrer con índice: `for (const [i, v] of xs.entries())`. `x in d` solo vale para diccionarios (`{ [k: str]: V }`) y `dynamic`; para rangos usa `.contains(x)`.
+
+Test: `tests/318-binding-conditions-entries-and-optional-calls.vn`.
+
