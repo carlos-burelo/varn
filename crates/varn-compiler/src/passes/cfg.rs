@@ -73,10 +73,6 @@ fn fold_redundant_branches(func: &mut SsaFunc) -> bool {
                 args: then_args,
             };
 
-            let preds = &mut func.blocks[then_blk.0 as usize].preds;
-            if let Some(pos) = preds.iter().position(|p| *p == b_id) {
-                preds.remove(pos);
-            }
             changed = true;
         }
     }
