@@ -249,11 +249,12 @@ assertTrue("async gen awaits sleep", awaitsSleep().next().value === 7)
 
 | Propiedad/Método | Tipo | Descripción |
 |-----------------|------|-------------|
-| `.next()` | `{ value: T, done: bool }` | Avanza al siguiente `yield`. |
-| `.next().value` | `T` | El valor del `yield` actual o del `return` final. |
-| `.next().done` | `bool` | `true` cuando la función generadora ha terminado. |
+| `.next()` | `T?` | Avanza al siguiente `yield`; devuelve el valor cedido, o `null` cuando el generador terminó. |
+| `.close()` | `void` | Cierra un generador suspendido y ejecuta sus `finally`. |
 
-Para **async generators**: `.next()` puede ser llamado normalmente; `await gen.next()` también es válido.
+Un generador no puede ceder `null` (marca el final). Para consumirlo sin comparar: `while (const v = gen.next()) { ... }` o `for (const v of gen)`.
+
+Para **async generators**: `.next()` devuelve `Task<T?>` (`await gen.next()`), y `.close()` devuelve `Task<void>`.
 
 ---
 
