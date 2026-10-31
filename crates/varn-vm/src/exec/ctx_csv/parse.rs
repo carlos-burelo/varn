@@ -10,6 +10,7 @@ pub(crate) fn parse_csv(
     has_header: bool,
     trim: bool,
 ) -> Result<VmValue, String> {
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     let mut parser = FastCsvParser::new(text.as_bytes(), delimiter, trim);
     let mut row_buf: Vec<std::borrow::Cow<'_, str>> = Vec::with_capacity(32);
 
@@ -19,10 +20,14 @@ pub(crate) fn parse_csv(
 
     if has_header {
         let mut shape = root_shape();
-        for col_name in &row_buf {
+        for (index, col_name) in row_buf.iter().enumerate() {
+            if row_buf[..index].iter().any(|earlier| earlier == col_name) {
+                return Err(format!("duplicate column '{col_name}' in the CSV header"));
+            }
             shape = shape.transition(col_name.as_ref().into());
         }
         let num_cols = row_buf.len();
+        let mut row_number = 1usize;
 
         let est_rows = (text.len() / (num_cols * 8).max(16)).clamp(16, 131072);
         let mut out_objects: Vec<VmValue> = Vec::with_capacity(est_rows);
@@ -32,12 +37,16 @@ pub(crate) fn parse_csv(
             if row_buf.is_empty() || (row_buf.len() == 1 && row_buf[0].is_empty()) {
                 continue;
             }
-            field_values.clear();
-            for cell in &row_buf[..row_buf.len().min(num_cols)] {
-                field_values.push(parse_cell_value(ctx, cell.as_ref()));
+            row_number += 1;
+            if row_buf.len() != num_cols {
+                return Err(format!(
+                    "CSV row {row_number} has {} fields but the header has {num_cols}",
+                    row_buf.len()
+                ));
             }
-            while field_values.len() < num_cols {
-                field_values.push(VmValue::null());
+            field_values.clear();
+            for cell in &row_buf {
+                field_values.push(parse_cell_value(ctx, cell.as_ref()));
             }
             let obj = ctx
                 .heap
@@ -86,37 +95,11 @@ fn parse_cell_value(ctx: &mut ExecCtx, s: &str) -> VmValue {
         return VmValue::null();
     }
 
-    let bytes = s.as_bytes();
-    let mut idx = 0;
-    let neg = if bytes[0] == b'-' {
-        idx = 1;
-        true
-    } else {
-        false
-    };
-    if idx < bytes.len() && bytes[idx..].iter().all(|&b| b.is_ascii_digit()) {
-        let mut int_val: i64 = 0;
-        let mut overflow = false;
-        for &b in &bytes[idx..] {
-            if let Some(next) = int_val
-                .checked_mul(10)
-                .and_then(|v| v.checked_add((b - b'0') as i64))
-            {
-                int_val = next;
-            } else {
-                overflow = true;
-                break;
-            }
-        }
-        if !overflow {
-            return VmValue::from_int(if neg { -int_val } else { int_val });
-        }
-    }
-
-    if let Ok(f) = s.parse::<f64>()
-        && f.is_finite()
-    {
-        return VmValue::from_f64(f);
+    if let Some(number) = canonical_number(s) {
+        return match number {
+            Number::Int(value) => VmValue::from_int(value),
+            Number::Float(value) => VmValue::from_f64(value),
+        };
     }
 
     if let Some(sso) = VmValue::try_from_sso(s) {
@@ -124,4 +107,47 @@ fn parse_cell_value(ctx: &mut ExecCtx, s: &str) -> VmValue {
     }
 
     ctx.heap.alloc_str_dynamic(s)
+}
+
+enum Number {
+    Int(i64),
+    Float(f64),
+}
+
+fn canonical_number(s: &str) -> Option<Number> {
+    let digits = s.strip_prefix('-').unwrap_or(s);
+    let whole_len = digits.find(['.', 'e', 'E']).unwrap_or(digits.len());
+    let whole = &digits[..whole_len];
+    let plain_whole = whole == "0"
+        || (!whole.is_empty()
+            && !whole.starts_with('0')
+            && whole.bytes().all(|b| b.is_ascii_digit()));
+    if !plain_whole {
+        return None;
+    }
+    if whole_len == digits.len() {
+        return s.parse::<i64>().ok().map(Number::Int);
+    }
+    let rest = &digits[whole_len..];
+    let well_formed = match rest.strip_prefix('.') {
+        Some(tail) => {
+            let (fraction, exponent) = tail.split_once(['e', 'E']).unwrap_or((tail, ""));
+            !fraction.is_empty()
+                && fraction.bytes().all(|b| b.is_ascii_digit())
+                && (exponent.is_empty() || exponent_ok(exponent))
+        }
+        None => rest.strip_prefix(['e', 'E']).is_some_and(exponent_ok),
+    };
+    if !well_formed {
+        return None;
+    }
+    s.parse::<f64>()
+        .ok()
+        .filter(|f| f.is_finite())
+        .map(Number::Float)
+}
+
+fn exponent_ok(text: &str) -> bool {
+    let digits = text.strip_prefix(['+', '-']).unwrap_or(text);
+    !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit())
 }
