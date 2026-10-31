@@ -312,6 +312,7 @@ import "./318-binding-conditions-entries-and-optional-calls.vn"
 import "./319-null-is-the-only-absence.vn"
 import "./320-decimal-scale-rules.vn"
 import "./321-calendar-parts-and-large-functions.vn"
+import "./322-narrowing-after-a-failed-conjunction.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

@@ -1,0 +1,66 @@
+import { describe, it, expect } from "std:test";
+
+function neither(a: str?, b: str?): str {
+    if (a !== null && b !== null) {
+        return "both";
+    }
+    if (a !== null) {
+        return "only a " + a;
+    }
+    if (b !== null) {
+        return "only b " + b;
+    }
+    return "none";
+}
+
+function eitherNull(a: int?, b: int?): int {
+    if (a === null || b === null) {
+        return -1;
+    }
+    return a + b;
+}
+
+function bothNullAfterOr(a: int?, b: int?): bool {
+    if (a === null || b === null) {
+        return true;
+    }
+    return a > 0 && b > 0;
+}
+
+function nested(a: int?, b: int?, c: int?): int {
+    if (a !== null && b !== null && c !== null) {
+        return a + b + c;
+    }
+    if (a !== null) {
+        return a;
+    }
+    if (c !== null) {
+        return c;
+    }
+    return 0;
+}
+
+await describe("322 narrowing after a failed conjunction", async () => {
+    await it("a failed A && B tells nothing about A or B alone", async () => {
+        expect(neither("x", null)).toBe("only a x");
+        expect(neither(null, "y")).toBe("only b y");
+        expect(neither("x", "y")).toBe("both");
+        expect(neither(null, null)).toBe("none");
+    });
+
+    await it("A || B narrows its operands only when it is false", async () => {
+        expect(eitherNull(1, null)).toBe(-1);
+        expect(eitherNull(null, 2)).toBe(-1);
+        expect(eitherNull(1, 2)).toBe(3);
+        expect(bothNullAfterOr(1, null)).toBe(true);
+        expect(bothNullAfterOr(3, 4)).toBe(true);
+        expect(bothNullAfterOr(-3, 4)).toBe(false);
+    });
+
+    await it("longer conjunctions behave the same", async () => {
+        expect(nested(1, 2, 3)).toBe(6);
+        expect(nested(1, null, 3)).toBe(1);
+        expect(nested(null, 2, 3)).toBe(3);
+        expect(nested(null, null, null)).toBe(0);
+    });
+});
