@@ -255,3 +255,19 @@ assertTrue("async gen awaits sleep", awaitsSleep().next().value === 7)
 
 Para **async generators**: `.next()` puede ser llamado normalmente; `await gen.next()` también es válido.
 
+---
+
+## 10. `yield` como sentencia, `yield*` y cierre
+
+`yield` no produce valor (`next()` no envía nada al generador), así que solo se acepta como sentencia: `const x = yield 1` es un error de sintaxis.
+
+`yield* fuente;` delega: equivale a `for (const x of fuente) { yield x; }` y acepta cualquier cosa que `for...of` acepte.
+
+Un generador suspendido dentro de un `try/finally` ejecuta sus `finally` cuando se cierra:
+
+- `gen.close()` reanuda el generador con la señal de cierre; corren todos los `finally` que lo rodean, de dentro hacia fuera, y los errores que lancen llegan a quien llamó a `close()`.
+- `for...of` y `for await` sobre un generador lo cierran al salir por `break`, `return` o `throw`.
+- En un `async function*`, `close()` devuelve una `Task`: `await gen.close()`.
+
+Los tests son `tests/317-generator-close-runs-finally.vn` y los fixtures `tests/errors/yield-*.vn`.
+
