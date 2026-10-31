@@ -1,26 +1,50 @@
-use parking_lot::RwLock;
 use std::collections::HashMap;
-use std::sync::LazyLock;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, LazyLock, PoisonError, RwLock};
 use varn_core::StdErrorClass;
 use varn_macros::varn_contract;
 use varn_types::NativeError;
 use varn_types::{NativeCtx, VmValue};
 
-struct RegexPool {
-    compiled: Vec<regex::Regex>,
-    sources: Vec<(String, String)>,
-    handles: HashMap<(String, String), i64>,
+const POOL_CAPACITY: usize = 4096;
+const SLOT_BITS: u32 = 20;
+const SLOT_MASK: i64 = (1 << SLOT_BITS) - 1;
+
+const HANDLE_FIELD: &str = "handle";
+const SOURCE_FIELD: &str = "source";
+const OPTIONS_FIELD: &str = "options";
+
+struct Entry {
+    regex: Arc<regex::Regex>,
+    generation: u32,
+    last_used: AtomicU64,
 }
+
+struct RegexPool {
+    slots: Vec<Option<Entry>>,
+    by_source: HashMap<(String, String), usize>,
+    generations: u32,
+}
+
+static USE_CLOCK: AtomicU64 = AtomicU64::new(0);
 
 static REGEX_POOL: LazyLock<RwLock<RegexPool>> = LazyLock::new(|| {
     RwLock::new(RegexPool {
-        compiled: Vec::new(),
-        sources: Vec::new(),
-        handles: HashMap::new(),
+        slots: Vec::new(),
+        by_source: HashMap::new(),
+        generations: 0,
     })
 });
 
-const HANDLE_FIELD: &str = "handle";
+fn touch(entry: &Entry) {
+    entry
+        .last_used
+        .store(USE_CLOCK.fetch_add(1, Ordering::Relaxed), Ordering::Relaxed);
+}
+
+fn handle_of(slot: usize, generation: u32) -> i64 {
+    (i64::from(generation) << SLOT_BITS) | slot as i64
+}
 
 pub struct RegexClass;
 
@@ -82,55 +106,102 @@ fn match_record(
     .alloc(ctx)
 }
 
-fn pooled(handle: i64) -> regex::Regex {
-    REGEX_POOL
-        .read()
-        .compiled
-        .get(usize::try_from(handle).expect("a Regex handle is a pool index"))
-        .cloned()
-        .expect("every Regex instance holds a handle its constructor interned")
+fn lookup(handle: i64) -> Option<Arc<regex::Regex>> {
+    let pool = REGEX_POOL.read().unwrap_or_else(PoisonError::into_inner);
+    let entry = pool.slots.get((handle & SLOT_MASK) as usize)?.as_ref()?;
+    if i64::from(entry.generation) != handle >> SLOT_BITS {
+        return None;
+    }
+    touch(entry);
+    Some(Arc::clone(&entry.regex))
 }
 
-fn intern(pattern: &str, flags: &str) -> Result<i64, NativeError> {
+fn free_slot(pool: &mut RegexPool) -> usize {
+    if pool.slots.len() < POOL_CAPACITY {
+        pool.slots.push(None);
+        return pool.slots.len() - 1;
+    }
+    let victim = pool
+        .slots
+        .iter()
+        .enumerate()
+        .min_by_key(|(_, slot)| {
+            slot.as_ref()
+                .map_or(0, |e| e.last_used.load(Ordering::Relaxed))
+        })
+        .map(|(at, _)| at)
+        .expect("a full pool has slots");
+    pool.by_source.retain(|_, at| *at != victim);
+    pool.slots[victim] = None;
+    victim
+}
+
+fn intern(pattern: &str, flags: &str) -> Result<(i64, Arc<regex::Regex>), NativeError> {
     let key = (pattern.to_string(), flags.to_string());
-    if let Some(&handle) = REGEX_POOL.read().handles.get(&key) {
-        return Ok(handle);
+    {
+        let pool = REGEX_POOL.read().unwrap_or_else(PoisonError::into_inner);
+        if let Some(&slot) = pool.by_source.get(&key)
+            && let Some(entry) = pool.slots[slot].as_ref()
+        {
+            touch(entry);
+            return Ok((handle_of(slot, entry.generation), Arc::clone(&entry.regex)));
+        }
     }
-    let re = varn_core::regex_pattern::compile(pattern, flags)
-        .map_err(|e| NativeError::std(StdErrorClass::Parse, e.to_string()))?;
-    let mut pool = REGEX_POOL.write();
-    if let Some(&handle) = pool.handles.get(&key) {
-        return Ok(handle);
+    let compiled = Arc::new(
+        varn_core::regex_pattern::compile(pattern, flags)
+            .map_err(|e| NativeError::std(StdErrorClass::Parse, e.to_string()))?,
+    );
+    let mut pool = REGEX_POOL.write().unwrap_or_else(PoisonError::into_inner);
+    if let Some(&slot) = pool.by_source.get(&key)
+        && let Some(entry) = pool.slots[slot].as_ref()
+    {
+        touch(entry);
+        return Ok((handle_of(slot, entry.generation), Arc::clone(&entry.regex)));
     }
-    let handle = pool.compiled.len() as i64;
-    pool.compiled.push(re);
-    pool.sources.push(key.clone());
-    pool.handles.insert(key, handle);
-    Ok(handle)
+    let slot = free_slot(&mut pool);
+    pool.generations = pool.generations.wrapping_add(1).max(1);
+    let generation = pool.generations;
+    let entry = Entry {
+        regex: Arc::clone(&compiled),
+        generation,
+        last_used: AtomicU64::new(0),
+    };
+    touch(&entry);
+    pool.slots[slot] = Some(entry);
+    pool.by_source.insert(key, slot);
+    Ok((handle_of(slot, generation), compiled))
 }
 
-fn handle_of(ctx: &dyn NativeCtx, this: VmValue) -> i64 {
+fn text_field(ctx: &dyn NativeCtx, this: VmValue, field: &str) -> String {
+    ctx.get_field(this, field)
+        .and_then(|v| ctx.str_owned(v))
+        .expect("a Regex instance carries its source")
+}
+
+fn of_instance(ctx: &mut dyn NativeCtx, this: VmValue) -> Arc<regex::Regex> {
     let handle = ctx
         .get_field(this, HANDLE_FIELD)
         .expect("a Regex instance carries its handle");
-    ctx.as_int(handle)
+    if let Some(regex) = lookup(ctx.as_int(handle)) {
+        return regex;
+    }
+    let pattern = text_field(ctx, this, SOURCE_FIELD);
+    let flags = text_field(ctx, this, OPTIONS_FIELD);
+    let (handle, regex) =
+        intern(&pattern, &flags).expect("a pattern that compiled once compiles again");
+    ctx.set_field(this, HANDLE_FIELD, VmValue::from_int(handle));
+    regex
 }
 
-fn of_instance(ctx: &dyn NativeCtx, this: VmValue) -> regex::Regex {
-    pooled(handle_of(ctx, this))
-}
-
-fn source_of(ctx: &dyn NativeCtx, this: VmValue) -> (String, String) {
-    let at = usize::try_from(handle_of(ctx, this)).expect("a Regex handle is a pool index");
-    REGEX_POOL.read().sources[at].clone()
-}
-
-pub(crate) fn regex_argument(ctx: &dyn NativeCtx, value: VmValue) -> Option<regex::Regex> {
+pub(crate) fn regex_argument(
+    ctx: &mut dyn NativeCtx,
+    value: VmValue,
+) -> Option<Arc<regex::Regex>> {
     if ctx.is_string(value) {
         return None;
     }
-    ctx.get_field(value, HANDLE_FIELD)
-        .map(|handle| pooled(ctx.as_int(handle)))
+    ctx.get_field(value, HANDLE_FIELD)?;
+    Some(of_instance(ctx, value))
 }
 
 varn_contract! {
@@ -140,17 +211,21 @@ varn_contract! {
     impl RegexClass {
         fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, pattern: &str, flags: Option<&str>) -> Result<VmValue, NativeError> {
             let flags = flags.unwrap_or("");
-            let handle = intern(pattern, flags)?;
+            let (handle, _) = intern(pattern, flags)?;
+            let source = ctx.alloc_str(pattern);
+            let options = ctx.alloc_str(flags);
+            ctx.set_field(this, SOURCE_FIELD, source);
+            ctx.set_field(this, OPTIONS_FIELD, options);
             ctx.set_field(this, HANDLE_FIELD, VmValue::from_int(handle));
             Ok(this)
         }
 
         fn pattern(ctx: &mut dyn NativeCtx, this: VmValue) -> String {
-            source_of(ctx, this).0
+            text_field(ctx, this, SOURCE_FIELD)
         }
 
         fn flags(ctx: &mut dyn NativeCtx, this: VmValue) -> String {
-            source_of(ctx, this).1
+            text_field(ctx, this, OPTIONS_FIELD)
         }
 
         fn test(ctx: &mut dyn NativeCtx, this: VmValue, text: &str) -> bool {

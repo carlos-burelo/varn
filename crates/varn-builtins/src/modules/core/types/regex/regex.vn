@@ -17,6 +17,8 @@ export interface RegexMatch {
  */
 export declare class Regex {
     private handle: int;
+    private source: str;
+    private options: str;
 
     get pattern(): str;
     get flags(): str;
