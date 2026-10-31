@@ -47,7 +47,7 @@ fn compute_preds(func: &mut SsaFunc) {
     let mut preds = vec![Vec::new(); n];
     for (b_idx, block) in func.blocks.iter().enumerate() {
         let bid = BlockId(b_idx as u32);
-        for succ in block_succs(block) {
+        for succ in crate::ssa::dom::block_successors(block) {
             if !preds[succ.0 as usize].contains(&bid) {
                 preds[succ.0 as usize].push(bid);
             }
@@ -156,55 +156,8 @@ fn find_suspend_inst(func: &SsaFunc, operand: Value) -> Option<(BlockId, usize)>
     None
 }
 
-fn get_term_succs(term: &Terminator) -> Vec<BlockId> {
-    match term {
-        Terminator::Jump { target, .. } => vec![*target],
-        Terminator::Branch {
-            then_blk, else_blk, ..
-        } => vec![*then_blk, *else_blk],
-        Terminator::Return(_) | Terminator::Throw(_) | Terminator::Unreachable => Vec::new(),
-    }
-}
-
-fn block_succs(block: &Block) -> Vec<BlockId> {
-    let mut s = get_term_succs(&block.term);
-    for inst in &block.insts {
-        if let InstKind::Try { handler } = &inst.kind {
-            s.push(*handler);
-        }
-    }
-    s
-}
-
-fn reverse_postorder(func: &SsaFunc) -> Vec<BlockId> {
-    let n = func.blocks.len();
-    let mut visited = vec![false; n];
-    let mut post: Vec<BlockId> = Vec::with_capacity(n);
-    let mut stack: Vec<(BlockId, usize)> = Vec::with_capacity(n);
-    let entry = func.entry;
-    visited[entry.0 as usize] = true;
-    stack.push((entry, 0));
-    while let Some(top) = stack.last_mut() {
-        let (b, idx) = *top;
-        top.1 += 1;
-        let s = block_succs(&func.blocks[b.0 as usize]);
-        if idx < s.len() {
-            let next = s[idx];
-            if !visited[next.0 as usize] {
-                visited[next.0 as usize] = true;
-                stack.push((next, 0));
-            }
-        } else {
-            post.push(b);
-            stack.pop();
-        }
-    }
-    post.reverse();
-    post
-}
-
 fn reorder_blocks_rpo(func: &mut SsaFunc) {
-    let order = reverse_postorder(func);
+    let order = crate::ssa::dom::reverse_postorder(func);
     let n = func.blocks.len();
     if order.len() == n && order.iter().enumerate().all(|(i, b)| b.0 as usize == i) {
         return;

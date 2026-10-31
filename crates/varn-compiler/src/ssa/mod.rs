@@ -1,3 +1,4 @@
+pub(crate) mod dom;
 pub mod dump;
 pub mod emit;
 pub(crate) mod ic;

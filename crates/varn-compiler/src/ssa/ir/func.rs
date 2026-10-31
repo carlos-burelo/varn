@@ -46,6 +46,23 @@ impl SsaFunc {
         self.values[v.0 as usize].ty
     }
 
+    pub fn replace_uses_batch(&mut self, replacements: &rustc_hash::FxHashMap<Value, Value>) {
+        if replacements.is_empty() {
+            return;
+        }
+        let mut sub = |v: &mut Value| {
+            while let Some(&next) = replacements.get(v) {
+                *v = next;
+            }
+        };
+        for block in &mut self.blocks {
+            for inst in &mut block.insts {
+                crate::ssa::uses::visit_uses_mut(&mut inst.kind, &mut sub);
+            }
+            crate::ssa::uses::visit_term_uses_mut(&mut block.term, &mut sub);
+        }
+    }
+
     pub fn replace_all_uses(&mut self, old: Value, new: Value) {
         let mut sub = |v: &mut Value| {
             if *v == old {

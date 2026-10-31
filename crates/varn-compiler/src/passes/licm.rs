@@ -1,4 +1,3 @@
-use super::cfg_dom::{dominates, dominators};
 use crate::hir::{HirBinOp, HirUnOp};
 use crate::ssa::ir::{BlockId, InstKind, SsaFunc, Terminator};
 use varn_tir::BackendTy;
@@ -9,13 +8,13 @@ pub fn run(func: &mut SsaFunc) -> bool {
         return false;
     }
 
-    let dom = dominators(func);
+    let dom = crate::ssa::dom::DomTree::compute(func);
     let mut changed = false;
 
     let mut loops: rustc_hash::FxHashMap<BlockId, Vec<BlockId>> = rustc_hash::FxHashMap::default();
     for b in 0..n {
         for succ in successors(&func.blocks[b].term) {
-            if dominates(&dom, succ.0 as usize, b) {
+            if dom.dominates(succ.0 as usize, b) {
                 loops.entry(succ).or_default().push(BlockId(b as u32));
             }
         }

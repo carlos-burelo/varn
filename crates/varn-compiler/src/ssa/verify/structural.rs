@@ -1,6 +1,7 @@
-use super::dominance::{check_use, dominators, DefSite};
+use super::dominance::{check_use, DefSite};
 use super::type_rules::check_inst_types;
-use crate::ssa::ir::{Block, BlockId, InstKind, SsaFunc, Terminator, Value};
+use crate::ssa::dom::DomTree;
+use crate::ssa::ir::{BlockId, InstKind, SsaFunc, Terminator, Value};
 
 pub type VerifyResult = Result<(), String>;
 
@@ -45,7 +46,7 @@ pub fn verify(func: &SsaFunc) -> VerifyResult {
     }
 
     for (b, block) in func.blocks.iter().enumerate() {
-        for s in block_succs(block) {
+        for s in crate::ssa::dom::block_successors(block) {
             if s.0 as usize >= n {
                 return Err(format!("block b{b} jumps to out-of-range block b{}", s.0));
             }
@@ -65,7 +66,7 @@ pub fn verify(func: &SsaFunc) -> VerifyResult {
         }
     }
 
-    let idom = dominators(func);
+    let dom = DomTree::compute(func);
     for (b, block) in func.blocks.iter().enumerate() {
         let bid = BlockId(b as u32);
 
@@ -73,18 +74,18 @@ pub fn verify(func: &SsaFunc) -> VerifyResult {
             let use_order = i as u32 + 1;
             check_inst_types(func, inst)?;
             for u in inst_uses(&inst.kind) {
-                check_use(func, &def, &idom, u, bid, use_order)?;
+                check_use(&def, &dom, u, bid, use_order)?;
             }
         }
 
         let end = block.insts.len() as u32 + 1;
         for u in term_value_uses(&block.term) {
-            check_use(func, &def, &idom, u, bid, end)?;
+            check_use(&def, &dom, u, bid, end)?;
         }
 
         for (target, args) in out_edges(&block.term) {
             for &a in args {
-                check_use(func, &def, &idom, a, bid, u32::MAX)?;
+                check_use(&def, &dom, a, bid, u32::MAX)?;
             }
             let _ = target;
         }
@@ -97,7 +98,7 @@ pub(crate) fn recompute_preds(func: &mut SsaFunc) {
     let mut preds = vec![Vec::new(); n];
     for (b_idx, block) in func.blocks.iter().enumerate() {
         let bid = BlockId(b_idx as u32);
-        for succ in block_succs(block) {
+        for succ in crate::ssa::dom::block_successors(block) {
             let slot = &mut preds[succ.0 as usize];
             if !slot.contains(&bid) {
                 slot.push(bid);
@@ -107,22 +108,6 @@ pub(crate) fn recompute_preds(func: &mut SsaFunc) {
     for (b_idx, block) in func.blocks.iter_mut().enumerate() {
         block.preds = std::mem::take(&mut preds[b_idx]);
     }
-}
-
-pub(super) fn block_succs(block: &Block) -> Vec<BlockId> {
-    let mut s = match &block.term {
-        Terminator::Return(_) | Terminator::Throw(_) | Terminator::Unreachable => Vec::new(),
-        Terminator::Jump { target, .. } => vec![*target],
-        Terminator::Branch {
-            then_blk, else_blk, ..
-        } => vec![*then_blk, *else_blk],
-    };
-    for inst in &block.insts {
-        if let InstKind::Try { handler } = &inst.kind {
-            s.push(*handler);
-        }
-    }
-    s
 }
 
 fn edge_arg_count(func: &SsaFunc, pred: BlockId, block: BlockId) -> Result<usize, String> {

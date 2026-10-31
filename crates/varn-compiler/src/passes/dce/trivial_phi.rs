@@ -1,4 +1,3 @@
-use super::super::cfg_dom::{dominates, dominators};
 use crate::ssa::ir::{BlockId, SsaFunc, Terminator, Value};
 
 pub(crate) fn eliminate_trivial_phis(func: &mut SsaFunc) -> bool {
@@ -22,8 +21,15 @@ pub(crate) fn eliminate_trivial_phis(func: &mut SsaFunc) -> bool {
         }
     }
 
-    let dom = dominators(func);
+    let dom = crate::ssa::dom::DomTree::compute(func);
     let mut any_changed = false;
+    let mut replacements: rustc_hash::FxHashMap<Value, Value> = rustc_hash::FxHashMap::default();
+    let resolve = |replacements: &rustc_hash::FxHashMap<Value, Value>, mut v: Value| {
+        while let Some(&next) = replacements.get(&v) {
+            v = next;
+        }
+        v
+    };
 
     loop {
         let mut changed = false;
@@ -51,7 +57,8 @@ pub(crate) fn eliminate_trivial_phis(func: &mut SsaFunc) -> bool {
                 let mut same: Option<Value> = None;
                 let mut is_trivial = true;
 
-                for &arg in &incoming {
+                for &raw in &incoming {
+                    let arg = resolve(&replacements, raw);
                     if arg == phi {
                         continue;
                     }
@@ -88,7 +95,7 @@ pub(crate) fn eliminate_trivial_phis(func: &mut SsaFunc) -> bool {
                 let can_replace = if def_b == b_id {
                     unique_val != phi && func.blocks[b_id.0 as usize].params.contains(&unique_val)
                 } else {
-                    dominates(&dom, def_b.0 as usize, b_id.0 as usize)
+                    dom.dominates(def_b.0 as usize, b_id.0 as usize)
                 };
 
                 if !can_replace {
@@ -96,7 +103,7 @@ pub(crate) fn eliminate_trivial_phis(func: &mut SsaFunc) -> bool {
                     continue;
                 }
 
-                func.replace_all_uses(phi, unique_val);
+                replacements.insert(phi, unique_val);
                 remove_param(func, b_id, pos);
                 changed = true;
                 any_changed = true;
@@ -108,6 +115,7 @@ pub(crate) fn eliminate_trivial_phis(func: &mut SsaFunc) -> bool {
         }
     }
 
+    func.replace_uses_batch(&replacements);
     any_changed
 }
 

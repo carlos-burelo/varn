@@ -81,7 +81,7 @@ pub fn run(func: &mut SsaFunc) -> bool {
 
 pub fn run_global(func: &mut SsaFunc) -> bool {
     crate::ssa::verify::recompute_preds(func);
-    let dom = super::cfg_dom::dominators(func);
+    let dom = crate::ssa::dom::DomTree::compute(func);
     let mut uses: Vec<Vec<u32>> = vec![Vec::new(); func.values.len()];
     for (b, block) in func.blocks.iter().enumerate() {
         let mut push = |v: crate::ssa::ir::Value| {
@@ -115,10 +115,9 @@ pub fn run_global(func: &mut SsaFunc) -> bool {
             }
             match seen.get(&key) {
                 Some((existing, def)) => {
-                    let dominated = uses.get(dest.0 as usize).is_some_and(|bs| {
-                        bs.iter()
-                            .all(|u| super::cfg_dom::dominates(&dom, *def, *u as usize))
-                    });
+                    let dominated = uses
+                        .get(dest.0 as usize)
+                        .is_some_and(|bs| bs.iter().all(|u| dom.dominates(*def, *u as usize)));
                     if dominated {
                         rewrites.insert(dest, *existing);
                     }
