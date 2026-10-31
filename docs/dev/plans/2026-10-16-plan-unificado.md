@@ -428,6 +428,30 @@ dentro del `try`; GC dentro del `try` con vivo heap.
 - **Deuda declarada**: `Union`→estructural comprueba (solo NYS
   se hizo); `case` +9% sin mecanismo (ruido hasta réplica).
 
+### 2.6 Anotado el 2026-10-31 (auditoría de red, datos y lenguaje)
+
+Hallazgos que no se cerraron en la sesión; cada uno con su causa.
+
+- **FFI en macOS/aarch64**: no se puede ejecutar aquí (sin compilador C
+  para cruzar). El truco ABI de 6 enteros + 8 flotantes está validado en
+  AArch64 Linux emulado (0 desajustes). Apple pasa los argumentos variádicos
+  en pila, y la vía actual no soporta variádicas en ninguna plataforma.
+- **`Csv.stringify` no neutraliza fórmulas**: un valor que empieza por `=`,
+  `+`, `-` o `@` se escribe tal cual (inyección de fórmulas en Excel).
+  Cambiarlo altera la salida visible: necesita decisión de diseño.
+- **Concatenación O(n²)**: `ByteBuilder` en `std/http/wire.vn` y
+  `bytesConcat` en `std/ws/client.vn` copian en cada lectura; acotado por
+  los límites nuevos pero sigue siendo cuadrático.
+- **Pool de regex**: el dedupe por (patrón, flags) cierra la fuga de
+  patrones repetidos; patrones distintos siguen sin límite.
+- **HTTP**: HTTP/1.0 no cierra por defecto la conexión; una cabecera
+  `Content-Length` puesta por el manejador se valida como dígitos pero no se
+  compara con el cuerpo.
+- **`null` como dato en `next()`**: ni un generador ni `Receiver.next()`
+  pueden transportar `null` (decisión de ADR-0024).
+- **Igualdad de NaN**: `includes`/`indexOf` siguen `==` (NaN ≠ NaN) y
+  `Set`/`Map` hashean con igualdad reflexiva; es deliberado (test 275).
+
 ## 3. Validación (puerta)
 
 `.\scripts\verify.ps1 -Fast` release 4 cuadrantes antes de
