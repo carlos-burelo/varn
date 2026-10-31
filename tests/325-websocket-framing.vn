@@ -1,0 +1,197 @@
+import { describe, it, expect } from "std:test";
+import { spawn, delay } from "std:task";
+import { TcpStream } from "std:net";
+import { WebSocket, WsServer } from "std:ws";
+import { ProtocolError } from "std:error";
+
+class Outcome {
+    value: bool = false;
+}
+
+const HANDSHAKE = "GET /chat HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n";
+
+function frame(first: int, payload: Bytes, masked: bool = true, lengthBytes: int = 0): Bytes {
+    const key = [1, 2, 3, 4];
+    const size = payload.length;
+    let head: int[] = [first];
+    const maskBit = masked ? 128 : 0;
+    if (lengthBytes === 8) {
+        head.push(maskBit + 127);
+        for (let shift = 7; shift >= 0; shift = shift - 1) {
+            head.push(shift > 3 ? 0 : (size / (256 ** shift)) % 256);
+        }
+    } else if (lengthBytes === 2) {
+        head.push(maskBit + 126);
+        head.push(size / 256);
+        head.push(size % 256);
+    } else {
+        head.push(maskBit + size);
+    }
+    if (masked) {
+        for (const k of key) { head.push(k); }
+    }
+    const out = Bytes.alloc(head.length + size);
+    for (let i = 0; i < head.length; i = i + 1) { out.setByte(i, head[i]); }
+    for (let i = 0; i < size; i = i + 1) {
+        out.setByte(head.length + i, masked ? payload.getByte(i) ^ key[i % 4] : payload.getByte(i));
+    }
+    return out;
+}
+
+async function readUntilHeadEnd(conn: TcpStream): Task<str> {
+    let text = "";
+    while (text.indexOf("\r\n\r\n") === null) {
+        const chunk = await conn.read(1024);
+        if (chunk === null) {
+            return text
+        }
+        text = text + (chunk as Bytes).toString();
+    }
+    return text
+}
+
+async function serverReadFails(port: int, send: Bytes[]): Task<bool> {
+    const server = WsServer.listen(port);
+    const outcome = new Outcome();
+    spawn((async (): Task<void> => {
+        const ws = await server.accept();
+        try {
+            await ws.read();
+        } catch (e) {
+            outcome.value = e instanceof ProtocolError;
+        }
+    })());
+    const raw = await TcpStream.connect("127.0.0.1", port, 1);
+    await raw.write(Bytes.fromString(HANDSHAKE));
+    await readUntilHeadEnd(raw);
+    for (const piece of send) {
+        await raw.write(piece);
+        await delay(20);
+    }
+    await delay(150);
+    raw.close();
+    server.close();
+    return outcome.value;
+}
+
+await describe("325 websocket framing", async () => {
+    await it("text and binary messages round-trip in both directions, including a 64-bit length", async () => {
+        const server = WsServer.listen(19930);
+        const big = Bytes.alloc(70000);
+        for (let i = 0; i < big.length; i = i + 1) { big.setByte(i, i % 251); }
+        const echoed: str[] = [];
+        spawn((async (): Task<void> => {
+            const ws = await server.accept();
+            echoed.push((await ws.read() as Bytes).toString());
+            const blob = await ws.read() as Bytes;
+            echoed.push(blob.length.toString());
+            await ws.send("pong é");
+            await ws.send(blob);
+        })());
+        await delay(100);
+        const client = await WebSocket.connect("ws://127.0.0.1:19930/chat");
+        await client.send("ping é");
+        await client.send(big);
+        expect((await client.read() as Bytes).toString()).toBe("pong é");
+        const back = await client.read() as Bytes;
+        expect(back.length).toBe(70000);
+        expect(back.getByte(69999)).toBe(69999 % 251);
+        expect(echoed[0]).toBe("ping é");
+        expect(echoed[1]).toBe("70000");
+        client.close();
+        server.close();
+    });
+
+    await it("an unmasked client frame is refused", async () => {
+        expect(await serverReadFails(19931, [frame(129, Bytes.fromString("hi"), false)])).toBe(true);
+    });
+
+    await it("reserved bits and reserved opcodes are refused", async () => {
+        expect(await serverReadFails(19932, [frame(129 + 64, Bytes.fromString("hi"))])).toBe(true);
+        expect(await serverReadFails(19933, [frame(128 + 3, Bytes.fromString("hi"))])).toBe(true);
+    });
+
+    await it("a length that could have been shorter is refused", async () => {
+        expect(await serverReadFails(19934, [frame(129, Bytes.fromString("hi"), true, 2)])).toBe(true);
+        expect(await serverReadFails(19935, [frame(129, Bytes.fromString("hi"), true, 8)])).toBe(true);
+    });
+
+    await it("a frame over the message limit is refused before it is buffered", async () => {
+        const server = WsServer.listen(19936);
+        const outcome = new Outcome();
+        spawn((async (): Task<void> => {
+            const ws = (await server.accept()).maxMessageBytes(1000);
+            try {
+                await ws.read();
+            } catch (e) {
+                outcome.value = e instanceof ProtocolError;
+            }
+        })());
+        const raw = await TcpStream.connect("127.0.0.1", 19936, 1);
+        await raw.write(Bytes.fromString(HANDSHAKE));
+        await readUntilHeadEnd(raw);
+        await raw.write(frame(130, Bytes.alloc(2000), true, 2));
+        await delay(200);
+        raw.close();
+        server.close();
+        expect(outcome.value).toBe(true);
+    });
+
+    await it("fragmentation must be well formed", async () => {
+        expect(await serverReadFails(19937, [frame(128, Bytes.fromString("tail"))])).toBe(true);
+        expect(await serverReadFails(19938, [frame(1, Bytes.fromString("part")), frame(129, Bytes.fromString("new"))])).toBe(true);
+    });
+
+    await it("a text message must be valid UTF-8 and a close code must be defined", async () => {
+        const bad = Bytes.alloc(2);
+        bad.setByte(0, 255);
+        bad.setByte(1, 254);
+        expect(await serverReadFails(19939, [frame(129, bad)])).toBe(true);
+        const code = Bytes.alloc(2);
+        code.setByte(0, 3);
+        code.setByte(1, 232);
+        const reserved = Bytes.alloc(2);
+        reserved.setByte(0, 4);
+        reserved.setByte(1, 0);
+        expect(await serverReadFails(19940, [frame(136, reserved)])).toBe(true);
+        expect(await serverReadFails(19941, [frame(136, Bytes.alloc(1))])).toBe(true);
+    });
+
+    await it("a fragmented text message is reassembled before it is decoded", async () => {
+        const server = WsServer.listen(19942);
+        const got: str[] = [];
+        spawn((async (): Task<void> => {
+            const ws = await server.accept();
+            got.push((await ws.read() as Bytes).toString());
+        })());
+        const raw = await TcpStream.connect("127.0.0.1", 19942, 1);
+        await raw.write(Bytes.fromString(HANDSHAKE));
+        await readUntilHeadEnd(raw);
+        const text = Bytes.fromString("é!");
+        await raw.write(frame(1, text.slice(0, 1)));
+        await delay(20);
+        await raw.write(frame(128 + 0, text.slice(1)));
+        await delay(150);
+        raw.close();
+        server.close();
+        expect(got[0]).toBe("é!");
+    });
+
+    await it("the client refuses a handshake that is not a real upgrade", async () => {
+        const server = WsServer.listen(19943);
+        const outcome = new Outcome();
+        spawn((async (): Task<void> => {
+            try {
+                await server.accept();
+            } catch (e) {
+                outcome.value = true;
+            }
+        })());
+        const raw = await TcpStream.connect("127.0.0.1", 19943, 1);
+        await raw.write(Bytes.fromString("GET / HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: short\r\nSec-WebSocket-Version: 13\r\n\r\n"));
+        await delay(200);
+        raw.close();
+        server.close();
+        expect(outcome.value).toBe(true);
+    });
+});
