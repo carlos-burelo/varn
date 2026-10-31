@@ -332,15 +332,22 @@ fn class_members(
                     capability: None,
                 })
             }
-            ClassMember::Constructor { params: ps, .. } => out.push(Member {
-                symbol: ::varn_core::TokenKind::Constructor.as_str().to_string(),
-                kind: Kind::Constructor,
-                params: params(ps, interner),
-                ret: Mapped::Dynamic,
-                fallible: false,
-                throws: Vec::new(),
-                capability: None,
-            }),
+            ClassMember::Constructor {
+                params: ps,
+                decorators,
+                ..
+            } => {
+                let declared = throws(decorators, arena, interner)?;
+                out.push(Member {
+                    symbol: ::varn_core::TokenKind::Constructor.as_str().to_string(),
+                    kind: Kind::Constructor,
+                    params: params(ps, interner),
+                    ret: Mapped::Dynamic,
+                    fallible: !declared.is_empty(),
+                    throws: declared,
+                    capability: None,
+                })
+            }
             ClassMember::Destructor { .. }
             | ClassMember::Property { .. }
             | ClassMember::Setter { .. }

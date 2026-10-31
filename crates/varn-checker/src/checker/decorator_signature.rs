@@ -34,6 +34,10 @@ impl<'r> Checker<'r> {
                 );
                 continue;
             }
+            if varn_core::ast::decorators::is_contract_decorator(self.ast_arena, &bind.interner, d)
+            {
+                continue;
+            }
             if let Some(kind) = Self::builtin_kind(b) {
                 self.check_builtin_placement(&kind, &target, target_name, d.range);
                 continue;

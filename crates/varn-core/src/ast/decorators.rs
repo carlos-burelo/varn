@@ -17,7 +17,7 @@ pub struct BuiltinMatch {
     pub result: Option<Result<BuiltinDecorator, &'static str>>,
 }
 
-pub fn decorator_head(arena: &AstArena, interner: &AtomInterner, d: &Decorator) -> Option<Atom> {
+fn written_head(arena: &AstArena, d: &Decorator) -> Option<Atom> {
     let head = match &arena.expr(d.expression).kind {
         ExprKind::Identifier { name } => *name,
         ExprKind::Call { callee, .. } => match &arena.expr(*callee).kind {
@@ -115,13 +115,25 @@ pub fn decorator_head(arena: &AstArena, interner: &AtomInterner, d: &Decorator) 
         | ExprKind::With { .. }
         | ExprKind::MetaAccess { .. } => return None,
     };
+    Some(head)
+}
+
+pub fn decorator_head(arena: &AstArena, interner: &AtomInterner, d: &Decorator) -> Option<Atom> {
+    let head = written_head(arena, d)?;
     super::decorator_kind::BuiltinDecoratorKind::of(interner.resolve(head)).map(|_| head)
 }
 
+pub fn is_contract_decorator(arena: &AstArena, interner: &AtomInterner, d: &Decorator) -> bool {
+    written_head(arena, d)
+        .and_then(|head| super::decorator_kind::ContractDecorator::of(interner.resolve(head)))
+        .is_some()
+}
+
 pub fn is_builtin(arena: &AstArena, interner: &AtomInterner, d: &Decorator) -> bool {
-    match_builtin(arena, interner, std::slice::from_ref(d))
-        .into_iter()
-        .any(|m| m.result.is_some())
+    is_contract_decorator(arena, interner, d)
+        || match_builtin(arena, interner, std::slice::from_ref(d))
+            .into_iter()
+            .any(|m| m.result.is_some())
 }
 
 pub fn is_active_builtin(
