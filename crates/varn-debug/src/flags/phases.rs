@@ -67,5 +67,9 @@ pub fn print_phases() {
         "env gc",
         "VARN_GC_TRACE=1   una línea por colección menor, según ocurre (cualquier comando)",
     );
+    terminal::tagged(
+        "env gc",
+        "VARN_GC_STRESS=N  colecciones cada N objetos jóvenes (N pequeño, p. ej. 64): caza raíces perdidas",
+    );
     Section::new("debug phases").close();
 }

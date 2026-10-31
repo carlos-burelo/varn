@@ -10,7 +10,7 @@ impl Heap {
         let young = &inner.young;
 
         let young_report = YoungReport {
-            threshold: super::young::YOUNG_THRESHOLD,
+            threshold: super::young::young_threshold(),
             live: young.len(),
             alloc_count: young.alloc_count(),
             minor_gc_count: young.minor_gc_count,

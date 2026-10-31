@@ -54,7 +54,7 @@ impl HeapInner {
             major_work: Vec::new(),
             gc_collections: 0,
             gc_total_freed: 0,
-            gc_threshold: 65536,
+            gc_threshold: super::young::old_floor(),
             young: YoungGen::default(),
             hotspot: None,
             scan_roots: Vec::new(),

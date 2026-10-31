@@ -13,7 +13,7 @@ macro_rules! fill_tail {
             instance_alloc: crate::heap::Heap::jit_instance_alloc(),
             heap_field_offset: std::mem::offset_of!(ctx::ExecCtx, heap),
             young_len_offset: crate::heap::Heap::young_len_byte_offset_from_rcbox(),
-            young_threshold: crate::heap::young::YOUNG_THRESHOLD,
+            young_threshold: crate::heap::young::young_threshold(),
             jit_native_result_offset: std::mem::offset_of!(ctx::ExecCtx, jit_native_result),
             jit_error_flag_offset: std::mem::offset_of!(ctx::ExecCtx, jit_error_flag),
             jit_exit_offset: std::mem::offset_of!(ctx::ExecCtx, jit_exit),
