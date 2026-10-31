@@ -146,6 +146,9 @@ pub(crate) fn op_in(key: VmValue, obj: VmValue, heap: &Heap) -> bool {
             }
             false
         }
+        Some(HeapObj::Map(m)) => heap
+            .lookup_map_key(key)
+            .is_some_and(|k| m.read().contains_key(&k)),
         Some(
             HeapObj::Str(_)
             | HeapObj::Tuple(_)
@@ -157,7 +160,6 @@ pub(crate) fn op_in(key: VmValue, obj: VmValue, heap: &Heap) -> bool {
             | HeapObj::Class(_)
             | HeapObj::NativeFn(..)
             | HeapObj::BoundMethod(_)
-            | HeapObj::Map(_)
             | HeapObj::Set(_)
             | HeapObj::Task(_)
             | HeapObj::TaskHandle(_)

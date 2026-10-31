@@ -9,6 +9,35 @@ use varn_sem::bind::BindResult;
 use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
+    fn is_keyed_dictionary(&self, ty: &Type) -> bool {
+        match self.ty_table.get(ty.0) {
+            varn_core::TypeKind::Object(members) | varn_core::TypeKind::Record(members) => self
+                .ty_table
+                .get_object_members(members)
+                .iter()
+                .any(|m| matches!(m, varn_sem::types::ObjectTypeMember::Index { .. })),
+            varn_core::TypeKind::Primitive(_)
+            | varn_core::TypeKind::Literal(_)
+            | varn_core::TypeKind::This
+            | varn_core::TypeKind::Union(_)
+            | varn_core::TypeKind::Intersection(_)
+            | varn_core::TypeKind::Tuple(_)
+            | varn_core::TypeKind::Array(_)
+            | varn_core::TypeKind::Named(..)
+            | varn_core::TypeKind::Generic(..)
+            | varn_core::TypeKind::TemplateLiteral(_)
+            | varn_core::TypeKind::Fn(_)
+            | varn_core::TypeKind::Typeof(_)
+            | varn_core::TypeKind::KeyOf(_)
+            | varn_core::TypeKind::IndexedAccess { .. }
+            | varn_core::TypeKind::Mapped { .. }
+            | varn_core::TypeKind::Conditional { .. }
+            | varn_core::TypeKind::Infer(_)
+            | varn_core::TypeKind::EnumVariant { .. }
+            | varn_core::TypeKind::TypePredicate { .. } => false,
+        }
+    }
+
     pub(super) fn check_binary_operands(
         &mut self,
         rec: &mut Recorder,
@@ -44,13 +73,6 @@ impl<'r> Checker<'r> {
             && !is_type_param_b(&l_base, self)
             && !is_type_param_b(&r_base, self)
         {
-            let is_scalar = |t: &Type| {
-                t.is_numeric()
-                    || *t == Type::Bool
-                    || *t == Type::Str
-                    || *t == Type::Char
-                    || *t == Type::Null
-            };
             let both_numeric = l_base.is_numeric() && r_base.is_numeric();
             let (l_eff, r_eff) = varn_sem::types::numeric_ops::adopt_literal_operands(
                 self.ast_arena,
@@ -93,9 +115,20 @@ impl<'r> Checker<'r> {
                     }
                 }
                 BinaryOp::Instanceof => true,
-                BinaryOp::In => !is_scalar(&r_base),
+                BinaryOp::In => l_base == Type::Str && self.is_keyed_dictionary(&r_base),
             };
-            if !valid {
+            if !valid && op == BinaryOp::In {
+                let r_ty_s = r_ty.display(&self.ty_table, &bind.interner);
+                self.emit(
+                    Diagnostic::error(
+                        ErrorCode::InvalidTypeOperator,
+                        format!(
+                            "'in' tests whether a dictionary has a str key, and '{r_ty_s}' is not one: its members are known statically, use `.contains(..)`, `.has(..)` or `.includes(..)`"
+                        ),
+                    )
+                    .with_range(range),
+                );
+            } else if !valid {
                 let l_ty_s = l_ty.display(&self.ty_table, &bind.interner);
                 let r_ty_s = r_ty.display(&self.ty_table, &bind.interner);
                 self.emit(
