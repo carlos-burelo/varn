@@ -103,6 +103,9 @@ pub(crate) fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
             Some(HeapObj::EnumVariant(ev)) => ev.enum_class_id.and_then(ClassObj::find_by_id),
             Some(HeapObj::Range(_)) => intrinsic(varn_core::RuntimeKind::Range),
             Some(HeapObj::Buffer(_)) => intrinsic(varn_core::RuntimeKind::Bytes),
+            Some(HeapObj::Generator(g)) if g.is_async => {
+                intrinsic(varn_core::RuntimeKind::AsyncGenerator)
+            }
             Some(HeapObj::Generator(_)) => intrinsic(varn_core::RuntimeKind::Generator),
             Some(
                 HeapObj::Module(_)

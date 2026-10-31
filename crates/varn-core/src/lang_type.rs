@@ -174,7 +174,8 @@ impl BuiltinType {
             Self::Bytes => K::Bytes,
             Self::Task => K::Task,
             Self::TaskHandle => K::TaskHandle,
-            Self::Generator | Self::AsyncGenerator => K::Generator,
+            Self::Generator => K::Generator,
+            Self::AsyncGenerator => K::AsyncGenerator,
         }
     }
 

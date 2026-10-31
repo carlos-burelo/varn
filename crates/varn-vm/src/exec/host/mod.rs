@@ -312,6 +312,18 @@ impl NativeCtx for ExecCtx {
             .map_err(varn_types::NativeError::from)
     }
 
+    fn close_async_generator(&mut self, generator: VmValue) -> VmValue {
+        let Some(state) = self.heap.generator_of(generator) else {
+            return self.host_task_resolved(VmValue::null());
+        };
+        if !state.is_suspended() {
+            state.close();
+            return self.host_task_resolved(VmValue::null());
+        }
+        state.begin_close();
+        self.step_generator_task(&state)
+    }
+
     fn close_generator(&mut self, generator: VmValue) -> Result<(), varn_types::NativeError> {
         let Some(state) = self.heap.generator_of(generator) else {
             return Ok(());

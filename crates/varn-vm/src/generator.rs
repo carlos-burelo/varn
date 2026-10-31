@@ -26,6 +26,7 @@ pub struct GenState {
     phase: RefCell<Phase>,
     spare: RefCell<FrameBuffers>,
     pub(crate) is_async: bool,
+    closing: std::cell::Cell<bool>,
 }
 
 impl std::fmt::Debug for GenState {
@@ -49,7 +50,24 @@ impl GenState {
             }),
             spare: RefCell::new(FrameBuffers::default()),
             is_async,
+            closing: std::cell::Cell::new(false),
         })
+    }
+
+    pub(crate) fn is_suspended(&self) -> bool {
+        matches!(&*self.phase.borrow(), Phase::Suspended { .. })
+    }
+
+    pub(crate) fn begin_close(&self) {
+        self.closing.set(true);
+    }
+
+    pub(crate) fn resume_input(&self) -> VmValue {
+        if self.closing.get() {
+            VmValue::from_bool(true)
+        } else {
+            VmValue::null()
+        }
     }
 
     pub(crate) fn close(&self) {
@@ -163,8 +181,7 @@ impl ExecCtx {
     }
 
     pub(crate) fn close_generator_state(&mut self, generator: &Rc<GenState>) -> VmResult<()> {
-        let suspended = matches!(&*generator.phase.borrow(), Phase::Suspended { .. });
-        if !suspended || generator.is_async {
+        if !generator.is_suspended() {
             generator.close();
             return Ok(());
         }
@@ -189,6 +206,10 @@ impl ExecCtx {
         suspend: Option<VmSuspend>,
     ) -> VmResult<VmValue> {
         match suspend {
+            Some(VmSuspend::Yield { .. }) if generator.closing.get() => {
+                generator.close();
+                self.make_option(None)
+            }
             Some(VmSuspend::Yield { value, dest_reg }) => {
                 self.park_generator(generator, 0, value, dest_reg)
             }

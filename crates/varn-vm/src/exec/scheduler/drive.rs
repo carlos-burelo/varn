@@ -81,7 +81,7 @@ pub(super) fn run_task(template: &ExecCtx, queue: &TaskQueue, ready: ReadyTask) 
             thaw(&mut ctx, *frozen);
             delivery
         }
-        Start::Step(state) => match ctx.enter_generator(&state, VmValue::null()) {
+        Start::Step(state) => match ctx.enter_generator(&state, state.resume_input()) {
             Ok(Entry::Done(finished)) => return finish(queue, ctx, &output, Ok(finished)),
             Ok(Entry::Mounted(_)) => {
                 request_osr(&mut ctx, varn_types::ssa::OsrMode::Resume);

@@ -64,6 +64,7 @@ impl HeapObj {
             HeapObj::BigInt(_) => RuntimeKind::BigInt,
             HeapObj::Decimal(_) => RuntimeKind::Decimal,
             HeapObj::Char(_) => RuntimeKind::Char,
+            HeapObj::Generator(g) if g.is_async => RuntimeKind::AsyncGenerator,
             HeapObj::Generator(_) => RuntimeKind::Generator,
             HeapObj::Spread(_) => RuntimeKind::Array,
             HeapObj::Buffer(_) => RuntimeKind::Bytes,

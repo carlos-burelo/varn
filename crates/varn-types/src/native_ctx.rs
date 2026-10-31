@@ -243,6 +243,10 @@ pub trait NativeCtx: crate::Buffers {
         ))
     }
 
+    fn close_async_generator(&mut self, _generator: VmValue) -> VmValue {
+        VmValue::null()
+    }
+
     fn close_generator(&mut self, _generator: VmValue) -> Result<(), crate::NativeError> {
         Ok(())
     }

@@ -25,6 +25,7 @@ pub enum RuntimeKind {
     Opaque,
     TaskHandle,
     Bytes,
+    AsyncGenerator,
 }
 
 impl RuntimeKind {
@@ -52,20 +53,21 @@ impl RuntimeKind {
             Self::Opaque => "opaque",
             Self::TaskHandle => "TaskHandle",
             Self::Bytes => "Bytes",
+            Self::AsyncGenerator => "AsyncGenerator",
         }
     }
 }
 
 impl RuntimeKind {
     pub const fn from_u8(raw: u8) -> Option<Self> {
-        if raw <= Self::Bytes as u8 {
+        if raw <= Self::AsyncGenerator as u8 {
             Some(unsafe { std::mem::transmute::<u8, Self>(raw) })
         } else {
             None
         }
     }
 
-    pub const COUNT: usize = Self::Bytes as usize + 1;
+    pub const COUNT: usize = Self::AsyncGenerator as usize + 1;
 
     pub fn named(name: &str) -> Option<Self> {
         (0..Self::COUNT as u8)

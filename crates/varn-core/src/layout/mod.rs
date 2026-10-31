@@ -67,7 +67,8 @@ impl TypeLayout {
                 | RuntimeKind::Function
                 | RuntimeKind::Task
                 | RuntimeKind::Bytes
-                | RuntimeKind::Generator,
+                | RuntimeKind::Generator
+                | RuntimeKind::AsyncGenerator,
             ) => Self::new(8, 8, ScalarRepr::Ref),
             Some(
                 RuntimeKind::Null

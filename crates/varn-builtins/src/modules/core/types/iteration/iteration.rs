@@ -34,8 +34,8 @@ varn_contract! {
                 }
             }
         }
-        fn close(ctx: &mut dyn NativeCtx, this: VmValue) -> Result<(), NativeError> {
-            ctx.close_generator(this)
+        fn close(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
+            ctx.close_async_generator(this)
         }
     }
 }

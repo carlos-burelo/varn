@@ -24,16 +24,34 @@ struct OptionTags {
 }
 
 impl FnEmitter<'_> {
-    fn closing_on_exit(&mut self, it: LocalId, it_ty: BackendTy, walk: TirStmt) -> Vec<TirStmt> {
+    fn closing_on_exit(
+        &mut self,
+        it: LocalId,
+        it_ty: BackendTy,
+        walk: TirStmt,
+        awaited_close: Option<BackendTy>,
+    ) -> Vec<TirStmt> {
         let dyn_ty = BackendTy::Dynamic(DynReason::Runtime);
-        let close = TirStmt::Expr(self.member_call(
+        let close_call = self.member_call(
             local_var(it, it_ty),
             Arc::from(MemberKey::IterClose.as_str()),
             vec![],
-            BackendTy::Void,
+            awaited_close.unwrap_or(BackendTy::Void),
             None,
             Span::EMPTY,
-        ));
+        );
+        let close = TirStmt::Expr(if awaited_close.is_some() {
+            TirExpr {
+                kind: TirExprKind::Await {
+                    future: Box::new(close_call),
+                },
+                ty: BackendTy::Void,
+                res: Resolution::None,
+                span: Span::EMPTY,
+            }
+        } else {
+            close_call
+        });
         let fin = vec![close];
         let caught = self.fresh_local(dyn_ty);
         let rethrow = TirStmt::Throw(local_var(caught, dyn_ty));
@@ -164,11 +182,16 @@ impl FnEmitter<'_> {
             cond: bool_lit(true),
             body: loop_body,
         };
-        if plan.is_await || !matches!(it_ty, BackendTy::Dynamic(DynReason::Yields(_))) {
+        if !matches!(it_ty, BackendTy::Dynamic(DynReason::Yields(_))) {
             out.push(walk);
             return out;
         }
-        out.extend(self.closing_on_exit(it, it_ty, walk));
+        let awaited_close = matches!(
+            next_ty,
+            BackendTy::Dynamic(DynReason::Awaitable(_) | DynReason::TaskHandle(_))
+        )
+        .then_some(next_ty);
+        out.extend(self.closing_on_exit(it, it_ty, walk, awaited_close));
         out
     }
 }
