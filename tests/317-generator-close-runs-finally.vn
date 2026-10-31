@@ -127,4 +127,41 @@ await describe("317 closing a generator runs the finally blocks it is suspended 
         expect(total).toBe(6000);
         expect(log.length).toBe(3000);
     });
+
+    await it("yield* forwards the items of its source and closing reaches the inner generator", async () => {
+        log = [];
+        function* inner(): Generator<int> {
+            try { yield 1; yield 2; yield 3; } finally { log.push("inner"); }
+        }
+        function* outer(): Generator<int> {
+            try { yield 0; yield* inner(); yield 4; } finally { log.push("outer"); }
+        }
+        const seen: int[] = [];
+        for (const v of outer()) { seen.push(v); }
+        expect(seen.join(",")).toBe("0,1,2,3,4");
+        expect(log.join(",")).toBe("inner,outer");
+        log = [];
+        for (const v of outer()) { if (v == 2) { break; } }
+        expect(log.join(",")).toBe("inner,outer");
+        function* fromArray(): Generator<int> { yield* [7, 8]; }
+        let text = "";
+        for (const v of fromArray()) { text = text + v.toString(); }
+        expect(text).toBe("78");
+    });
+
+    await it("an async generator runs its finally blocks when closed or left by for await", async () => {
+        log = [];
+        async function* ag(tag: str): AsyncGenerator<int> {
+            try { yield 1; yield 2; } finally { log.push(tag); }
+        }
+        for await (const v of ag("break")) { if (v == 1) { break; } }
+        expect(log.join(",")).toBe("break");
+        const g = ag("close");
+        await g.next();
+        await g.close();
+        expect(log.join(",")).toBe("break,close");
+        expect((await g.next()).isNone()).toBe(true);
+        for await (const v of counted("sync")) { if (v == 1) { break; } }
+        expect(log.join(",")).toBe("break,close,sync");
+    });
 });
