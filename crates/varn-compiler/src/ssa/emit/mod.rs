@@ -107,7 +107,7 @@ pub(crate) fn emit_function_meta(
                 &reg,
                 scratch,
                 call_base,
-                ic.of(b, idx),
+                ic.emit_slot(b, idx),
                 &source_file,
                 nparams,
                 &mut fixups,

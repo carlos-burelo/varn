@@ -179,7 +179,11 @@ pub(super) fn emit_build_object_spread(
                 let idx = chunk.add_str(k);
                 let cs = next_slot
                     .ok_or(OptError::Unsupported("ssa-emit: cache site without a slot"))?;
-                next_slot = cs.checked_add(1);
+                next_slot = if cs == Chunk::NO_IC_SLOT {
+                    Some(cs)
+                } else {
+                    cs.checked_add(1)
+                };
                 chunk.emit_rrc_ic(OpCode::SetProperty, d, reg[v.0 as usize], idx, cs, line);
             }
             None => chunk.emit_rr(OpCode::ObjectMerge, d, reg[v.0 as usize], line),

@@ -271,6 +271,9 @@ impl Chunk {
         self.write(const_idx, line);
     }
 
+    pub const MAX_IC_SLOTS: u16 = 255;
+    pub const NO_IC_SLOT: u8 = u8::MAX;
+
     pub fn emit_rrc_ic(
         &mut self,
         op: OpCode,

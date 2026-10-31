@@ -1,8 +1,10 @@
 use super::ir::{InstKind, SsaFunc};
 use crate::OptError;
+use varn_types::chunk::Chunk;
 
 pub(crate) struct IcSlots {
     slots: Vec<Vec<Option<u8>>>,
+    uncached: Vec<Vec<bool>>,
     count: u16,
 }
 
@@ -13,6 +15,11 @@ impl IcSlots {
             .iter()
             .map(|b| vec![None; b.insts.len()])
             .collect();
+        let mut uncached: Vec<Vec<bool>> = ssa
+            .blocks
+            .iter()
+            .map(|b| vec![false; b.insts.len()])
+            .collect();
         let mut count: u16 = 0;
         for &b in order {
             for (i, inst) in ssa.blocks[b].insts.iter().enumerate() {
@@ -20,14 +27,31 @@ impl IcSlots {
                 if n == 0 {
                     continue;
                 }
-                let too_many = || OptError::Unsupported("ssa-emit: too many inline-cache sites");
-
-                u8::try_from(count + n - 1).map_err(|_| too_many())?;
+                if count + n > Chunk::MAX_IC_SLOTS {
+                    uncached[b][i] = true;
+                    continue;
+                }
                 slots[b][i] = Some(count as u8);
                 count += n;
             }
         }
-        Ok(Self { slots, count })
+        Ok(Self {
+            slots,
+            uncached,
+            count,
+        })
+    }
+
+    pub(crate) fn emit_slot(&self, block: usize, inst: usize) -> Option<u8> {
+        match self.of(block, inst) {
+            Some(slot) => Some(slot),
+            None => self
+                .uncached
+                .get(block)?
+                .get(inst)
+                .copied()?
+                .then_some(Chunk::NO_IC_SLOT),
+        }
     }
 
     pub(crate) fn of(&self, block: usize, inst: usize) -> Option<u8> {
