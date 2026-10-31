@@ -162,6 +162,17 @@ impl ExecCtx {
         }
     }
 
+    pub(crate) fn close_generator_state(&mut self, generator: &Rc<GenState>) -> VmResult<()> {
+        let suspended = matches!(&*generator.phase.borrow(), Phase::Suspended { .. });
+        if !suspended || generator.is_async {
+            generator.close();
+            return Ok(());
+        }
+        let ran = self.resume_generator(generator, VmValue::from_bool(true));
+        generator.close();
+        ran.map(|_| ())
+    }
+
     pub(crate) fn step_generator_task(&mut self, generator: &Rc<GenState>) -> VmValue {
         let output = crate::task::TaskCell::pending();
         crate::exec::scheduler::queue_for(self).push_ready(crate::exec::scheduler::ReadyTask {

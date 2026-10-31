@@ -6,7 +6,7 @@ import { Option } from "core:types/option";
  */
 export declare class Generator<T> {
     @throws(Error) next(): Option<T>;
-    close(): void;
+    @throws(Error) close(): void;
 }
 
 /**
@@ -16,7 +16,7 @@ export declare class Generator<T> {
  */
 export declare class AsyncGenerator<T> {
     next(): Task<Option<T>>;
-    close(): void;
+    @throws(Error) close(): void;
 }
 
 /**

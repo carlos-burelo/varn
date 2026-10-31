@@ -243,7 +243,9 @@ pub trait NativeCtx: crate::Buffers {
         ))
     }
 
-    fn close_generator(&mut self, _generator: VmValue) {}
+    fn close_generator(&mut self, _generator: VmValue) -> Result<(), crate::NativeError> {
+        Ok(())
+    }
 
     fn as_char(&self, _v: VmValue) -> Option<char> {
         None

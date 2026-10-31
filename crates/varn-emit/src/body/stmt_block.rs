@@ -86,6 +86,17 @@ impl<'a> FnEmitter<'a> {
                     let (subject, cases) = (*subject, cases);
                     return self.lower_match_stmt(subject, cases);
                 }
+                if let ExprKind::Yield {
+                    argument,
+                    delegate: false,
+                } = &self.ast_arena.expr(expression).kind
+                {
+                    let (argument, span) = (
+                        *argument,
+                        super::small_utils::span_of(self.ast_arena, expression),
+                    );
+                    return self.lower_yield_stmt(argument, span);
+                }
                 let e = self.lower_expr(expression);
                 drained(self, one(TirStmt::Expr(e)))
             }

@@ -312,10 +312,12 @@ impl NativeCtx for ExecCtx {
             .map_err(varn_types::NativeError::from)
     }
 
-    fn close_generator(&mut self, generator: VmValue) {
-        if let Some(state) = self.heap.generator_of(generator) {
-            state.close();
-        }
+    fn close_generator(&mut self, generator: VmValue) -> Result<(), varn_types::NativeError> {
+        let Some(state) = self.heap.generator_of(generator) else {
+            return Ok(());
+        };
+        self.close_generator_state(&state)
+            .map_err(varn_types::NativeError::from)
     }
 
     fn as_char(&self, v: VmValue) -> Option<char> {
