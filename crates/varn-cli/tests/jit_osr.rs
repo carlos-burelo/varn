@@ -17,12 +17,12 @@ fn osr_entries_resume_from_ssa() {
     let out = Command::new(env!("CARGO_BIN_EXE_vn"))
         .arg("run")
         .arg(root.join("tests/151-jit-osr.vn"))
-        .env("VARN_CACHE_DIR", &cache)
+        .env(varn_core::env::EnvVar::CacheDir.name(), &cache)
         .env("NO_COLOR", "1")
-        .env("VARN_JIT_TIER", "100000000")
-        .env("VARN_JIT_TIER_STRAIGHT", "100000000")
-        .env("VARN_JIT_OSR", "50")
-        .env("VARN_CLIF_TRACE", "1")
+        .env(varn_core::env::EnvVar::JitTier.name(), "100000000")
+        .env(varn_core::env::EnvVar::JitTierStraight.name(), "100000000")
+        .env(varn_core::env::EnvVar::JitOsr.name(), "50")
+        .env(varn_core::env::EnvVar::ClifTrace.name(), "1")
         .output()
         .expect("spawn vn");
     let _ = std::fs::remove_dir_all(&cache);

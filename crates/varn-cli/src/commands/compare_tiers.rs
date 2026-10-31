@@ -1,5 +1,6 @@
 use std::path::Path;
 use std::process::Command;
+use varn_core::env::EnvVar;
 
 use varn_core::term::chalk::chalk;
 
@@ -7,13 +8,13 @@ use crate::error::CliError;
 
 struct Tier {
     label: &'static str,
-    env: &'static [(&'static str, &'static str)],
+    env: &'static [(EnvVar, &'static str)],
 }
 
 const TIERS: &[Tier] = &[
     Tier {
         label: "interpreter",
-        env: &[("VARN_NO_CLIF", "1")],
+        env: &[(EnvVar::NoClif, "1")],
     },
     Tier {
         label: "jit",
@@ -21,7 +22,7 @@ const TIERS: &[Tier] = &[
     },
     Tier {
         label: "jit (tier 1)",
-        env: &[("VARN_JIT_TIER", "1")],
+        env: &[(EnvVar::JitTier, "1")],
     },
 ];
 
@@ -52,9 +53,10 @@ pub fn execute(file: &str, script_args: &[String]) -> Result<(), CliError> {
             cmd.arg("--").args(script_args);
         }
 
-        cmd.env_remove("VARN_NO_CLIF").env_remove("VARN_JIT_TIER");
+        cmd.env_remove(EnvVar::NoClif.name())
+            .env_remove(EnvVar::JitTier.name());
         for (k, v) in tier.env {
-            cmd.env(k, v);
+            cmd.env(k.name(), v);
         }
         let out = cmd
             .output()

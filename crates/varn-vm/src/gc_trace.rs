@@ -4,10 +4,7 @@ use std::time::Instant;
 static ENABLED: AtomicBool = AtomicBool::new(false);
 
 pub fn init() {
-    ENABLED.store(
-        std::env::var_os("VARN_GC_TRACE").is_some(),
-        Ordering::Relaxed,
-    );
+    ENABLED.store(varn_core::env::settings().gc_trace, Ordering::Relaxed);
 }
 
 #[inline(always)]

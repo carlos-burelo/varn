@@ -19,9 +19,9 @@ fn every_compiled_function_lowers_from_ssa() {
         .arg("run")
         .arg(root.join("tests/main.vn"))
         .current_dir(&root)
-        .env("VARN_CACHE_DIR", &cache)
+        .env(varn_core::env::EnvVar::CacheDir.name(), &cache)
         .env("NO_COLOR", "1")
-        .env("VARN_CLIF_TRACE", "1")
+        .env(varn_core::env::EnvVar::ClifTrace.name(), "1")
         .output()
         .expect("spawn vn");
     let _ = std::fs::remove_dir_all(&cache);

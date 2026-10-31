@@ -133,10 +133,7 @@ pub fn report() {
 }
 
 pub fn init() {
-    let level = std::env::var("VARN_ALLOC_PROFILE")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(0u8);
+    let level = varn_core::env::settings().alloc_profile;
     LEVEL.store(level, std::sync::atomic::Ordering::Relaxed);
     if level > 0 {
         calibrate();

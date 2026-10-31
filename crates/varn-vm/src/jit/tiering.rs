@@ -12,9 +12,8 @@ impl VmClosure {
     pub(crate) fn osr_backedge_threshold() -> u32 {
         static T: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
         *T.get_or_init(|| {
-            std::env::var("VARN_JIT_OSR")
-                .ok()
-                .and_then(|v| v.parse().ok())
+            varn_core::env::settings()
+                .jit_osr
                 .unwrap_or(Self::JIT_OSR_BACKEDGES)
         })
     }
@@ -23,17 +22,15 @@ impl VmClosure {
         if proto.has_backedge() {
             static LT: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
             return *LT.get_or_init(|| {
-                std::env::var("VARN_JIT_TIER")
-                    .ok()
-                    .and_then(|v| v.parse().ok())
+                varn_core::env::settings()
+                    .jit_tier
                     .unwrap_or(Self::JIT_TIER_THRESHOLD)
             });
         }
         static ST: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
         *ST.get_or_init(|| {
-            std::env::var("VARN_JIT_TIER_STRAIGHT")
-                .ok()
-                .and_then(|v| v.parse().ok())
+            varn_core::env::settings()
+                .jit_tier_straight
                 .unwrap_or(Self::JIT_TIER_THRESHOLD_STRAIGHT)
         })
     }

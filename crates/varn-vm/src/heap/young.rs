@@ -5,12 +5,7 @@ const DEFAULT_OLD_FLOOR: u64 = 65536;
 
 fn stress_cells() -> Option<usize> {
     static STRESS: std::sync::OnceLock<Option<usize>> = std::sync::OnceLock::new();
-    *STRESS.get_or_init(|| {
-        std::env::var("VARN_GC_STRESS")
-            .ok()
-            .and_then(|text| text.trim().parse::<usize>().ok())
-            .filter(|cells| *cells > 0)
-    })
+    *STRESS.get_or_init(|| varn_core::env::settings().gc_stress)
 }
 
 pub fn young_threshold() -> usize {

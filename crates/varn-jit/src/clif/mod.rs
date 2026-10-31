@@ -23,12 +23,12 @@ use std::sync::OnceLock;
 
 pub fn enabled() -> bool {
     static ON: OnceLock<bool> = OnceLock::new();
-    *ON.get_or_init(|| std::env::var("VARN_NO_CLIF").is_err())
+    *ON.get_or_init(|| !varn_core::env::settings().no_clif)
 }
 
 pub fn trace() -> bool {
     static ON: OnceLock<bool> = OnceLock::new();
-    *ON.get_or_init(|| std::env::var("VARN_CLIF_TRACE").is_ok())
+    *ON.get_or_init(|| varn_core::env::settings().clif_trace)
 }
 
 pub fn shared_isa() -> Result<&'static OwnedTargetIsa, String> {
@@ -52,10 +52,12 @@ pub fn isa_identity() -> u64 {
 
 pub fn host_isa() -> Result<OwnedTargetIsa, String> {
     let mut flags = settings::builder();
-    let opt = std::env::var("VARN_CLIF_OPT").unwrap_or_else(|_| "speed".to_owned());
-    flags.set("opt_level", &opt).map_err(|e| e.to_string())?;
+    let env = varn_core::env::settings();
+    flags
+        .set("opt_level", env.clif_opt.flag_value())
+        .map_err(|e| e.to_string())?;
 
-    let verify = std::env::var("VARN_CLIF_VERIFY").is_ok() || cfg!(debug_assertions);
+    let verify = env.clif_verify || cfg!(debug_assertions);
     flags
         .set("enable_verifier", if verify { "true" } else { "false" })
         .map_err(|e| e.to_string())?;
@@ -82,7 +84,7 @@ fn compile_in<R>(
     isa: &dyn TargetIsa,
     take: impl FnOnce(&cranelift_codegen::CompiledCode) -> Result<R, String>,
 ) -> Result<R, String> {
-    if std::env::var("VARN_CLIF_PRINT_IR").is_ok() {
+    if varn_core::env::settings().clif_print_ir {
         eprintln!("=== CLIF IR ===\n{}", ctx.func.display());
     }
     let start = std::time::Instant::now();

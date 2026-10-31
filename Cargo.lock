@@ -5098,6 +5098,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "varn-core",
 ]
 
 [[package]]

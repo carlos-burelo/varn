@@ -93,7 +93,7 @@ pub(super) fn invoke_once(
         cmd.arg(arg);
     }
     cmd.arg(file);
-    cmd.env("VARN_CACHE_DIR", cache_dir);
+    cmd.env(varn_core::env::EnvVar::CacheDir.name(), cache_dir);
 
     let start = Instant::now();
     let output = cmd.output()?;

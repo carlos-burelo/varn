@@ -82,5 +82,5 @@ pub(crate) fn at(params: TextDocumentPositionParams) -> (String, Position) {
 }
 
 pub(crate) fn verbose() -> bool {
-    std::env::var_os("VARN_LSP_DEBUG").is_some()
+    varn_core::env::settings().lsp_debug
 }

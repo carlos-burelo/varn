@@ -124,7 +124,7 @@ fn emit_build_object_inline(
     let end = b.ins().load(types::I64, flags, lane, LANE_END_OFF as i32);
 
     let guard = b.ins().bor(c_hot, c_nat);
-    let force_slow = std::env::var("VARN_ALLOC_SLOW").is_ok();
+    let force_slow = varn_core::env::settings().alloc_slow;
     if force_slow {
         b.ins().jump(slow_blk, &[]);
     } else {

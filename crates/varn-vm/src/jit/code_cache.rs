@@ -22,10 +22,10 @@ enum Mode {
 
 fn mode() -> Mode {
     static MODE: OnceLock<Mode> = OnceLock::new();
-    *MODE.get_or_init(|| match std::env::var("VARN_JIT_CACHE").as_deref() {
-        Ok("off") => Mode::Off,
-        Ok("verify") => Mode::Verify,
-        _ => Mode::On,
+    *MODE.get_or_init(|| match varn_core::env::settings().jit_cache {
+        varn_core::env::JitCacheMode::Off => Mode::Off,
+        varn_core::env::JitCacheMode::Verify => Mode::Verify,
+        varn_core::env::JitCacheMode::On => Mode::On,
     })
 }
 

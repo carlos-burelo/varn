@@ -35,7 +35,7 @@ fn vn(sub: &str, file: &Path, cache: &Path) -> Output {
     Command::new(env!("CARGO_BIN_EXE_vn"))
         .arg(sub)
         .arg(file)
-        .env("VARN_CACHE_DIR", cache)
+        .env(varn_core::env::EnvVar::CacheDir.name(), cache)
         .env("NO_COLOR", "1")
         .output()
         .expect("spawn vn")

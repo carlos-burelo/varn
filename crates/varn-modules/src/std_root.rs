@@ -1,6 +1,5 @@
 use std::path::{Path, PathBuf};
 
-pub const ENV_VARN_STD: &str = "VARN_STD";
 pub const STD_DIR_NAME: &str = "std";
 
 pub const STD_EMBEDDED_SENTINEL: &str = "@embedded";
@@ -53,7 +52,7 @@ fn resolve_uncached() -> (StdSource, StdProvenance) {
     {
         return (src, StdProvenance::ProjectOverride);
     }
-    if let Ok(p) = std::env::var(ENV_VARN_STD) {
+    if let Some(p) = varn_core::env::settings().std.clone() {
         if p == STD_EMBEDDED_SENTINEL {
             return (StdSource::Embedded, StdProvenance::Env);
         }

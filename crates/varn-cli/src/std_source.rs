@@ -35,7 +35,7 @@ fn select(building_image: bool) -> Option<StdInput> {
             },
             None if provenance == StdProvenance::Env => StdInput::Unavailable(format!(
                 "{}={} was requested but this binary has no stdlib compiled into it",
-                std_root::ENV_VARN_STD,
+                varn_core::env::EnvVar::Std.name(),
                 std_root::STD_EMBEDDED_SENTINEL
             )),
             None => return None,
@@ -59,7 +59,7 @@ fn carried_image() -> Option<&'static [u8]> {
     }
     #[cfg(not(feature = "embed-std"))]
     {
-        let bytes = std::fs::read(std::env::var_os("VARN_STD_BUNDLE")?).ok()?;
+        let bytes = std::fs::read(varn_core::env::settings().std_bundle.as_ref()?).ok()?;
         Some(Box::leak(bytes.into_boxed_slice()))
     }
 }
@@ -103,7 +103,7 @@ fn build_image(root: &Path, dir: &Path, path: &Path) -> Result<(), String> {
         .arg(root)
         .arg("--out")
         .arg(&tmp)
-        .env(std_root::ENV_VARN_STD, root)
+        .env(varn_core::env::EnvVar::Std.name(), root)
         .output()
         .map_err(|e| format!("cannot run vn {IMAGE_BUILD_COMMAND}: {e}"))?;
     if !output.status.success() {

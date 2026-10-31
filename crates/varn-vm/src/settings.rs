@@ -8,7 +8,7 @@ pub struct ExecSettings {
 impl ExecSettings {
     pub fn from_env(trace: bool) -> Self {
         Self {
-            no_jit: std::env::var_os("VARN_NO_JIT").is_some_and(|flag| !flag.is_empty()),
+            no_jit: varn_core::env::settings().no_jit,
             trace,
         }
     }
