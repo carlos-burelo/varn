@@ -306,6 +306,7 @@ import "./312-time-validation.vn"
 import "./313-crypto-sizes-and-decoding.vn"
 import "./314-json-text-fidelity.vn"
 import "./315-large-module-compiles.vn"
+import "./316-array-regex-and-never-union.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

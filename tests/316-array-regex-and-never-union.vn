@@ -1,0 +1,48 @@
+import { describe, it, expect } from "std:test";
+import { Regex } from "std:regex";
+import { ParseError } from "std:error";
+
+function outcome(f: () => str): str {
+    try { return f(); } catch (e) {
+        return e instanceof RangeError ? "range" : e instanceof ParseError ? "parse" : "other:" + e.name;
+    }
+}
+
+function load(): int { return 4; }
+
+await describe("316 Array construction, regex flags and never in unions", async () => {
+    await it("new Array<T>() is a real, empty, growable array", async () => {
+        const a = new Array<int>();
+        expect(a.length).toBe(0);
+        a.push(3);
+        a.push(5);
+        expect(a.join(",")).toBe("3,5");
+    });
+
+    await it("Array.filled builds length copies of the value", async () => {
+        expect(Array.filled(3, 7).join(",")).toBe("7,7,7");
+        expect(Array.filled(0, "x").length).toBe(0);
+        expect(Array.filled(2, "ab").join("|")).toBe("ab|ab");
+        expect(outcome(() => Array.filled(-1, 0).length.toString())).toBe("range");
+        expect(outcome(() => Array.filled(1 << 40, 0).length.toString())).toBe("range");
+    });
+
+    await it("regex flags are checked and equal patterns share one handle", async () => {
+        expect(outcome(() => new Regex("a", "z").flags)).toBe("parse");
+        expect(outcome(() => new Regex("a", "g").flags)).toBe("parse");
+        expect(new Regex("A", "i").test("a")).toBe(true);
+        expect(new Regex("^b$", "m").test("a\nb\nc")).toBe(true);
+        let hits = 0;
+        for (let i = 0; i < 2000; i++) {
+            if (new Regex("a+b", "").test("xaab")) { hits = hits + 1; }
+        }
+        expect(hits).toBe(2000);
+    });
+
+    await it("never disappears from a union", async () => {
+        const r = null ?? load();
+        expect(r.toString()).toBe("4");
+        const s = (null as int?) ?? load();
+        expect(s + 1).toBe(5);
+    });
+});
