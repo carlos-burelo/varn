@@ -11,16 +11,17 @@ pub fn run_doctor() -> CliResult<()> {
     }
 
     println!(
-        "  VARN_HOME: {}",
+        "  {}: {}",
+        varn_core::env::EnvVar::Home.name(),
         varn_core::paths::varn_home_dir().display()
     );
     println!(
         "  cache dir: {}",
         varn_core::paths::varn_cache_dir().display()
     );
-    match std::env::var(varn_modules::std_root::ENV_VARN_STD) {
-        Ok(raw) => println!("  VARN_STD: {raw}"),
-        Err(_) => println!("  VARN_STD: <not set>"),
+    match &varn_core::env::settings().std {
+        Some(raw) => println!("  VARN_STD: {raw}"),
+        None => println!("  VARN_STD: <not set>"),
     }
 
     match varn_modules::provider::get().and_then(|p| p.std_provenance()) {
@@ -36,6 +37,18 @@ pub fn run_doctor() -> CliResult<()> {
             println!("  std: {desc} (via {origin})");
         }
         None => println!("  std: none resolved"),
+    }
+
+    println!("  environment:");
+    for var in varn_core::env::EnvVar::ALL {
+        let shown = match varn_core::env::raw(*var) {
+            Some(value) => format!("= {value}"),
+            None => "(unset)".to_owned(),
+        };
+        println!("    {:<24} {:<10} {}", var.name(), shown, var.doc());
+    }
+    for name in varn_core::env::unknown_vars() {
+        println!("    {name}: unknown VARN_ variable (typo?)");
     }
 
     match varn_builtins::std_load_error() {

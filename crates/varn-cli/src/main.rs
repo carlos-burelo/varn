@@ -41,6 +41,8 @@ fn main() {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
+    varn_core::env::report_errors_and_exit_if_any();
+
     match std::thread::Builder::new()
         .stack_size(varn_vm::VM_STACK_BYTES)
         .spawn(run_cli)
