@@ -112,11 +112,15 @@ impl<'a> FnEmitter<'a> {
             ExprKind::Call {
                 callee,
                 args,
-                optional: _,
+                optional,
                 type_args: _,
             } => {
                 let callee = *callee;
-                let call = self.lower_call(e.index(), callee, args, ty, span);
+                let call = if *optional {
+                    self.lower_optional_call(e.index(), callee, args, ty, span)
+                } else {
+                    self.lower_call(e.index(), callee, args, ty, span)
+                };
                 if !self.m.desugar.decoded_calls.contains(&e.index()) {
                     return call;
                 }

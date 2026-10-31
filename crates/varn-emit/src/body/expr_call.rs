@@ -4,6 +4,50 @@ use varn_core::ast::{Arg, AstId, ExprId, ExprKind};
 use varn_tir::{BackendTy, Resolution, Span, TirArg, TirExpr, TirExprKind, TirUnOp};
 
 impl<'a> FnEmitter<'a> {
+    pub(super) fn lower_optional_call(
+        &mut self,
+        call_id: AstId,
+        callee: ExprId,
+        args: &[Arg],
+        ty: BackendTy,
+        span: Span,
+    ) -> TirExpr {
+        let value = self.lower_expr(callee);
+        let value = self.pin(value);
+        let is_null = TirExpr {
+            kind: TirExprKind::Unary {
+                op: TirUnOp::IsNull,
+                operand: Box::new(value.clone()),
+            },
+            ty: BackendTy::Bool,
+            res: Resolution::None,
+            span,
+        };
+        let present = TirExpr {
+            ty: value.ty.non_nullable(self.tt),
+            ..value
+        };
+        let targs = self.lower_call_args(call_id, args);
+        let callee_sig = self.callee_signature(callee);
+        let (target, targs) = self.settle_args(
+            Some(call_id),
+            Callee::Value(present),
+            targs,
+            callee_sig,
+            span,
+        );
+        let call = TirExpr {
+            kind: TirExprKind::Call {
+                callee: Box::new(target.into_expr()),
+                args: targs,
+            },
+            ty: ty.non_nullable(self.tt),
+            res: Resolution::None,
+            span,
+        };
+        self.null_or(is_null, call, span)
+    }
+
     pub(super) fn lower_call(
         &mut self,
         call_id: AstId,
