@@ -32,7 +32,42 @@ varn_macros::varn_record! {
     struct RegexMatch;
 }
 
-fn match_record(ctx: &mut dyn NativeCtx, caps: &regex::Captures<'_>) -> VmValue {
+struct CharIndex<'a> {
+    text: &'a str,
+    ascii: bool,
+    byte: usize,
+    chars: usize,
+}
+
+impl<'a> CharIndex<'a> {
+    fn new(text: &'a str) -> Self {
+        Self {
+            text,
+            ascii: text.is_ascii(),
+            byte: 0,
+            chars: 0,
+        }
+    }
+
+    fn at(&mut self, byte: usize) -> i64 {
+        if self.ascii {
+            return byte as i64;
+        }
+        if byte < self.byte {
+            self.byte = 0;
+            self.chars = 0;
+        }
+        self.chars += self.text[self.byte..byte].chars().count();
+        self.byte = byte;
+        self.chars as i64
+    }
+}
+
+fn match_record(
+    ctx: &mut dyn NativeCtx,
+    caps: &regex::Captures<'_>,
+    index: &mut CharIndex<'_>,
+) -> VmValue {
     let whole = caps.get(0).expect("a capture set always holds the whole match");
     let groups: Vec<VmValue> = caps
         .iter()
@@ -43,7 +78,7 @@ fn match_record(ctx: &mut dyn NativeCtx, caps: &regex::Captures<'_>) -> VmValue 
     let groups = ctx.alloc_array(groups);
     RegexMatch {
         r#match: matched,
-        index: whole.start() as i64,
+        index: index.at(whole.start()),
         groups,
     }
     .alloc(ctx)
@@ -96,14 +131,16 @@ varn_contract! {
 
         fn exec(ctx: &mut dyn NativeCtx, handle: i64, text: &str) -> Result<Option<VmValue>, NativeError> {
             let re = get_regex(handle).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
-            Ok(re.captures(text).map(|caps| match_record(ctx, &caps)))
+            let mut index = CharIndex::new(text);
+            Ok(re.captures(text).map(|caps| match_record(ctx, &caps, &mut index)))
         }
 
         fn findAll(ctx: &mut dyn NativeCtx, handle: i64, text: &str) -> Result<Vec<VmValue>, NativeError> {
             let re = get_regex(handle).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
+            let mut index = CharIndex::new(text);
             Ok(re
                 .captures_iter(text)
-                .map(|caps| match_record(ctx, &caps))
+                .map(|caps| match_record(ctx, &caps, &mut index))
                 .collect())
         }
 

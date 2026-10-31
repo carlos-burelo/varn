@@ -319,6 +319,7 @@ import "./325-websocket-framing.vn"
 import "./326-csv-fidelity.vn"
 import "./327-multipart-forms.vn"
 import "./328-loop-header-with-redundant-branch.vn"
+import "./329-regex-index-in-code-points.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

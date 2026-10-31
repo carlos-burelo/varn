@@ -1,0 +1,20 @@
+import { describe, it, expect } from "std:test";
+import { Regex } from "std:regex";
+
+await describe("329 regex match index is in code points", async () => {
+    await it("exec reports the index the string methods use", async () => {
+        const text = "ñé😀x";
+        const m = Regex.compile("x").exec(text);
+        expect(m!.index).toBe(3);
+        expect(text.substring(m!.index, m!.index + 1)).toBe("x");
+    });
+    await it("findAll advances the index across multibyte text", async () => {
+        const all = Regex.compile("a").findAll("éaé😀a");
+        expect(all.length).toBe(2);
+        expect(all[0].index).toBe(1);
+        expect(all[1].index).toBe(4);
+    });
+    await it("an ascii text keeps byte and code point indexes equal", async () => {
+        expect(Regex.compile("c").exec("abc")!.index).toBe(2);
+    });
+});
