@@ -64,3 +64,13 @@ export async function reportMain(tx: Sender<bool>) {
 export async function workerThrows(tx: Sender<int>): Task<void> {
     throw new Error("worker-failed")
 }
+
+function unexportedWorker(tx: Sender<str>) {}
+
+export function unexportedWorkerRef(): (tx: Sender<str>) => void {
+    return unexportedWorker;
+}
+
+export function anonymousWorkerRef(): (tx: Sender<str>) => void {
+    return (tx: Sender<str>) => {};
+}
