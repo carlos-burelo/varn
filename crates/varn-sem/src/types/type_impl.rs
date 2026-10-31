@@ -198,6 +198,14 @@ impl Type {
     }
 
     pub fn union(members: Vec<Type>, table: &mut CheckerTyTable) -> Self {
+        let had_members = !members.is_empty();
+        let members: Vec<Type> = members
+            .into_iter()
+            .filter(|m| m.0 != CheckerTyId::NEVER)
+            .collect();
+        if had_members && members.is_empty() {
+            return Type::Never;
+        }
         if members.len() == 1 {
             if !matches!(table.get(members[0].0), TypeKind::Union(_)) {
                 return members.into_iter().next().unwrap();
@@ -226,7 +234,7 @@ impl Type {
                 TypeKind::Union(inner_list) => {
                     for id in table.get_list(inner_list).to_vec() {
                         let t = Type::resolved(id);
-                        if seen.insert(t) {
+                        if t.0 != CheckerTyId::NEVER && seen.insert(t) {
                             flat.push(t);
                         }
                     }
