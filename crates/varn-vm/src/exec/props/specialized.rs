@@ -93,6 +93,7 @@ fn enum_variant_property(
             | MemberKey::ToString
             | MemberKey::ValueOf
             | MemberKey::IterNext
+            | MemberKey::IterClose
             | MemberKey::Push
             | MemberKey::Pop
             | MemberKey::Shift

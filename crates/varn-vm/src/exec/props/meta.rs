@@ -212,6 +212,7 @@ pub(crate) fn resolve_meta_property(
                 | MemberKey::ToString
                 | MemberKey::ValueOf
                 | MemberKey::IterNext
+                | MemberKey::IterClose
                 | MemberKey::Push
                 | MemberKey::Pop
                 | MemberKey::Shift
@@ -268,6 +269,7 @@ pub(crate) fn resolve_meta_property(
         | MemberKey::ToString
         | MemberKey::ValueOf
         | MemberKey::IterNext
+        | MemberKey::IterClose
         | MemberKey::Push
         | MemberKey::Pop
         | MemberKey::Shift

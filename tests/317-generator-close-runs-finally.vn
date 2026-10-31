@@ -1,0 +1,130 @@
+import { describe, it, expect } from "std:test";
+
+let log: str[] = [];
+
+function* nestedFinally(): Generator<int> {
+    try {
+        try {
+            yield 1;
+            yield 2;
+        } finally {
+            log.push("inner");
+        }
+    } finally {
+        log.push("outer");
+    }
+}
+
+function* swallowsNothing(): Generator<int> {
+    try {
+        yield 1;
+        log.push("not reached");
+    } catch (e) {
+        log.push("caught");
+    } finally {
+        log.push("finally");
+    }
+}
+
+function* throwsOnClose(): Generator<int> {
+    try {
+        yield 1;
+    } finally {
+        throw new Error("from finally");
+    }
+}
+
+function* counted(tag: str): Generator<int> {
+    let i = 0;
+    try {
+        while (i < 10) {
+            yield i;
+            i = i + 1;
+        }
+    } finally {
+        log.push(tag);
+    }
+}
+
+function firstOf(tag: str): int {
+    for (const v of counted(tag)) {
+        if (v == 2) { return v; }
+    }
+    return -1;
+}
+
+await describe("317 closing a generator runs the finally blocks it is suspended in", async () => {
+    await it("close() runs nested finally blocks from the inside out", async () => {
+        log = [];
+        const g = nestedFinally();
+        g.next();
+        g.close();
+        expect(log.join(",")).toBe("inner,outer");
+        expect(g.next().isNone()).toBe(true);
+    });
+
+    await it("a catch clause does not swallow the close", async () => {
+        log = [];
+        const g = swallowsNothing();
+        g.next();
+        g.close();
+        expect(log.join(",")).toBe("finally");
+    });
+
+    await it("closing twice, or an exhausted or unstarted generator, runs nothing more", async () => {
+        log = [];
+        const g = counted("a");
+        g.next();
+        g.close();
+        g.close();
+        expect(log.join(",")).toBe("a");
+        const fresh = counted("b");
+        fresh.close();
+        expect(log.join(",")).toBe("a");
+        const done = counted("c");
+        for (const v of done) { }
+        expect(log.join(",")).toBe("a,c");
+        done.close();
+        expect(log.join(",")).toBe("a,c");
+    });
+
+    await it("an error thrown by the finally block reaches the closer", async () => {
+        const g = throwsOnClose();
+        g.next();
+        let message = "none";
+        try { g.close(); } catch (e) { message = e.message; }
+        expect(message).toBe("from finally");
+    });
+
+    await it("for-of closes the generator on break, return and throw", async () => {
+        log = [];
+        for (const v of counted("break")) { if (v == 1) { break; } }
+        expect(log.join(",")).toBe("break");
+        expect(firstOf("return")).toBe(2);
+        expect(log.join(",")).toBe("break,return");
+        try {
+            for (const v of counted("throw")) { if (v == 1) { throw new Error("x"); } }
+        } catch (e) { log.push("caught"); }
+        expect(log.join(",")).toBe("break,return,throw,caught");
+    });
+
+    await it("a labelled continue closes the inner generator each time", async () => {
+        log = [];
+        outer: for (let i = 0; i < 3; i++) {
+            for (const v of counted("in" + i.toString())) {
+                if (v == 0) { continue outer; }
+            }
+        }
+        expect(log.join(",")).toBe("in0,in1,in2");
+    });
+
+    await it("closing in a hot loop keeps working once the code is compiled", async () => {
+        log = [];
+        let total = 0;
+        for (let n = 0; n < 3000; n++) {
+            total = total + firstOf("");
+        }
+        expect(total).toBe(6000);
+        expect(log.length).toBe(3000);
+    });
+});

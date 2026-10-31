@@ -36,6 +36,7 @@ member_keys! {
     ValueOf => "valueOf",
     Iter => "iter",
     IterNext => "next",
+    IterClose => "close",
     Push => "push",
     Pop => "pop",
     Shift => "shift",

@@ -1,11 +1,14 @@
 use super::context::FnEmitter;
+use super::finally_splice;
 use super::small_utils::{bool_lit, int_lit};
 use super::stmt_for_of::{binary, local_var};
 use std::sync::Arc;
 use varn_core::ast::{Pattern, StmtId};
 use varn_core::{CoreSum, MemberKey};
 use varn_sem::types::Type;
-use varn_tir::{BackendTy, Resolution, Span, TirBinOp, TirExpr, TirExprKind, TirStmt};
+use varn_tir::{
+    BackendTy, DynReason, LocalId, Resolution, Span, TirBinOp, TirExpr, TirExprKind, TirStmt,
+};
 
 pub(super) struct Protocol {
     pub(super) iterator: Option<Type>,
@@ -21,6 +24,35 @@ struct OptionTags {
 }
 
 impl FnEmitter<'_> {
+    fn closing_on_exit(&mut self, it: LocalId, it_ty: BackendTy, walk: TirStmt) -> Vec<TirStmt> {
+        let dyn_ty = BackendTy::Dynamic(DynReason::Runtime);
+        let close = TirStmt::Expr(self.member_call(
+            local_var(it, it_ty),
+            Arc::from(MemberKey::IterClose.as_str()),
+            vec![],
+            BackendTy::Void,
+            None,
+            Span::EMPTY,
+        ));
+        let fin = vec![close];
+        let caught = self.fresh_local(dyn_ty);
+        let rethrow = TirStmt::Throw(local_var(caught, dyn_ty));
+        let body = finally_splice::splice_finally_before_exits(vec![walk], &fin, &mut |ty| {
+            self.fresh_local(ty)
+        });
+        let catch_body =
+            finally_splice::splice_finally_before_exits_and_throw(vec![rethrow], &fin, &mut |ty| {
+                self.fresh_local(ty)
+            });
+        let mut out = vec![TirStmt::Try {
+            body,
+            catch_local: caught,
+            catch_body,
+        }];
+        out.extend(fin);
+        out
+    }
+
     fn option_tags(&mut self, step: BackendTy) -> Option<OptionTags> {
         let BackendTy::Enum(eid) = step.non_nullable(self.tt) else {
             return None;
@@ -128,10 +160,15 @@ impl FnEmitter<'_> {
         });
         self.bind_pattern(left, value, &mut loop_body);
         loop_body.extend(self.lower_stmt_as_block(body));
-        out.push(TirStmt::Loop {
+        let walk = TirStmt::Loop {
             cond: bool_lit(true),
             body: loop_body,
-        });
+        };
+        if plan.is_await || !matches!(it_ty, BackendTy::Dynamic(DynReason::Yields(_))) {
+            out.push(walk);
+            return out;
+        }
+        out.extend(self.closing_on_exit(it, it_ty, walk));
         out
     }
 }
