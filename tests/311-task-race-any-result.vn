@@ -1,0 +1,64 @@
+import { describe, it, expect } from "std:test";
+import { Task, delay } from "std:task";
+import { FsNotFoundError } from "std:error";
+import { readTextAsync } from "std:fs";
+
+class Payload {
+    name: str;
+    n: int;
+
+    constructor(name: str, n: int) {
+        this.name = name;
+        this.n = n;
+    }
+}
+
+const slow = async (): Task<Payload> => {
+    await delay(200);
+    return new Payload("slow", 2);
+};
+const fast = async (): Task<Payload> => {
+    await delay(5);
+    return new Payload("fast", 1);
+};
+const failing = async (): Task<Payload> => {
+    await readTextAsync("/definitely/not/here");
+    return new Payload("never", 0);
+};
+const nothing = async (): Task<int?> => {
+    await delay(5);
+    return null;
+};
+
+await describe("311 Task.race carries any result", async () => {
+    await it("returns an object that cannot cross an isolate", async () => {
+        const winner = await Task.race([slow(), fast()]);
+        expect(winner.name).toBe("fast");
+        expect(winner.n).toBe(1);
+    });
+
+    await it("keeps the class and fields of the error that wins", async () => {
+        let path = "";
+        try {
+            await Task.race([failing(), slow()]);
+        } catch (e: FsNotFoundError) {
+            path = e.path;
+        }
+        expect(path).toBe("/definitely/not/here");
+    });
+
+    await it("distinguishes a null result from no result", async () => {
+        const none = await Task.race([nothing()]);
+        expect(none === null).toBe(true);
+    });
+
+    await it("refuses an empty list", async () => {
+        let refused = false;
+        try {
+            await Task.race<int>([]);
+        } catch (e: RangeError) {
+            refused = true;
+        }
+        expect(refused).toBe(true);
+    });
+});

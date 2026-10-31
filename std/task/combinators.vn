@@ -25,12 +25,17 @@ async function wrapSettledOne<T>(task: Task<T>): Task<Result<T, Error>> {
     }
 }
 
-async function raceOneHandle<T>(handle: TaskHandle<T>, ch: Channel<Result<T, Error>>): Task<void> {
+class Settled<T> {
+    result: Result<T, Error>? = null;
+}
+
+async function raceOne<T>(index: int, handle: TaskHandle<T>, settled: Settled<T>[], done: Channel<int>): Task<void> {
     try {
-        await ch.tx.send(Result.Ok(await handle));
+        settled[index].result = Result.Ok(await handle);
     } catch (err) {
-        await ch.tx.send(Result.Err(err as Error));
+        settled[index].result = Result.Err(err as Error);
     }
+    await done.tx.send(index);
 }
 
 class Deadline {
@@ -80,19 +85,21 @@ export namespace Task {
         if (tasks.length === 0) {
             throw new RangeError("Task.race requires at least one task");
         }
-        let ch = channel$<Result<T, Error>>(tasks.length);
-        let handles: Array<TaskHandle<T>> = [];
+        const done = channel$<int>(tasks.length);
+        const settled: Settled<T>[] = [];
+        const handles: Array<TaskHandle<T>> = [];
         for (let i = 0; i < tasks.length; i = i + 1) {
+            settled.push(new Settled<T>());
             handles.push(spawn(tasks[i]));
         }
         for (let i = 0; i < handles.length; i = i + 1) {
-            spawn(raceOneHandle(handles[i], ch));
+            spawn(raceOne(i, handles[i], settled, done));
         }
-        let first = await ch.rx.receive();
+        const winner = await done.rx.receive();
         for (let i = 0; i < handles.length; i = i + 1) {
             cancel(handles[i]);
         }
-        return match (first) {
+        return match (settled[winner].result!) {
             Ok(value) => value,
             Err(error) => {
                 throw error;
