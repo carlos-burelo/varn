@@ -50,20 +50,24 @@ impl<'r> Checker<'r> {
         left: Vec<(SymbolId, Type)>,
         right: Vec<(SymbolId, Type)>,
     ) -> Vec<(SymbolId, Type)> {
-        let mut map: FxHashMap<SymbolId, Vec<Type>> = FxHashMap::default();
-        for (id, ty) in left {
-            map.entry(id).or_default().push(ty);
-        }
-        for (id, ty) in right {
-            map.entry(id).or_default().push(ty);
-        }
-
+        let first_per_symbol = |entries: Vec<(SymbolId, Type)>| {
+            let mut map: FxHashMap<SymbolId, Type> = FxHashMap::default();
+            for (id, ty) in entries {
+                map.entry(id).or_insert(ty);
+            }
+            map
+        };
+        let left = first_per_symbol(left);
+        let right = first_per_symbol(right);
         let mut merged = Vec::new();
-        for (id, types) in map {
-            if types.len() > 1 {
+        for (id, left_ty) in left {
+            if let Some(&right_ty) = right.get(&id) {
                 merged.push((
                     id,
-                    Type::union(types, &mut *std::sync::Arc::make_mut(&mut self.ty_table)),
+                    Type::union(
+                        vec![left_ty, right_ty],
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    ),
                 ));
             }
         }

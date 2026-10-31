@@ -1,0 +1,8 @@
+// expect: error[VN3010]
+function use(b: int?, c: int?): int {
+    let r = 0;
+    if (c == null || !(b === null || b == null)) {
+        r = r + b;
+    }
+    return r;
+}
