@@ -64,6 +64,10 @@ await describe("314 JSON keeps its text and its integers exactly", async () => {
         expect(parses("1e")).toBe(false);
         expect(parses("+1")).toBe(false);
         expect(parses(".5")).toBe(false);
+        expect(parses("\"a\u0001b\"")).toBe(false);
+        expect(parses("\"a\nb\"")).toBe(false);
+        expect(parses("{\"k\t\":1}")).toBe(false);
+        expect(parses("\"a\\u0001b\"")).toBe(true);
         expect(parses("[1,2]")).toBe(true);
         expect(parses("-0.5e-3")).toBe(true);
     });

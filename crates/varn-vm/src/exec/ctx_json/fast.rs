@@ -91,15 +91,15 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
         let first = memchr::memchr2(b'"', b'\\', &bytes[start..])? + start;
         if bytes[first] == b'"' {
             self.pos = first + 1;
-            return Some(std::borrow::Cow::Borrowed(
-                std::str::from_utf8(&bytes[start..first]).ok()?,
-            ));
+            return Some(std::borrow::Cow::Borrowed(Self::plain_text(
+                &bytes[start..first],
+            )?));
         }
         let mut out = String::with_capacity(first - start + 16);
         let mut chunk = start;
         let mut at = first;
         loop {
-            out.push_str(std::str::from_utf8(&bytes[chunk..at]).ok()?);
+            out.push_str(Self::plain_text(&bytes[chunk..at])?);
             if bytes[at] == b'"' {
                 self.pos = at + 1;
                 return Some(std::borrow::Cow::Owned(out));
@@ -137,6 +137,13 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
             chunk = next;
             at = memchr::memchr2(b'"', b'\\', &bytes[chunk..])? + chunk;
         }
+    }
+
+    fn plain_text(span: &[u8]) -> Option<&str> {
+        if span.iter().any(|&b| b < 0x20) {
+            return None;
+        }
+        std::str::from_utf8(span).ok()
     }
 
     fn hex4(bytes: &[u8], at: usize) -> Option<u32> {
