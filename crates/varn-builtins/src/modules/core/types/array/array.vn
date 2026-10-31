@@ -3,14 +3,14 @@
  */
 export declare class Array<T> {
     readonly length: int;
-    push(item: T): void;
+    @throws(RangeError) push(item: T): void;
     pop(): T?;
     shift(): T?;
-    unshift(item: T): void;
+    @throws(RangeError) unshift(item: T): void;
     join(separator?: str): str;
     slice(start?: int, end?: int): T[];
     at(index: int): T?;
-    concat(...items: T[][]): T[];
+    @throws(RangeError) concat(...items: T[][]): T[];
     fill(value: T, start?: int, end?: int): T[];
     @throws(Error) filter(predicate: (item: T, index: int, array: T[]) => bool): T[];
     @throws(Error) find(predicate: (item: T, index: int, array: T[]) => bool): T?;

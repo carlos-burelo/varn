@@ -290,10 +290,7 @@ pub(crate) extern "C" fn jit_array_push(
         let val = VmValue::from_raw_parts(val_tag, val_payload);
         match ctx_ref.exec_array_push(arr, val) {
             Ok(()) => {}
-            Err(e) => {
-                eprintln!("ARRAY_PUSH ERR: arr={:?} (tag={arr_tag}, payload={arr_payload:#x}) val={:?} err={:?}", arr, val, e);
-                jit_propagate_error(ctx_ref, e);
-            }
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }

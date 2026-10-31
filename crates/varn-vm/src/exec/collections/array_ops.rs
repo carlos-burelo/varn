@@ -21,10 +21,21 @@ pub(crate) fn bytes_length(val: VmValue, heap: &Heap) -> VmResult<VmValue> {
     Err(RuntimeError::new("OpBytesLength: not bytes"))
 }
 
+#[cold]
+fn array_too_long() -> RuntimeError {
+    RuntimeError::range_error(format!(
+        "an array cannot hold more than {} elements",
+        varn_core::MAX_ARRAY_LEN
+    ))
+}
+
 pub(crate) fn array_push(arr: VmValue, val: VmValue, heap: &mut Heap) -> VmResult<()> {
     if arr.is_heap()
         && let Some(HeapObj::Array(a)) = heap.get(arr.as_heap())
     {
+        if a.len() >= varn_core::MAX_ARRAY_LEN {
+            return Err(array_too_long());
+        }
         a.push_vm(val);
         heap.write_barrier(arr.as_heap(), val);
         return Ok(());
@@ -49,6 +60,9 @@ pub(crate) fn array_extend(dst: VmValue, src: VmValue, heap: &Heap) -> VmResult<
             (heap.get(dst.as_heap()), heap.get(src.as_heap()))
     {
         let n = sa.len();
+        if da.len().saturating_add(n) > varn_core::MAX_ARRAY_LEN {
+            return Err(array_too_long());
+        }
         let mut items: Vec<VmValue> = Vec::with_capacity(n);
         for i in 0..n {
             items.push(sa.get_vm(i).unwrap_or(VmValue::null()));

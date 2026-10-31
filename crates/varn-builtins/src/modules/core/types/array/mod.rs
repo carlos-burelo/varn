@@ -15,6 +15,16 @@ fn norm_idx(idx: i64, len: i64) -> usize {
     varn_core::clamp_index(idx, usize::try_from(len).unwrap_or(0))
 }
 
+fn room_for(ctx: &mut dyn NativeCtx, array: &VnArray, extra: usize) -> Result<(), NativeError> {
+    if array.len(ctx).saturating_add(extra) > varn_core::MAX_ARRAY_LEN {
+        return Err(NativeError::range_error(format!(
+            "an array cannot hold more than {} elements",
+            varn_core::MAX_ARRAY_LEN
+        )));
+    }
+    Ok(())
+}
+
 fn flatten(ctx: &mut dyn NativeCtx, arr: VmValue, depth: i64, out: &mut Vec<VmValue>) {
     let len = ctx.array_len(arr);
     for i in 0..len {
@@ -38,8 +48,10 @@ varn_contract! {
         }
 
 
-        fn push(ctx: &mut dyn NativeCtx, this: VnArray, item: VmValue) {
+        fn push(ctx: &mut dyn NativeCtx, this: VnArray, item: VmValue) -> Result<(), NativeError> {
+            room_for(ctx, &this, 1)?;
             this.push(ctx, item);
+            Ok(())
         }
         fn pop(ctx: &mut dyn NativeCtx, this: VnArray) -> Option<VmValue> {
             this.pop(ctx)
@@ -57,7 +69,8 @@ varn_contract! {
             this.pop(ctx);
             Some(first)
         }
-        fn unshift(ctx: &mut dyn NativeCtx, this: VnArray, item: VmValue) {
+        fn unshift(ctx: &mut dyn NativeCtx, this: VnArray, item: VmValue) -> Result<(), NativeError> {
+            room_for(ctx, &this, 1)?;
             let len = this.len(ctx);
             let mut items = Vec::with_capacity(len + 1);
             items.push(item);
@@ -68,6 +81,7 @@ varn_contract! {
             for (i, v) in items.into_iter().enumerate() {
                 this.set(ctx, i, v);
             }
+            Ok(())
         }
 
 
@@ -158,7 +172,12 @@ varn_contract! {
         }
 
 
-        fn concat(ctx: &mut dyn NativeCtx, this: VnArray, items: &[VmValue]) -> Vec<VmValue> {
+        fn concat(ctx: &mut dyn NativeCtx, this: VnArray, items: &[VmValue]) -> Result<Vec<VmValue>, NativeError> {
+            let mut added = 0usize;
+            for &other in items {
+                added = added.saturating_add(if ctx.is_array(other) { ctx.array_len(other) } else { 1 });
+            }
+            room_for(ctx, &this, added)?;
             let mut out = this.to_vec(ctx);
             for &other in items {
                 if ctx.is_array(other) {
@@ -170,7 +189,7 @@ varn_contract! {
                     out.push(other);
                 }
             }
-            out
+            Ok(out)
         }
         fn fill(ctx: &mut dyn NativeCtx, this: VnArray, value: VmValue, start: Option<i64>, end: Option<i64>) -> Vec<VmValue> {
             let len = this.len(ctx) as i64;

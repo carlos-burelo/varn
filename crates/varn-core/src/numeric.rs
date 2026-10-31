@@ -84,6 +84,8 @@ pub const MAX_ALLOC_BYTES: usize = 1 << 31;
 
 pub const MAX_STR_BYTES: usize = 1 << 29;
 
+pub const MAX_ARRAY_LEN: usize = 1 << 28;
+
 pub fn clamp_index(index: i64, len: usize) -> usize {
     if index < 0 {
         usize::try_from(index.saturating_add(len as i64)).unwrap_or(0)
