@@ -23,6 +23,22 @@ export class Instant {
     }
 }
 
+function isLeap(year: int): bool {
+    return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+}
+
+function daysInMonth(year: int, month: int): int {
+    if (month === 2) return isLeap(year) ? 29 : 28;
+    if (month === 4 || month === 6 || month === 9 || month === 11) return 30;
+    return 31;
+}
+
+function requireWithin(what: str, value: int, low: int, high: int): void {
+    if (value < low || value > high) {
+        throw new RangeError(`PlainDateTime: ${what} ${value} is outside ${low}..${high}`);
+    }
+}
+
 export class PlainDateTime {
     year: int;
     month: int;
@@ -33,6 +49,13 @@ export class PlainDateTime {
     millisecond: int;
 
     constructor(year: int, month: int, day: int, hour: int = 0, minute: int = 0, second: int = 0, millisecond: int = 0) {
+        requireWithin("year", year, 0, 9999);
+        requireWithin("month", month, 1, 12);
+        requireWithin("day", day, 1, daysInMonth(year, month));
+        requireWithin("hour", hour, 0, 23);
+        requireWithin("minute", minute, 0, 59);
+        requireWithin("second", second, 0, 59);
+        requireWithin("millisecond", millisecond, 0, 999);
         this.year = year;
         this.month = month;
         this.day = day;

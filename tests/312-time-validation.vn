@@ -1,0 +1,38 @@
+import { describe, it, expect } from "std:test";
+import { Duration, DateTime, PlainDateTime } from "std:time";
+
+function outcome(f: () => str): str {
+    try { return f(); } catch (e) {
+        return e instanceof RangeError ? "range" : "other:" + e.name;
+    }
+}
+
+await describe("312 time values reject what they cannot hold", async () => {
+    await it("PlainDateTime checks every field, including leap years", async () => {
+        expect(outcome(() => new PlainDateTime(2024, 2, 29).toString())).toBe("2024-02-29T00:00:00.000");
+        expect(outcome(() => new PlainDateTime(2000, 2, 29).toString())).toBe("2000-02-29T00:00:00.000");
+        expect(outcome(() => new PlainDateTime(2023, 2, 29).toString())).toBe("range");
+        expect(outcome(() => new PlainDateTime(1900, 2, 29).toString())).toBe("range");
+        expect(outcome(() => new PlainDateTime(2025, 13, 1).toString())).toBe("range");
+        expect(outcome(() => new PlainDateTime(2025, 0, 1).toString())).toBe("range");
+        expect(outcome(() => new PlainDateTime(2025, 4, 31).toString())).toBe("range");
+        expect(outcome(() => new PlainDateTime(2025, 1, 1, 24).toString())).toBe("range");
+        expect(outcome(() => new PlainDateTime(2025, 1, 1, 0, 60).toString())).toBe("range");
+        expect(outcome(() => new PlainDateTime(2025, 1, 1, 0, 0, 60).toString())).toBe("range");
+        expect(outcome(() => new PlainDateTime(2025, 1, 1, 0, 0, 0, 1000).toString())).toBe("range");
+        expect(outcome(() => new PlainDateTime(-5, 1, 1).toString())).toBe("range");
+    });
+
+    await it("a timestamp the calendar cannot represent is a RangeError", async () => {
+        expect(outcome(() => new DateTime(9223372036854775807).toISOString())).toBe("range");
+        expect(outcome(() => new DateTime(0).toISOString())).toBe("1970-01-01T00:00:00.000Z");
+    });
+
+    await it("Duration parts that do not fit a fixed span are refused, not dropped", async () => {
+        expect(outcome(() => Duration.from({ years: 1 }).totalMilliseconds.toString())).toBe("range");
+        expect(outcome(() => Duration.from({ months: 2, days: 1 }).totalMilliseconds.toString())).toBe("range");
+        expect(outcome(() => Duration.from({ hours: 1, sign: -1 }).totalMilliseconds.toString())).toBe("-3600000");
+        expect(outcome(() => Duration.from({ hours: 1, sign: 2 }).totalMilliseconds.toString())).toBe("range");
+        expect(outcome(() => Duration.from({ minutes: 90 }).totalMilliseconds.toString())).toBe("5400000");
+    });
+});

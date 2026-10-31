@@ -33,6 +33,9 @@ export class Duration {
             return new Duration(input as int);
         } else {
             let parts = input as DurationParts;
+            if (parts.years !== null || parts.months !== null) {
+                throw new RangeError("a Duration is a fixed span of time and cannot hold years or months");
+            }
             let ms = 0;
             // Los miembros de DurationParts son opcionales: el checker los
             // expone como `T?` y la lectura de un campo ausente da null.
@@ -42,7 +45,11 @@ export class Duration {
             ms = ms + (parts.minutes ?? 0) * 60000;
             ms = ms + (parts.hours ?? 0) * 3600000;
             ms = ms + (parts.days ?? 0) * 86400000;
-            return new Duration(ms);
+            const sign = parts.sign ?? 1;
+            if (sign !== 1 && sign !== -1) {
+                throw new RangeError(`a Duration sign must be 1 or -1, got ${sign}`);
+            }
+            return new Duration(ms * sign);
         }
     }
 

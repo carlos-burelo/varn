@@ -78,7 +78,7 @@ varn_contract! {
             let dt = Utc
                 .timestamp_millis_opt(ms)
                 .single()
-                .ok_or_else(|| "invalid timestamp".to_string()).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
+                .ok_or_else(|| NativeError::range_error(format!("{ms} is not a timestamp this calendar can represent")))?;
             let obj = ctx.alloc_object();
             set_int(ctx, obj, "year", dt.year() as i64);
             set_int(ctx, obj, "month", dt.month() as i64);
@@ -98,24 +98,24 @@ varn_contract! {
                     .unwrap_or(0)
             };
             let invalid = || "Invalid date parts".to_string();
-            let year = i32::try_from(get_int(ctx, "year")).map_err(|_| invalid()).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
-            let month = u32::try_from(get_int(ctx, "month")).map_err(|_| invalid()).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
-            let day = u32::try_from(get_int(ctx, "day")).map_err(|_| invalid()).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
-            let hour = u32::try_from(get_int(ctx, "hour")).map_err(|_| invalid()).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
-            let minute = u32::try_from(get_int(ctx, "minute")).map_err(|_| invalid()).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
-            let second = u32::try_from(get_int(ctx, "second")).map_err(|_| invalid()).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
+            let year = i32::try_from(get_int(ctx, "year")).map_err(|_| NativeError::range_error(invalid()))?;
+            let month = u32::try_from(get_int(ctx, "month")).map_err(|_| NativeError::range_error(invalid()))?;
+            let day = u32::try_from(get_int(ctx, "day")).map_err(|_| NativeError::range_error(invalid()))?;
+            let hour = u32::try_from(get_int(ctx, "hour")).map_err(|_| NativeError::range_error(invalid()))?;
+            let minute = u32::try_from(get_int(ctx, "minute")).map_err(|_| NativeError::range_error(invalid()))?;
+            let second = u32::try_from(get_int(ctx, "second")).map_err(|_| NativeError::range_error(invalid()))?;
             let millisecond = u32::try_from(get_int(ctx, "millisecond"))
                 .ok()
                 .filter(|ms| *ms < 1000)
-                .ok_or_else(|| "Invalid millisecond".to_string()).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
+                .ok_or_else(|| NativeError::range_error("Invalid millisecond"))?;
 
             use chrono::{TimeZone, Timelike, Utc};
             let dt = Utc
                 .with_ymd_and_hms(year, month, day, hour, minute, second)
                 .single()
-                .ok_or_else(invalid).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?
+                .ok_or_else(|| NativeError::range_error(invalid()))?
                 .with_nanosecond(millisecond * 1_000_000)
-                .ok_or_else(|| "Invalid millisecond".to_string()).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
+                .ok_or_else(|| NativeError::range_error("Invalid millisecond"))?;
             Ok(dt.timestamp_millis())
         }
     }
