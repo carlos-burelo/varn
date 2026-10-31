@@ -10,6 +10,7 @@ export declare class Array<T> {
     shift(): T?;
     @throws(RangeError) unshift(item: T): void;
     join(separator?: str): str;
+    entries(): [int, T][];
     slice(start?: int, end?: int): T[];
     at(index: int): T?;
     @throws(RangeError) concat(...items: T[][]): T[];

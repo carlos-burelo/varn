@@ -155,6 +155,16 @@ varn_contract! {
                 None
             }
         }
+        fn entries(ctx: &mut dyn NativeCtx, this: VnArray) -> Vec<VmValue> {
+            this.to_vec(ctx)
+                .into_iter()
+                .enumerate()
+                .map(|(index, item)| {
+                    let index = ctx.int_val(index as i64);
+                    ctx.alloc_tuple(vec![index, item])
+                })
+                .collect()
+        }
         fn includes(ctx: &mut dyn NativeCtx, this: VnArray, search: VmValue) -> bool {
             let len = this.len(ctx);
             for i in 0..len {
