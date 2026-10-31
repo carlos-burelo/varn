@@ -1,0 +1,5 @@
+// expect: error[VN3028]
+const n: int = 3;
+if (const v = n) {
+    print(v.toString());
+}

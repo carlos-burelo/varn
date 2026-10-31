@@ -8,7 +8,11 @@ pub(super) fn parse_if_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     let start_range = s.range();
     s.advance();
     s.expect(TokenKind::LParen)?;
-    let test = crate::expressions::parse_expr(s)?;
+    let binding = super::binding_cond::parse_binding(s)?;
+    let test = match binding {
+        Some(_) => None,
+        None => Some(crate::expressions::parse_expr(s)?),
+    };
     s.expect(TokenKind::RParen)?;
     let consequent = parse_stmt_or_decl_inner(s)?;
     let alternate = if s.eat(TokenKind::Else) {
@@ -17,6 +21,15 @@ pub(super) fn parse_if_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
         None
     };
     let range = s.span_from(start_range);
+    let test = match (binding, test) {
+        (Some(binding), _) => {
+            return Ok(super::binding_cond::desugar_if(
+                s, binding, consequent, alternate, range,
+            ));
+        }
+        (None, Some(test)) => test,
+        (None, None) => return Err(String::from("`if` needs a condition")),
+    };
     Ok(s.stmt(
         range,
         StmtKind::If {
@@ -31,6 +44,12 @@ pub(super) fn parse_while_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     let start_range = s.range();
     s.advance();
     s.expect(TokenKind::LParen)?;
+    if let Some(binding) = super::binding_cond::parse_binding(s)? {
+        s.expect(TokenKind::RParen)?;
+        let body = parse_stmt_or_decl_inner(s)?;
+        let range = s.span_from(start_range);
+        return Ok(super::binding_cond::desugar_while(s, binding, body, range));
+    }
     let test = crate::expressions::parse_expr(s)?;
     s.expect(TokenKind::RParen)?;
     let body = parse_stmt_or_decl_inner(s)?;

@@ -23,6 +23,7 @@ macro_rules! member_keys {
 }
 
 pub const DELEGATED_ITEM: &str = "<yield*>";
+pub const BOUND_SOURCE: &str = "<bound>";
 
 member_keys! {
     Tag => "__tag",
