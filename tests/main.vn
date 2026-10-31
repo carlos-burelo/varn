@@ -314,6 +314,7 @@ import "./320-decimal-scale-rules.vn"
 import "./321-calendar-parts-and-large-functions.vn"
 import "./322-narrowing-after-a-failed-conjunction.vn"
 import "./323-http-hostile-input.vn"
+import "./324-url-parsing-and-resolution.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

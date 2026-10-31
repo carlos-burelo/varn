@@ -1,0 +1,124 @@
+import { describe, it, expect } from "std:test";
+import { Url } from "std:net";
+import { resolveLocation } from "std:http/redirect";
+import { ParseError } from "std:error";
+
+const BASE = "http://a/b/c/d;p?q";
+
+const RESOLUTIONS: [str, str][] = [
+    #["g:h", "g:h"],
+    #["g", "http://a/b/c/g"],
+    #["./g", "http://a/b/c/g"],
+    #["g/", "http://a/b/c/g/"],
+    #["/g", "http://a/g"],
+    #["//g", "http://g/"],
+    #["?y", "http://a/b/c/d;p?y"],
+    #["g?y", "http://a/b/c/g?y"],
+    #["#s", "http://a/b/c/d;p?q#s"],
+    #["g#s", "http://a/b/c/g#s"],
+    #["g?y#s", "http://a/b/c/g?y#s"],
+    #[";x", "http://a/b/c/;x"],
+    #["g;x", "http://a/b/c/g;x"],
+    #["g;x?y#s", "http://a/b/c/g;x?y#s"],
+    #["", "http://a/b/c/d;p?q"],
+    #[".", "http://a/b/c/"],
+    #["./", "http://a/b/c/"],
+    #["..", "http://a/b/"],
+    #["../", "http://a/b/"],
+    #["../g", "http://a/b/g"],
+    #["../..", "http://a/"],
+    #["../../", "http://a/"],
+    #["../../g", "http://a/g"],
+    #["../../../g", "http://a/g"],
+    #["../../../../g", "http://a/g"],
+    #["/./g", "http://a/g"],
+    #["/../g", "http://a/g"],
+    #["g.", "http://a/b/c/g."],
+    #[".g", "http://a/b/c/.g"],
+    #["g..", "http://a/b/c/g.."],
+    #["..g", "http://a/b/c/..g"],
+    #["./../g", "http://a/b/g"],
+    #["./g/.", "http://a/b/c/g/"],
+    #["g/./h", "http://a/b/c/g/h"],
+    #["g/../h", "http://a/b/c/h"],
+    #["g;x=1/./y", "http://a/b/c/g;x=1/y"],
+    #["g;x=1/../y", "http://a/b/c/y"],
+    #["g?y/./x", "http://a/b/c/g?y/./x"],
+    #["g?y/../x", "http://a/b/c/g?y/../x"],
+    #["g#s/./x", "http://a/b/c/g#s/./x"],
+    #["http:g", "http:g"]
+];
+
+function parseFails(text: str): bool {
+    try {
+        Url.parse(text);
+        return false;
+    } catch (e) {
+        return e instanceof ParseError;
+    }
+}
+
+await describe("324 url parsing and resolution", async () => {
+    await it("resolving a reference follows RFC 3986 section 5.4", async () => {
+        const base = Url.parse(BASE);
+        for (const [reference, expected] of RESOLUTIONS) {
+            expect(Url.resolve(base, reference).toString()).toBe(expected);
+        }
+    });
+
+    await it("the authority is split into user information, host and port", async () => {
+        const full = Url.parse("http://user:pw@Host.Example:81/a/b?x=1#f");
+        expect(full.protocol).toBe("http");
+        expect(full.userinfo).toBe("user:pw");
+        expect(full.host).toBe("host.example");
+        expect(full.port).toBe(81);
+        expect(full.path).toBe("/a/b");
+        expect(full.fragment).toBe("f");
+        expect(Url.parse("HTTPS://Example.COM").toString()).toBe("https://example.com/");
+        const confusing = Url.parse("http://trusted.example@evil.example/");
+        expect(confusing.host).toBe("evil.example");
+        expect(confusing.userinfo).toBe("trusted.example");
+    });
+
+    await it("IPv6 literals keep their colons out of the port", async () => {
+        const v6 = Url.parse("http://[2001:db8::1]:8080/p");
+        expect(v6.host).toBe("2001:db8::1");
+        expect(v6.port).toBe(8080);
+        expect(v6.authority()).toBe("[2001:db8::1]:8080");
+        expect(v6.toString()).toBe("http://[2001:db8::1]:8080/p");
+        expect(Url.parse("http://[::1]/").port).toBe(null);
+    });
+
+    await it("an empty port is no port and a bad port is an error", async () => {
+        expect(Url.parse("http://host:/p").port).toBe(null);
+        expect(parseFails("http://host:abc/p")).toBe(true);
+        expect(parseFails("http://host:70000/p")).toBe(true);
+        expect(parseFails("http://host:-1/p")).toBe(true);
+    });
+
+    await it("spaces, control characters and relative references are not absolute URLs", async () => {
+        expect(parseFails("http://a b/")).toBe(true);
+        expect(parseFails("http://host/pa\u0001th")).toBe(true);
+        expect(parseFails("/just/a/path")).toBe(true);
+        expect(parseFails("host.example/path")).toBe(true);
+        expect(parseFails("http://[::1/")).toBe(true);
+    });
+
+    await it("a URL inside the query is not mistaken for the scheme", async () => {
+        const url = Url.parse("http://host/login?next=https://other.example/cb#top");
+        expect(url.protocol).toBe("http");
+        expect(url.path).toBe("/login");
+        expect(url.toString()).toBe("http://host/login?next=https://other.example/cb#top");
+        const base = Url.parse("http://host/a/b");
+        expect(resolveLocation(base, "/cb?url=https://x.example/y")).toBe("http://host/cb?url=https://x.example/y");
+        expect(resolveLocation(base, "c?u=http://z")).toBe("http://host/a/c?u=http://z");
+        expect(resolveLocation(base, "https://elsewhere.example/p")).toBe("https://elsewhere.example/p");
+    });
+
+    await it("the query text survives unless the Query is changed", async () => {
+        const url = Url.parse("http://host/p?sig=a%2Fb+c&x=%7E");
+        expect(url.toString()).toBe("http://host/p?sig=a%2Fb+c&x=%7E");
+        url.query.append("y", "1");
+        expect(url.toString().indexOf("y=1") !== null).toBe(true);
+    });
+});
