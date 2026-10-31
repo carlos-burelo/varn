@@ -46,10 +46,45 @@ fn parse_iso_duration(text: &str) -> Result<i64, String> {
     Ok(ms.round() as i64)
 }
 
+const GREGORIAN_CYCLE_YEARS: i64 = 400;
+const GREGORIAN_CYCLE_MS: i64 = 146_097 * 86_400_000;
+
 fn parse_iso_instant(text: &str) -> Result<i64, String> {
-    chrono::DateTime::parse_from_rfc3339(text)
-        .map(|dt| dt.timestamp_millis())
-        .map_err(|e| format!("invalid ISO-8601 instant '{text}': {e}"))
+    let invalid = |detail: String| format!("invalid ISO-8601 instant '{text}': {detail}");
+    let (year, rest) = match extended_year(text) {
+        Some(split) => split,
+        None => {
+            return chrono::DateTime::parse_from_rfc3339(text)
+                .map(|dt| dt.timestamp_millis())
+                .map_err(|e| invalid(e.to_string()));
+        }
+    };
+    let equivalent = 2000 + year.rem_euclid(GREGORIAN_CYCLE_YEARS);
+    let shifted = format!("{equivalent:04}{rest}");
+    let base = chrono::DateTime::parse_from_rfc3339(&shifted)
+        .map_err(|e| invalid(e.to_string()))?
+        .timestamp_millis();
+    ((year - equivalent) / GREGORIAN_CYCLE_YEARS)
+        .checked_mul(GREGORIAN_CYCLE_MS)
+        .and_then(|cycles| cycles.checked_add(base))
+        .ok_or_else(|| invalid("the year is out of range".to_string()))
+}
+
+fn extended_year(text: &str) -> Option<(i64, &str)> {
+    let negative = match text.as_bytes().first()? {
+        b'+' => false,
+        b'-' => true,
+        _ => return None,
+    };
+    let digits = text.get(1..7)?;
+    if !digits.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let magnitude: i64 = digits.parse().ok()?;
+    if negative && magnitude == 0 {
+        return None;
+    }
+    Some((if negative { -magnitude } else { magnitude }, &text[7..]))
 }
 
 fn set_int(ctx: &mut dyn NativeCtx, obj: VmValue, key: &str, val: i64) {

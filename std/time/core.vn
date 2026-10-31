@@ -47,13 +47,21 @@ export function pad4(n: int): str {
     return `${n}`;
 }
 
+export function isoYear(year: int): str {
+    if (year >= 0 && year <= 9999) return pad4(year);
+    const magnitude = year < 0 ? -year : year;
+    const digits = `${magnitude}`;
+    const padded = "0".repeat(6 - digits.length) + digits;
+    return (year < 0 ? "-" : "+") + padded;
+}
+
 export function now(): int {
     return nowMs$();
 }
 
 export function toISOString(ms: int): str {
     let parts = msToParts$(ms);
-    return pad4(parts.year) + "-" + pad2(parts.month) + "-" + pad2(parts.day) + "T" + pad2(parts.hour) + ":" + pad2(parts.minute) + ":" + pad2(parts.second) + "." + pad3(parts.millisecond) + "Z";
+    return isoYear(parts.year) + "-" + pad2(parts.month) + "-" + pad2(parts.day) + "T" + pad2(parts.hour) + ":" + pad2(parts.minute) + ":" + pad2(parts.second) + "." + pad3(parts.millisecond) + "Z";
 }
 
 export function fromISO(iso: str): int {
