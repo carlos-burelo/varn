@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 use std::path::{Path, PathBuf};
 
 use crate::names::ENV_DIR_NAME;

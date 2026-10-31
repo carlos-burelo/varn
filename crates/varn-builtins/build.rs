@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 use std::fs;
 use std::io::Write;
 use std::path::Path;

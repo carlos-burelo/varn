@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 const DELAY_LOADED_DLLS: &[&str] = &[
     "opengl32.dll",
     "GLU32.dll",

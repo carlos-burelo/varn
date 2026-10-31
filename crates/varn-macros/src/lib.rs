@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 mod contract_members;
 mod contract_parse;
 mod contract_records;

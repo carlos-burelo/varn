@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 mod launch;
 #[cfg(windows)]
 mod shadow;

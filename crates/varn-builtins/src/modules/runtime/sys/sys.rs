@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 use std::sync::OnceLock;
 use std::time::Instant;
 use varn_core::StdErrorClass;

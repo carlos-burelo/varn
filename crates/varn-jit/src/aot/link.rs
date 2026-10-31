@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 use std::fmt;
 use std::path::Path;
 #[cfg(all(windows, target_arch = "x86_64"))]

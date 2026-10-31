@@ -1,3 +1,4 @@
+#![allow(clippy::disallowed_methods)]
 use std::collections::HashMap;
 use std::path::PathBuf;
 

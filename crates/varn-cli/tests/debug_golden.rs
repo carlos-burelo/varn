@@ -1,4 +1,5 @@
 #![allow(unused_crate_dependencies)]
+#![allow(clippy::disallowed_methods)]
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
