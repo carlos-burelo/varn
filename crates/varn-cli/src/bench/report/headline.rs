@@ -15,7 +15,7 @@ pub struct BuildId {
 
 impl BuildId {
     pub fn detect() -> Self {
-        let backend = if varn_vm::ExecSettings::from_env(false).no_jit {
+        let backend = if varn_core::env::process().no_jit {
             "interp (VARN_NO_JIT)"
         } else if varn_jit::clif::enabled() {
             "clif"

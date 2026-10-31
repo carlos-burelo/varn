@@ -104,7 +104,7 @@ mod minor_gc_tests {
     use varn_types::ClassObj;
 
     fn test_heap_with_class() -> (crate::heap::Heap, std::rc::Rc<ClassObj>) {
-        let heap = crate::heap::Heap::new();
+        let heap = crate::heap::Heap::new(&crate::settings::ExecSettings::default());
         let cls = ClassObj::new_rc("Probe");
         let layout = std::rc::Rc::new(varn_core::layout::ClassLayout::from_fields(&[(
             std::sync::Arc::from("x"),

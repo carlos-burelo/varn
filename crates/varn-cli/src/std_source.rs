@@ -59,7 +59,7 @@ fn carried_image() -> Option<&'static [u8]> {
     }
     #[cfg(not(feature = "embed-std"))]
     {
-        let bytes = std::fs::read(varn_core::env::settings().std_bundle.as_ref()?).ok()?;
+        let bytes = std::fs::read(varn_core::env::process().std_bundle.as_ref()?).ok()?;
         Some(Box::leak(bytes.into_boxed_slice()))
     }
 }

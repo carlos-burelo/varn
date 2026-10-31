@@ -17,22 +17,31 @@ pub fn raw(var: EnvVar) -> Option<String> {
     process_lookup(var.name())
 }
 
-static LOADED: OnceLock<(Settings, Vec<EnvError>)> = OnceLock::new();
+static PROCESS: OnceLock<Settings> = OnceLock::new();
 
-fn loaded() -> &'static (Settings, Vec<EnvError>) {
-    LOADED.get_or_init(|| Settings::read(&process_lookup))
+pub fn from_process() -> (Settings, Vec<EnvError>) {
+    Settings::read(&process_lookup)
 }
 
-pub fn install(settings: Settings) -> bool {
-    LOADED.set((settings, Vec::new())).is_ok()
+pub fn install(settings: Settings) -> &'static Settings {
+    PROCESS.get_or_init(|| settings)
 }
 
-pub fn settings() -> &'static Settings {
-    &loaded().0
+pub fn install_from_process_or_exit() -> &'static Settings {
+    let (settings, errors) = from_process();
+    if !errors.is_empty() {
+        for error in &errors {
+            eprintln!("error: {error}");
+        }
+        std::process::exit(2);
+    }
+    install(settings)
 }
 
-pub fn process_errors() -> &'static [EnvError] {
-    &loaded().1
+pub fn process() -> &'static Settings {
+    PROCESS
+        .get()
+        .expect("varn_core::env::install runs at process start, before any reader")
 }
 
 #[allow(clippy::disallowed_methods)]
@@ -43,15 +52,4 @@ pub fn unknown_vars() -> Vec<String> {
         .collect();
     unknown.sort();
     unknown
-}
-
-pub fn report_errors_and_exit_if_any() {
-    let errors = process_errors();
-    if errors.is_empty() {
-        return;
-    }
-    for error in errors {
-        eprintln!("error: {error}");
-    }
-    std::process::exit(2);
 }

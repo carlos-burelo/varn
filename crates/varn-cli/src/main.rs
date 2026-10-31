@@ -41,7 +41,7 @@ fn main() {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
-    varn_core::env::report_errors_and_exit_if_any();
+    varn_vm::configure_process(varn_core::env::install_from_process_or_exit());
 
     match std::thread::Builder::new()
         .stack_size(varn_vm::VM_STACK_BYTES)
@@ -86,8 +86,6 @@ fn run_cli() {
         process::exit(e.exit_code().code());
     }
 
-    varn_vm::alloc_profile::init();
-    varn_vm::gc_trace::init();
     let result = dispatch::run(cli.command, &session);
     varn_vm::alloc_profile::report();
 

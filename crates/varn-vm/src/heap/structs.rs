@@ -16,6 +16,7 @@ pub struct HeapInner {
     pub gc_collections: u64,
     pub gc_total_freed: u64,
     pub gc_threshold: u64,
+    pub(crate) gc_floor: u64,
     pub(crate) young: YoungGen,
     pub(crate) cells: CellSpace,
     pub(super) string_interner: FxHashMap<RuntimeString, HeapRef>,
@@ -38,7 +39,7 @@ impl Drop for HeapInner {
 }
 
 impl HeapInner {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(settings: &crate::settings::ExecSettings) -> Self {
         Self {
             jit_epoch: crate::clif_link::next_epoch(),
             cells: CellSpace::default(),
@@ -54,8 +55,9 @@ impl HeapInner {
             major_work: Vec::new(),
             gc_collections: 0,
             gc_total_freed: 0,
-            gc_threshold: super::young::old_floor(),
-            young: YoungGen::default(),
+            gc_threshold: settings.old_floor(),
+            gc_floor: settings.old_floor(),
+            young: YoungGen::new(settings.young_threshold()),
             hotspot: None,
             scan_roots: Vec::new(),
             identity_index: FxHashMap::default(),
@@ -172,9 +174,9 @@ pub struct Heap {
 }
 
 impl Heap {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(settings: &crate::settings::ExecSettings) -> Self {
         Self {
-            inner: Rc::new(std::cell::UnsafeCell::new(HeapInner::new())),
+            inner: Rc::new(std::cell::UnsafeCell::new(HeapInner::new(settings))),
         }
     }
 

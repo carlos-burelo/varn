@@ -82,5 +82,5 @@ pub(crate) fn at(params: TextDocumentPositionParams) -> (String, Position) {
 }
 
 pub(crate) fn verbose() -> bool {
-    varn_core::env::settings().lsp_debug
+    varn_core::env::process().lsp_debug
 }

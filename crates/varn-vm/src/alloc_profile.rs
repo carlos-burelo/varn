@@ -132,8 +132,7 @@ pub fn report() {
     }
 }
 
-pub fn init() {
-    let level = varn_core::env::settings().alloc_profile;
+pub fn configure(level: u8) {
     LEVEL.store(level, std::sync::atomic::Ordering::Relaxed);
     if level > 0 {
         calibrate();

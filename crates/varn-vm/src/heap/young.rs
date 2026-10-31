@@ -1,21 +1,5 @@
 use varn_types::HeapRef;
 
-const DEFAULT_YOUNG_THRESHOLD: usize = 786432;
-const DEFAULT_OLD_FLOOR: u64 = 65536;
-
-fn stress_cells() -> Option<usize> {
-    static STRESS: std::sync::OnceLock<Option<usize>> = std::sync::OnceLock::new();
-    *STRESS.get_or_init(|| varn_core::env::settings().gc_stress)
-}
-
-pub fn young_threshold() -> usize {
-    stress_cells().unwrap_or(DEFAULT_YOUNG_THRESHOLD)
-}
-
-pub fn old_floor() -> u64 {
-    stress_cells().map_or(DEFAULT_OLD_FLOOR, |cells| cells as u64)
-}
-
 pub struct YoungGen {
     pub(crate) threshold: usize,
     pub(crate) born: Vec<HeapRef>,
@@ -26,10 +10,10 @@ pub struct YoungGen {
     pub minor_gc_promoted: u64,
 }
 
-impl Default for YoungGen {
-    fn default() -> Self {
+impl YoungGen {
+    pub(crate) fn new(threshold: usize) -> Self {
         Self {
-            threshold: young_threshold(),
+            threshold,
             born: Vec::new(),
             remembered: Vec::new(),
             worklist: Vec::new(),

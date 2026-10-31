@@ -121,7 +121,7 @@ pub(super) fn emit_alloc_instance(
 
     let guard = b.ins().bor(c_hot, c_nat);
     let guard = b.ins().bor(guard, c_tag);
-    let force_slow = varn_core::env::settings().alloc_slow;
+    let force_slow = crate::config::config().alloc_slow;
     if force_slow {
         b.ins().jump(slow_blk, &[]);
     } else {

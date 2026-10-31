@@ -2,6 +2,7 @@
 pub mod aot;
 #[cfg(feature = "clif")]
 pub mod clif;
+pub mod config;
 #[cfg(not(feature = "clif"))]
 pub mod clif {
     pub fn enabled() -> bool {
@@ -169,6 +170,7 @@ pub use clif::lower::CodeImage;
 
 #[cfg(feature = "clif")]
 pub use clif::isa_identity;
+pub use config::{config, configure, JitConfig};
 
 #[cfg(not(feature = "clif"))]
 pub fn isa_identity() -> u64 {

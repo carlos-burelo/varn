@@ -19,7 +19,7 @@ pub fn run_doctor() -> CliResult<()> {
         "  cache dir: {}",
         varn_core::paths::varn_cache_dir().display()
     );
-    match &varn_core::env::settings().std {
+    match &varn_core::env::process().std {
         Some(raw) => println!("  VARN_STD: {raw}"),
         None => println!("  VARN_STD: <not set>"),
     }

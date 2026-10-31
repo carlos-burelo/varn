@@ -82,7 +82,7 @@ pub fn boot_machine(
     let loader = std::sync::Arc::new(crate::stdlib_loader::PipelineLoader::new(
         session.shared_resolver(),
     ));
-    let settings = varn_vm::ExecSettings::from_env(trace);
+    let settings = varn_vm::ExecSettings::of(varn_core::env::process(), trace);
     let mut machine = Vm::new(precompiled.clone(), settings).with_loader(loader);
     machine.ctx.capabilities = Rc::new(capabilities);
     varn_vm::prefill_native_modules(&mut machine);

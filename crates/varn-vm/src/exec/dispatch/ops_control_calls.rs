@@ -20,7 +20,7 @@ impl ExecCtx {
         }
         let proto = &closure.proto;
         let n = proto.backedge_count.get().wrapping_add(1);
-        if n < VmClosure::osr_backedge_threshold() {
+        if n < self.settings.osr_backedges {
             proto.backedge_count.set(n);
             return false;
         }

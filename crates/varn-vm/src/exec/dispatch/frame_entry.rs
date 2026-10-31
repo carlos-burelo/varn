@@ -35,7 +35,9 @@ pub(super) unsafe fn enter(
     let osr_fn = match pending_osr {
         Some(req) if unsafe { req.ip == (*ctx).frames[frame_idx].ip } => {
             let jit_on = unsafe { !(*ctx).settings.no_jit };
-            let f = jit_on.then(|| closure.osr_jit_fn(req)).flatten();
+            let f = jit_on
+                .then(|| closure.osr_jit_fn(req, unsafe { &(*ctx).settings }))
+                .flatten();
             match (f, req.mode) {
                 (Some(f), _) => Some(f),
                 (None, varn_types::ssa::OsrMode::Resume) => unsafe {
@@ -59,7 +61,9 @@ pub(super) unsafe fn enter(
 
     let hot_fn = match osr_fn {
         Some(f) => Some(f),
-        None if unsafe { !(*ctx).settings.no_jit } && is_first_entry => closure.hot_jit_fn(),
+        None if unsafe { !(*ctx).settings.no_jit } && is_first_entry => {
+            closure.hot_jit_fn(unsafe { &(*ctx).settings })
+        }
         None => None,
     };
     if let Some(jit_fn) = hot_fn {

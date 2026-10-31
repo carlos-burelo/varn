@@ -3,8 +3,8 @@ use std::time::Instant;
 
 static ENABLED: AtomicBool = AtomicBool::new(false);
 
-pub fn init() {
-    ENABLED.store(varn_core::env::settings().gc_trace, Ordering::Relaxed);
+pub fn configure(enabled: bool) {
+    ENABLED.store(enabled, Ordering::Relaxed);
 }
 
 #[inline(always)]

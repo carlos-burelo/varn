@@ -22,13 +22,11 @@ use std::sync::atomic::Ordering;
 use std::sync::OnceLock;
 
 pub fn enabled() -> bool {
-    static ON: OnceLock<bool> = OnceLock::new();
-    *ON.get_or_init(|| !varn_core::env::settings().no_clif)
+    crate::config::config().enabled
 }
 
 pub fn trace() -> bool {
-    static ON: OnceLock<bool> = OnceLock::new();
-    *ON.get_or_init(|| varn_core::env::settings().clif_trace)
+    crate::config::config().trace
 }
 
 pub fn shared_isa() -> Result<&'static OwnedTargetIsa, String> {
@@ -44,6 +42,10 @@ pub fn isa_identity() -> u64 {
             for v in isa.flags().iter().chain(isa.isa_flags()) {
                 text.push_str(&format!(";{v}"));
             }
+            text.push_str(&format!(
+                ";{}",
+                crate::config::config().codegen_fingerprint()
+            ));
             varn_core::fingerprint::fingerprint(text.as_bytes())
         }
         Err(_) => 0,
@@ -52,12 +54,12 @@ pub fn isa_identity() -> u64 {
 
 pub fn host_isa() -> Result<OwnedTargetIsa, String> {
     let mut flags = settings::builder();
-    let env = varn_core::env::settings();
+    let config = crate::config::config();
     flags
-        .set("opt_level", env.clif_opt.flag_value())
+        .set("opt_level", config.opt_level)
         .map_err(|e| e.to_string())?;
 
-    let verify = env.clif_verify || cfg!(debug_assertions);
+    let verify = config.verify || cfg!(debug_assertions);
     flags
         .set("enable_verifier", if verify { "true" } else { "false" })
         .map_err(|e| e.to_string())?;
@@ -84,7 +86,7 @@ fn compile_in<R>(
     isa: &dyn TargetIsa,
     take: impl FnOnce(&cranelift_codegen::CompiledCode) -> Result<R, String>,
 ) -> Result<R, String> {
-    if varn_core::env::settings().clif_print_ir {
+    if crate::config::config().print_ir {
         eprintln!("=== CLIF IR ===\n{}", ctx.func.display());
     }
     let start = std::time::Instant::now();

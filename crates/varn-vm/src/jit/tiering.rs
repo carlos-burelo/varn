@@ -1,38 +1,14 @@
 use crate::closure::VmClosure;
+use crate::settings::ExecSettings;
 use varn_types::FunctionProto;
 
 impl VmClosure {
-    const JIT_TIER_THRESHOLD: u32 = 1;
-
-    const JIT_TIER_THRESHOLD_STRAIGHT: u32 = 128;
-
-    const JIT_OSR_BACKEDGES: u32 = 1000;
-
-    #[inline(always)]
-    pub(crate) fn osr_backedge_threshold() -> u32 {
-        static T: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
-        *T.get_or_init(|| {
-            varn_core::env::settings()
-                .jit_osr
-                .unwrap_or(Self::JIT_OSR_BACKEDGES)
-        })
-    }
-
-    fn tier_threshold(proto: &FunctionProto) -> u32 {
+    fn tier_threshold(proto: &FunctionProto, settings: &ExecSettings) -> u32 {
         if proto.has_backedge() {
-            static LT: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
-            return *LT.get_or_init(|| {
-                varn_core::env::settings()
-                    .jit_tier
-                    .unwrap_or(Self::JIT_TIER_THRESHOLD)
-            });
+            settings.tier_loop
+        } else {
+            settings.tier_straight
         }
-        static ST: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
-        *ST.get_or_init(|| {
-            varn_core::env::settings()
-                .jit_tier_straight
-                .unwrap_or(Self::JIT_TIER_THRESHOLD_STRAIGHT)
-        })
     }
 
     #[inline(always)]
@@ -47,7 +23,7 @@ impl VmClosure {
         Some(unsafe { std::mem::transmute::<usize, varn_jit::JitFn>(e) })
     }
 
-    pub(crate) fn hot_jit_fn(&self) -> Option<varn_jit::JitFn> {
+    pub(crate) fn hot_jit_fn(&self, settings: &ExecSettings) -> Option<varn_jit::JitFn> {
         if let Some(f) = self.jit_fn() {
             varn_jit::JIT_STATS
                 .jit_cached
@@ -59,14 +35,14 @@ impl VmClosure {
         }
         let n = self.proto.jit_entry_count.get() + 1;
         self.proto.jit_entry_count.set(n);
-        if n < Self::tier_threshold(&self.proto) {
+        if n < Self::tier_threshold(&self.proto, settings) {
             return None;
         }
-        self.compile_jit();
+        self.compile_jit(settings);
         self.jit_fn()
     }
 
-    pub(crate) fn compile_jit(&self) {
+    pub(crate) fn compile_jit(&self, settings: &ExecSettings) {
         let epoch = crate::clif_link::current_epoch();
         if self.proto.jit_failed.get() || epoch == 0 {
             return;
@@ -85,7 +61,7 @@ impl VmClosure {
         } else {
             None
         };
-        let helpers = super::table_build::build_jit_helpers();
+        let helpers = super::table_build::build_jit_helpers(settings);
         let linker = crate::clif_link::CtxLinker;
         match super::code_cache::compile(&self.proto, &self.constants, helpers, &linker, None) {
             Ok(compiled) => {
@@ -111,7 +87,11 @@ impl VmClosure {
         }
     }
 
-    pub(crate) fn osr_jit_fn(&self, req: varn_types::ssa::OsrRequest) -> Option<varn_jit::JitFn> {
+    pub(crate) fn osr_jit_fn(
+        &self,
+        req: varn_types::ssa::OsrRequest,
+        settings: &ExecSettings,
+    ) -> Option<varn_jit::JitFn> {
         let proto = &self.proto;
         let epoch = crate::clif_link::current_epoch();
         if epoch == 0 {
@@ -139,7 +119,7 @@ impl VmClosure {
             return None;
         }
 
-        let helpers = super::table_build::build_jit_helpers();
+        let helpers = super::table_build::build_jit_helpers(settings);
         let linker = crate::clif_link::CtxLinker;
         match super::code_cache::compile(proto, &self.constants, helpers, &linker, Some(req)) {
             Ok(compiled) => {

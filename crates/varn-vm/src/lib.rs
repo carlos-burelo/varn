@@ -37,6 +37,6 @@ pub use globals::GlobalStore;
 pub use heap::{Heap, HeapObj};
 pub use loader::{ModuleError, ModuleLoader};
 pub use profile::{CallEntry, HotspotCounters, ProfileCounters, VmProfile};
-pub use settings::ExecSettings;
+pub use settings::{configure_process, ExecSettings};
 pub use value::VmValue;
 pub use vm::{prefill_native_modules, Vm};

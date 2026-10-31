@@ -87,7 +87,7 @@ pub struct ExecCtx {
 
 impl ExecCtx {
     pub(crate) fn new(mut globals: GlobalStore, settings: crate::settings::ExecSettings) -> Self {
-        let mut heap = Heap::new();
+        let mut heap = Heap::new(&settings);
 
         let fresh = globals.values.is_empty();
         if fresh {

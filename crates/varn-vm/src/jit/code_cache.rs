@@ -20,18 +20,29 @@ enum Mode {
     Off,
 }
 
-fn mode() -> Mode {
-    static MODE: OnceLock<Mode> = OnceLock::new();
-    *MODE.get_or_init(|| match varn_core::env::settings().jit_cache {
+static MODE: OnceLock<Mode> = OnceLock::new();
+
+pub fn configure(mode: varn_core::env::JitCacheMode) -> bool {
+    MODE.set(match mode {
         varn_core::env::JitCacheMode::Off => Mode::Off,
         varn_core::env::JitCacheMode::Verify => Mode::Verify,
         varn_core::env::JitCacheMode::On => Mode::On,
     })
+    .is_ok()
 }
 
-fn key(proto: &FunctionProto, osr: Option<varn_types::ssa::OsrRequest>) -> Option<u64> {
+fn mode() -> Mode {
+    *MODE.get_or_init(|| Mode::On)
+}
+
+fn key(
+    proto: &FunctionProto,
+    helpers: &varn_jit::JitHelpers,
+    osr: Option<varn_types::ssa::OsrRequest>,
+) -> Option<u64> {
     let mut bytes = postcard::to_allocvec(proto).ok()?;
     bytes.extend_from_slice(&varn_jit::isa_identity().to_le_bytes());
+    bytes.extend_from_slice(&(helpers.young_threshold as u64).to_le_bytes());
     bytes.extend_from_slice(&varn_jit::JIT_HELPERS_VERSION.to_le_bytes());
     if let Some(req) = osr {
         bytes.extend_from_slice(&(req.ip as u64).to_le_bytes());
@@ -52,7 +63,7 @@ pub(crate) fn compile(
             return varn_jit::compile(proto, constants, helpers, linker, osr)
         }
     };
-    let key = key(proto, osr);
+    let key = key(proto, &helpers, osr);
     let cached = key
         .and_then(|k| store.load(k))
         .and_then(|bytes| postcard::from_bytes::<varn_jit::CodeImage>(&bytes).ok());

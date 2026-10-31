@@ -62,7 +62,7 @@ impl HeapInner {
         self.gc_total_freed += freed as u64;
         self.cells.old_growth = 0;
         let live = self.cells.survivors as u64;
-        self.gc_threshold = (live * 2).max(super::young::old_floor());
+        self.gc_threshold = (live * 2).max(self.gc_floor);
         freed
     }
 

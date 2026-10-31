@@ -227,12 +227,15 @@ impl ExecCtx {
             return None;
         }
         let entry = if frame.ip == 0 {
-            closure.hot_jit_fn()
+            closure.hot_jit_fn(&self.settings)
         } else {
-            closure.osr_jit_fn(varn_types::ssa::OsrRequest {
-                ip: frame.ip,
-                mode: varn_types::ssa::OsrMode::Resume,
-            })
+            closure.osr_jit_fn(
+                varn_types::ssa::OsrRequest {
+                    ip: frame.ip,
+                    mode: varn_types::ssa::OsrMode::Resume,
+                },
+                &self.settings,
+            )
         }?;
         let owner = depth + 1;
         self.try_handlers.retain(|h| h.frame_depth != owner);

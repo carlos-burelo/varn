@@ -52,7 +52,7 @@ fn resolve_uncached() -> (StdSource, StdProvenance) {
     {
         return (src, StdProvenance::ProjectOverride);
     }
-    if let Some(p) = varn_core::env::settings().std.clone() {
+    if let Some(p) = varn_core::env::process().std.clone() {
         if p == STD_EMBEDDED_SENTINEL {
             return (StdSource::Embedded, StdProvenance::Env);
         }

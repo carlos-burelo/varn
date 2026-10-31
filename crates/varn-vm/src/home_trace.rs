@@ -1,6 +1,12 @@
-use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, Ordering};
 
+static ON: AtomicBool = AtomicBool::new(false);
+
+pub fn configure(enabled: bool) {
+    ON.store(enabled, Ordering::Relaxed);
+}
+
+#[inline(always)]
 pub(crate) fn enabled() -> bool {
-    static ON: OnceLock<bool> = OnceLock::new();
-    *ON.get_or_init(|| varn_core::env::settings().home_trace)
+    ON.load(Ordering::Relaxed)
 }
