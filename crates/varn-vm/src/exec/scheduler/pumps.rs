@@ -12,6 +12,7 @@ use crate::task::{LazyTask, TaskCell};
 struct Pump {
     ctx: *mut ExecCtx,
     queue: *const TaskQueue,
+    awaited: Rc<TaskCell>,
 }
 
 struct Hosts {
@@ -82,10 +83,11 @@ pub(crate) fn drain_hosts() -> Vec<Rc<TaskCell>> {
 pub(super) struct PumpGuard;
 
 impl PumpGuard {
-    pub(super) fn enter(ctx: &ExecCtx) -> Self {
+    pub(super) fn enter(ctx: &ExecCtx, awaited: &Rc<TaskCell>) -> Self {
         let pump = Pump {
             ctx: ctx as *const ExecCtx as *mut ExecCtx,
             queue: ctx.queue() as *const TaskQueue,
+            awaited: Rc::clone(awaited),
         };
         PUMPS.with(|pumps| pumps.borrow_mut().push(pump));
         Self
@@ -118,8 +120,10 @@ pub(crate) struct GcScope {
 pub(crate) fn gc_scope(me: &ExecCtx) -> GcScope {
     let mut owners = vec![me as *const ExecCtx as *mut ExecCtx];
     let mut queues: Vec<*const TaskQueue> = Vec::new();
+    let mut awaited: Vec<Rc<TaskCell>> = Vec::new();
     PUMPS.with(|pumps| {
         for pump in pumps.borrow().iter() {
+            awaited.push(Rc::clone(&pump.awaited));
             if !owners.contains(&pump.ctx) {
                 owners.push(pump.ctx);
             }
@@ -137,7 +141,7 @@ pub(crate) fn gc_scope(me: &ExecCtx) -> GcScope {
     let mut scope = GcScope {
         owners,
         frozen: Vec::new(),
-        cells: Vec::new(),
+        cells: awaited,
         lazies: Vec::new(),
         gens: Vec::new(),
     };

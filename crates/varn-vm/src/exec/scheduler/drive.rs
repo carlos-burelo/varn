@@ -163,7 +163,7 @@ impl ExecCtx {
     }
 
     pub fn pump_until(&mut self, target: &Rc<TaskCell>) {
-        let _guard = PumpGuard::enter(self);
+        let _guard = PumpGuard::enter(self, target);
         let queue: *const TaskQueue = self.queue();
         let queue = unsafe { &*queue };
         loop {
