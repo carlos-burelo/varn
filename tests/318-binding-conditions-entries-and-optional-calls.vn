@@ -1,0 +1,89 @@
+import { describe, it, expect } from "std:test";
+
+type Pair = { a: int, b: str };
+type Holder = { f: (() => int)? };
+
+function find(xs: int[], n: int): int? { return xs.indexOf(n); }
+function pair(ok: bool): Pair? { return ok ? { a: 1, b: "x" } : null; }
+function run(cb: ((x: int) => int)?, x: int): int { return (cb?.(x)) ?? -1; }
+
+function describeFind(xs: int[], n: int): str {
+    if (const i = find(xs, n)) {
+        return "at " + i.toString();
+    } else {
+        return "missing";
+    }
+}
+
+function chain(xs: int[], first: int, second: int): str {
+    if (const i = find(xs, first)) {
+        return "first " + i.toString();
+    } else if (const j = find(xs, second)) {
+        return "second " + j.toString();
+    }
+    return "neither";
+}
+
+await describe("318 binding conditions, entries and optional calls", async () => {
+    await it("if with a binding runs its branch only for a present value", async () => {
+        expect(describeFind([5, 6, 7], 6)).toBe("at 1");
+        expect(describeFind([5, 6, 7], 9)).toBe("missing");
+        expect(chain([1, 2], 9, 2)).toBe("second 1");
+        expect(chain([1, 2], 9, 8)).toBe("neither");
+    });
+
+    await it("the bound name is narrowed, scoped to the branch, and may destructure", async () => {
+        let seen = "";
+        if (const { a, b } = pair(true)) { seen = a.toString() + b; }
+        expect(seen).toBe("1x");
+        if (const p = pair(false)) { seen = "unexpected"; }
+        expect(seen).toBe("1x");
+        if (let n = find([4, 5], 5)) { n = n + 10; seen = n.toString(); }
+        expect(seen).toBe("11");
+    });
+
+    await it("while with a binding loops until the value is null", async () => {
+        const queue: int[] = [1, 2, 3];
+        let sum = 0;
+        while (const item = queue.pop()) { sum = sum + item; }
+        expect(sum).toBe(6);
+        const q2: int[] = [1, 2, 3, 4, 5];
+        let seen = "";
+        while (const x = q2.shift()) {
+            if (x == 2) { continue; }
+            if (x == 4) { break; }
+            seen = seen + x.toString();
+        }
+        expect(seen).toBe("13");
+    });
+
+    await it("entries pairs every element with its index", async () => {
+        const xs = ["a", "b", "c"];
+        let joined = "";
+        for (const [i, v] of xs.entries()) { joined = joined + i.toString() + v; }
+        expect(joined).toBe("0a1b2c");
+        expect(xs.entries().length).toBe(3);
+        expect(([] as int[]).entries().length).toBe(0);
+    });
+
+    await it("an optional call yields null for a null callee and calls otherwise", async () => {
+        const none: (() => int)? = null;
+        const some: (() => int)? = () => 7;
+        expect((none?.()) ?? -1).toBe(-1);
+        expect((some?.()) ?? -1).toBe(7);
+        const empty: Holder = { f: null };
+        const full: Holder = { f: () => 5 };
+        expect((empty.f?.()) ?? -1).toBe(-1);
+        expect((full.f?.()) ?? -1).toBe(5);
+        expect(run(null, 1)).toBe(-1);
+        expect(run((x: int) => x + 1, 1)).toBe(2);
+    });
+
+    await it("in tests the keys of a dictionary", async () => {
+        const dict: { [k: str]: int } = { a: 1 };
+        expect("a" in dict).toBe(true);
+        expect("z" in dict).toBe(false);
+        expect((1..5).contains(3)).toBe(true);
+        expect((1..5).contains(9)).toBe(false);
+    });
+});
