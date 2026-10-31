@@ -37,5 +37,4 @@ export {
     trunc
 } from "std:math/intrinsics";
 
-export { Math } from "std:math/class";
 export { Stats } from "std:math/stats";

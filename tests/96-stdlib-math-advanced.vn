@@ -1,4 +1,5 @@
-import { Math, exp, log, log10, log2, pow, hypot, cbrt, sign, trunc } from "std:math";
+import * as Math from "std:math";
+import { exp, log, log10, log2, pow, hypot, cbrt, sign, trunc } from "std:math";
 import { describe, it, expect } from "std:test";
 
 

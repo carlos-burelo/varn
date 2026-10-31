@@ -35,9 +35,7 @@ export declare class str {
     words(): str[];
     @throws(RangeError) repeat(n: int): str;
     @throws(RangeError) padStart(target: int, pad?: str): str;
-    @throws(RangeError) padLeft(target: int, pad?: str): str; // ALIAS
     @throws(RangeError) padEnd(target: int, pad?: str): str;
-    @throws(RangeError) padRight(target: int, pad?: str): str; // ALIAS
     concat(other: str): str;
     substr(start: int, length?: int): str;
     isEmpty(): bool;

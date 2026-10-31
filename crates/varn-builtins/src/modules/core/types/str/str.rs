@@ -230,15 +230,7 @@ varn_contract! {
             pad_target(target)?;
             Ok(pad_start(this, target, pad))
         }
-        fn padLeft(_ctx: &mut dyn NativeCtx, this: &VnStr, target: i64, pad: Option<&str>) -> Result<String, varn_types::NativeError> {
-            pad_target(target)?;
-            Ok(pad_start(this, target, pad))
-        }
         fn padEnd(_ctx: &mut dyn NativeCtx, this: &VnStr, target: i64, pad: Option<&str>) -> Result<String, varn_types::NativeError> {
-            pad_target(target)?;
-            Ok(pad_end(this, target, pad))
-        }
-        fn padRight(_ctx: &mut dyn NativeCtx, this: &VnStr, target: i64, pad: Option<&str>) -> Result<String, varn_types::NativeError> {
             pad_target(target)?;
             Ok(pad_end(this, target, pad))
         }

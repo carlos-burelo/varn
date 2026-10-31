@@ -1,5 +1,5 @@
 import { describe, it, expect } from "std:test";
-import { Math, max, min, sign } from "std:math";
+import { max, min, sign } from "std:math";
 
 const BASE: int[] = [-1, 1, 0, 2, -2];
 const EXPS: int[] = [0, 1, 2, 3, 2147483648, 4294967296, 4294967297, 9007199254740992, 9007199254740993, 4611686018427387904, 9223372036854775807];
@@ -64,15 +64,11 @@ await describe("303 power, shifts and float extremes", async () => {
         expect(floatKind(min(FL[0], FL[2]))).toBe("-0.0");
     });
 
-    await it("the Math statics and the module functions agree", async () => {
+    await it("sign keeps NaN and the sign of zero", async () => {
         const nan = FL[0] / FL[0];
-        expect(floatKind(Math.max(nan, FL[1]))).toBe(floatKind(max(nan, FL[1])));
-        expect(floatKind(Math.max(FL[2], FL[0]))).toBe(floatKind(max(FL[2], FL[0])));
-        expect(floatKind(Math.min(FL[0], FL[2]))).toBe(floatKind(min(FL[0], FL[2])));
-        expect(floatKind(Math.sign(nan))).toBe("NaN");
         expect(floatKind(sign(nan))).toBe("NaN");
         expect(floatKind(sign(FL[2]))).toBe("-0.0");
-        expect(floatKind(Math.sign(-FL[3]))).toBe("-1.0");
+        expect(floatKind(sign(-FL[3]))).toBe("-1.0");
     });
     await it("a bigint power takes the whole exponent and refuses what cannot fit", async () => {
         const one: bigint = 1n;
