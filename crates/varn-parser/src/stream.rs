@@ -1,4 +1,5 @@
 mod angle;
+mod regex_literals;
 
 use crate::ParseProfile;
 use std::sync::Arc;
@@ -38,6 +39,7 @@ pub struct TokenStream {
 
     split_count: u8,
     next_ast_id: AstId,
+    regex_literals: Vec<regex_literals::RegexLiteral>,
 
     pub interner: varn_core::AtomInterner,
 
@@ -62,6 +64,7 @@ impl TokenStream {
             async_body: false,
             split_count: 0,
             next_ast_id: 1,
+            regex_literals: Vec::new(),
             interner,
             arena: AstArena::new(),
         }

@@ -108,6 +108,12 @@ impl Parser {
             self.stream.profile.program_loop += started.elapsed();
         }
 
+        let mut hoisted = self.stream.hoist_regex_literals();
+        if !hoisted.is_empty() {
+            hoisted.append(&mut body);
+            body = hoisted;
+        }
+
         self.diagnostics
             .extend(std::mem::take(&mut self.stream.errors));
         let errors = self.diagnostics.clone();

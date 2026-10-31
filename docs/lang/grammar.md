@@ -40,7 +40,7 @@ RawStrLiteral = '"""' [ newline ] { /cualquier carácter/ } '"""' ;
 StrChar       = /cualquier carácter salvo la comilla de cierre/ | "\" /cualquier carácter/ ;
 
 Template      = "`" { TemplateChar | "${" Expression "}" } "`" ;
-RegexLiteral  = "/" /cuerpo/ "/" { flag } ;
+RegexLiteral  = "/" /cuerpo/ "/" { "i" | "m" | "s" | "x" } ;
 ```
 
 Reglas léxicas que no caben en EBNF:

@@ -17,7 +17,7 @@ pub fn build_document_symbols(state: &DocumentState) -> DocumentSymbolResponse {
 }
 
 fn is_outlinable(name: &str, kind: SymbolKind) -> bool {
-    if name.starts_with("__ext_") {
+    if name.starts_with("__ext_") || varn_core::intrinsics::is_synthetic_name(name) {
         return false;
     }
     !matches!(

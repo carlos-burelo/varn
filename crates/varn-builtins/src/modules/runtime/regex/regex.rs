@@ -18,12 +18,6 @@ static REGEX_POOL: LazyLock<RwLock<RegexPool>> = LazyLock::new(|| {
     })
 });
 
-const CASE_INSENSITIVE: char = 'i';
-const MULTI_LINE: char = 'm';
-const DOT_MATCHES_NEWLINE: char = 's';
-const IGNORE_WHITESPACE: char = 'x';
-const FLAGS: [char; 4] = [CASE_INSENSITIVE, MULTI_LINE, DOT_MATCHES_NEWLINE, IGNORE_WHITESPACE];
-
 pub struct RegexRuntime;
 
 varn_macros::varn_record! {
@@ -100,20 +94,12 @@ varn_contract! {
     contract: "src/modules/runtime/regex/regex_runtime.vn",
     impl RegexRuntime {
         fn compile(_ctx: &mut dyn NativeCtx, pattern: &str, flags: &str) -> Result<i64, NativeError> {
-            if let Some(bad) = flags.chars().find(|c| !FLAGS.contains(c)) {
-                return Err(NativeError::std(StdErrorClass::Parse, format!("unknown regex flag '{bad}': the flags are i, m, s and x")));
-            }
             let key = (pattern.to_string(), flags.to_string());
             if let Some(&handle) = REGEX_POOL.read().handles.get(&key) {
                 return Ok(handle);
             }
-            let mut builder = regex::RegexBuilder::new(pattern);
-            builder
-                .case_insensitive(flags.contains(CASE_INSENSITIVE))
-                .multi_line(flags.contains(MULTI_LINE))
-                .dot_matches_new_line(flags.contains(DOT_MATCHES_NEWLINE))
-                .ignore_whitespace(flags.contains(IGNORE_WHITESPACE));
-            let re = builder.build().map_err(|e| format!("Invalid regex pattern: {e}")).map_err(|e| NativeError::std(StdErrorClass::Parse, e))?;
+            let re = varn_core::regex_pattern::compile(pattern, flags)
+                .map_err(|e| NativeError::std(StdErrorClass::Parse, e.to_string()))?;
             let mut pool = REGEX_POOL.write();
             if let Some(&handle) = pool.handles.get(&key) {
                 return Ok(handle);

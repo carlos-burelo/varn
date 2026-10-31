@@ -1,2 +1,0 @@
-// expect: error[VN2007]
-const pattern = /a+/;

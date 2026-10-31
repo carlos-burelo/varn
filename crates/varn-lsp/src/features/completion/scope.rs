@@ -24,6 +24,9 @@ pub fn build_scope_completions(
         for &symbol_id in &scope.ordered {
             let sym = state.db.bind.arena.get(symbol_id);
             let name = state.name(sym.name);
+            if varn_core::intrinsics::is_synthetic_name(name) {
+                continue;
+            }
             if matches!(
                 sym.kind,
                 SymbolKind::Var | SymbolKind::Let | SymbolKind::Const

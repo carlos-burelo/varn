@@ -21,7 +21,7 @@ pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
             .collect();
     let mut exports: Vec<Arc<ExportEntry>> = state
         .symbols()
-        .filter(|s| is_indexable(s.kind(), s.line()))
+        .filter(|s| is_indexable(s.name(), s.kind(), s.line()))
         .map(|s| {
             let parent = match s.kind() {
                 SymbolKind::Class | SymbolKind::Struct => {
@@ -57,7 +57,10 @@ pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
         })
         .collect();
 
-    for sym in state.symbols().filter(|s| is_indexable(s.kind(), s.line())) {
+    for sym in state
+        .symbols()
+        .filter(|s| is_indexable(s.name(), s.kind(), s.line()))
+    {
         collect_member_exports(state, &uri_shared, sym, &mut exports);
     }
 
@@ -165,8 +168,8 @@ fn is_stable_specifier(specifier: &str) -> bool {
     varn_core::ModuleKind::of(specifier).is_some()
 }
 
-fn is_indexable(kind: SymbolKind, line: u32) -> bool {
-    if line == u32::MAX {
+fn is_indexable(name: &str, kind: SymbolKind, line: u32) -> bool {
+    if line == u32::MAX || varn_core::intrinsics::is_synthetic_name(name) {
         return false;
     }
     !matches!(kind, SymbolKind::Parameter | SymbolKind::TypeParameter)

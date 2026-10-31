@@ -3777,6 +3777,7 @@ dependencies = [
  "console",
  "num-bigint",
  "num-traits",
+ "regex",
  "rustc-hash 1.1.0",
  "serde",
  "xxhash-rust",

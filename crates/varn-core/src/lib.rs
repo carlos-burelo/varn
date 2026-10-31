@@ -24,6 +24,7 @@ pub mod op_id;
 pub mod op_meta;
 pub mod opcode;
 pub mod paths;
+pub mod regex_pattern;
 pub mod runtime_kind;
 pub mod runtime_ops;
 pub mod source;

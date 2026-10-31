@@ -1,0 +1,65 @@
+import { describe, it, expect } from "std:test";
+import { Regex } from "std:regex";
+
+function matches(re: Regex, text: str): bool {
+    return re.test(text);
+}
+
+function wordAt(text: str): str {
+    return /\w+/.exec(text)!.match;
+}
+
+const total = 10;
+const half = total / 2 / 5;
+const items = [4, 2];
+const ratio = items[0] / items[1] / 1;
+
+await describe("330 regex literals", async () => {
+    await it("a literal is a Regex with its flags applied", async () => {
+        const re: Regex = /ab+c/i;
+        expect(re.pattern).toBe("ab+c");
+        expect(re.flags).toBe("i");
+        expect(re.test("xABBCx")).toBe(true);
+        expect(/^b/m.findAll("a\nb").length).toBe(1);
+        expect(/a.b/s.test("a\nb")).toBe(true);
+        expect(/a b/x.test("ab")).toBe(true);
+    });
+
+    await it("a literal works wherever an expression starts", async () => {
+        expect(matches(/\d+/, "a12")).toBe(true);
+        expect(wordAt("  hello world")).toBe("hello");
+        const all = [/a/, /b/].map((r: Regex) => r.test("b"));
+        expect(all[0]).toBe(false);
+        expect(all[1]).toBe(true);
+        const pick = total > 5 ? /big/ : /small/;
+        expect(pick.pattern).toBe("big");
+        expect(`${/x/.test("x")}`).toBe("true");
+        const guard = true && /z/.test("z");
+        expect(guard).toBe(true);
+    });
+
+    await it("a slash after a value is still a division", async () => {
+        expect(half).toBe(1);
+        expect(ratio).toBe(2);
+        expect((total) / 5).toBe(2);
+        expect(total / 5 / 2).toBe(1);
+    });
+
+    await it("a slash inside a class does not end the literal", async () => {
+        expect(/[/]x/.test("/x")).toBe(true);
+        expect(/a\/b/.test("a/b")).toBe(true);
+    });
+
+    await it("an identical literal in one module is one Regex", async () => {
+        const first = /same/i;
+        const second = /same/i;
+        expect(first.pattern).toBe(second.pattern);
+        expect(Regex.compile("same", "i").test("SAME")).toBe(true);
+    });
+
+    await it("the match index and groups come back as with the class", async () => {
+        const m = /(\d{4})-(\d{2})/.exec("on 2026-10");
+        expect(m!.index).toBe(3);
+        expect(m!.groups[1]).toBe("10");
+    });
+});

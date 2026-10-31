@@ -5,6 +5,7 @@ mod import_meta;
 mod match_expr;
 mod new_expr;
 mod object;
+mod regex_literal;
 mod template;
 
 use super::literal_text::{parse_int_radix, unescape_string};
@@ -89,10 +90,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
             s.advance();
             Ok(s.expr(range, ExprKind::NullLiteral))
         }
-        TokenKind::RegularExpression => Err(
-            "regular expression literals are not supported; use `Regex.compile(pattern)` from std:regex"
-                .to_owned(),
-        ),
+        TokenKind::RegularExpression => Ok(regex_literal::parse_regex_literal(s)),
 
         TokenKind::Template | TokenKind::TemplateHead => parse_template(s),
 
@@ -172,7 +170,17 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
                 let ExprKind::Object { properties } = s.arena.expr(obj).kind.clone() else {
                     unreachable!()
                 };
-                if properties.iter().any(|p| !matches!(p, varn_core::ast::ObjectProp::Property { key: varn_core::ast::PropKey::Identifier(_) | varn_core::ast::PropKey::Str(_) | varn_core::ast::PropKey::Int(_), .. })) {
+                if properties.iter().any(|p| {
+                    !matches!(
+                        p,
+                        varn_core::ast::ObjectProp::Property {
+                            key: varn_core::ast::PropKey::Identifier(_)
+                                | varn_core::ast::PropKey::Str(_)
+                                | varn_core::ast::PropKey::Int(_),
+                            ..
+                        }
+                    )
+                }) {
                     return Err("records require named fields; spread, methods and computed keys are not supported".into());
                 }
                 Ok(s.expr(full_range, ExprKind::Record { properties }))

@@ -30,6 +30,7 @@ pub enum ErrorCode {
     InvalidRestElement = 2018,
     MultipleRestElements = 2019,
     ConstWithoutInitializer = 2020,
+    InvalidRegex = 2021,
 
     TypeMismatch = 3001,
     UnknownSymbol = 3002,
@@ -173,6 +174,7 @@ impl ErrorCode {
             ErrorCode::InvalidRestElement => "invalid-rest-element",
             ErrorCode::MultipleRestElements => "multiple-rest-elements",
             ErrorCode::ConstWithoutInitializer => "const-without-initializer",
+            ErrorCode::InvalidRegex => "invalid-regex",
 
             ErrorCode::TypeMismatch => "type-mismatch",
             ErrorCode::UnknownSymbol => "unknown-symbol",

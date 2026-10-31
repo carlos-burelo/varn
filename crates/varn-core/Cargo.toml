@@ -11,6 +11,7 @@ num-traits = { workspace = true }
 bigdecimal = { workspace = true }
 rustc-hash = { workspace = true }
 xxhash-rust = { workspace = true }
+regex      = { workspace = true }
 
 [features]
 default = []

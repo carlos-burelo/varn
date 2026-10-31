@@ -166,6 +166,25 @@ const p3: Profile? = null    // tests/08-null-safety.vn
 assertTrue("triple eq null", null === null)
 ```
 
+### 4.11 Literales de expresión regular (`Regex`)
+
+```varn
+const fecha = /(\d{4})-(\d{2})/       // tests/330-regex-literals.vn
+const m = fecha.exec("el 2026-10")
+const ok = /^ab+c$/i.test("ABBC")
+```
+
+- Un literal `/cuerpo/flags` tiene tipo `Regex` de `std:regex`; no hace falta importarlo.
+- El cuerpo y los flags se validan al **parsear**: un patrón inválido, un flag desconocido o una
+  construcción que el motor no admite (retroreferencias, lookaround) es el error `VN2021`.
+- Flags admitidos: `i`, `m`, `s`, `x`. No existe `g`: `findAll` y `replace` son siempre globales.
+- Cada patrón con sus flags se construye **una vez por módulo**, al arrancar el módulo; dos literales
+  iguales comparten la misma instancia.
+- El motor es lineal (sin retroceso); `index` de una coincidencia cuenta puntos de código, igual que
+  `indexOf` y `substring`.
+- `/` es división después de un valor (identificador, literal, `)`, `]`, `}`); en cualquier otra
+  posición empieza una expresión regular.
+
 ---
 
 ## 5. Operadores

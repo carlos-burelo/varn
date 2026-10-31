@@ -10,7 +10,10 @@ pub fn build_type_hints(state: &DocumentState) -> Vec<InlayHint> {
     let mut hints = Vec::new();
 
     for s in state.symbols() {
-        if s.line() == u32::MAX || s.is_from_stdlib() {
+        if s.line() == u32::MAX
+            || s.is_from_stdlib()
+            || varn_core::intrinsics::is_synthetic_name(s.name())
+        {
             continue;
         }
 

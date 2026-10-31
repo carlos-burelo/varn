@@ -24,6 +24,15 @@ macro_rules! member_keys {
 
 pub const DELEGATED_ITEM: &str = "<yield*>";
 pub const BOUND_SOURCE: &str = "<bound>";
+pub const REGEX_CLASS_ALIAS: &str = "<Regex>";
+
+pub fn is_synthetic_name(name: &str) -> bool {
+    name.starts_with('<')
+}
+
+pub fn regex_literal_binding(index: usize) -> String {
+    format!("<regex {index}>")
+}
 
 member_keys! {
     Tag => "__tag",
