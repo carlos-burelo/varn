@@ -1,0 +1,4 @@
+// expect: error[VN3002]
+function first(xs: int[]): Option<int> {
+    return null;
+}

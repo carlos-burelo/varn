@@ -1,0 +1,64 @@
+import { describe, it, expect } from "std:test";
+import { channel } from "std:task";
+
+function* numbers(): Generator<int> {
+    yield 1;
+    yield 2;
+}
+
+function* passes(value: dynamic): Generator<dynamic> {
+    yield value;
+}
+
+class Countdown {
+    left: int;
+    constructor(from: int) { this.left = from; }
+    next(): int? {
+        if (this.left <= 0) { return null; }
+        this.left = this.left - 1;
+        return this.left + 1;
+    }
+}
+
+class Source {
+    iter(): Countdown { return new Countdown(3); }
+}
+
+await describe("319 null is the only absent value", async () => {
+    await it("a generator ends with null and its values are never nullable", async () => {
+        const g = numbers();
+        const first: int? = g.next();
+        expect(first).toBe(1);
+        expect(g.next()).toBe(2);
+        expect(g.next()).toBe(null);
+        expect(g.next()).toBe(null);
+    });
+
+    await it("a generator that yields null at run time fails instead of looking finished", async () => {
+        let message = "none";
+        try { passes(null).next(); } catch (e) { message = e.message; }
+        expect(message.includes("cannot yield null")).toBe(true);
+        expect(passes(5).next()).toBe(5);
+    });
+
+    await it("any type whose next() returns T? is iterable", async () => {
+        let out = "";
+        for (const n of new Source()) { out = out + n.toString(); }
+        expect(out).toBe("321");
+    });
+
+    await it("a receiver's next() resolves to null once the channel is closed", async () => {
+        const pipe = channel<int>(2);
+        await pipe.tx.send(7);
+        pipe.tx.close();
+        expect(await pipe.rx.next()).toBe(7);
+        expect(await pipe.rx.next()).toBe(null);
+    });
+
+    await it("arrays of nullable values still iterate every element", async () => {
+        const values: (int?)[] = [1, null, 3];
+        let seen = 0;
+        for (const v of values) { seen = seen + 1; }
+        expect(seen).toBe(3);
+    });
+});
