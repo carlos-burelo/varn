@@ -123,8 +123,10 @@ fn parse_prop_key(s: &mut TokenStream) -> Result<PropKey, String> {
             Ok(PropKey::Identifier(s.interner.resolve(atom).to_string()))
         }
         TokenKind::Str => {
-            let atom = s.consume_lexeme();
-            Ok(PropKey::Str(s.interner.resolve(atom).to_string()))
+            let raw = s.consume_str();
+            Ok(PropKey::Str(super::super::literal_text::unescape_string(
+                &raw,
+            )))
         }
         TokenKind::IntegerLiteral => {
             let pre_parsed = s.parsed_num();

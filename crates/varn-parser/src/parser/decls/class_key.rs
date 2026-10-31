@@ -4,7 +4,9 @@ use varn_core::TokenKind;
 pub(super) fn member_key_name(s: &mut TokenStream) -> Result<String, String> {
     match s.kind() {
         TokenKind::Identifier => Ok(s.consume_str()),
-        TokenKind::Str => Ok(s.consume_str()),
+        TokenKind::Str => Ok(crate::expressions::literal_text::unescape_string(
+            &s.consume_str(),
+        )),
         TokenKind::IntegerLiteral => Ok(s.consume_str()),
         TokenKind::Hash => {
             s.advance();
