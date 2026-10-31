@@ -303,7 +303,7 @@ pub(super) fn parse_function_decl(
         s.eat_semicolon();
         s.stmt(s.range(), varn_core::ast::StmtKind::Empty)
     } else {
-        super::stmts::parse_block(s)?
+        s.in_function_body(is_async_pre, super::stmts::parse_block)?
     };
 
     let full_range = s.span_from(range);

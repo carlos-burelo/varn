@@ -53,7 +53,7 @@ pub(crate) fn parse_yield_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
             left: Pattern::Identifier { name: item, range },
             right: source,
             body,
-            is_await: false,
+            is_await: s.async_body,
         },
     ))
 }

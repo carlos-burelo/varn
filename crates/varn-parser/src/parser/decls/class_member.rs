@@ -112,7 +112,7 @@ pub fn parse_class_member(
             if class_is_declare {
                 return Err("declare getter cannot have a body".to_owned());
             }
-            Some(super::super::stmts::parse_block(s)?)
+            Some(s.in_function_body(mods.is_async, super::super::stmts::parse_block)?)
         } else {
             s.eat_semicolon();
             None

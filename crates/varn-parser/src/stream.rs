@@ -34,6 +34,7 @@ pub struct TokenStream {
 
     pub errors: varn_core::DiagnosticBag,
     pub profile: ParseProfile,
+    pub async_body: bool,
 
     split_count: u8,
     next_ast_id: AstId,
@@ -58,11 +59,19 @@ impl TokenStream {
             pending_doc: None,
             errors: varn_core::DiagnosticBag::new(),
             profile: ParseProfile::default(),
+            async_body: false,
             split_count: 0,
             next_ast_id: 1,
             interner,
             arena: AstArena::new(),
         }
+    }
+
+    pub fn in_function_body<R>(&mut self, is_async: bool, parse: impl FnOnce(&mut Self) -> R) -> R {
+        let outer = std::mem::replace(&mut self.async_body, is_async);
+        let parsed = parse(self);
+        self.async_body = outer;
+        parsed
     }
 
     #[inline(always)]

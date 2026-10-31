@@ -66,7 +66,7 @@ pub(crate) fn parse_object_body(s: &mut TokenStream) -> Result<Vec<ObjectProp>, 
             } else {
                 None
             };
-            let body = crate::parser::parse_block(s)?;
+            let body = s.in_function_body(is_async, crate::parser::parse_block)?;
             let full_prop_range = s.span_from(prop_range);
             properties.push(ObjectProp::Method {
                 key,

@@ -25,7 +25,7 @@ pub(super) fn parse_function_expr_inner_with_start(
     } else {
         None
     };
-    let body = crate::parser::parse_block(s)?;
+    let body = s.in_function_body(is_async, crate::parser::parse_block)?;
     let full_range = s.span_from(start_range);
     Ok(s.expr(
         full_range,

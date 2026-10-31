@@ -164,4 +164,21 @@ await describe("317 closing a generator runs the finally blocks it is suspended 
         for await (const v of counted("sync")) { if (v == 1) { break; } }
         expect(log.join(",")).toBe("break,close,sync");
     });
+
+    await it("yield* in an async generator delegates with for await and closes the inner one", async () => {
+        log = [];
+        async function* inner(): AsyncGenerator<int> {
+            try { yield 1; yield 2; } finally { log.push("inner"); }
+        }
+        async function* outer(): AsyncGenerator<int> {
+            try { yield 0; yield* inner(); } finally { log.push("outer"); }
+        }
+        let text = "";
+        for await (const v of outer()) { text = text + v.toString(); }
+        expect(text).toBe("012");
+        expect(log.join(",")).toBe("inner,outer");
+        log = [];
+        for await (const v of outer()) { if (v == 1) { break; } }
+        expect(log.join(",")).toBe("inner,outer");
+    });
 });
