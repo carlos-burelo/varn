@@ -1,130 +1,265 @@
 import { Query } from "std:net/query";
+import { ParseError } from "std:error";
+
+const MAX_PORT = 65535;
+
+class Reference {
+    scheme: str = "";
+    hasAuthority: bool = false;
+    userinfo: str = "";
+    host: str = "";
+    port: int? = null;
+    path: str = "";
+    hasQuery: bool = false;
+    query: str = "";
+    fragment: str = "";
+}
+
+function isSchemeChar(code: int, first: bool): bool {
+    const alpha = (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+    if (first) {
+        return alpha;
+    }
+    return alpha || (code >= 48 && code <= 57) || code === 43 || code === 45 || code === 46;
+}
+
+function schemeEnd(text: str): int {
+    for (let i = 0; i < text.length; i = i + 1) {
+        const code = text.charCodeAt(i) as int;
+        if (code === 58) {
+            return i > 0 ? i : -1;
+        }
+        if (!isSchemeChar(code, i === 0)) {
+            return -1;
+        }
+    }
+    return -1;
+}
+
+function parsePort(text: str, source: str): int? {
+    if (text.length === 0) {
+        return null;
+    }
+    let value = 0;
+    for (let i = 0; i < text.length; i = i + 1) {
+        const code = text.charCodeAt(i) as int;
+        if (code < 48 || code > 57) {
+            throw new ParseError(`invalid port in '${source}'`);
+        }
+        value = value * 10 + (code - 48);
+        if (value > MAX_PORT) {
+            throw new ParseError(`port out of range in '${source}'`);
+        }
+    }
+    return value;
+}
+
+function requireHostChars(host: str, bracketed: bool, source: str): void {
+    for (let i = 0; i < host.length; i = i + 1) {
+        const code = host.charCodeAt(i) as int;
+        const forbidden = code <= 32 || code === 127 || code === 47 || code === 92 || code === 63 || code === 35 || code === 64 || code === 91 || code === 93 || (!bracketed && code === 58);
+        if (forbidden) {
+            throw new ParseError(`invalid host in '${source}'`);
+        }
+    }
+}
+
+function parseAuthority(authority: str, ref: Reference, source: str): void {
+    const at = authority.lastIndexOf("@");
+    let hostPort = authority;
+    if (at !== null) {
+        ref.userinfo = authority.slice(0, at);
+        hostPort = authority.slice(at + 1);
+    }
+    if (hostPort.startsWith("[")) {
+        const close = hostPort.indexOf("]");
+        if (close === null) {
+            throw new ParseError(`unterminated IPv6 host in '${source}'`);
+        }
+        const inside = hostPort.slice(1, close);
+        requireHostChars(inside, true, source);
+        ref.host = inside.toLowerCase();
+        const after = hostPort.slice(close + 1);
+        if (after.length > 0) {
+            if (!after.startsWith(":")) {
+                throw new ParseError(`invalid host in '${source}'`);
+            }
+            ref.port = parsePort(after.slice(1), source);
+        }
+        return;
+    }
+    const colon = hostPort.lastIndexOf(":");
+    let hostText = hostPort;
+    if (colon !== null) {
+        hostText = hostPort.slice(0, colon);
+        ref.port = parsePort(hostPort.slice(colon + 1), source);
+    }
+    requireHostChars(hostText, false, source);
+    ref.host = hostText.toLowerCase();
+}
+
+function splitReference(text: str): Reference {
+    for (let i = 0; i < text.length; i = i + 1) {
+        const code = text.charCodeAt(i) as int;
+        if (code <= 32 || code === 127) {
+            throw new ParseError(`a URL cannot hold spaces or control characters: '${text}'`);
+        }
+    }
+    const ref = new Reference();
+    let rest = text;
+    const hash = rest.indexOf("#");
+    if (hash !== null) {
+        ref.fragment = rest.slice(hash + 1);
+        rest = rest.slice(0, hash);
+    }
+    const question = rest.indexOf("?");
+    if (question !== null) {
+        ref.hasQuery = true;
+        ref.query = rest.slice(question + 1);
+        rest = rest.slice(0, question);
+    }
+    const colon = schemeEnd(rest);
+    if (colon >= 0) {
+        ref.scheme = rest.slice(0, colon).toLowerCase();
+        rest = rest.slice(colon + 1);
+    }
+    if (rest.startsWith("//")) {
+        const body = rest.slice(2);
+        const slash = body.indexOf("/");
+        ref.hasAuthority = true;
+        ref.path = slash === null ? "" : body.slice(slash);
+        parseAuthority(slash === null ? body : body.slice(0, slash), ref, text);
+    } else {
+        ref.path = rest;
+    }
+    return ref;
+}
+
+function dropLastSegment(output: str): str {
+    const at = output.lastIndexOf("/");
+    return at === null ? "" : output.slice(0, at);
+}
+
+function removeDotSegments(path: str): str {
+    let input = path;
+    let output = "";
+    while (input.length > 0) {
+        if (input.startsWith("../")) {
+            input = input.slice(3);
+        } else if (input.startsWith("./")) {
+            input = input.slice(2);
+        } else if (input.startsWith("/./")) {
+            input = input.slice(2);
+        } else if (input === "/.") {
+            input = "/";
+        } else if (input.startsWith("/../")) {
+            input = input.slice(3);
+            output = dropLastSegment(output);
+        } else if (input === "/..") {
+            input = "/";
+            output = dropLastSegment(output);
+        } else if (input === "." || input === "..") {
+            input = "";
+        } else {
+            const start = input.startsWith("/") ? 1 : 0;
+            const cut = input.slice(start).indexOf("/");
+            const segment = cut === null ? input : input.slice(0, start + cut);
+            output = output + segment;
+            input = input.slice(segment.length);
+        }
+    }
+    return output;
+}
+
+function mergePaths(base: Url, relative: str): str {
+    if (base.host.length > 0 && base.path.length === 0) {
+        return "/" + relative;
+    }
+    const slash = base.path.lastIndexOf("/");
+    return slash === null ? relative : base.path.slice(0, slash + 1) + relative;
+}
 
 export class Url {
     protocol: str = "";
+    userinfo: str = "";
     host: str = "";
     port: int? = null;
     path: str = "";
     query: Query = new Query();
     fragment: str = "";
+    private _sourceQuery: str = "";
+    private _sourceNormalized: str = "";
 
     static parse(url: str): Url {
+        const ref = splitReference(url);
+        if (ref.scheme.length === 0) {
+            throw new ParseError(`'${url}' is not an absolute URL: it has no scheme`);
+        }
         const out = new Url();
-        
-        let rest = url;
-        
-        let protoIdx = rest.indexOf("://");
-        if (protoIdx !== null) {
-            out.protocol = rest.slice(0, protoIdx);
-            rest = rest.slice(protoIdx + 3);
-        }
-        
-        let fragIdx = rest.indexOf("#");
-        if (fragIdx !== null) {
-            out.fragment = rest.slice(fragIdx + 1);
-            rest = rest.slice(0, fragIdx);
-        }
-        
-        let queryIdx = rest.indexOf("?");
-        let queryStr = "";
-        if (queryIdx !== null) {
-            queryStr = rest.slice(queryIdx + 1);
-            rest = rest.slice(0, queryIdx);
-        }
-        out.query = Query.parse(queryStr);
-        
-        let pathIdx = rest.indexOf("/");
-        let hostAndPort = rest;
-        if (pathIdx !== null) {
-            out.path = rest.slice(pathIdx);
-            hostAndPort = rest.slice(0, pathIdx);
-        } else {
-            out.path = "/";
-        }
-        
-        let portIdx = hostAndPort.indexOf(":");
-        if (portIdx !== null) {
-            out.host = hostAndPort.slice(0, portIdx);
-            let portStr = hostAndPort.slice(portIdx + 1);
-            
-            let portVal = 0;
-            let keepParsing = true;
-            for (let i = 0; i < portStr.length; i = i + 1) {
-                if (keepParsing) {
-                    let c = portStr[i];
-                    let digit = -1;
-                    if (c === "0") digit = 0;
-                    else if (c === "1") digit = 1;
-                    else if (c === "2") digit = 2;
-                    else if (c === "3") digit = 3;
-                    else if (c === "4") digit = 4;
-                    else if (c === "5") digit = 5;
-                    else if (c === "6") digit = 6;
-                    else if (c === "7") digit = 7;
-                    else if (c === "8") digit = 8;
-                    else if (c === "9") digit = 9;
-                    
-                    if (digit >= 0) {
-                        portVal = portVal * 10 + digit;
-                    } else {
-                        keepParsing = false;
-                    }
-                }
-            }
-            out.port = portVal;
-        } else {
-            out.host = hostAndPort;
-            out.port = null;
-        }
-        
+        out.protocol = ref.scheme;
+        out.userinfo = ref.userinfo;
+        out.host = ref.host;
+        out.port = ref.port;
+        out.path = ref.hasAuthority && ref.path.length === 0 ? "/" : ref.path;
+        out.keepQuery(ref.query);
+        out.fragment = ref.fragment;
         return out;
     }
 
+    private keepQuery(text: str): void {
+        this.query = Query.parse(text);
+        this._sourceQuery = text;
+        this._sourceNormalized = this.query.toString();
+    }
+
     static resolve(base: str | Url, relative: str): Url {
-        let baseObj: Url = base is str ? Url.parse(base) : base as Url;
-        if (relative.includes("://")) {
-            return Url.parse(relative);
+        const origin: Url = base is str ? Url.parse(base) : base as Url;
+        const ref = splitReference(relative);
+        const out = new Url();
+        out.fragment = ref.fragment;
+        if (ref.scheme.length > 0 || ref.hasAuthority) {
+            out.protocol = ref.scheme.length > 0 ? ref.scheme : origin.protocol;
+            out.userinfo = ref.userinfo;
+            out.host = ref.host;
+            out.port = ref.port;
+            const path = removeDotSegments(ref.path);
+            out.path = ref.hasAuthority && path.length === 0 ? "/" : path;
+            out.keepQuery(ref.query);
+            return out;
         }
-        let next = new Url();
-        next.protocol = baseObj.protocol;
-        next.host = baseObj.host;
-        next.port = baseObj.port;
-        
-        let pathPart = relative;
-        let queryPart = "";
-        let fragPart = "";
-        
-        let hashIdx = pathPart.indexOf("#");
-        if (hashIdx !== null) {
-            fragPart = pathPart.slice(hashIdx + 1);
-            pathPart = pathPart.slice(0, hashIdx);
-        }
-        let qIdx = pathPart.indexOf("?");
-        if (qIdx !== null) {
-            queryPart = pathPart.slice(qIdx + 1);
-            pathPart = pathPart.slice(0, qIdx);
-        }
-        
-        if (pathPart.startsWith("/")) {
-            next.path = pathPart;
-        } else {
-            let baseDir = baseObj.path;
-            let lastSlash = baseDir.lastIndexOf("/");
-            if (lastSlash !== null) {
-                baseDir = baseDir.slice(0, lastSlash + 1);
+        out.protocol = origin.protocol;
+        out.userinfo = origin.userinfo;
+        out.host = origin.host;
+        out.port = origin.port;
+        if (ref.path.length === 0) {
+            out.path = origin.path;
+            if (ref.hasQuery) {
+                out.keepQuery(ref.query);
             } else {
-                baseDir = "/";
+                out.keepQuery(origin.queryText());
             }
-            next.path = baseDir + pathPart;
+            return out;
         }
-        next.query = Query.parse(queryPart);
-        next.fragment = fragPart;
-        return next;
+        out.path = removeDotSegments(ref.path.startsWith("/") ? ref.path : mergePaths(origin, ref.path));
+        out.keepQuery(ref.query);
+        return out;
+    }
+
+    queryText(): str {
+        const current = this.query.toString();
+        return current === this._sourceNormalized ? this._sourceQuery : current;
+    }
+
+    authority(): str {
+        const shown = this.host.indexOf(":") === null ? this.host : "[" + this.host + "]";
+        const port = this.port;
+        return port === null ? shown : `${shown}:${port}`;
     }
 
     withQuery(query: Query): Url {
         const next = new Url();
         next.protocol = this.protocol;
+        next.userinfo = this.userinfo;
         next.host = this.host;
         next.port = this.port;
         next.path = this.path;
@@ -134,27 +269,20 @@ export class Url {
     }
 
     toString(): str {
-        let out = this.protocol + "://" + this.host;
-        const port = this.port;
-        if (port != null) {
-            out = out + ":" + port.toString();
-        }
-
-        if (this.path.length == 0) {
-            out = out + "/";
+        let out = this.protocol.length > 0 ? this.protocol + ":" : "";
+        if (this.host.length > 0) {
+            out = out + "//" + (this.userinfo.length > 0 ? this.userinfo + "@" : "") + this.authority();
+            out = out + (this.path.length === 0 ? "/" : this.path);
         } else {
             out = out + this.path;
         }
-
-        const queryText = this.query.toString();
+        const queryText = this.queryText();
         if (queryText.length > 0) {
             out = out + "?" + queryText;
         }
-
         if (this.fragment.length > 0) {
             out = out + "#" + this.fragment;
         }
-
         return out;
     }
 }

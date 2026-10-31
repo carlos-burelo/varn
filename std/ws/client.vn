@@ -86,7 +86,7 @@ export class WebSocket implements AsyncReader, AsyncWriter {
     static async connect(url: str): Task<WebSocket> {
         let parsed = Url.parse(url);
         const secure = parsed.protocol === "wss";
-        if (!secure && parsed.protocol !== "" && parsed.protocol !== "ws") {
+        if (!secure && parsed.protocol !== "ws") {
             throw new TypeError("only ws:// and wss:// URLs are supported");
         }
         let port = parsed.port ?? (secure ? 443 : 80);
@@ -101,7 +101,7 @@ export class WebSocket implements AsyncReader, AsyncWriter {
             if (target.length === 0) {
                 target = "/";
             }
-            let req = "GET " + target + " HTTP/1.1\r\nHost: " + parsed.host + "\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: " + key + "\r\nSec-WebSocket-Version: 13\r\n\r\n";
+            let req = "GET " + target + " HTTP/1.1\r\nHost: " + parsed.authority() + "\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: " + key + "\r\nSec-WebSocket-Version: 13\r\n\r\n";
             await tcpWrite$(conn, req);
             let head = await readHttpHead(conn);
             wsValidateResponse$(head.head, key);

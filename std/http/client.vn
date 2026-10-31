@@ -31,9 +31,7 @@ async function doFetch(connId: int, parsedUrl: Url, method: HttpMethod, headers:
         }
     }
     if (!hasHost) {
-        const explicitPort = parsedUrl.port;
-        const authority = explicitPort === null ? parsedUrl.host : `${parsedUrl.host}:${explicitPort}`;
-        requestStr = requestStr + "Host: " + authority + "\r\n";
+        requestStr = requestStr + "Host: " + parsedUrl.authority() + "\r\n";
     }
     if (!hasConnection) {
         requestStr = requestStr + "Connection: close\r\n";
