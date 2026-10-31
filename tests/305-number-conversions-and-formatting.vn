@@ -69,4 +69,25 @@ await describe("305 number conversions and formatting", async () => {
         expect((-0.0).sign().toString()).toBe("-0.0");
         expect((-3.0).sign().toString()).toBe("-1.0");
     });
+    await it("float exposes NaN, the infinities and its exact limits", async () => {
+        expect(float.NAN.isNaN()).toBe(true);
+        expect(float.NAN == float.NAN).toBe(false);
+        expect(float.INFINITY > float.MAX_VALUE).toBe(true);
+        expect(float.NEG_INFINITY < float.LOWEST).toBe(true);
+        expect(float.LOWEST).toBe(-float.MAX_VALUE);
+        expect(float.MIN_POSITIVE > 0.0).toBe(true);
+        expect(float.MIN_POSITIVE / 2.0 > 0.0).toBe(true);
+        expect(float.INFINITY.toString()).toBe("Infinity");
+        expect(float.EPSILON).toBe(2.220446049250313e-16);
+    });
+    await it("toString picks the even digit when two shortest decimals tie", async () => {
+        expect((0.1 * 9007199254740992.0).toString()).toBe("900719925474099.2");
+        expect((9007199254740994.0 / 4.35).toString()).toBe("2070620518331263.2");
+        expect((0.1 + 0.2).toString()).toBe("0.30000000000000004");
+        expect((1e21).toString()).toBe("1e21");
+        expect((123456789012345680000.0).toString()).toBe("123456789012345680000.0");
+        expect((5e-324).toString()).toBe("5e-324");
+        expect((-1.5e-7).toString()).toBe("-1.5e-7");
+        expect((0.000001).toString()).toBe("0.000001");
+    });
 });

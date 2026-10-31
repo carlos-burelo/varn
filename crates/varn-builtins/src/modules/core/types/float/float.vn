@@ -3,7 +3,11 @@
  */
 export declare class float {
     static MAX_VALUE: float;
-    static MIN_VALUE: float;
+    static LOWEST: float;
+    static MIN_POSITIVE: float;
+    static NAN: float;
+    static INFINITY: float;
+    static NEG_INFINITY: float;
     static EPSILON: float;
     @throws(ParseError) static parse(s: str): float;
     static tryParse(s: str): float?;

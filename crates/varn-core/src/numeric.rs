@@ -246,20 +246,59 @@ pub fn binary_operand_kind(
     }
 }
 
+fn shortest_digits(f: f64) -> (String, i32) {
+    let shortest = format!("{:e}", f.abs());
+    let (mantissa, exponent) = shortest.split_once('e').unwrap_or((shortest.as_str(), "0"));
+    let digits: String = mantissa.chars().filter(char::is_ascii_digit).collect();
+    let exponent: i32 = exponent.parse().unwrap_or(0);
+    let nearest = format!("{:.*e}", digits.len() - 1, f.abs());
+    let round_trips = nearest.parse::<f64>().is_ok_and(|back| back == f.abs());
+    if !round_trips {
+        return (digits, exponent);
+    }
+    let (mantissa, exponent) = nearest.split_once('e').unwrap_or((nearest.as_str(), "0"));
+    (
+        mantissa.chars().filter(char::is_ascii_digit).collect(),
+        exponent.parse().unwrap_or(0),
+    )
+}
+
 pub fn float_to_string(f: f64) -> String {
     if f.is_nan() {
-        "NaN".to_owned()
-    } else if f.is_infinite() {
-        if f > 0.0 { "Infinity" } else { "-Infinity" }.to_owned()
-    } else if f != 0.0 && (f.abs() >= 1e21 || f.abs() < 1e-6) {
-        format!("{f:e}")
-    } else {
-        let mut text = f.to_string();
-        if !text.contains('.') {
-            text.push_str(".0");
-        }
-        text
+        return "NaN".to_owned();
     }
+    if f.is_infinite() {
+        return if f > 0.0 { "Infinity" } else { "-Infinity" }.to_owned();
+    }
+    let sign = if f.is_sign_negative() { "-" } else { "" };
+    if f == 0.0 {
+        return format!("{sign}0.0");
+    }
+    let (digits, exponent) = shortest_digits(f);
+    let count = digits.len() as i32;
+    if f.abs() >= 1e21 || f.abs() < 1e-6 {
+        let tail = if count > 1 {
+            format!(".{}", &digits[1..])
+        } else {
+            String::new()
+        };
+        return format!("{sign}{}{tail}e{exponent}", &digits[..1]);
+    }
+    let body = if exponent >= 0 {
+        let whole = exponent + 1;
+        if count <= whole {
+            format!("{digits}{}.0", "0".repeat((whole - count) as usize))
+        } else {
+            format!(
+                "{}.{}",
+                &digits[..whole as usize],
+                &digits[whole as usize..]
+            )
+        }
+    } else {
+        format!("0.{}{digits}", "0".repeat((-exponent - 1) as usize))
+    };
+    format!("{sign}{body}")
 }
 
 #[cfg(test)]

@@ -10,7 +10,11 @@ varn_contract! {
     impl Float {
 
         fn MAX_VALUE(_ctx: &mut dyn NativeCtx) -> f64 { f64::MAX }
-        fn MIN_VALUE(_ctx: &mut dyn NativeCtx) -> f64 { f64::MIN }
+        fn LOWEST(_ctx: &mut dyn NativeCtx) -> f64 { f64::MIN }
+        fn MIN_POSITIVE(_ctx: &mut dyn NativeCtx) -> f64 { f64::MIN_POSITIVE }
+        fn NAN(_ctx: &mut dyn NativeCtx) -> f64 { f64::NAN }
+        fn INFINITY(_ctx: &mut dyn NativeCtx) -> f64 { f64::INFINITY }
+        fn NEG_INFINITY(_ctx: &mut dyn NativeCtx) -> f64 { f64::NEG_INFINITY }
         fn EPSILON(_ctx: &mut dyn NativeCtx) -> f64 { f64::EPSILON }
 
         fn parse(_ctx: &mut dyn NativeCtx, s: &str) -> Result<f64, NativeError> {

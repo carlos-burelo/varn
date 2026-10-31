@@ -57,7 +57,8 @@ pub use numeric::{
     add_int, binary_operand_kind, ceil_div_int, checked_int, clamp_index, div_int, fixed_digits,
     float_to_fixed, float_to_string, floor_div_int, fmax, fmin, fsign, mod_int, mul_int, neg_int,
     pow_int, rem_int, shl_int, shr_int, slice_bounds, sub_int, ushr_int, IntDivFault,
-    NumericOperand, FIXED_MAX_DIGITS, INT_MAX, INT_MIN, MAX_ALLOC_BYTES, MAX_STR_BYTES, SHIFT_MAX,
+    NumericOperand, FIXED_MAX_DIGITS, INT_MAX, INT_MIN, MAX_ALLOC_BYTES,
+    MAX_STR_BYTES, SHIFT_MAX,
 };
 pub use numeric_conv::{float_to_int, NumericDomain, ValueConv};
 pub use runtime_kind::{FieldAccess, RuntimeKind};
