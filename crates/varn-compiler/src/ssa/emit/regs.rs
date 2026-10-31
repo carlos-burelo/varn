@@ -194,9 +194,10 @@ pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignme
             }
         };
         if r > 255 {
-            return Err(OptError::Unsupported(
-                "ssa-emit: register count exceeds 255",
-            ));
+            return Err(OptError::OutOfRegisters {
+                function: String::new(),
+                needed: r as usize + 1,
+            });
         }
         reg[v] = r as u8;
         assigned[v] = true;
@@ -204,10 +205,11 @@ pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignme
     }
 
     let total = next + 2 + max_call;
-    if total > 256 {
-        return Err(OptError::Unsupported(
-            "ssa-emit: register count exceeds 255",
-        ));
+    if total as usize > crate::MAX_REGISTERS {
+        return Err(OptError::OutOfRegisters {
+            function: String::new(),
+            needed: total as usize,
+        });
     }
     let scratch = next as u8;
     let null_reg = (next + 1) as u8;

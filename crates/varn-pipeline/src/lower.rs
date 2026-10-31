@@ -143,7 +143,7 @@ pub(crate) fn compile_tir(
 ) -> (Result<FunctionProto, String>, std::time::Duration) {
     let (result, opt_time) =
         varn_compiler::from_tir::compile_module(tir, export_names, source, measure);
-    (result.map_err(|e| format!("{e:?}")), opt_time)
+    (result.map_err(|e| e.to_string()), opt_time)
 }
 
 pub(crate) struct LowerInput<'a> {
