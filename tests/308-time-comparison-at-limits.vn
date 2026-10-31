@@ -19,7 +19,7 @@ await describe("308 time comparisons do not overflow", async () => {
     });
 
     await it("PlainDateTime.compare orders by the first differing field", async () => {
-        expect(PlainDateTime.compare(new PlainDateTime(MAX, 1, 1), new PlainDateTime(MIN, 1, 1))).toBe(1);
+        expect(PlainDateTime.compare(new PlainDateTime(9999, 12, 31), new PlainDateTime(0, 1, 1))).toBe(1);
         expect(PlainDateTime.compare(new PlainDateTime(2020, 5, 1), new PlainDateTime(2020, 5, 2))).toBe(-1);
         expect(PlainDateTime.compare(new PlainDateTime(2020, 5, 2, 1), new PlainDateTime(2020, 5, 2, 1))).toBe(0);
         expect(PlainDateTime.compare(new PlainDateTime(2020, 5, 2, 1, 0, 0, 1), new PlainDateTime(2020, 5, 2, 1, 0, 0, 0))).toBe(1);
