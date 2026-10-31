@@ -6,6 +6,7 @@ pub mod capability;
 pub mod debug_flags;
 pub mod diagnostics;
 pub mod doc;
+pub mod env;
 pub mod errors;
 pub mod ffi_kind;
 pub mod fingerprint;
