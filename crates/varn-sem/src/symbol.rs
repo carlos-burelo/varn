@@ -109,6 +109,9 @@ pub struct Symbol {
     pub capabilities: Vec<String>,
 
     #[serde(default)]
+    pub throws: Vec<String>,
+
+    #[serde(default)]
     pub is_test: bool,
 }
 
@@ -140,6 +143,7 @@ impl Symbol {
             is_pure: false,
             force_inline: false,
             capabilities: Vec::new(),
+            throws: Vec::new(),
             is_test: false,
         }
     }

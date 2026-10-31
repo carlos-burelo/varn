@@ -13,6 +13,14 @@ pub fn symbol_hover(state: &DocumentState, sym: SymbolView<'_>) -> Hover {
         value.push_str("\n*(from standard library)*");
     }
 
+    if !sym.throws().is_empty() {
+        value.push_str(&format!(
+            "
+*throws {}*",
+            sym.throws().join(", ")
+        ));
+    }
+
     push_doc(&mut value, sym.doc());
 
     Hover {

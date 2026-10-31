@@ -1,7 +1,35 @@
 use super::Binder;
+use varn_core::ast::decorator_kind::ContractDecorator;
 use varn_core::ast::decorators::{decorator_head, match_builtin, BuiltinDecorator};
 use varn_core::ast::types::Decorator;
+use varn_core::ast::{Arg, ExprKind};
+use varn_core::{Atom, AtomInterner};
 use varn_sem::symbol::SymbolId;
+
+fn head_is_throws(binder: &Binder, head: Atom) -> bool {
+    ContractDecorator::of(binder.interner.resolve(head)) == Some(ContractDecorator::Throws)
+}
+
+fn throws_classes(
+    arena: &varn_core::ast::AstArena,
+    interner: &AtomInterner,
+    d: &Decorator,
+) -> Vec<String> {
+    let ExprKind::Call { args, .. } = &arena.expr(d.expression).kind else {
+        return Vec::new();
+    };
+    args.iter()
+        .filter_map(|arg| {
+            if let Arg::Positional(e) = arg
+                && let ExprKind::Identifier { name } = &arena.expr(*e).kind
+            {
+                Some(interner.resolve(*name).to_string())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
 
 pub(super) fn record_decorators(binder: &mut Binder, sym: SymbolId, decorators: &[Decorator]) {
     if decorators.is_empty() {
@@ -23,6 +51,16 @@ impl Binder<'_> {
                 };
                 if self.scopes.get(scope).resolve(head, &self.scopes).is_some() {
                     self.user_decorators.insert(d.range.start.offset);
+                    continue;
+                }
+                if head_is_throws(self, head) {
+                    let classes = throws_classes(self.ast_arena, &self.interner, d);
+                    let sym = self.arena.get_mut(symid);
+                    for c in classes {
+                        if !sym.throws.contains(&c) {
+                            sym.throws.push(c);
+                        }
+                    }
                     continue;
                 }
                 let mut matched =

@@ -70,6 +70,9 @@ impl<'a> SymbolView<'a> {
     pub fn origin(&self) -> Option<&'a str> {
         self.sym.origin_module.map(|a| self.text(a))
     }
+    pub fn throws(&self) -> &'a [String] {
+        &self.sym.throws
+    }
     pub fn is_async(&self) -> bool {
         self.sym.is_async
     }
