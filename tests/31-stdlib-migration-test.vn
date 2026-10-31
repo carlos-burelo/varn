@@ -13,10 +13,14 @@ await describe("31 stdlib migration test", async () => {
         expect(d.totalMilliseconds).toBe(5400000)
         expect(d.hours).toBe(1)
         expect(d.minutes).toBe(30)
-        expect(d.seconds).toBe(5400)
+        expect(d.seconds).toBe(0)
         
         let d2 = Duration.from("P1DT2H30M10S");
         expect(d2.totalMilliseconds).toBe(95410000)
+        expect(d2.days).toBe(1)
+        expect(d2.hours).toBe(2)
+        expect(d2.minutes).toBe(30)
+        expect(d2.seconds).toBe(10)
         
         // ── std:time / PlainDateTime ──────────────────────────────────────
         let now = new PlainDateTime(2026, 4, 21, 10, 0, 0, 0);

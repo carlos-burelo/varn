@@ -58,7 +58,7 @@ await describe("56 tier parity", async () => {
         expect(tierD1.hours).toBe(tierD2.hours)
         expect(tierD2.hours).toBe(1)
         expect(tierD2.minutes).toBe(30)
-        expect(tierD2.seconds).toBe(5400)
+        expect(tierD2.seconds).toBe(0)
         expect(tierD2.days).toBe(0)
         expect(typeof tierD1.hours).toBe(typeof tierD2.hours)
         

@@ -1,0 +1,38 @@
+import { describe, it, expect } from "std:test";
+import { Duration } from "std:time";
+
+await describe("310 Duration fields are components of totalMilliseconds", async () => {
+    await it("each field is the part of its own unit", async () => {
+        const d = new Duration(((26 * 60 + 30) * 60 + 10) * 1000 + 250);
+        expect(d.days).toBe(1);
+        expect(d.hours).toBe(2);
+        expect(d.minutes).toBe(30);
+        expect(d.seconds).toBe(10);
+        expect(d.milliseconds).toBe(250);
+        expect(d.totalMilliseconds).toBe(95410250);
+    });
+
+    await it("the components add back to the total", async () => {
+        const d = new Duration(987654321);
+        const rebuilt = (((d.days * 24 + d.hours) * 60 + d.minutes) * 60 + d.seconds) * 1000 + d.milliseconds;
+        expect(rebuilt).toBe(987654321);
+    });
+
+    await it("parts and ISO text decompose the same way", async () => {
+        const fromParts = Duration.from({ hours: 25, minutes: 61 });
+        expect(fromParts.days).toBe(1);
+        expect(fromParts.hours).toBe(2);
+        expect(fromParts.minutes).toBe(1);
+        const fromIso = Duration.from("P1DT2H1M");
+        expect(fromIso.totalMilliseconds).toBe(fromParts.totalMilliseconds);
+    });
+
+    await it("a negative duration carries its sign on every component", async () => {
+        const d = new Duration(-5400000);
+        expect(d.hours).toBe(-1);
+        expect(d.minutes).toBe(-30);
+        expect(d.seconds).toBe(0);
+        expect(d.days).toBe(0);
+        expect(d.negated().hours).toBe(1);
+    });
+});

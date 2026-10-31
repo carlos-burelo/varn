@@ -52,6 +52,7 @@ propagan errores de un callback.
   `Float.parse`, `toFixed`, `clamp`, `toInt` pueden lanzar; `Bytes.getByte` ya no
   responde `0` fuera de rango; `Duration/Instant/PlainDateTime.compare` devuelven
   -1, 0 o 1.
-- Pendiente de decisión del dueño: los campos de `Duration` mezclan totales
-  (`hours`, `seconds`, `days`) y componentes (`minutes`, `milliseconds`); los
-  tests actuales fijan esa mezcla.
+- `Duration` descompone `totalMilliseconds` en componentes puros (`days`,
+  `hours` 0..23, `minutes` 0..59, `seconds` 0..59, `milliseconds` 0..999); un
+  valor negativo lleva su signo en cada componente. Antes `hours`, `seconds` y
+  `days` eran totales y `minutes`/`milliseconds` componentes.
