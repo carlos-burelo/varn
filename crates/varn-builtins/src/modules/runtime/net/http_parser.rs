@@ -12,6 +12,8 @@ varn_macros::varn_record! {
     struct HttpRequestHead;
 }
 
+const SINGLETON_HEADERS: [&str; 3] = ["content-length", "transfer-encoding", "host"];
+
 pub fn parse_http_request(ctx: &mut dyn NativeCtx, raw: &str) -> Result<Option<VmValue>, String> {
     let mut headers = [httparse::EMPTY_HEADER; 64];
     let mut req = httparse::Request::new(&mut headers);
@@ -34,9 +36,16 @@ pub fn parse_http_request(ctx: &mut dyn NativeCtx, raw: &str) -> Result<Option<V
         ""
     };
 
+    let mut seen_singletons: Vec<String> = Vec::new();
     let headers_obj = ctx.alloc_object();
     for header in req.headers.iter() {
         let name = header.name.to_lowercase();
+        if SINGLETON_HEADERS.contains(&name.as_str()) {
+            if seen_singletons.contains(&name) {
+                return Ok(None);
+            }
+            seen_singletons.push(name.clone());
+        }
         let value = String::from_utf8_lossy(header.value);
         let val_nv = ctx.alloc_str(value.as_ref());
         ctx.set_field(headers_obj, &name, val_nv);

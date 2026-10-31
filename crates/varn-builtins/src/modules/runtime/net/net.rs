@@ -1,4 +1,5 @@
 pub mod driver;
+mod http_head;
 pub mod http_parser;
 
 use driver::driver;
@@ -122,47 +123,45 @@ varn_contract! {
             body: &str,
             cookies: varn_types::VnArray,
         ) -> Result<VmValue, NativeError> {
-            use std::io::Write;
-            let mut out = Vec::with_capacity(128 + body.len());
-            let _ = write!(&mut out, "HTTP/1.1 {status} {status_text}\r\n");
-
-            let mut has_content_length = false;
-            let mut has_content_type = false;
-
-            if !headers.is_null() {
-                ctx.object_for_each(headers, &mut |key, val| {
-                    let lower = key.to_lowercase();
-                    if lower == "content-length" {
-                        has_content_length = true;
-                    } else if lower == "content-type" {
-                        has_content_type = true;
-                    }
-                    if let Some(val_str) = ctx.str_owned(val) {
-                        let _ = write!(&mut out, "{key}: {val_str}\r\n");
-                    }
-                });
-            }
-
-            if !has_content_type {
-                let _ = write!(&mut out, "Content-Type: text/plain\r\n");
-            }
-
-            if !has_content_length {
-                let _ = write!(&mut out, "Content-Length: {}\r\n", body.len());
-            }
-
-            let cookie_len = cookies.len(ctx);
-            for i in 0..cookie_len {
-                if let Some(v) = cookies.get(ctx, i)
-                    && let Some(c) = ctx.str_owned(v) {
-                        let _ = write!(&mut out, "Set-Cookie: {c}\r\n");
-                    }
-            }
-
-            let _ = write!(&mut out, "\r\n");
+            let mut out = http_head::encode_head(
+                ctx,
+                status,
+                status_text,
+                headers,
+                cookies,
+                http_head::Framing::Length(body.len()),
+            )?;
             out.extend_from_slice(body.as_bytes());
 
             let task = driver().write(conn_id, out);
+            Ok(ctx.task_from_host(task, HostOpen::Plain))
+        }
+
+        fn isHttpToken(_ctx: &mut dyn NativeCtx, name: &str) -> Result<bool, NativeError> {
+            Ok(http_head::is_token(name))
+        }
+
+        fn isHttpFieldValue(_ctx: &mut dyn NativeCtx, value: &str) -> Result<bool, NativeError> {
+            Ok(http_head::is_clean(value))
+        }
+
+        fn sendHttpHead(
+            ctx: &mut dyn NativeCtx,
+            conn_id: i64,
+            status: i64,
+            status_text: &str,
+            headers: VmValue,
+            cookies: varn_types::VnArray,
+        ) -> Result<VmValue, NativeError> {
+            let head = http_head::encode_head(
+                ctx,
+                status,
+                status_text,
+                headers,
+                cookies,
+                http_head::Framing::Chunked,
+            )?;
+            let task = driver().write(conn_id, head);
             Ok(ctx.task_from_host(task, HostOpen::Plain))
         }
 
