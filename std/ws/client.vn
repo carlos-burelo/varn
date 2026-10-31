@@ -3,7 +3,9 @@ import {
     wsValidateResponse$,
     wsFrameBytes$,
     wsParseFrame$,
-    WsOpcode
+    wsDecodeText$,
+    WsOpcode,
+    WsFrame
 } from "runtime:ws";
 
 import {
@@ -38,12 +40,18 @@ export function bytesConcat(a: Bytes, b: Bytes): Bytes {
     return out;
 }
 
+const MAX_HANDSHAKE = 16384;
+const DEFAULT_MAX_MESSAGE = 16777216;
+
 export async function readHttpHead(connId: int): Task<#{ head: str, rest: Bytes }> {
     let buf = Bytes.alloc(0);
     while (true) {
         let end = findHeadEnd(buf);
         if (end >= 0) {
             return #{ head: buf.slice(0, end).toString(), rest: buf.slice(end) };
+        }
+        if (buf.length > MAX_HANDSHAKE) {
+            throw new ProtocolError("the WebSocket handshake is too large");
         }
         let chunk = await tcpRead$(connId, 4096);
         if (chunk === null) {
@@ -71,15 +79,18 @@ export class WebSocket implements AsyncReader, AsyncWriter {
     private _recvBuf: Bytes = Bytes.alloc(0);
     private _fragBuf: Bytes? = null;
     private _fragOp: WsOpcode? = null;
+    private _server: bool = false;
+    private _maxMessage: int = DEFAULT_MAX_MESSAGE;
     private _onOpenListeners: Array<() => void> = [];
     private _onMessageListeners: Array<(data: str) => void> = [];
     private _onBytesListeners: Array<(data: Bytes) => void> = [];
     private _onErrorListeners: Array<(err: str) => void> = [];
     private _onCloseListeners: Array<() => void> = [];
 
-    constructor(connId: int, url: str) {
+    constructor(connId: int, url: str, server: bool = false) {
         this._conn = connId;
         this._url = url;
+        this._server = server;
         this._readyState = WebSocketReadyState.Open;
     }
 
@@ -112,6 +123,14 @@ export class WebSocket implements AsyncReader, AsyncWriter {
             tcpClose$(conn);
             throw e;
         }
+    }
+
+    maxMessageBytes(limit: int): WebSocket {
+        if (limit < 1) {
+            throw new RangeError("the message limit must be positive");
+        }
+        this._maxMessage = limit;
+        return this;
     }
 
     get readyState(): WebSocketReadyState {
@@ -190,7 +209,7 @@ export class WebSocket implements AsyncReader, AsyncWriter {
                 data = message as Bytes;
                 opcode = WsOpcode.Binary;
             }
-            await tcpWrite$(this._conn, wsFrameBytes$(data, opcode));
+            await tcpWrite$(this._conn, wsFrameBytes$(data, opcode, !this._server));
             return data.length;
         } catch (e) {
             this._notifyError(e.message);
@@ -198,18 +217,56 @@ export class WebSocket implements AsyncReader, AsyncWriter {
         }
     }
 
+    private async _fail(code: int): Task<void> {
+        try {
+            const body = Bytes.alloc(2);
+            body.setByte(0, code / 256);
+            body.setByte(1, code % 256);
+            await tcpWrite$(this._conn, wsFrameBytes$(body, WsOpcode.Close, !this._server));
+        } catch (e) {}
+        this.close();
+    }
+
+    private async _reject(code: int, message: str): Task<void> {
+        await this._fail(code);
+        this._notifyError(message);
+        throw new ProtocolError(message);
+    }
+
     private async _pumpControl(opcode: WsOpcode, payload: Bytes): Task<void> {
         if (opcode == WsOpcode.Ping) {
-            await tcpWrite$(this._conn, wsFrameBytes$(payload, WsOpcode.Pong));
-        } else if (opcode == WsOpcode.Close) {
-            await tcpWrite$(this._conn, wsFrameBytes$(payload.slice(0, 0), WsOpcode.Close));
-            this.close();
+            await tcpWrite$(this._conn, wsFrameBytes$(payload, WsOpcode.Pong, !this._server));
+            return;
         }
+        if (payload.length === 1) {
+            await this._reject(1002, "a close frame carries one byte");
+        }
+        if (payload.length >= 2) {
+            const code = payload.getByte(0) * 256 + payload.getByte(1);
+            const valid = (code >= 1000 && code <= 1003) || (code >= 1007 && code <= 1011) || (code >= 3000 && code <= 4999);
+            if (!valid) {
+                await this._reject(1002, `a close frame carries the invalid code ${code}`);
+            }
+            try {
+                wsDecodeText$(payload.slice(2));
+            } catch (e) {
+                await this._reject(1007, "the close reason is not valid UTF-8");
+            }
+        }
+        try {
+            await tcpWrite$(this._conn, wsFrameBytes$(payload.slice(0, payload.length >= 2 ? 2 : 0), WsOpcode.Close, !this._server));
+        } catch (e) {}
+        this.close();
     }
 
     async read(size?: int): Task<Bytes?> {
         while (true) {
-            let frame = wsParseFrame$(this._recvBuf);
+            let frame: WsFrame? = null;
+            try {
+                frame = wsParseFrame$(this._recvBuf, this._server, this._maxMessage);
+            } catch (e) {
+                await this._reject(e.message.indexOf("exceeds the limit") !== null ? 1009 : 1002, e.message);
+            }
             if (frame === null) {
                 if (!this.isOpen) {
                     return null;
@@ -248,29 +305,42 @@ export class WebSocket implements AsyncReader, AsyncWriter {
             }
             if (opcode == WsOpcode.Continuation) {
                 if (this._fragBuf === null) {
-                    continue;
+                    await this._reject(1002, "a continuation frame has nothing to continue");
                 }
-                this._fragBuf = bytesConcat(this._fragBuf as Bytes, payload);
+                const joined = bytesConcat(this._fragBuf as Bytes, payload);
+                if (joined.length > this._maxMessage) {
+                    await this._reject(1009, "the message exceeds the limit");
+                }
+                this._fragBuf = joined;
                 if (frame.fin) {
                     let done = this._fragBuf as Bytes;
                     let op = this._fragOp as WsOpcode;
                     this._fragBuf = null;
                     this._fragOp = null;
-                    return this._deliver(op, done);
+                    return await this._deliver(op, done);
                 }
                 continue;
             }
+            if (this._fragBuf !== null) {
+                await this._reject(1002, "a new message starts inside a fragmented one");
+            }
             if (frame.fin) {
-                return this._deliver(opcode, payload);
+                return await this._deliver(opcode, payload);
             }
             this._fragBuf = payload;
             this._fragOp = opcode;
         }
     }
 
-    private _deliver(opcode: WsOpcode, payload: Bytes): Bytes {
+    private async _deliver(opcode: WsOpcode, payload: Bytes): Task<Bytes> {
         if (opcode == WsOpcode.Text) {
-            this._dispatchText(payload.toString());
+            let text = "";
+            try {
+                text = wsDecodeText$(payload);
+            } catch (e) {
+                await this._reject(1007, "a text message is not valid UTF-8");
+            }
+            this._dispatchText(text);
         } else {
             this._dispatchBytes(payload);
         }
@@ -308,7 +378,7 @@ export class WebSocket implements AsyncReader, AsyncWriter {
     async closeGracefully(): Task<void> {
         if (this._readyState !== WebSocketReadyState.Closed) {
             try {
-                await tcpWrite$(this._conn, wsFrameBytes$(Bytes.alloc(0), WsOpcode.Close));
+                await tcpWrite$(this._conn, wsFrameBytes$(Bytes.alloc(0), WsOpcode.Close, !this._server));
             } catch (e) {}
             this.close();
         }

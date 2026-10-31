@@ -41,13 +41,9 @@ export class WsServer {
         const conn = await tcpAccept$(this._listener);
         try {
             let head = await readHttpHead(conn);
-            if (!head.head.toLowerCase().includes("upgrade")) {
-                tcpClose$(conn);
-                throw new ProtocolError("not a websocket upgrade");
-            }
             let res = wsAcceptResponse$(head.head);
             await tcpWrite$(conn, res);
-            let ws = new WebSocket(conn, "");
+            let ws = new WebSocket(conn, "", true);
             ws.absorb(head.rest);
             return ws;
         } catch (e) {
