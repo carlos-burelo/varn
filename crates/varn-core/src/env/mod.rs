@@ -23,10 +23,8 @@ fn loaded() -> &'static (Settings, Vec<EnvError>) {
     LOADED.get_or_init(|| Settings::read(&process_lookup))
 }
 
-pub fn install(settings: Settings) -> Result<(), Settings> {
-    LOADED
-        .set((settings, Vec::new()))
-        .map_err(|(rejected, _)| rejected)
+pub fn install(settings: Settings) -> bool {
+    LOADED.set((settings, Vec::new())).is_ok()
 }
 
 pub fn settings() -> &'static Settings {
