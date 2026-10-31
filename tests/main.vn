@@ -317,6 +317,7 @@ import "./323-http-hostile-input.vn"
 import "./324-url-parsing-and-resolution.vn"
 import "./325-websocket-framing.vn"
 import "./326-csv-fidelity.vn"
+import "./327-multipart-forms.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {
