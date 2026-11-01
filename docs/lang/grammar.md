@@ -318,7 +318,7 @@ Primary       = Literal
               | Identifier | "_" | "this" | "super"
               | "(" ")"                                  (* tupla vacía / unit *)
               | "(" SeqExpression ")"
-              | ArrayLiteral | MapLiteral | ObjectLiteral | TupleLiteral | RecordLiteral
+              | ArrayLiteral | ObjectLiteral | TupleLiteral | RecordLiteral
               | Template
               | "new" NewCallee [ TypeArgs ] [ Arguments ]
               | FunctionExpr | ClassExpr
@@ -330,10 +330,8 @@ Literal       = IntLiteral | FloatLiteral | BigIntLiteral | DecimalLit | BinLit 
               | "true" | "false" | "null" ;
 
 ArrayLiteral  = "[" { "," | [ "..." ] AssignExpr [ "," ] } "]" ;      (* huecos permitidos *)
-MapLiteral    = "[" ":" "]"
-              | "[" AssignExpr ":" AssignExpr { "," AssignExpr ":" AssignExpr } [ "," ] "]" ;
-TupleLiteral  = "(" [ AssignExpr "," [ AssignExpr { "," AssignExpr } [ "," ] ] ] ")" ;
-RecordLiteral = "#" ObjectLiteral ;     (* la propuesta de modelo de datos lo sustituye por `{ }` *)
+TupleLiteral  = "#" "[" [ AssignExpr { "," AssignExpr } [ "," ] ] "]" ;
+RecordLiteral = "#" ObjectLiteral ;
 ObjectLiteral = "{" ObjectBody "}" ;
 ObjectBody    = { ObjectProp [ "," ] } ;
 ObjectProp    = "..." AssignExpr
