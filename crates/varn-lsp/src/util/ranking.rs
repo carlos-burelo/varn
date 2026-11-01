@@ -3,7 +3,7 @@ use varn_sem::symbol::SymbolKind;
 pub fn symbol_priority(kind: SymbolKind) -> u8 {
     use SymbolKind::*;
     match kind {
-        Class | Struct => 0,
+        Class => 0,
         Interface | Enum => 1,
         Function => 2,
         Method => 3,

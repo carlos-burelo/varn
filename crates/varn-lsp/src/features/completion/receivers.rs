@@ -41,7 +41,7 @@ fn hit(
 fn names_a_type(kind: SymbolKind) -> bool {
     matches!(
         kind,
-        SymbolKind::Class | SymbolKind::Interface | SymbolKind::Enum | SymbolKind::Struct
+        SymbolKind::Class | SymbolKind::Interface | SymbolKind::Enum
     )
 }
 

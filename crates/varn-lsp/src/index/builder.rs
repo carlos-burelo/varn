@@ -24,9 +24,7 @@ pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
         .filter(|s| is_indexable(s.name(), s.kind(), s.line()))
         .map(|s| {
             let parent = match s.kind() {
-                SymbolKind::Class | SymbolKind::Struct => {
-                    heritage.get(s.name()).map(|p| Arc::from(p.as_str()))
-                }
+                SymbolKind::Class => heritage.get(s.name()).map(|p| Arc::from(p.as_str())),
                 SymbolKind::Var
                 | SymbolKind::Let
                 | SymbolKind::Const

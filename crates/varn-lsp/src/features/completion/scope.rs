@@ -92,7 +92,6 @@ fn scope_group(kind: SymbolKind) -> u8 {
         | SymbolKind::TypeAlias
         | SymbolKind::Enum
         | SymbolKind::Namespace
-        | SymbolKind::Struct
         | SymbolKind::Extension
         | SymbolKind::EnumMember
         | SymbolKind::TypeParameter => 2,

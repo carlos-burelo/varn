@@ -112,7 +112,6 @@ fn hoist_decl(arena: &AstArena, decl: &Decl, out: &mut Vec<Hoisted>) {
         | Decl::Import(_)
         | Decl::Export(_)
         | Decl::Extension(_)
-        | Decl::Struct(_)
         | Decl::SumType(_) => {}
     }
 }

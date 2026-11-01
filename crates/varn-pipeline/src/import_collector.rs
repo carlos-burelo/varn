@@ -70,7 +70,6 @@ impl<'a> ImportCollector<'a> {
             | Decl::TypeAlias(_)
             | Decl::Enum(_)
             | Decl::Extension(_)
-            | Decl::Struct(_)
             | Decl::SumType(_) => {}
         }
     }

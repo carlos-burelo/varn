@@ -19,7 +19,6 @@ pub enum Decl {
     Import(ImportDecl),
     Export(ExportDecl),
     Extension(ExtensionDecl),
-    Struct(StructDecl),
     SumType(SumTypeDecl),
 }
 
@@ -36,7 +35,6 @@ impl Decl {
             Decl::Import(d) => d.ast_id,
             Decl::Export(d) => d.id(),
             Decl::Extension(d) => d.ast_id,
-            Decl::Struct(d) => d.ast_id,
             Decl::SumType(d) => d.ast_id,
         }
     }
@@ -53,7 +51,6 @@ impl Decl {
             Decl::Import(d) => &d.range,
             Decl::Export(d) => d.range(),
             Decl::Extension(d) => &d.range,
-            Decl::Struct(d) => &d.range,
             Decl::SumType(d) => &d.range,
         }
     }
@@ -116,6 +113,7 @@ pub struct ClassDecl {
     pub decorators: Vec<Decorator>,
     pub doc: Option<String>,
     pub range: SourceRange,
+    pub is_struct: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -294,21 +292,4 @@ pub enum ExtensionMember {
         modifiers: Modifiers,
         range: SourceRange,
     },
-}
-
-#[derive(Clone, Debug)]
-pub struct StructDecl {
-    pub id: Atom,
-    pub ast_id: AstId,
-    pub fields: Vec<StructField>,
-    pub doc: Option<String>,
-    pub range: SourceRange,
-}
-
-#[derive(Clone, Debug)]
-pub struct StructField {
-    pub name: Atom,
-    pub type_ann: TypeNode,
-    pub default: Option<ExprId>,
-    pub range: SourceRange,
 }

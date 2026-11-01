@@ -127,6 +127,18 @@ impl<'r> Checker<'r> {
             | ExprKind::With { .. }
             | ExprKind::MetaAccess { .. } => None,
         };
+        if let (ExprKind::Identifier { name }, Some(sid)) = (&arena.expr(callee).kind, callee_sid)
+            && bind.arena.get(sid).kind == varn_sem::symbol::SymbolKind::Class
+        {
+            let name = bind.interner.resolve(*name);
+            self.emit(
+                Diagnostic::error(
+                    ErrorCode::NotCallable,
+                    format!("'{name}' is a class: construct it with `new {name}(...)`"),
+                )
+                .with_range(*range),
+            );
+        }
         self.check_pure_callee(callee_sid, *range, bind);
         self.check_capability_callee(callee_sid, *range, bind);
 

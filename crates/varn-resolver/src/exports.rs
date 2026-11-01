@@ -304,7 +304,6 @@ fn decl_export_names(decl: &Decl) -> Vec<Atom> {
         Decl::Interface(i) => vec![i.id],
         Decl::TypeAlias(t) => vec![t.id],
         Decl::Namespace(n) => vec![n.id],
-        Decl::Struct(s) => vec![s.id],
         Decl::SumType(s) => vec![s.id],
         Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) => Vec::new(),
     }

@@ -86,7 +86,6 @@ fn parse(source: &str, name: &str) -> Result<Contract, LookupFailure> {
             | Decl::Import(_)
             | Decl::Export(_)
             | Decl::Extension(_)
-            | Decl::Struct(_)
             | Decl::SumType(_) => {}
         }
     }
@@ -106,7 +105,6 @@ pub(crate) fn unwrap_export(decl: &Decl) -> &Decl {
         | Decl::Import(_)
         | Decl::Export(_)
         | Decl::Extension(_)
-        | Decl::Struct(_)
         | Decl::SumType(_) => decl,
     }
 }

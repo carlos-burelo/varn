@@ -147,6 +147,7 @@ impl<'r> super::Binder<'r> {
             is_abstract: c.modifiers.is_abstract,
             is_readonly: false,
             is_override: false,
+            is_struct: c.is_struct,
             symbol_id: None,
             ..Default::default()
         };

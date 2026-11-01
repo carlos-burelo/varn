@@ -53,7 +53,6 @@ pub(super) fn collect_free_functions<'a>(
                 | other @ varn_core::ast::Decl::Import(_)
                 | other @ varn_core::ast::Decl::Export(_)
                 | other @ varn_core::ast::Decl::Extension(_)
-                | other @ varn_core::ast::Decl::Struct(_)
                 | other @ varn_core::ast::Decl::SumType(_) => other,
             };
             match inner {
@@ -69,7 +68,6 @@ pub(super) fn collect_free_functions<'a>(
                 | varn_core::ast::Decl::Import(_)
                 | varn_core::ast::Decl::Export(_)
                 | varn_core::ast::Decl::Extension(_)
-                | varn_core::ast::Decl::Struct(_)
                 | varn_core::ast::Decl::SumType(_) => {}
             }
         }

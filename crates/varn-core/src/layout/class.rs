@@ -32,6 +32,9 @@ pub struct ClassLayout {
     pub fields: Vec<FieldLayout>,
 
     pub gc: GcLayout,
+
+    #[serde(default)]
+    pub is_value: bool,
 }
 
 impl ClassLayout {
@@ -72,6 +75,7 @@ impl ClassLayout {
             alignment: max_align,
             fields,
             gc,
+            is_value: false,
         }
     }
 

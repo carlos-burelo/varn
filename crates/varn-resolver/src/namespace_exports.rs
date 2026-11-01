@@ -85,8 +85,7 @@ fn value_paths<'a>(
             | ClassMemberKind::Property
             | ClassMemberKind::Getter
             | ClassMemberKind::Setter
-            | ClassMemberKind::Interface
-            | ClassMemberKind::Struct => {}
+            | ClassMemberKind::Interface => {}
         }
     }
 }

@@ -115,17 +115,14 @@ pub(super) fn try_parse_decl_stmt_mode(
             Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Namespace(decl)))))
         }
         TokenKind::Struct => {
-            if !decorators.is_empty() {
-                return Some(Err("decorators are not supported on structs".to_owned()));
-            }
             let doc = s.current_doc();
-            let mut decl = match super::decls::parse_struct_decl(s) {
+            let mut decl = match super::decls::parse_struct_decl(s, decorators) {
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),
             };
             decl.doc = doc;
             let range = decl.range;
-            Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Struct(decl)))))
+            Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Class(decl)))))
         }
         TokenKind::Extension => {
             if !decorators.is_empty() {

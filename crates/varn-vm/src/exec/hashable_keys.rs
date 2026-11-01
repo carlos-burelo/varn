@@ -12,7 +12,7 @@ impl ExecCtx {
             self.bound_method(key, "hash"),
             self.bound_method(key, "equals"),
         ) else {
-            return Ok(key);
+            return Ok(self.value_instance_key(key, class_id));
         };
         let hash = self.invoke(hash_fn, &[hash_fn])?;
         if !hash.is_int() {
@@ -37,6 +37,32 @@ impl ExecCtx {
             .or_default()
             .push(key);
         Ok(key)
+    }
+
+    fn value_instance_key(&mut self, key: VmValue, class_id: u32) -> VmValue {
+        let is_value =
+            varn_types::ClassObj::find_by_id(class_id).is_some_and(|class| class.layout().is_value);
+        if !is_value {
+            return key;
+        }
+        let bucket_key = (
+            class_id,
+            super::value_hash::structural_hash(key, &self.heap),
+        );
+        let candidates = unsafe { &*self.hashable_keys.get() }
+            .get(&bucket_key)
+            .cloned()
+            .unwrap_or_default();
+        for rep in candidates {
+            if rep == key || super::compare::eq(rep, key, &self.heap) {
+                return rep;
+            }
+        }
+        unsafe { &mut *self.hashable_keys.get() }
+            .entry(bucket_key)
+            .or_default()
+            .push(key);
+        key
     }
 
     fn instance_class_id(&self, v: VmValue) -> Option<u32> {

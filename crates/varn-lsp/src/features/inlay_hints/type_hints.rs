@@ -54,7 +54,6 @@ pub fn build_type_hints(state: &DocumentState) -> Vec<InlayHint> {
             | SymbolKind::Property
             | SymbolKind::TypeParameter
             | SymbolKind::Namespace
-            | SymbolKind::Struct
             | SymbolKind::Extension
             | SymbolKind::EnumMember => {}
         }

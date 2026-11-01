@@ -109,7 +109,6 @@ impl TypeContext for Binder<'_> {
             | varn_sem::symbol::SymbolKind::Method
             | varn_sem::symbol::SymbolKind::TypeParameter
             | varn_sem::symbol::SymbolKind::Namespace
-            | varn_sem::symbol::SymbolKind::Struct
             | varn_sem::symbol::SymbolKind::Extension
             | varn_sem::symbol::SymbolKind::EnumMember => None,
         }

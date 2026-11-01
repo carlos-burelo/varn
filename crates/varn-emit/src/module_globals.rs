@@ -77,8 +77,7 @@ pub(super) fn core_method_ops(bind: &BindResult) -> FxHashMap<(Arc<str>, Arc<str
                     | varn_sem::types::ClassMemberKind::Class
                     | varn_sem::types::ClassMemberKind::Interface
                     | varn_sem::types::ClassMemberKind::Namespace
-                    | varn_sem::types::ClassMemberKind::Enum
-                    | varn_sem::types::ClassMemberKind::Struct,
+                    | varn_sem::types::ClassMemberKind::Enum,
                     _,
                 ) => continue,
             };

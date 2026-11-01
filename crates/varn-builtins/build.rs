@@ -110,7 +110,6 @@ impl ContractSurface {
                 Decl::TypeAlias(t) => (vec![name(t.id)], true),
                 Decl::Namespace(n) => (vec![name(n.id)], n.is_declare),
                 Decl::Enum(e) => (vec![name(e.id)], e.is_declare),
-                Decl::Struct(st) => (vec![name(st.id)], false),
                 Decl::SumType(st) => (vec![name(st.id)], false),
                 Decl::Variable(v) => (
                     v.declarators

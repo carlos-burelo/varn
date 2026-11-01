@@ -47,7 +47,6 @@ pub(crate) fn assigned_in_stmt(stmt: StmtId, arena: &AstArena, out: &mut Assigne
             | Decl::Export(_)
             | Decl::Extension(_)
             | Decl::Namespace(_)
-            | Decl::Struct(_)
             | Decl::SumType(_) => {}
         },
         StmtKind::If {

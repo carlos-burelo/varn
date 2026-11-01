@@ -7,6 +7,9 @@ pub trait TypeContext {
         origin: Option<&str>,
     ) -> Option<Vec<ClassMemberInfo>>;
     fn get_class_members(&self, name: &str, origin: Option<&str>) -> Option<Vec<ClassMemberInfo>>;
+    fn class_entry(&self, _name: &str, _origin: Option<&str>) -> Option<ClassMemberInfo> {
+        None
+    }
     fn get_namespace_members(
         &self,
         name: &str,

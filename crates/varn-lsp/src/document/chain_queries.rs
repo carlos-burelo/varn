@@ -39,7 +39,6 @@ fn summary_from_class_member(
             C::Interface => R::NestedType(N::Interface),
             C::Namespace => R::NestedType(N::Namespace),
             C::Enum => R::NestedType(N::Enum),
-            C::Struct => R::NestedType(N::Struct),
             C::Variable | C::Property => R::Property,
         },
         is_static: m.is_static,
@@ -255,7 +254,6 @@ impl DocumentState {
                         SymbolKind::Class
                             | SymbolKind::Interface
                             | SymbolKind::Enum
-                            | SymbolKind::Struct
                             | SymbolKind::Namespace
                     ) {
                         return self.lexeme(prev_tok).to_owned();

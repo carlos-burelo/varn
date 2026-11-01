@@ -37,6 +37,7 @@ pub(crate) mod modules;
 pub(crate) mod props;
 pub mod scheduler;
 pub(crate) mod strings;
+pub(crate) mod value_hash;
 pub(crate) mod value_views;
 use crate::value::VmValue;
 pub use ctx::ExecCtx;

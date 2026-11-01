@@ -232,8 +232,7 @@ impl Checker<'_> {
                     ClassMemberKind::Class
                     | ClassMemberKind::Interface
                     | ClassMemberKind::Namespace
-                    | ClassMemberKind::Enum
-                    | ClassMemberKind::Struct => {}
+                    | ClassMemberKind::Enum => {}
                 }
             }
         }

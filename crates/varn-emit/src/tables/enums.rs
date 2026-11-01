@@ -100,8 +100,7 @@ pub(super) fn enum_members<'a>(
             | ClassMemberKind::Class
             | ClassMemberKind::Interface
             | ClassMemberKind::Namespace
-            | ClassMemberKind::Enum
-            | ClassMemberKind::Struct => continue,
+            | ClassMemberKind::Enum => continue,
         };
         match out.iter_mut().find(|e| e.name == key) {
             Some(entry) => entry.sig = sig,

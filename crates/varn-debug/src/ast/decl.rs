@@ -228,24 +228,6 @@ pub(super) fn print_decl(
                 chalk(name).blue()
             ));
         }
-        Decl::Struct(s) => {
-            terminal::log(format!(
-                "{indent}{marker}{} {}",
-                chalk("StructDecl").bold(),
-                chalk(interner.resolve(s.id)).blue()
-            ));
-            for (idx, f) in s.fields.iter().enumerate() {
-                let mk = if idx == s.fields.len() - 1 {
-                    "└── "
-                } else {
-                    "├── "
-                };
-                terminal::log(format!(
-                    "{child_indent}{mk}{}",
-                    chalk(interner.resolve(f.name)).cyan()
-                ));
-            }
-        }
         Decl::SumType(s) => {
             terminal::log(format!(
                 "{indent}{marker}{} {}{}",

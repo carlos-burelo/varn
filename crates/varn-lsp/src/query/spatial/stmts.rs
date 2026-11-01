@@ -2,8 +2,8 @@ use super::exprs::collect_expr;
 use super::index::SpatialEntry;
 use varn_core::ast::{
     AstArena, ClassDecl, ClassMember, Decl, EnumDecl, ExportDecl, ExportDefaultDecl, ExtensionDecl,
-    ExtensionMember, ForInit, FunctionDecl, NamespaceDecl, StmtId, StmtKind, StructDecl,
-    SwitchCase, VarDeclarator,
+    ExtensionMember, ForInit, FunctionDecl, NamespaceDecl, StmtId, StmtKind, SwitchCase,
+    VarDeclarator,
 };
 
 pub(super) fn collect_stmt(a: &AstArena, stmt: &StmtId, out: &mut Vec<SpatialEntry>) {
@@ -137,7 +137,6 @@ pub(super) fn collect_decl(a: &AstArena, decl: &Decl, out: &mut Vec<SpatialEntry
         Decl::Namespace(n) => collect_namespace_decl(a, n, out),
         Decl::Export(exp) => collect_export_decl(a, exp, out),
         Decl::Extension(ext) => collect_extension_decl(a, ext, out),
-        Decl::Struct(s) => collect_struct_decl(a, s, out),
         Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Import(_) | Decl::SumType(_) => {}
     }
 }
@@ -254,14 +253,6 @@ pub(super) fn collect_extension_decl(
                 }
                 collect_stmt(a, body, out);
             }
-        }
-    }
-}
-
-pub(super) fn collect_struct_decl(a: &AstArena, s: &StructDecl, out: &mut Vec<SpatialEntry>) {
-    for f in &s.fields {
-        if let Some(default) = &f.default {
-            collect_expr(a, default, out);
         }
     }
 }

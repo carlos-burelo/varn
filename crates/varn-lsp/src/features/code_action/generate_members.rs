@@ -175,7 +175,6 @@ fn find_class_in_stmt(
             | Decl::Import(_)
             | Decl::Export(_)
             | Decl::Extension(_)
-            | Decl::Struct(_)
             | Decl::SumType(_) => None,
         },
         StmtKind::Block { stmts } => {

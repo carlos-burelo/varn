@@ -119,7 +119,6 @@ pub enum ClassMemberKind {
     Interface,
     Namespace,
     Enum,
-    Struct,
 }
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
@@ -140,6 +139,7 @@ pub struct ClassMemberInfo {
     pub is_readonly: bool,
     pub is_override: bool,
     pub is_builtin_or_intrinsic: bool,
+    pub is_struct: bool,
     pub symbol_id: Option<usize>,
     pub doc: Option<Arc<str>>,
 }

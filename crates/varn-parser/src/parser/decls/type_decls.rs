@@ -1,11 +1,8 @@
 use super::class_key::member_key_name;
-use crate::expressions::parse_expr;
 use crate::stream::TokenStream;
 use crate::types::{parse_type, parse_type_params};
-use varn_core::ast::decl::{Decl, StructField};
-use varn_core::ast::{
-    InterfaceDecl, InterfaceMember, NamespaceDecl, StmtKind, StructDecl, TypeAliasDecl,
-};
+use varn_core::ast::decl::Decl;
+use varn_core::ast::{InterfaceDecl, InterfaceMember, NamespaceDecl, StmtKind, TypeAliasDecl};
 use varn_core::TokenKind;
 
 pub fn parse_interface_decl(s: &mut TokenStream) -> Result<InterfaceDecl, String> {
@@ -180,46 +177,6 @@ pub fn parse_namespace_decl(
         ast_id: s.next_ast_id(),
         body,
         is_declare,
-        doc: None,
-        range: full_range,
-    })
-}
-
-pub fn parse_struct_decl(s: &mut TokenStream) -> Result<StructDecl, String> {
-    let range = s.range();
-    s.expect(TokenKind::Struct)?;
-    let id = s.expect_id()?;
-    s.expect(TokenKind::LBrace)?;
-    let mut fields = vec![];
-    while !s.check(TokenKind::RBrace) && !s.is_eof() {
-        while s.eat(TokenKind::Semicolon) {}
-        if s.check(TokenKind::RBrace) {
-            break;
-        }
-        let field_range = s.range();
-        let name = s.expect_id()?;
-        s.expect(TokenKind::Colon)?;
-        let type_ann = parse_type(s)?;
-        let default = if s.eat(TokenKind::Eq) {
-            Some(parse_expr(s)?)
-        } else {
-            None
-        };
-        let full_field_range = s.span_from(field_range);
-        fields.push(StructField {
-            name,
-            type_ann,
-            default,
-            range: full_field_range,
-        });
-        s.eat(TokenKind::Comma);
-    }
-    s.expect(TokenKind::RBrace)?;
-    let full_range = s.span_from(range);
-    Ok(StructDecl {
-        id,
-        ast_id: s.next_ast_id(),
-        fields,
         doc: None,
         range: full_range,
     })

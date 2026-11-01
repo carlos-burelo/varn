@@ -21,7 +21,6 @@ pub fn top_level_classes(state: &DocumentState) -> impl Iterator<Item = &ClassDe
                 | Decl::Import(_)
                 | Decl::Export(_)
                 | Decl::Extension(_)
-                | Decl::Struct(_)
                 | Decl::SumType(_) => None,
             },
             StmtKind::Block { .. }

@@ -113,7 +113,7 @@ fn completion_kind(kind: ResolvedMemberKind) -> CompletionItemKind {
             NestedTypeKind::Interface => CompletionItemKind::Interface,
             NestedTypeKind::Namespace => CompletionItemKind::Module,
             NestedTypeKind::Enum => CompletionItemKind::Enum,
-            NestedTypeKind::Class | NestedTypeKind::Struct => CompletionItemKind::Class,
+            NestedTypeKind::Class => CompletionItemKind::Class,
         },
     }
 }

@@ -26,7 +26,6 @@ pub fn qualified_type(
             ClassMemberKind::Class
             | ClassMemberKind::Enum
             | ClassMemberKind::Interface
-            | ClassMemberKind::Struct
             | ClassMemberKind::Namespace => {
                 Type::named_with_origin(format!("{scope}::{segment}"), origin.clone(), table)
             }

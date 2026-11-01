@@ -28,7 +28,6 @@ pub(super) fn ns_nested_types(ns: &NamespaceDecl) -> Vec<&Decl> {
             | other @ Decl::Import(_)
             | other @ Decl::Export(_)
             | other @ Decl::Extension(_)
-            | other @ Decl::Struct(_)
             | other @ Decl::SumType(_) => other,
         };
         match inner {
@@ -41,7 +40,6 @@ pub(super) fn ns_nested_types(ns: &NamespaceDecl) -> Vec<&Decl> {
             | Decl::Import(_)
             | Decl::Export(_)
             | Decl::Extension(_)
-            | Decl::Struct(_)
             | Decl::SumType(_) => {}
         }
     }
@@ -80,7 +78,6 @@ pub(super) fn emit_namespace_object(
             | other @ Decl::Import(_)
             | other @ Decl::Export(_)
             | other @ Decl::Extension(_)
-            | other @ Decl::Struct(_)
             | other @ Decl::SumType(_) => other,
         };
         if let Decl::Namespace(inner_ns) = inner {
@@ -297,7 +294,6 @@ fn collect_scoped_names(
         | Decl::TypeAlias(_)
         | Decl::Export(_)
         | Decl::Extension(_)
-        | Decl::Struct(_)
         | Decl::SumType(_) => {}
     }
 }

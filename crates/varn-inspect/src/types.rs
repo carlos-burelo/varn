@@ -89,7 +89,6 @@ fn format_sym_details(s: &varn_lsp::document::SymbolView<'_>) -> String {
         | SymbolKind::Method
         | SymbolKind::TypeParameter
         | SymbolKind::Namespace
-        | SymbolKind::Struct
         | SymbolKind::Extension
         | SymbolKind::EnumMember => s.ty_text(),
     }

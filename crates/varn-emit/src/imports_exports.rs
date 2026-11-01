@@ -90,7 +90,6 @@ pub(super) fn collect_exports(
             | Decl::Import(_)
             | Decl::Export(_)
             | Decl::Extension(_)
-            | Decl::Struct(_)
             | Decl::SumType(_) => {}
         }
     }

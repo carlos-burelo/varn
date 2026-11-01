@@ -168,7 +168,6 @@ fn find_class_at_line<'a>(
                 | Decl::Import(_)
                 | Decl::Export(_)
                 | Decl::Extension(_)
-                | Decl::Struct(_)
                 | Decl::SumType(_) => None,
             },
             StmtKind::Block { .. }
@@ -215,7 +214,6 @@ fn find_interface(
                 | Decl::Import(_)
                 | Decl::Export(_)
                 | Decl::Extension(_)
-                | Decl::Struct(_)
                 | Decl::SumType(_) => None,
             },
             StmtKind::Block { .. }

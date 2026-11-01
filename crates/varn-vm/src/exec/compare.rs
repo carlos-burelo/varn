@@ -53,6 +53,9 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
         if ai == bi {
             return true;
         }
+        if is_value_instance(a, heap) && is_value_instance(b, heap) {
+            return composite_eq(a, b, heap);
+        }
         match (heap.get(ai), heap.get(bi)) {
             (Some(HeapObj::Str(sa)), Some(HeapObj::Str(sb))) => {
                 if sa.byte_len() != sb.byte_len() {
@@ -151,6 +154,39 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     false
 }
 
+fn is_value_instance(v: VmValue, heap: &Heap) -> bool {
+    heap.instance(v.as_heap())
+        .and_then(|inst| varn_types::ClassObj::find_by_id(inst.class_id))
+        .is_some_and(|class| class.layout().is_value)
+}
+
+fn expand_instances(
+    a: VmValue,
+    b: VmValue,
+    heap: &Heap,
+    pending: &mut Vec<(VmValue, VmValue, bool)>,
+) -> Option<bool> {
+    let ia = heap.instance(a.as_heap())?;
+    let ib = heap.instance(b.as_heap())?;
+    if ia.class_id != ib.class_id {
+        return Some(false);
+    }
+    let class = varn_types::ClassObj::find_by_id(ia.class_id)?;
+    let layout = class.layout();
+    if !layout.is_value {
+        return None;
+    }
+    let null = VmValue::null();
+    for field in &layout.fields {
+        pending.push((
+            ia.read_field(field).unwrap_or(null),
+            ib.read_field(field).unwrap_or(null),
+            true,
+        ));
+    }
+    Some(true)
+}
+
 fn composite_eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     let mut pending = vec![(a, b, false)];
     while let Some((x, y, member)) = pending.pop() {
@@ -176,6 +212,9 @@ fn expand(
 ) -> Option<bool> {
     if !(a.is_heap() && b.is_heap()) {
         return None;
+    }
+    if let Some(decided) = expand_instances(a, b, heap, pending) {
+        return Some(decided);
     }
     let null = VmValue::null();
     match (heap.get(a.as_heap())?, heap.get(b.as_heap())?) {

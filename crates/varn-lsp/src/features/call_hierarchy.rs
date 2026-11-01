@@ -179,7 +179,6 @@ fn callables(file: &DocumentState) -> Vec<(String, SourceRange)> {
             | Decl::Import(_)
             | Decl::Export(_)
             | Decl::Extension(_)
-            | Decl::Struct(_)
             | Decl::SumType(_) => {}
         }
     }

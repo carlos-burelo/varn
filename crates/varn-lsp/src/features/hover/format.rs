@@ -48,7 +48,6 @@ pub fn format_signature(state: &DocumentState, sym: SymbolView<'_>) -> String {
     match sym.kind() {
         SymbolKind::Function | SymbolKind::Method => format_fn(sym),
         SymbolKind::Class => format_class(state, sym),
-        SymbolKind::Struct => format!("struct {}", sym.name()),
         SymbolKind::Interface => format_interface(state, sym),
         SymbolKind::TypeAlias => format!("type {} = {}", sym.name(), sym.type_str()),
         SymbolKind::Enum => format!("enum {}", sym.name()),

@@ -19,7 +19,6 @@ pub enum SymbolKind {
     Method,
     TypeParameter,
     Namespace,
-    Struct,
     Extension,
     EnumMember,
 }
@@ -31,8 +30,7 @@ impl SymbolKind {
             | SymbolKind::Interface
             | SymbolKind::TypeAlias
             | SymbolKind::Enum
-            | SymbolKind::TypeParameter
-            | SymbolKind::Struct => true,
+            | SymbolKind::TypeParameter => true,
             SymbolKind::Var
             | SymbolKind::Let
             | SymbolKind::Const
@@ -61,7 +59,6 @@ impl SymbolKind {
             SymbolKind::Method => "method ",
             SymbolKind::TypeParameter => "type_param",
             SymbolKind::Namespace => "namespace   ",
-            SymbolKind::Struct => "struct",
             SymbolKind::Extension => "extension  ",
             SymbolKind::EnumMember => "enum_member",
         }

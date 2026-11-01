@@ -86,5 +86,6 @@ pub fn parse_class_decl(
         decorators,
         doc: None,
         range: full_range,
+        is_struct: false,
     })
 }

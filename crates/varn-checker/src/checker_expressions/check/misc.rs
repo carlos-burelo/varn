@@ -80,10 +80,61 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) {
         self.check_expr(rec, object, bind);
+        let obj_ty = self.infer_type(rec, object, bind);
         for prop in properties {
             match prop {
-                varn_core::ast::ObjectProp::Property { value, .. } => {
-                    self.check_expr(rec, *value, bind);
+                varn_core::ast::ObjectProp::Property {
+                    key,
+                    value,
+                    range: prop_range,
+                    ..
+                } => {
+                    let member = match key {
+                        varn_core::ast::PropKey::Identifier(name)
+                        | varn_core::ast::PropKey::Str(name) => Some(name.clone()),
+                        varn_core::ast::PropKey::Int(_) | varn_core::ast::PropKey::Computed(_) => {
+                            None
+                        }
+                    };
+                    let expected = match (&member, obj_ty.is_dynamic()) {
+                        (Some(name), false) => {
+                            let found = self.find_member_info(&obj_ty, name, bind);
+                            if found.is_none() {
+                                self.emit(
+                                    Diagnostic::error(
+                                        ErrorCode::MissingProperty,
+                                        format!(
+                                            "property '{name}' does not exist on type '{}'",
+                                            obj_ty.display(&self.ty_table, &bind.interner)
+                                        ),
+                                    )
+                                    .with_range(*prop_range),
+                                );
+                            }
+                            found.map(|(ty, _)| ty)
+                        }
+                        (Some(_), true) | (None, _) => None,
+                    };
+                    self.with_expected(expected, |c| c.check_expr(rec, *value, bind));
+                    if let Some(expected) = expected {
+                        let actual = self.infer_type(rec, *value, bind);
+                        if !actual.is_dynamic()
+                            && !self.value_fits(rec, &expected, &actual, Some(*value), Some(bind))
+                        {
+                            self.emit(
+                                Diagnostic::error(
+                                    ErrorCode::TypeMismatch,
+                                    format!(
+                                        "type mismatch: '{}' expects '{}' but got '{}'",
+                                        member.as_deref().unwrap_or("?"),
+                                        expected.display(&self.ty_table, &bind.interner),
+                                        actual.display(&self.ty_table, &bind.interner)
+                                    ),
+                                )
+                                .with_range(*prop_range),
+                            );
+                        }
+                    }
                 }
                 varn_core::ast::ObjectProp::Spread { argument, .. } => {
                     self.check_expr(rec, *argument, bind);
@@ -91,7 +142,6 @@ impl<'r> Checker<'r> {
                 varn_core::ast::ObjectProp::Method { .. } => {}
             }
         }
-        let obj_ty = self.infer_type(rec, object, bind);
         self.record_type(rec, range.start.offset, obj_ty);
     }
 

@@ -21,8 +21,7 @@ pub fn settle_members(members: &mut [ClassMemberInfo], symbol_types: &FxHashMap<
             | ClassMemberKind::Setter
             | ClassMemberKind::Class
             | ClassMemberKind::Interface
-            | ClassMemberKind::Enum
-            | ClassMemberKind::Struct => {}
+            | ClassMemberKind::Enum => {}
         }
     }
 }

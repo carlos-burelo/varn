@@ -278,7 +278,6 @@ fn symbol_kind_cache_key(kind: varn_sem::symbol::SymbolKind) -> u8 {
         varn_sem::symbol::SymbolKind::Method => 10,
         varn_sem::symbol::SymbolKind::TypeParameter => 11,
         varn_sem::symbol::SymbolKind::Namespace => 12,
-        varn_sem::symbol::SymbolKind::Struct => 13,
         varn_sem::symbol::SymbolKind::Extension => 14,
         varn_sem::symbol::SymbolKind::EnumMember => 15,
     }

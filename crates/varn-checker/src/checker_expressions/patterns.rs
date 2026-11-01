@@ -46,6 +46,45 @@ impl<'r> Checker<'r> {
                 let tuple_pattern = matches!(pattern, Pattern::Tuple { .. });
                 let value_is_array =
                     matches!(self.ty_table.get(value_ty.0), varn_core::TypeKind::Array(_));
+                let not_sequence = match self.ty_table.get(value_ty.0) {
+                    varn_core::TypeKind::Primitive(p) => !matches!(
+                        p,
+                        varn_core::LangPrimitive::Dynamic | varn_core::LangPrimitive::Str
+                    ),
+                    varn_core::TypeKind::Named(..)
+                    | varn_core::TypeKind::Generic(..)
+                    | varn_core::TypeKind::Object(_)
+                    | varn_core::TypeKind::Record(_)
+                    | varn_core::TypeKind::Fn(_)
+                    | varn_core::TypeKind::EnumVariant { .. } => true,
+                    varn_core::TypeKind::Literal(_)
+                    | varn_core::TypeKind::This
+                    | varn_core::TypeKind::Array(_)
+                    | varn_core::TypeKind::Union(_)
+                    | varn_core::TypeKind::Intersection(_)
+                    | varn_core::TypeKind::Tuple(_)
+                    | varn_core::TypeKind::TemplateLiteral(_)
+                    | varn_core::TypeKind::Typeof(_)
+                    | varn_core::TypeKind::KeyOf(_)
+                    | varn_core::TypeKind::IndexedAccess { .. }
+                    | varn_core::TypeKind::Mapped { .. }
+                    | varn_core::TypeKind::Conditional { .. }
+                    | varn_core::TypeKind::Infer(_)
+                    | varn_core::TypeKind::TypePredicate { .. } => false,
+                };
+                if not_sequence {
+                    self.emit(
+                        varn_core::Diagnostic::error(
+                            varn_core::ErrorCode::TypeMismatch,
+                            format!(
+                                "'{}' is neither an array nor a tuple, so it cannot be destructured by position",
+                                value_ty.display(&self.ty_table, &bind.interner)
+                            ),
+                        )
+                        .with_range(*pattern.range()),
+                    );
+                    return;
+                }
                 if tuple_pattern && value_is_array {
                     self.emit(
                         varn_core::Diagnostic::error(

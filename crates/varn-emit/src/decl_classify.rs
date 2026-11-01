@@ -4,7 +4,7 @@ pub(super) fn is_value_symbol(kind: varn_sem::symbol::SymbolKind) -> bool {
     use varn_sem::symbol::SymbolKind as K;
     matches!(
         kind,
-        K::Var | K::Let | K::Const | K::Function | K::Class | K::Enum | K::Namespace | K::Struct
+        K::Var | K::Let | K::Const | K::Function | K::Class | K::Enum | K::Namespace
     )
 }
 
@@ -22,7 +22,6 @@ pub(super) fn free_function(decl: &Decl) -> Option<&FunctionDecl> {
             | Decl::Import(_)
             | Decl::Export(_)
             | Decl::Extension(_)
-            | Decl::Struct(_)
             | Decl::SumType(_) => None,
         },
         Decl::Variable(_)
@@ -34,7 +33,6 @@ pub(super) fn free_function(decl: &Decl) -> Option<&FunctionDecl> {
         | Decl::Import(_)
         | Decl::Export(_)
         | Decl::Extension(_)
-        | Decl::Struct(_)
         | Decl::SumType(_) => None,
     }
 }
@@ -53,7 +51,6 @@ pub(super) fn namespace_decl(decl: &Decl) -> Option<&varn_core::ast::NamespaceDe
             | Decl::Import(_)
             | Decl::Export(_)
             | Decl::Extension(_)
-            | Decl::Struct(_)
             | Decl::SumType(_) => None,
         },
         Decl::Variable(_)
@@ -65,7 +62,6 @@ pub(super) fn namespace_decl(decl: &Decl) -> Option<&varn_core::ast::NamespaceDe
         | Decl::Import(_)
         | Decl::Export(_)
         | Decl::Extension(_)
-        | Decl::Struct(_)
         | Decl::SumType(_) => None,
     }
 }
@@ -84,7 +80,6 @@ pub(super) fn variable_decl(decl: &Decl) -> Option<&varn_core::ast::VariableDecl
             | Decl::Import(_)
             | Decl::Export(_)
             | Decl::Extension(_)
-            | Decl::Struct(_)
             | Decl::SumType(_) => None,
         },
         Decl::Function(_)
@@ -96,7 +91,6 @@ pub(super) fn variable_decl(decl: &Decl) -> Option<&varn_core::ast::VariableDecl
         | Decl::Import(_)
         | Decl::Export(_)
         | Decl::Extension(_)
-        | Decl::Struct(_)
         | Decl::SumType(_) => None,
     }
 }
@@ -115,7 +109,6 @@ pub(super) fn class_decl(decl: &Decl) -> Option<&varn_core::ast::ClassDecl> {
             | Decl::Import(_)
             | Decl::Export(_)
             | Decl::Extension(_)
-            | Decl::Struct(_)
             | Decl::SumType(_) => None,
         },
         Decl::Variable(_)
@@ -127,7 +120,6 @@ pub(super) fn class_decl(decl: &Decl) -> Option<&varn_core::ast::ClassDecl> {
         | Decl::Import(_)
         | Decl::Export(_)
         | Decl::Extension(_)
-        | Decl::Struct(_)
         | Decl::SumType(_) => None,
     }
 }
@@ -146,7 +138,6 @@ pub(super) fn enum_decl(decl: &Decl) -> Option<&varn_core::ast::EnumDecl> {
             | Decl::Import(_)
             | Decl::Export(_)
             | Decl::Extension(_)
-            | Decl::Struct(_)
             | Decl::SumType(_) => None,
         },
         Decl::Variable(_)
@@ -158,7 +149,6 @@ pub(super) fn enum_decl(decl: &Decl) -> Option<&varn_core::ast::EnumDecl> {
         | Decl::Import(_)
         | Decl::Export(_)
         | Decl::Extension(_)
-        | Decl::Struct(_)
         | Decl::SumType(_) => None,
     }
 }

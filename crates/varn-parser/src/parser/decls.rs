@@ -8,14 +8,14 @@ mod extension;
 mod import;
 pub mod type_decls;
 
+mod struct_decl;
 pub use class::parse_class_decl;
 pub(super) use enum_decl::parse_enum_decl;
 pub(super) use export::parse_export_decl;
 pub(super) use extension::parse_extension_decl;
 pub(super) use import::parse_import_decl;
-pub(super) use type_decls::{
-    parse_interface_decl, parse_namespace_decl, parse_struct_decl, parse_type_alias_decl,
-};
+pub(super) use struct_decl::parse_struct_decl;
+pub(super) use type_decls::{parse_interface_decl, parse_namespace_decl, parse_type_alias_decl};
 
 use crate::expressions::parse_expr;
 use crate::stream::TokenStream;

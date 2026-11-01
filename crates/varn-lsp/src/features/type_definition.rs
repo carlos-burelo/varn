@@ -28,7 +28,6 @@ pub fn build_goto_type_definition(
                 SymbolKind::Class
                     | SymbolKind::Interface
                     | SymbolKind::Enum
-                    | SymbolKind::Struct
                     | SymbolKind::TypeAlias
             )
             && sym.line() != u32::MAX

@@ -125,6 +125,13 @@ impl TypeContext for BindView<'_> {
         self.bind.get_class_entry(name).map(|e| e.members.clone())
     }
 
+    fn class_entry(&self, name: &str, origin: Option<&str>) -> Option<ClassMemberInfo> {
+        if let Some(rb) = self.foreign(origin) {
+            return rb.get_class_entry(name).cloned();
+        }
+        self.bind.get_class_entry(name).cloned()
+    }
+
     fn get_namespace_members(
         &self,
         name: &str,
@@ -174,7 +181,6 @@ impl TypeContext for BindView<'_> {
             | crate::symbol::SymbolKind::Method
             | crate::symbol::SymbolKind::TypeParameter
             | crate::symbol::SymbolKind::Namespace
-            | crate::symbol::SymbolKind::Struct
             | crate::symbol::SymbolKind::Extension
             | crate::symbol::SymbolKind::EnumMember => None,
         }

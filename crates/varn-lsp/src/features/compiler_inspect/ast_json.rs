@@ -237,7 +237,6 @@ impl AstJson<'_> {
                     .collect();
                 node(format!("enum {}", self.name(e.id)), "enum", line, children)
             }
-            Decl::Struct(s) => leaf(format!("struct {}", self.name(s.id)), "struct", line),
             Decl::TypeAlias(t) => leaf(format!("type {}", self.name(t.id)), "type", line),
             Decl::Import(imp) => leaf(
                 format!("import '{}'", self.name(imp.source)),

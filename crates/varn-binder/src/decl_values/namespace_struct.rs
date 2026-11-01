@@ -268,41 +268,6 @@ impl<'r> super::super::Binder<'r> {
                         ..Default::default()
                     });
                 }
-                Decl::Struct(s) => {
-                    let struct_members = self
-                        .type_members
-                        .objects
-                        .get(&s.id)
-                        .cloned()
-                        .unwrap_or_default();
-                    let scope = self.scopes.get(self.current);
-                    let symbol_id = scope.resolve(s.id, &self.scopes);
-                    let s_id_rc: Arc<str> = Arc::from(self.interner.resolve(s.id));
-                    let struct_ty = Type::named_with_origin(
-                        self.type_name_of(s.id, s.ast_id),
-                        Some(Arc::from(self.source_file.as_ref())),
-                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                    );
-                    members.push(ClassMemberInfo {
-                        name: s_id_rc,
-                        kind: ClassMemberKind::Struct,
-                        is_async: false,
-                        is_generator: false,
-                        is_static: false,
-                        is_optional: false,
-                        line: s.range.start.line.saturating_sub(1),
-                        col: s.range.start.column,
-                        offset: s.range.start.offset,
-                        ty: struct_ty,
-                        members: struct_members,
-                        visibility: None,
-                        is_abstract: false,
-                        is_readonly: false,
-                        is_override: false,
-                        symbol_id,
-                        ..Default::default()
-                    });
-                }
                 Decl::Interface(i) => {
                     let i_id_rc: Arc<str> = Arc::from(self.interner.resolve(i.id));
                     let declared = self.type_name_of(i.id, i.ast_id);

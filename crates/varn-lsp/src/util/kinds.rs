@@ -15,7 +15,6 @@ pub fn to_lsp_symbol_kind(kind: SymbolKind) -> LspSymbolKind {
         SymbolKind::Method => LspSymbolKind::Method,
         SymbolKind::TypeParameter => LspSymbolKind::TypeParameter,
         SymbolKind::Namespace => LspSymbolKind::Namespace,
-        SymbolKind::Struct => LspSymbolKind::Struct,
         SymbolKind::Extension => LspSymbolKind::Class,
         SymbolKind::EnumMember => LspSymbolKind::EnumMember,
     }
@@ -35,7 +34,6 @@ pub fn to_completion_kind(kind: SymbolKind) -> CompletionItemKind {
         SymbolKind::Method => CompletionItemKind::Method,
         SymbolKind::TypeParameter => CompletionItemKind::TypeParameter,
         SymbolKind::Namespace => CompletionItemKind::Module,
-        SymbolKind::Struct => CompletionItemKind::Struct,
         SymbolKind::Extension => CompletionItemKind::Class,
         SymbolKind::EnumMember => CompletionItemKind::EnumMember,
     }
@@ -44,10 +42,6 @@ pub fn to_completion_kind(kind: SymbolKind) -> CompletionItemKind {
 pub fn is_container_symbol_kind(kind: SymbolKind) -> bool {
     matches!(
         kind,
-        SymbolKind::Class
-            | SymbolKind::Interface
-            | SymbolKind::Namespace
-            | SymbolKind::Enum
-            | SymbolKind::Struct
+        SymbolKind::Class | SymbolKind::Interface | SymbolKind::Namespace | SymbolKind::Enum
     )
 }

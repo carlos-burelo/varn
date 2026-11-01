@@ -22,7 +22,6 @@ impl<'a> FnEmitter<'a> {
             | other @ Decl::Import(_)
             | other @ Decl::Export(_)
             | other @ Decl::Extension(_)
-            | other @ Decl::Struct(_)
             | other @ Decl::SumType(_) => other,
         };
 
@@ -143,7 +142,6 @@ impl<'a> FnEmitter<'a> {
                 | Decl::Import(_)
                 | Decl::Export(_)
                 | Decl::Extension(_)
-                | Decl::Struct(_)
                 | Decl::SumType(_) => return vec![],
             },
             Decl::Function(_)
@@ -155,7 +153,6 @@ impl<'a> FnEmitter<'a> {
             | Decl::Import(_)
             | Decl::Export(_)
             | Decl::Extension(_)
-            | Decl::Struct(_)
             | Decl::SumType(_) => return vec![],
         };
         let mut out = Vec::new();

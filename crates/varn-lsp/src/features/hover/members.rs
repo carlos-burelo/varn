@@ -65,7 +65,7 @@ pub fn format_member_sig(
         ResolvedMemberKind::NestedType(k @ NestedTypeKind::Namespace) => {
             format_nested(state, k.label(), &owner, member, "")
         }
-        ResolvedMemberKind::NestedType(k @ (NestedTypeKind::Enum | NestedTypeKind::Struct)) => {
+        ResolvedMemberKind::NestedType(k @ NestedTypeKind::Enum) => {
             format!("{} {owner}{name}", k.label())
         }
         ResolvedMemberKind::EnumMember => format_enum_member(clean_parent, name, ""),

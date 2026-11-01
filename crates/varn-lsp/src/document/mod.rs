@@ -131,7 +131,6 @@ impl DocumentState {
             SymbolKind::Class
             | SymbolKind::Interface
             | SymbolKind::Enum
-            | SymbolKind::Struct
             | SymbolKind::Namespace => self.db.named_type(sym.name()),
             SymbolKind::Var
             | SymbolKind::Let

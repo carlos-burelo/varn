@@ -24,7 +24,6 @@ pub enum NestedTypeKind {
     Interface,
     Namespace,
     Enum,
-    Struct,
 }
 
 impl ResolvedMemberKind {
@@ -52,7 +51,6 @@ impl NestedTypeKind {
             NestedTypeKind::Interface => "interface",
             NestedTypeKind::Namespace => "namespace",
             NestedTypeKind::Enum => "enum",
-            NestedTypeKind::Struct => "struct",
         }
     }
 }

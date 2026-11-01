@@ -35,8 +35,5 @@ pub(super) fn map_class_member_kind(
         varn_sem::types::ClassMemberKind::Enum => {
             nested(varn_sem::semantic_info::NestedTypeKind::Enum)
         }
-        varn_sem::types::ClassMemberKind::Struct => {
-            nested(varn_sem::semantic_info::NestedTypeKind::Struct)
-        }
     }
 }

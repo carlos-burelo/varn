@@ -161,8 +161,7 @@ fn class_members_compatible(
             | ClassMemberKind::Class
             | ClassMemberKind::Interface
             | ClassMemberKind::Namespace
-            | ClassMemberKind::Enum
-            | ClassMemberKind::Struct => {}
+            | ClassMemberKind::Enum => {}
         }
     }
     true
@@ -240,8 +239,7 @@ pub(super) fn class_members_match_object(
             | ClassMemberKind::Class
             | ClassMemberKind::Interface
             | ClassMemberKind::Namespace
-            | ClassMemberKind::Enum
-            | ClassMemberKind::Struct => {}
+            | ClassMemberKind::Enum => {}
         }
     }
     true

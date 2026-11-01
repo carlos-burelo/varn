@@ -119,7 +119,6 @@ fn decl_uses_receiver(arena: &AstArena, d: &Decl) -> bool {
         | Decl::Namespace(_)
         | Decl::Import(_)
         | Decl::Extension(_)
-        | Decl::Struct(_)
         | Decl::SumType(_) => false,
     }
 }

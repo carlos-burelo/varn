@@ -214,8 +214,7 @@ fn build_one_class(
             ClassMemberKind::Class
             | ClassMemberKind::Interface
             | ClassMemberKind::Namespace
-            | ClassMemberKind::Enum
-            | ClassMemberKind::Struct => {}
+            | ClassMemberKind::Enum => {}
         }
     }
 
@@ -232,6 +231,9 @@ fn build_one_class(
     let mut info =
         ClassInfo::new_with_methods(name.clone(), ancestry, fields, methods, statics, tt);
     info.constructor = constructor;
+    info.layout.is_value = bind
+        .get_class_entry(name)
+        .is_some_and(|entry| entry.is_struct);
     info
 }
 
@@ -268,8 +270,7 @@ pub(super) fn build_statics<'a>(
             | ClassMemberKind::Class
             | ClassMemberKind::Interface
             | ClassMemberKind::Namespace
-            | ClassMemberKind::Enum
-            | ClassMemberKind::Struct => {}
+            | ClassMemberKind::Enum => {}
         }
     }
     for (kind, name, ty, _) in members {
@@ -293,8 +294,7 @@ pub(super) fn build_statics<'a>(
             | ClassMemberKind::Class
             | ClassMemberKind::Interface
             | ClassMemberKind::Namespace
-            | ClassMemberKind::Enum
-            | ClassMemberKind::Struct => {}
+            | ClassMemberKind::Enum => {}
         }
     }
     statics

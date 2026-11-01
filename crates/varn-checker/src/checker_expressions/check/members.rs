@@ -151,7 +151,6 @@ impl<'r> Checker<'r> {
                                 | varn_sem::symbol::SymbolKind::Interface
                                 | varn_sem::symbol::SymbolKind::Enum
                                 | varn_sem::symbol::SymbolKind::Namespace
-                                | varn_sem::symbol::SymbolKind::Struct
                         )
                     })
                     .unwrap_or(false)

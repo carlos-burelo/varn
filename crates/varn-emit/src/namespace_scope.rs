@@ -60,7 +60,6 @@ fn unwrapped(decl: &Decl) -> (&Decl, bool) {
         | Decl::Import(_)
         | Decl::Export(_)
         | Decl::Extension(_)
-        | Decl::Struct(_)
         | Decl::SumType(_) => (decl, false),
     }
 }
@@ -109,7 +108,6 @@ fn walk(
             | Decl::Import(_)
             | Decl::Export(_)
             | Decl::Extension(_)
-            | Decl::Struct(_)
             | Decl::SumType(_) => {}
         }
     }

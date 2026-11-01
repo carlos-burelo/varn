@@ -1,8 +1,10 @@
 use super::context::FnEmitter;
 use super::small_utils::prop_key_name;
+use std::sync::Arc;
 use varn_core::ast::{ArrayEl, ExprId, ObjectProp};
 use varn_tir::{
-    BackendTy, DynReason, Resolution, Span, TirArrayEl, TirExpr, TirExprKind, TirObjectEntry,
+    BackendTy, DynReason, Resolution, Span, TirArg, TirArrayEl, TirExpr, TirExprKind,
+    TirObjectEntry,
 };
 
 impl<'a> FnEmitter<'a> {
@@ -121,6 +123,47 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
+    fn lower_value_with(
+        &mut self,
+        class: varn_tir::ClassId,
+        object: ExprId,
+        properties: &[ObjectProp],
+        ty: BackendTy,
+        span: Span,
+    ) -> TirExpr {
+        let source = self.lower_expr(object);
+        let source = self.pin(source);
+        let mut given: Vec<(Arc<str>, TirExpr)> = Vec::new();
+        for p in properties {
+            if let ObjectProp::Property { key, value, .. } = p
+                && let Some(name) = prop_key_name(key)
+            {
+                given.push((name, self.lower_expr(*value)));
+            }
+        }
+        let fields: Vec<(Arc<str>, BackendTy)> = self.m.classes[class.0 as usize]
+            .fields
+            .iter()
+            .map(|f| (f.name.clone(), f.ty))
+            .collect();
+        let args = fields
+            .into_iter()
+            .map(|(name, field_ty)| {
+                let value = match given.iter().position(|(given_name, _)| *given_name == name) {
+                    Some(at) => given.swap_remove(at).1,
+                    None => self.field_access(source.clone(), name, field_ty, span),
+                };
+                TirArg::Expr(value)
+            })
+            .collect();
+        TirExpr {
+            kind: TirExprKind::New { class, args },
+            ty,
+            res: Resolution::None,
+            span,
+        }
+    }
+
     pub(super) fn lower_with(
         &mut self,
         object: ExprId,
@@ -128,6 +171,15 @@ impl<'a> FnEmitter<'a> {
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
+        if let BackendTy::Class(class) = ty.non_nullable(self.tt)
+            && self
+                .m
+                .classes
+                .get(class.0 as usize)
+                .is_some_and(|info| info.layout.is_value)
+        {
+            return self.lower_value_with(class, object, properties, ty, span);
+        }
         let mut entries = vec![TirObjectEntry::Spread(self.lower_expr(object))];
         for p in properties {
             if let ObjectProp::Property { key, value, .. } = p

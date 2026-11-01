@@ -72,8 +72,7 @@ pub fn resolve_token(
                 varn_sem::semantic_info::NestedTypeKind::Interface => TT_INTERFACE,
                 varn_sem::semantic_info::NestedTypeKind::Namespace => TT_NAMESPACE,
                 varn_sem::semantic_info::NestedTypeKind::Enum => TT_TYPE,
-                varn_sem::semantic_info::NestedTypeKind::Class
-                | varn_sem::semantic_info::NestedTypeKind::Struct => TT_CLASS,
+                varn_sem::semantic_info::NestedTypeKind::Class => TT_CLASS,
             },
         });
     }
@@ -141,7 +140,7 @@ fn tt_from_symbol(state: &DocumentState, kind: SymbolKind, ty: &Type, prev_is_do
     let is_fn = matches!(state.db.ty_kind(ty), TypeKind::Fn(_));
     match kind {
         SymbolKind::Function | SymbolKind::Method => TT_FUNCTION,
-        SymbolKind::Class | SymbolKind::Struct | SymbolKind::Extension => TT_CLASS,
+        SymbolKind::Class | SymbolKind::Extension => TT_CLASS,
         SymbolKind::Interface => TT_INTERFACE,
         SymbolKind::Namespace => TT_NAMESPACE,
         SymbolKind::TypeAlias | SymbolKind::Enum => TT_TYPE,

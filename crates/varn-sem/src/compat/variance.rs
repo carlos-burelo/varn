@@ -228,8 +228,7 @@ pub fn measure_params(
             | ClassMemberKind::Class
             | ClassMemberKind::Interface
             | ClassMemberKind::Namespace
-            | ClassMemberKind::Enum
-            | ClassMemberKind::Struct => {
+            | ClassMemberKind::Enum => {
                 if m.is_readonly {
                     walk(&mut ctx, m.ty.0, Pol::Out, &[]);
                 } else {
