@@ -330,7 +330,7 @@ Literal       = IntLiteral | FloatLiteral | BigIntLiteral | DecimalLit | BinLit 
               | "true" | "false" | "null" ;
 
 ArrayLiteral  = "[" { "," | [ "..." ] AssignExpr [ "," ] } "]" ;      (* huecos permitidos *)
-TupleLiteral  = "#" "[" [ AssignExpr { "," AssignExpr } [ "," ] ] "]" ;
+TupleLiteral  = "(" [ AssignExpr "," [ AssignExpr { "," AssignExpr } [ "," ] ] ] ")" ;
 RecordLiteral = "#" ObjectLiteral ;
 ObjectLiteral = "{" ObjectBody "}" ;
 ObjectBody    = { ObjectProp [ "," ] } ;
