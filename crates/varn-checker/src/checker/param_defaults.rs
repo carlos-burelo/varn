@@ -12,6 +12,12 @@ impl Checker<'_> {
         bind: &BindResult,
     ) {
         for param in params {
+            if !matches!(param.pattern, varn_core::ast::Pattern::Identifier { .. })
+                && let Some(ann) = param.type_ann.as_ref()
+            {
+                let declared = self.resolve_type_node_cached(ann, bind);
+                self.check_pattern(rec, &param.pattern, &declared, bind);
+            }
             let Some(default) = param.default else {
                 continue;
             };

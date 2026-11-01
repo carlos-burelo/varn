@@ -108,26 +108,31 @@ impl<'r> Checker<'r> {
                     );
                 }
                 let elem_ty = value_ty.get_array_element_type(&self.ty_table);
+                if let Some(items) = &fixed {
+                    let arity_ok = if rest.is_some() {
+                        elements.len() <= items.len()
+                    } else {
+                        elements.len() == items.len()
+                    };
+                    if !arity_ok {
+                        self.emit(
+                            varn_core::Diagnostic::error(
+                                varn_core::ErrorCode::TupleIndexOutOfBounds,
+                                format!(
+                                    "this pattern destructures {} elements, but '{}' has {}",
+                                    elements.len(),
+                                    value_ty.display(&self.ty_table, &bind.interner),
+                                    items.len()
+                                ),
+                            )
+                            .with_range(*pattern.range()),
+                        );
+                    }
+                }
                 for (at, el) in elements.iter().enumerate() {
                     let Some(el) = el else { continue };
                     let item_ty = match &fixed {
-                        Some(items) => match items.get(at) {
-                            Some(item) => *item,
-                            None => {
-                                self.emit(
-                                    varn_core::Diagnostic::error(
-                                        varn_core::ErrorCode::TupleIndexOutOfBounds,
-                                        format!(
-                                            "this pattern takes element {at}, but '{}' has {} elements",
-                                            value_ty.display(&self.ty_table, &bind.interner),
-                                            items.len()
-                                        ),
-                                    )
-                                    .with_range(*el.pattern.range()),
-                                );
-                                Type::Dynamic
-                            }
-                        },
+                        Some(items) => items.get(at).copied().unwrap_or(Type::Dynamic),
                         None => elem_ty,
                     };
                     self.check_pattern(rec, &el.pattern, &item_ty, bind);

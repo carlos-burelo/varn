@@ -20,6 +20,10 @@ impl<'r> Checker<'r> {
             if has_ann || ep_ty.is_dynamic() {
                 continue;
             }
+            if !matches!(ap.pattern, varn_core::ast::Pattern::Identifier { .. }) {
+                self.check_pattern(rec, &ap.pattern, &ep_ty, bind);
+                continue;
+            }
 
             let name = pattern_lead_name(&ap.pattern, &bind.interner);
             let scope = bind.scopes.get(self.current_scope);
