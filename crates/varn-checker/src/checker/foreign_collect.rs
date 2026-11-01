@@ -275,6 +275,9 @@ impl Checker<'_> {
                         .is_some_and(|n| self.resolve_bind_atom(bind, n) == *name)
             })
             .map(|s| self.resolve_bind_atom(bind, s.name));
+        let is_struct = owner
+            .get_class_entry(name.as_ref())
+            .is_some_and(|entry| entry.is_struct);
         let parent = owner.get_class_parent(name.as_ref()).map(|p| {
             (
                 p.name.clone(),
@@ -298,6 +301,7 @@ impl Checker<'_> {
                 accessors,
                 constructor,
                 import_binding,
+                is_struct,
                 parent,
             },
             field_tys,

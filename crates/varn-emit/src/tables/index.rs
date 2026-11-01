@@ -241,6 +241,7 @@ pub fn build(
             )
         });
         info.import_binding = f.import_binding.clone();
+        info.layout.is_value = f.is_struct;
         foreign_parent_infos.push(info);
     }
     let mut classes = build_classes(

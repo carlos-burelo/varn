@@ -91,6 +91,7 @@ pub struct ForeignClass {
     pub accessors: Vec<ForeignAccessor>,
     pub constructor: Option<Type>,
     pub import_binding: Option<Arc<str>>,
+    pub is_struct: bool,
     pub parent: Option<(Arc<str>, Arc<str>)>,
 }
 
