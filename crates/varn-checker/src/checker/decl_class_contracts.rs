@@ -168,6 +168,40 @@ impl<'r> Checker<'r> {
 
     pub(super) fn check_member_names(&mut self, c: &varn_core::ast::ClassDecl, bind: &BindResult) {
         let mut seen: Vec<(varn_core::Atom, bool, u8)> = Vec::new();
+        for param in c.body.iter().flat_map(|member| match member {
+            ClassMember::Constructor { params, .. } => params.as_slice(),
+            ClassMember::Method { .. }
+            | ClassMember::Property { .. }
+            | ClassMember::Getter { .. }
+            | ClassMember::Setter { .. }
+            | ClassMember::Destructor { .. }
+            | ClassMember::StaticBlock { .. } => &[],
+        }) {
+            let declares_property =
+                param.modifiers.is_readonly || param.modifiers.visibility.is_some();
+            let varn_core::ast::Pattern::Identifier { name, range, .. } = &param.pattern else {
+                continue;
+            };
+            if !declares_property {
+                continue;
+            }
+            if seen
+                .iter()
+                .any(|(other, is_static, _)| other == name && !*is_static)
+            {
+                self.emit(
+                    Diagnostic::error(
+                        ErrorCode::DuplicateMemberName,
+                        format!(
+                            "the class already declares a member named '{}'",
+                            bind.interner.resolve(*name)
+                        ),
+                    )
+                    .with_range(*range),
+                );
+            }
+            seen.push((*name, false, 0u8));
+        }
         for member in &c.body {
             let (key, modifiers, range, role) = match member {
                 ClassMember::Method {
