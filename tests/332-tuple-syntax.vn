@@ -1,0 +1,59 @@
+import { describe, it, expect } from "std:test";
+
+function swap(pair: (int, str)): (str, int) {
+    const (n, s) = pair;
+    return (s, n);
+}
+
+function apply(f: (int, int) => int, pair: (int, int)): int {
+    return f(pair[0], pair[1]);
+}
+
+function wrap(x: int): (int,) {
+    return (x,);
+}
+
+await describe("332 tuple syntax", async () => {
+    await it("a tuple is written with parentheses and a type with parentheses", async () => {
+        const t: (int, str, bool) = (1, "a", true);
+        expect(t[0]).toBe(1);
+        expect(t[1]).toBe("a");
+        expect(t.length).toBe(3);
+        expect(`${t}`).toBe('(1, "a", true)');
+    });
+
+    await it("one element needs a trailing comma and parentheses alone only group", async () => {
+        const one = wrap(7);
+        expect(one.length).toBe(1);
+        expect(`${one}`).toBe("(7,)");
+        const grouped = (3 + 4) * 2;
+        expect(grouped).toBe(14);
+    });
+
+    await it("the empty tuple is unit", async () => {
+        const unit: () = ();
+        expect(unit.length).toBe(0);
+        expect(`${unit}`).toBe("()");
+    });
+
+    await it("tuples destructure with parentheses and arrays with brackets", async () => {
+        const (a, b) = (1, "x");
+        const [first, second] = [10, 20];
+        expect(a).toBe(1);
+        expect(b).toBe("x");
+        expect(first + second).toBe(30);
+        expect(swap((5, "five"))[0]).toBe("five");
+    });
+
+    await it("a tuple type and a function type do not mix", async () => {
+        expect(apply((x: int, y: int): int => x + y, (2, 3))).toBe(5);
+        const pairs: (int, str)[] = [(1, "a"), (2, "b")];
+        expect(pairs[1][1]).toBe("b");
+    });
+
+    await it("tuples nest and compare by contents", async () => {
+        const nested = ((1, 2), (3, (4, 5)));
+        expect(nested[1][1][0]).toBe(4);
+        expect(sameValue(nested, ((1, 2), (3, (4, 5))))).toBe(true);
+    });
+});

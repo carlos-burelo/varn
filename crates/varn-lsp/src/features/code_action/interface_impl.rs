@@ -88,6 +88,7 @@ pub fn generate_interface_impl_action(
                                 format!("{}{}", state.name(*name), ty_str)
                             }
                             varn_core::ast::Pattern::Array { .. }
+                            | varn_core::ast::Pattern::Tuple { .. }
                             | varn_core::ast::Pattern::Object { .. }
                             | varn_core::ast::Pattern::Assignment { .. }
                             | varn_core::ast::Pattern::Rest { .. } => format!("arg{}", ty_str),

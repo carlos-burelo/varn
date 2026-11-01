@@ -44,7 +44,7 @@ await describe("179 explicit collection decoding", async () => {
         expect(dict["c"]).toBe(3)
         expect(parsed.c).toBe(3)
         let total = 0
-        for (const [k, v] of dict) { total = total + v }
+        for (const (k, v) of dict) { total = total + v }
         expect(total).toBe(6)
         let caught = ""
         try { const bad: { [k: str]: int } = Json.parse("{\"a\":\"x\"}") } catch (e) { caught = e.message }

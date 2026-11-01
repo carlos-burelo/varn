@@ -235,7 +235,7 @@ Literal de cadena delimitado por triple comilla. No procesa secuencias de escape
 
 **Record (`#{…}`)**
 Producto estructural inmutable con igualdad profunda (`==`); par de
-`Tuple` (`#[…]`) (`tests/69-tuples-records.vn`).
+`Tuple` (`(…)`) (`tests/69-tuples-records.vn`).
 
 **`return`**  
 Devuelve un valor desde una función y termina su ejecución.
@@ -275,7 +275,7 @@ Referencia a la instancia actual dentro de métodos de clase o extensiones.
 **`throw`**  
 Lanza un error o excepción.
 
-**Tuple (`#[…]`)**  
+**Tuple (`(…)`)**  
 Colección heterogénea inmutable con igualdad estructural profunda (`==`).
 
 **`try`**  

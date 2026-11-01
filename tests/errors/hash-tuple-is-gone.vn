@@ -1,2 +1,2 @@
 // expect: error[VN2007]
-const pair = (1, 2);
+const t = #[1, 2]

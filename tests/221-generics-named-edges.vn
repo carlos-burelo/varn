@@ -56,12 +56,12 @@ function nested<T>(items: T[], wrap: (v: T) => T[]): T[][] {
     return out;
 }
 
-function pairOf<A, B>(a: A, b: B): [A, B] {
-    return #[a, b];
+function pairOf<A, B>(a: A, b: B): (A, B) {
+    return (a, b);
 }
 
-function boxPair<A, B>(a: A, b: B): Box<[A, B]> {
-    return new Box<[A, B]>(#[a, b]);
+function boxPair<A, B>(a: A, b: B): Box<(A, B)> {
+    return new Box<(A, B)>((a, b));
 }
 
 namespace tools {

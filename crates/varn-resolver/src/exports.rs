@@ -292,6 +292,7 @@ fn decl_export_names(decl: &Decl) -> Vec<Atom> {
             .filter_map(|d| match &d.id {
                 Pattern::Identifier { name, .. } => Some(*name),
                 Pattern::Array { .. }
+                | Pattern::Tuple { .. }
                 | Pattern::Object { .. }
                 | Pattern::Assignment { .. }
                 | Pattern::Rest { .. } => None,

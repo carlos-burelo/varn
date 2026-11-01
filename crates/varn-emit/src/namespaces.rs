@@ -228,7 +228,7 @@ fn collect_scoped_names(
             P::Identifier { name, .. } => {
                 out.insert(scoped_name(scope, interner.resolve(*name)));
             }
-            P::Array { elements, rest, .. } => {
+            P::Array { elements, rest, .. } | P::Tuple { elements, rest, .. } => {
                 for e in elements.iter().flatten() {
                     pat_names(&e.pattern, scope, out, interner);
                 }

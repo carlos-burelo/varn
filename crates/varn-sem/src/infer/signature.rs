@@ -89,6 +89,32 @@ pub fn infer_object_member_type(
     }
 }
 
+fn sequence_pattern_str(
+    delimiters: (&str, &str),
+    elements: &[Option<varn_core::ast::ArrayPatternEl>],
+    rest: Option<&Pattern>,
+    interner: Option<&varn_core::AtomInterner>,
+) -> Arc<str> {
+    let mut s = delimiters.0.to_owned();
+    for (i, el) in elements.iter().enumerate() {
+        if i > 0 {
+            s.push_str(", ");
+        }
+        if let Some(el) = el {
+            s.push_str(&pattern_to_rc_str(&el.pattern, interner));
+        }
+    }
+    if let Some(r) = rest {
+        if !elements.is_empty() {
+            s.push_str(", ");
+        }
+        s.push_str("...");
+        s.push_str(&pattern_to_rc_str(r, interner));
+    }
+    s.push_str(delimiters.1);
+    Arc::from(s)
+}
+
 pub fn pattern_to_rc_str(p: &Pattern, interner: Option<&varn_core::AtomInterner>) -> Arc<str> {
     match p {
         Pattern::Identifier { name, .. } => match interner {
@@ -96,24 +122,10 @@ pub fn pattern_to_rc_str(p: &Pattern, interner: Option<&varn_core::AtomInterner>
             None => Arc::from(varn_core::TokenKind::Placeholder.as_str()),
         },
         Pattern::Array { elements, rest, .. } => {
-            let mut s = "[".to_owned();
-            for (i, el) in elements.iter().enumerate() {
-                if i > 0 {
-                    s.push_str(", ");
-                }
-                if let Some(el) = el {
-                    s.push_str(&pattern_to_rc_str(&el.pattern, interner));
-                }
-            }
-            if let Some(r) = rest {
-                if !elements.is_empty() {
-                    s.push_str(", ");
-                }
-                s.push_str("...");
-                s.push_str(&pattern_to_rc_str(r, interner));
-            }
-            s.push(']');
-            Arc::from(s)
+            sequence_pattern_str(("[", "]"), elements, rest.as_deref(), interner)
+        }
+        Pattern::Tuple { elements, rest, .. } => {
+            sequence_pattern_str(("(", ")"), elements, rest.as_deref(), interner)
         }
         Pattern::Object {
             properties, rest, ..
@@ -162,6 +174,7 @@ pub fn pattern_lead_name<'a>(p: &Pattern, interner: &'a varn_core::AtomInterner)
     match p {
         Pattern::Identifier { name, .. } => interner.resolve(*name),
         Pattern::Array { .. } => "<array>",
+        Pattern::Tuple { .. } => "<tuple>",
         Pattern::Object { .. } => "<object>",
         Pattern::Rest { .. } => "<rest>",
         Pattern::Assignment { left, .. } => pattern_lead_name(left, interner),

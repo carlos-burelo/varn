@@ -118,6 +118,7 @@ impl ContractSurface {
                         .filter_map(|d| match &d.id {
                             varn_core::ast::Pattern::Identifier { name: n, .. } => Some(name(*n)),
                             varn_core::ast::Pattern::Array { .. }
+                            | varn_core::ast::Pattern::Tuple { .. }
                             | varn_core::ast::Pattern::Object { .. }
                             | varn_core::ast::Pattern::Assignment { .. }
                             | varn_core::ast::Pattern::Rest { .. } => None,

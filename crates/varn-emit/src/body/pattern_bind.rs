@@ -121,7 +121,7 @@ impl<'a> FnEmitter<'a> {
                     self.bind_pattern(rest_pat, rest_obj, out);
                 }
             }
-            Pattern::Array { elements, rest, .. } => {
+            Pattern::Array { elements, rest, .. } | Pattern::Tuple { elements, rest, .. } => {
                 let tuple_elems = if let BackendTy::Tuple(slots) = src.ty.non_nullable(self.tt)
                     && self.tt.contains_list(slots)
                 {

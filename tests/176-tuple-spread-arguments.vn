@@ -11,8 +11,8 @@ class Point {
     join(a: int, b: str): str { return `${b}${a}`}
 }
 
-const mixed: #[int, str] = #[1, "x"]
-const numbers: #[int, int] = #[2, 3]
+const mixed: (int, str) = (1, "x")
+const numbers: (int, int) = (2, 3)
 
 await describe("176 tuple spread in arguments", async () => {
     await it("a tuple fills the parameters by position", () => {

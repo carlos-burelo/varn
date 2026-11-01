@@ -96,7 +96,7 @@ await describe("73 str charcode json shape", async () => {
         expect(Json.stringify({ z: 1, a: 2, m: 3 })).toBe("{\"z\":1,\"a\":2,\"m\":3}")
         
         // Tuples and records: these used to come out as `[]` and `{}`.
-        const tup = #[1, "two", true]
+        const tup = (1, "two", true)
         expect(Json.stringify(tup as dynamic)).toBe("[1,\"two\",true]")
         
         const rec = #{ x: 3, y: 4 }

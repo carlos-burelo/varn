@@ -288,14 +288,17 @@ impl fmt::Display for TypeDesc {
             TypeDesc::Set(el) => write!(f, "Set<{el}>"),
             TypeDesc::Dict(el) => write!(f, "{{ [key: str]: {el} }}"),
             TypeDesc::Tuple(els) => {
-                f.write_str("#[")?;
+                f.write_str("(")?;
                 for (i, el) in els.iter().enumerate() {
                     if i > 0 {
                         f.write_str(", ")?;
                     }
                     write!(f, "{el}")?;
                 }
-                f.write_str("]")
+                if els.len() == 1 {
+                    f.write_str(",")?;
+                }
+                f.write_str(")")
             }
             TypeDesc::Class { name, .. } => f.write_str(name),
             TypeDesc::Enum { name, .. } => f.write_str(name),

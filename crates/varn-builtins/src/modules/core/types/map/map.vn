@@ -10,7 +10,7 @@ export declare class Map<K, V> {
     clear(): void;
     keys(): K[];
     values(): V[];
-    entries(): [K, V][];
+    entries(): (K, V)[];
     @throws(Error) forEach(callback: (value: V, key: K, map: Map<K, V>) => void): void;
     readonly size: int;
 }

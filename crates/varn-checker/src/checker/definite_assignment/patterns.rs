@@ -7,7 +7,7 @@ pub(super) fn pattern_names(p: &varn_core::ast::Pattern) -> Vec<Atom> {
     fn go(p: &Pattern, out: &mut Vec<Atom>) {
         match p {
             Pattern::Identifier { name, .. } => out.push(*name),
-            Pattern::Array { elements, rest, .. } => {
+            Pattern::Array { elements, rest, .. } | Pattern::Tuple { elements, rest, .. } => {
                 for e in elements.iter().flatten() {
                     go(&e.pattern, out);
                 }

@@ -97,11 +97,11 @@ const ext  = { ...base, z: 3 }        // spread en objeto
 ## 6. Tuplas y Records (Inmutables)
 
 ```varn
-let t = #[1, "hello", true]       // Tuple  (tests/69-tuples-records.vn)
+let t = (1, "hello", true)       // Tuple  (tests/69-tuples-records.vn)
 let r = #{ name: "Varn", v: 1 }   // Record
 
 // Igualdad estructural profunda con ==
-let t2 = #[1, "hello", true]
+let t2 = (1, "hello", true)
 assertTrue("tuple eq", t == t2)
 let r2 = #{ name: "Varn", v: 1 }
 assertTrue("record eq", r == r2)

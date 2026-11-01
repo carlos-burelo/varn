@@ -24,6 +24,7 @@ impl Binder<'_> {
                     varn_core::intrinsics::is_regex_literal_binding(self.interner.resolve(*name))
                 }
                 Pattern::Array { .. }
+                | Pattern::Tuple { .. }
                 | Pattern::Object { .. }
                 | Pattern::Assignment { .. }
                 | Pattern::Rest { .. } => false,

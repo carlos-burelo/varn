@@ -122,12 +122,12 @@ export class Query {
         return res;
     }
 
-    entries(): [str, str][] {
-        let res: [str, str][] = [];
+    entries(): (str, str)[] {
+        let res: (str, str)[] = [];
         for (const key in this.buckets) {
             const bucket = this.buckets[key]!;
             for (const val of bucket) {
-                res.push(#[key, val]);
+                res.push((key, val));
             }
         }
         return res;

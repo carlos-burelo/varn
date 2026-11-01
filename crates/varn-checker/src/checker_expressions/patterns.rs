@@ -30,7 +30,7 @@ impl<'r> Checker<'r> {
                     self.record_type(rec, range.start.offset, *value_ty);
                 }
             }
-            Pattern::Array { elements, rest, .. } => {
+            Pattern::Array { elements, rest, .. } | Pattern::Tuple { elements, rest, .. } => {
                 let fixed: Option<Vec<Type>> =
                     if let varn_core::TypeKind::Tuple(items) = self.ty_table.get(value_ty.0) {
                         Some(
@@ -43,6 +43,32 @@ impl<'r> Checker<'r> {
                     } else {
                         None
                     };
+                let tuple_pattern = matches!(pattern, Pattern::Tuple { .. });
+                let value_is_array =
+                    matches!(self.ty_table.get(value_ty.0), varn_core::TypeKind::Array(_));
+                if tuple_pattern && value_is_array {
+                    self.emit(
+                        varn_core::Diagnostic::error(
+                            varn_core::ErrorCode::TypeMismatch,
+                            format!(
+                                "'{}' is an array: destructure it with [a, b], not (a, b)",
+                                value_ty.display(&self.ty_table, &bind.interner)
+                            ),
+                        )
+                        .with_range(*pattern.range()),
+                    );
+                } else if !tuple_pattern && fixed.is_some() {
+                    self.emit(
+                        varn_core::Diagnostic::error(
+                            varn_core::ErrorCode::TypeMismatch,
+                            format!(
+                                "'{}' is a tuple: destructure it with (a, b), not [a, b]",
+                                value_ty.display(&self.ty_table, &bind.interner)
+                            ),
+                        )
+                        .with_range(*pattern.range()),
+                    );
+                }
                 let elem_ty = value_ty.get_array_element_type(&self.ty_table);
                 for (at, el) in elements.iter().enumerate() {
                     let Some(el) = el else { continue };

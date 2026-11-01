@@ -103,7 +103,10 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String
                     }
                 }
                 s.expect(TokenKind::RParen)?;
-                s.expect(TokenKind::FatArrow)?;
+                if !s.eat(TokenKind::FatArrow) {
+                    let full_range = s.span_from(range);
+                    return Ok(s.type_node(full_range, TypeKind::Tuple(param_types)));
+                }
                 let ret = super::entry::parse_type(s)?;
                 let full_range = s.span_from(range);
                 let params = param_types
@@ -148,11 +151,6 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String
             Ok(first)
         }
 
-        TokenKind::Hash if s.peek_kind(1) == TokenKind::LBracket => {
-            s.advance();
-            super::composite::parse_tuple_type(s, range)
-        }
-        TokenKind::LBracket => super::composite::parse_tuple_type(s, range),
         TokenKind::Hash if s.peek_kind(1) == TokenKind::LBrace => {
             s.advance();
             let object = parse_primary_type(s)?;
@@ -376,6 +374,7 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String
         | TokenKind::Match
         | TokenKind::At
         | TokenKind::Hash
+        | TokenKind::LBracket
         | TokenKind::Backslash
         | TokenKind::Dollar
         | TokenKind::Backtick

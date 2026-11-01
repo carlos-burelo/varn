@@ -328,6 +328,7 @@ impl<'a> FnEmitter<'a> {
                 }
 
                 pat @ Pattern::Array { .. }
+                | pat @ Pattern::Tuple { .. }
                 | pat @ Pattern::Object { .. }
                 | pat @ Pattern::Assignment { .. }
                 | pat @ Pattern::Rest { .. } => {

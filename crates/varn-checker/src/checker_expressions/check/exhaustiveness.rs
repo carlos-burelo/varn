@@ -157,7 +157,8 @@ impl<'r> Checker<'r> {
                                         && matches!(sub, Some(MatchPattern::Identifier(n)) if bind.interner.resolve(*n) == vname.as_ref())
                                 })
                             }
-                            MatchPattern::Sequence(_) | MatchPattern::Type { .. } => false,
+                            MatchPattern::Sequence(_)
+                            | MatchPattern::Type { .. } => false,
                         }
                     })
                 })

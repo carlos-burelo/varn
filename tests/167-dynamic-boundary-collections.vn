@@ -32,7 +32,7 @@ function legs(d: dynamic): int {
 }
 function mapSize(d: dynamic): int { const m: Map<str, int> = d; return m.size }
 function setSize(d: dynamic): int { const s: Set<int> = d; return s.size }
-function first(d: dynamic): int { const t: #[int, str] = d; return t[0] }
+function first(d: dynamic): int { const t: (int, str) = d; return t[0] }
 function tint(d: dynamic): Tint { return d }
 function apply(d: dynamic): int { const f: (x: int) => int = d; return f(2) }
 function absent(d: dynamic): bool { const xs: int[]? = d; return xs == null }
@@ -77,13 +77,13 @@ await describe("167 dynamic boundary: collections", async () => {
     })
 
     await it("a tuple is checked by arity and slot", () => {
-        expect(first(#[1, "a"])).toBe(1)
-        expect(outcome(() => { first(#[1, 2]) })).toBe("type mismatch: expected '#[int, str]', got 'Tuple'")
-        expect(outcome(() => { first(#[1]) })).toBe("type mismatch: expected '#[int, str]', got 'Tuple'")
-        expect(outcome(() => { first([1, "a"]) })).toBe("type mismatch: expected '#[int, str]', got 'Array'")
-        expect(first(Json.parse<#[int, str]>("[7, \"z\"]"))).toBe(7)
-        expect(outcome(() => { first([1]) })).toBe("type mismatch: expected '#[int, str]', got 'Array'")
-        expect(outcome(() => { first(["x", "a"]) })).toBe("type mismatch: expected '#[int, str]', got 'Array'")
+        expect(first((1, "a"))).toBe(1)
+        expect(outcome(() => { first((1, 2)) })).toBe("type mismatch: expected '(int, str)', got 'Tuple'")
+        expect(outcome(() => { first((1,)) })).toBe("type mismatch: expected '(int, str)', got 'Tuple'")
+        expect(outcome(() => { first([1, "a"]) })).toBe("type mismatch: expected '(int, str)', got 'Array'")
+        expect(first(Json.parse<(int, str)>("[7, \"z\"]"))).toBe(7)
+        expect(outcome(() => { first([1]) })).toBe("type mismatch: expected '(int, str)', got 'Array'")
+        expect(outcome(() => { first(["x", "a"]) })).toBe("type mismatch: expected '(int, str)', got 'Array'")
     })
 
     await it("an enum only accepts its own variants", () => {

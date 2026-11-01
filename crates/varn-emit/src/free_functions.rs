@@ -7,6 +7,7 @@ pub(super) fn param_name(p: &Param, interner: &AtomInterner) -> Arc<str> {
     match &p.pattern {
         Pattern::Identifier { name, .. } => Arc::from(interner.resolve(*name)),
         Pattern::Array { .. }
+        | Pattern::Tuple { .. }
         | Pattern::Object { .. }
         | Pattern::Assignment { .. }
         | Pattern::Rest { .. } => Arc::from(varn_core::TokenKind::Placeholder.as_str()),

@@ -322,6 +322,7 @@ import "./328-loop-header-with-redundant-branch.vn"
 import "./329-regex-index-in-code-points.vn"
 import "./330-regex-literals.vn"
 import "./331-regex-cache-is-bounded.vn"
+import "./332-tuple-syntax.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

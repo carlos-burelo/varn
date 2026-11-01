@@ -131,7 +131,8 @@ impl HeapInner {
             HeapObj::Tuple(a) if a.is_empty() => out.push_str("()"),
             HeapObj::Tuple(a) => {
                 let items: Vec<VmValue> = (0..a.len()).filter_map(|i| a.get_vm(i)).collect();
-                self.write_list("#[", "]", items.into_iter(), out, path);
+                let close = if items.len() == 1 { ",)" } else { ")" };
+                self.write_list("(", close, items.into_iter(), out, path);
             }
             HeapObj::Object(_) => {
                 let entries =

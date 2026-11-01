@@ -257,14 +257,18 @@ impl fmt::Display for TypeDisplay<'_> {
             }
             TypeKind::Tuple(list) if table.get_list(list).is_empty() => write!(f, "()"),
             TypeKind::Tuple(list) => {
-                write!(f, "#[")?;
-                for (i, m) in table.get_list(list).iter().enumerate() {
+                write!(f, "(")?;
+                let members = table.get_list(list);
+                for (i, m) in members.iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;
                     }
                     write!(f, "{}", self.child(*m))?;
                 }
-                write!(f, "]")
+                if members.len() == 1 {
+                    write!(f, ",")?;
+                }
+                write!(f, ")")
             }
             TypeKind::Typeof(_) => write!(f, "typeof <expr>"),
             TypeKind::EnumVariant { .. } => write!(f, "enum variant"),

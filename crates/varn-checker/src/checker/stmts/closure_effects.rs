@@ -171,7 +171,7 @@ impl<'r> Checker<'r> {
     pub(crate) fn pattern_bound_atoms(pattern: &Pattern, out: &mut Vec<Atom>) {
         match pattern {
             Pattern::Identifier { name, .. } => out.push(*name),
-            Pattern::Array { elements, rest, .. } => {
+            Pattern::Array { elements, rest, .. } | Pattern::Tuple { elements, rest, .. } => {
                 for el in elements.iter().flatten() {
                     Self::pattern_bound_atoms(&el.pattern, out);
                 }

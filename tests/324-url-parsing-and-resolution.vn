@@ -5,48 +5,48 @@ import { ParseError } from "std:error";
 
 const BASE = "http://a/b/c/d;p?q";
 
-const RESOLUTIONS: [str, str][] = [
-    #["g:h", "g:h"],
-    #["g", "http://a/b/c/g"],
-    #["./g", "http://a/b/c/g"],
-    #["g/", "http://a/b/c/g/"],
-    #["/g", "http://a/g"],
-    #["//g", "http://g/"],
-    #["?y", "http://a/b/c/d;p?y"],
-    #["g?y", "http://a/b/c/g?y"],
-    #["#s", "http://a/b/c/d;p?q#s"],
-    #["g#s", "http://a/b/c/g#s"],
-    #["g?y#s", "http://a/b/c/g?y#s"],
-    #[";x", "http://a/b/c/;x"],
-    #["g;x", "http://a/b/c/g;x"],
-    #["g;x?y#s", "http://a/b/c/g;x?y#s"],
-    #["", "http://a/b/c/d;p?q"],
-    #[".", "http://a/b/c/"],
-    #["./", "http://a/b/c/"],
-    #["..", "http://a/b/"],
-    #["../", "http://a/b/"],
-    #["../g", "http://a/b/g"],
-    #["../..", "http://a/"],
-    #["../../", "http://a/"],
-    #["../../g", "http://a/g"],
-    #["../../../g", "http://a/g"],
-    #["../../../../g", "http://a/g"],
-    #["/./g", "http://a/g"],
-    #["/../g", "http://a/g"],
-    #["g.", "http://a/b/c/g."],
-    #[".g", "http://a/b/c/.g"],
-    #["g..", "http://a/b/c/g.."],
-    #["..g", "http://a/b/c/..g"],
-    #["./../g", "http://a/b/g"],
-    #["./g/.", "http://a/b/c/g/"],
-    #["g/./h", "http://a/b/c/g/h"],
-    #["g/../h", "http://a/b/c/h"],
-    #["g;x=1/./y", "http://a/b/c/g;x=1/y"],
-    #["g;x=1/../y", "http://a/b/c/y"],
-    #["g?y/./x", "http://a/b/c/g?y/./x"],
-    #["g?y/../x", "http://a/b/c/g?y/../x"],
-    #["g#s/./x", "http://a/b/c/g#s/./x"],
-    #["http:g", "http:g"]
+const RESOLUTIONS: (str, str)[] = [
+    ("g:h", "g:h"),
+    ("g", "http://a/b/c/g"),
+    ("./g", "http://a/b/c/g"),
+    ("g/", "http://a/b/c/g/"),
+    ("/g", "http://a/g"),
+    ("//g", "http://g/"),
+    ("?y", "http://a/b/c/d;p?y"),
+    ("g?y", "http://a/b/c/g?y"),
+    ("#s", "http://a/b/c/d;p?q#s"),
+    ("g#s", "http://a/b/c/g#s"),
+    ("g?y#s", "http://a/b/c/g?y#s"),
+    (";x", "http://a/b/c/;x"),
+    ("g;x", "http://a/b/c/g;x"),
+    ("g;x?y#s", "http://a/b/c/g;x?y#s"),
+    ("", "http://a/b/c/d;p?q"),
+    (".", "http://a/b/c/"),
+    ("./", "http://a/b/c/"),
+    ("..", "http://a/b/"),
+    ("../", "http://a/b/"),
+    ("../g", "http://a/b/g"),
+    ("../..", "http://a/"),
+    ("../../", "http://a/"),
+    ("../../g", "http://a/g"),
+    ("../../../g", "http://a/g"),
+    ("../../../../g", "http://a/g"),
+    ("/./g", "http://a/g"),
+    ("/../g", "http://a/g"),
+    ("g.", "http://a/b/c/g."),
+    (".g", "http://a/b/c/.g"),
+    ("g..", "http://a/b/c/g.."),
+    ("..g", "http://a/b/c/..g"),
+    ("./../g", "http://a/b/g"),
+    ("./g/.", "http://a/b/c/g/"),
+    ("g/./h", "http://a/b/c/g/h"),
+    ("g/../h", "http://a/b/c/h"),
+    ("g;x=1/./y", "http://a/b/c/g;x=1/y"),
+    ("g;x=1/../y", "http://a/b/c/y"),
+    ("g?y/./x", "http://a/b/c/g?y/./x"),
+    ("g?y/../x", "http://a/b/c/g?y/../x"),
+    ("g#s/./x", "http://a/b/c/g#s/./x"),
+    ("http:g", "http:g")
 ];
 
 function parseFails(text: str): bool {
@@ -61,7 +61,7 @@ function parseFails(text: str): bool {
 await describe("324 url parsing and resolution", async () => {
     await it("resolving a reference follows RFC 3986 section 5.4", async () => {
         const base = Url.parse(BASE);
-        for (const [reference, expected] of RESOLUTIONS) {
+        for (const (reference, expected) of RESOLUTIONS) {
             expect(Url.resolve(base, reference).toString()).toBe(expected);
         }
     });

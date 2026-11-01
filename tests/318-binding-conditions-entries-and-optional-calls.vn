@@ -60,7 +60,7 @@ await describe("318 binding conditions, entries and optional calls", async () =>
     await it("entries pairs every element with its index", async () => {
         const xs = ["a", "b", "c"];
         let joined = "";
-        for (const [i, v] of xs.entries()) { joined = joined + i.toString() + v; }
+        for (const (i, v) of xs.entries()) { joined = joined + i.toString() + v; }
         expect(joined).toBe("0a1b2c");
         expect(xs.entries().length).toBe(3);
         expect(([] as int[]).entries().length).toBe(0);

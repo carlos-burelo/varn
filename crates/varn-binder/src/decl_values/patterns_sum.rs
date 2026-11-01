@@ -24,7 +24,7 @@ impl<'r> super::super::Binder<'r> {
                 sym.ty = ty;
                 self.define(*name, sym);
             }
-            Pattern::Array { elements, rest, .. } => {
+            Pattern::Array { elements, rest, .. } | Pattern::Tuple { elements, rest, .. } => {
                 let elem_ty = ty.as_ref().and_then(|t| match self.ty_table.get(t.0) {
                     varn_core::TypeKind::Array(inner) => Some(Type::resolved(inner)),
                     varn_core::TypeKind::Primitive(_)

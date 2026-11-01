@@ -15,6 +15,11 @@ pub enum Pattern {
         rest: Option<Box<Pattern>>,
         range: SourceRange,
     },
+    Tuple {
+        elements: Vec<Option<ArrayPatternEl>>,
+        rest: Option<Box<Pattern>>,
+        range: SourceRange,
+    },
     Object {
         properties: Vec<ObjPatternProp>,
         rest: Option<Box<Pattern>>,
@@ -37,6 +42,7 @@ impl Pattern {
         match self {
             Pattern::Identifier { range, .. } => range,
             Pattern::Array { range, .. } => range,
+            Pattern::Tuple { range, .. } => range,
             Pattern::Object { range, .. } => range,
             Pattern::Assignment { range, .. } => range,
             Pattern::Rest { range, .. } => range,

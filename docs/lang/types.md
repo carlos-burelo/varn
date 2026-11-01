@@ -48,16 +48,16 @@ let nested: int[][] = [[1, 2], [3, 4]]           // 2D array
 
 `Array<T>` y `T[]` son semánticamente idénticos y asignables bidireccionalmente.
 
-### 2.2 Tuples (`#[…]`)
+### 2.2 Tuples (`(…)`)
 
 Colecciones heterogéneas inmutables con igualdad estructural:
 
 ```varn
-let t1 = #[1, "hello", true]    // tests/69-tuples-records.vn
+let t1 = (1, "hello", true)    // tests/69-tuples-records.vn
 assertTrue("tuple elem 0", t1[0] == 1)
 assertTrue("tuple length", t1.length == 3)
 
-let t2 = #[1, "hello", true]
+let t2 = (1, "hello", true)
 assertTrue("tuple eq true", t1 == t2)   // igualdad estructural profunda
 ```
 
@@ -128,7 +128,7 @@ assertTrue("map size", m.size === 1)
 |---|---|---|---|---|
 | **`Object`** | `{ name: "Alice", age: 30 }` | `obj.name` (offset de compilación fijo) | Explícita (`sameValue(a, b)`) | Mutable |
 | **`Record`** | `#{ name: "Alice", age: 30 }` | `rec.name` | Estructural profunda (`==`) | Inmutable |
-| **`Tuple`** | `#[ 1, "hello" ]` | `tup[0]` | Estructural profunda (`==`) | Inmutable |
+| **`Tuple`** | `( 1, "hello" )` | `tup[0]` | Estructural profunda (`==`) | Inmutable |
 | **`Map<K, V>`** | `new Map<K, V>()` | `m[k]`, `m.get(k)`, `m.set(k, v)` | Explícita (`sameValue(a, b)`) | Mutable |
 | **`{ [key: K]: V }`** | `{ "a": 1 }` | `d[k]` | Explícita (`sameValue(a, b)`) | Mutable |
 

@@ -460,10 +460,10 @@ await h1.join()
 ## 69 — Tuples y Records (`tests/69-tuples-records.vn`)
 
 ```varn
-let t1 = #[1, "hello", true]
+let t1 = (1, "hello", true)
 assertTrue("tuple elem 0", t1[0] == 1)
 assertTrue("tuple length", t1.length == 3)
-let t2 = #[1, "hello", true]
+let t2 = (1, "hello", true)
 assertTrue("tuple eq true", t1 == t2)
 
 let r1 = #{ name: "Varn", version: 1 }
@@ -471,8 +471,8 @@ assertTrue("record field", r1.name == "Varn")
 let r2 = #{ name: "Varn", version: 1 }
 assertTrue("record eq", r1 == r2)
 
-let nested1 = #{ point: #[10, 20], meta: #{ active: true } }
-let nested2 = #{ point: #[10, 20], meta: #{ active: true } }
+let nested1 = #{ point: (10, 20), meta: #{ active: true } }
+let nested2 = #{ point: (10, 20), meta: #{ active: true } }
 assertTrue("nested eq true", nested1 == nested2)
 ```
 

@@ -261,7 +261,7 @@ fn match_case_uses_receiver(arena: &AstArena, c: &MatchCase) -> bool {
 fn pattern_default_uses_receiver(arena: &AstArena, p: &Pattern) -> bool {
     match p {
         Pattern::Identifier { .. } => false,
-        Pattern::Array { elements, rest, .. } => {
+        Pattern::Array { elements, rest, .. } | Pattern::Tuple { elements, rest, .. } => {
             elements.iter().any(|el| {
                 el.as_ref()
                     .is_some_and(|e| pattern_default_uses_receiver(arena, &e.pattern))

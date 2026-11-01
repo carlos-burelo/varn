@@ -6,7 +6,8 @@ use varn_core::TokenKind;
 pub fn parse_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
     let range = s.range();
     match s.kind() {
-        TokenKind::LBracket => parse_array_pattern(s),
+        TokenKind::LBracket => parse_sequence_pattern(s, Sequence::Array),
+        TokenKind::LParen => parse_sequence_pattern(s, Sequence::Tuple),
         TokenKind::LBrace => parse_object_pattern(s),
         TokenKind::DotDotDot => {
             s.advance();
@@ -43,7 +44,6 @@ pub fn parse_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
         | TokenKind::TemplateMiddle
         | TokenKind::TemplateTail
         | TokenKind::RegularExpression
-        | TokenKind::LParen
         | TokenKind::RParen
         | TokenKind::RBrace
         | TokenKind::RBracket
@@ -194,16 +194,39 @@ pub fn parse_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
     }
 }
 
-fn parse_array_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Sequence {
+    Array,
+    Tuple,
+}
+
+impl Sequence {
+    fn closing(self) -> TokenKind {
+        match self {
+            Self::Array => TokenKind::RBracket,
+            Self::Tuple => TokenKind::RParen,
+        }
+    }
+
+    fn noun(self) -> &'static str {
+        match self {
+            Self::Array => "array",
+            Self::Tuple => "tuple",
+        }
+    }
+}
+
+fn parse_sequence_pattern(s: &mut TokenStream, kind: Sequence) -> Result<Pattern, String> {
     let range = s.range();
     s.advance();
     let mut elements: Vec<Option<ArrayPatternEl>> = vec![];
     let mut rest = None;
 
-    while !s.check(TokenKind::RBracket) && !s.is_eof() {
+    while !s.check(kind.closing()) && !s.is_eof() {
         if s.check(TokenKind::Comma) {
             return Err(format!(
-                "array destructuring holes are not allowed at {}:{}; use `_` to discard a position",
+                "{} destructuring holes are not allowed at {}:{}; use `_` to discard a position",
+                kind.noun(),
                 s.range().start.line,
                 s.range().start.column
             ));
@@ -227,12 +250,19 @@ fn parse_array_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
         elements.push(Some(ArrayPatternEl { pattern: pat }));
         s.eat(TokenKind::Comma);
     }
-    s.expect(TokenKind::RBracket)?;
+    s.expect(kind.closing())?;
     let full_range = s.span_from(range);
-    Ok(Pattern::Array {
-        elements,
-        rest,
-        range: full_range,
+    Ok(match kind {
+        Sequence::Array => Pattern::Array {
+            elements,
+            rest,
+            range: full_range,
+        },
+        Sequence::Tuple => Pattern::Tuple {
+            elements,
+            rest,
+            range: full_range,
+        },
     })
 }
 

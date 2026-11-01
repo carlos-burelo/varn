@@ -30,7 +30,7 @@ await describe("199 containers are invariant", async () => {
         const grid: int?[][] = [[1, null], []]
         const table: { [key: str]: int | str } = { a: 1, b: "x" }
         const item: Labelled = { label: null, weight: 2 }
-        const more: (int | str)[] = [0, ...[1, 2], ...#[3, "four"]]
+        const more: (int | str)[] = [0, ...[1, 2], ...(3, "four")]
         expect(mixed.length + holes.length + ratios.length + grid.length + more.length).toBe(14)
         expect(table["a"]).toBe(1)
         expect(item.weight).toBe(2)

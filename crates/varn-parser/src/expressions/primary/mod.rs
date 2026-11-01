@@ -127,6 +127,18 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
                 return Ok(s.expr(full_range, ExprKind::Tuple { elements: vec![] }));
             }
             let expr = parse_expr(s)?;
+            if s.check(TokenKind::Comma) {
+                let mut elements = vec![expr];
+                while s.eat(TokenKind::Comma) {
+                    if s.check(TokenKind::RParen) {
+                        break;
+                    }
+                    elements.push(super::parse_assign_expr(s)?);
+                }
+                s.expect(TokenKind::RParen)?;
+                let full_range = s.span_from(start_range);
+                return Ok(s.expr(full_range, ExprKind::Tuple { elements }));
+            }
             s.expect(TokenKind::RParen)?;
             let full_range = s.span_from(start_range);
             Ok(s.expr(full_range, ExprKind::Paren { expression: expr }))
@@ -152,18 +164,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
 
         TokenKind::Hash => {
             let start_range = s.range();
-            if s.peek_kind(1) == TokenKind::LBracket {
-                s.advance();
-                s.advance();
-                let mut elements = vec![];
-                while !s.check(TokenKind::RBracket) && !s.is_eof() {
-                    elements.push(super::parse_assign_expr(s)?);
-                    s.eat(TokenKind::Comma);
-                }
-                s.expect(TokenKind::RBracket)?;
-                let full_range = s.span_from(start_range);
-                Ok(s.expr(full_range, ExprKind::Tuple { elements }))
-            } else if s.peek_kind(1) == TokenKind::LBrace {
+            if s.peek_kind(1) == TokenKind::LBrace {
                 s.advance();
                 let obj = parse_object_expr(s)?;
                 let full_range = s.span_from(start_range);
