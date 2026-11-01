@@ -88,7 +88,8 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
             call_args.push(quote!(#b));
             arg_base = 1;
         }
-        Kind::StaticMethod | Kind::StaticGetter | Kind::Function | Kind::Property => {
+        Kind::Function => {}
+        Kind::StaticMethod | Kind::StaticGetter | Kind::Property => {
             arg_base_is_dynamic = true;
         }
     }
