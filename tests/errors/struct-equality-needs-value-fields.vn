@@ -1,0 +1,6 @@
+// expect: error[VN3010]
+class Box { constructor(readonly v: int) {} }
+struct Holder { box: Box }
+const a = new Holder(new Box(1))
+const b = new Holder(new Box(1))
+const same = a == b

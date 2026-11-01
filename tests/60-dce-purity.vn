@@ -61,7 +61,7 @@ function dropPure(a: int[], t: Ticker): int {
 await describe("60 dce purity", async () => {
     await it("tests", async () => {
         
-        const ticker = Ticker()
+        const ticker = new Ticker()
         
         expect(dropGetter(ticker)).toBe(42)
         expect(getterRuns).toBe(1)

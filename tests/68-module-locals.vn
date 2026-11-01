@@ -80,7 +80,7 @@ await describe("68 module locals", async () => {
         let closure = (): int => readByClosure * 2
         expect(closure()).toBe(14)
         
-        let t = Touches(21)
+        let t = new Touches(21)
         expect(ctorRuns).toBe(1)
         expect(t.doubled).toBe(42)
         expect(getterRuns).toBe(1)

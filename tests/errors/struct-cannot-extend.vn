@@ -1,0 +1,3 @@
+// expect: error[VN2007]
+struct Base { x: int }
+struct Derived extends Base { y: int }

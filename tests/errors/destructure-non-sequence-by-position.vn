@@ -1,0 +1,3 @@
+// expect: error[VN3001]
+class Box { constructor(readonly v: int) {} }
+const [a] = new Box(1)

@@ -1,0 +1,176 @@
+import { describe, it, expect } from "std:test";
+
+struct Point {
+    x: int;
+    y: int;
+
+    manhattan(): int {
+        return this.x + this.y;
+    }
+
+    static origin(): Point {
+        return new Point(0, 0);
+    }
+}
+
+struct Line {
+    from: Point;
+    to: Point;
+}
+
+struct Settings {
+    retries: int = 3;
+    verbose: bool = false;
+    label: str = "default";
+}
+
+struct Pair<A, B> {
+    first: A;
+    second: B;
+}
+
+interface Shape {
+    area(): int;
+}
+
+struct Square implements Shape {
+    side: int;
+    area(): int {
+        return this.side * this.side;
+    }
+}
+
+class Counter {
+    constructor(readonly start: int) {}
+}
+
+struct Tagged {
+    name: str;
+    weight: float;
+    ok: bool;
+}
+
+function sumPoints(points: Point[]): int {
+    let total = 0;
+    for (const p of points) {
+        total += p.manhattan();
+    }
+    return total;
+}
+
+function hotEquality(n: int): int {
+    let equal = 0;
+    for (let i = 0; i < n; i++) {
+        const a = new Point(i, i + 1);
+        const b = new Point(i, i + 1);
+        const c = new Point(i, i + 2);
+        if (a == b && a != c) {
+            equal += 1;
+        }
+    }
+    return equal;
+}
+
+await describe("334 struct", async () => {
+    await it("a struct is built with new, its fields in order or by name", async () => {
+        const a = new Point(1, 2);
+        const b = new Point(y: 5, x: 4);
+        expect(a.x).toBe(1);
+        expect(a.y).toBe(2);
+        expect(b.x).toBe(4);
+        expect(b.y).toBe(5);
+    });
+
+    await it("a field with a default may be left out", async () => {
+        const s = new Settings();
+        expect(s.retries).toBe(3);
+        expect(s.verbose).toBe(false);
+        expect(s.label).toBe("default");
+        const t = new Settings(5, true);
+        expect(t.retries).toBe(5);
+        expect(t.label).toBe("default");
+        expect(new Settings(label: "x").label).toBe("x");
+    });
+
+    await it("methods and static members work like a class", async () => {
+        expect(new Point(3, 4).manhattan()).toBe(7);
+        expect(Point.origin().manhattan()).toBe(0);
+        expect(sumPoints([new Point(1, 1), new Point(2, 3)])).toBe(7);
+    });
+
+    await it("equality compares the contents field by field", async () => {
+        expect(new Point(1, 2) == new Point(1, 2)).toBe(true);
+        expect(new Point(1, 2) == new Point(1, 3)).toBe(false);
+        expect(new Point(1, 2) != new Point(2, 2)).toBe(true);
+        const line = new Line(new Point(0, 0), new Point(1, 1));
+        expect(line == new Line(new Point(0, 0), new Point(1, 1))).toBe(true);
+        expect(line == new Line(new Point(0, 0), new Point(1, 2))).toBe(false);
+        const tagged = new Tagged("a", 1.5, true);
+        expect(tagged == new Tagged("a", 1.5, true)).toBe(true);
+        expect(tagged == new Tagged("a", 2.5, true)).toBe(false);
+        expect(tagged == new Tagged("b", 1.5, true)).toBe(false);
+    });
+
+    await it("equality holds in a hot loop", async () => {
+        expect(hotEquality(2000)).toBe(2000);
+    });
+
+    await it("with builds a new struct and keeps the rest", async () => {
+        const p = new Point(1, 2);
+        const q = p with { y: 9 };
+        expect(q.x).toBe(1);
+        expect(q.y).toBe(9);
+        expect(p.y).toBe(2);
+        expect(q.manhattan()).toBe(10);
+        expect((p with { x: 1 }) == p).toBe(true);
+        expect((p with {}) == p).toBe(true);
+        const line = new Line(new Point(0, 0), new Point(1, 1));
+        const moved = line with { to: new Point(5, 5) };
+        expect(moved.to.x).toBe(5);
+        expect(moved.from == line.from).toBe(true);
+        expect(moved == line).toBe(false);
+    });
+
+    await it("a generic struct compares by its type arguments", async () => {
+        const a = new Pair<int, str>(1, "a");
+        const b = new Pair<int, str>(1, "a");
+        expect(a == b).toBe(true);
+        expect(a.first).toBe(1);
+        expect(a == new Pair<int, str>(2, "a")).toBe(false);
+    });
+
+    await it("a struct implements an interface and is used through it", async () => {
+        const shape: Shape = new Square(4);
+        expect(shape.area()).toBe(16);
+    });
+
+    await it("equal structs are the same key of a Map and a Set", async () => {
+        const names = new Map<Point, str>();
+        names.set(new Point(1, 2), "a");
+        names.set(new Point(1, 2), "b");
+        names.set(new Point(3, 4), "c");
+        expect(names.size).toBe(2);
+        expect(names.get(new Point(1, 2))).toBe("b");
+        expect(names.get(new Point(9, 9))).toBe(null);
+        const seen = new Set<Point>();
+        seen.add(new Point(1, 2));
+        seen.add(new Point(1, 2));
+        expect(seen.size).toBe(1);
+        const nested = new Map<Line, int>();
+        nested.set(new Line(new Point(0, 0), new Point(1, 1)), 7);
+        expect(nested.get(new Line(new Point(0, 0), new Point(1, 1)))).toBe(7);
+    });
+
+    await it("a struct destructures by name and prints its fields", async () => {
+        const { x, y } = new Point(3, 4);
+        expect(x + y).toBe(7);
+        expect(`${new Point(1, 2)}`).toBe("Point { x: 1, y: 2 }");
+    });
+
+    await it("a class is compared by identity and a struct by contents", async () => {
+        const c = new Counter(1);
+        expect(sameValue(c, c)).toBe(true);
+        expect(sameValue(new Counter(1), new Counter(1))).toBe(false);
+        expect(sameValue(new Point(1, 2), new Point(1, 2))).toBe(true);
+    });
+});

@@ -1,0 +1,5 @@
+// expect: error[VN2007]
+struct Point {
+    x: int
+    constructor(x: int) { this.x = x }
+}

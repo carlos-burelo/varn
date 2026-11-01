@@ -433,3 +433,28 @@ const result = new Builder().add("hello").add("from").add("builder").build()
 assertTrue("builder pattern", result === "hello from builder")
 ```
 
+
+## Structs
+
+`struct` es un tipo valor nominal: una clase restringida cuyos campos, en orden, son su constructor.
+
+```varn
+// tests/334-struct.vn
+struct Point {
+    x: int;
+    y: int;
+    manhattan(): int { return this.x + this.y; }
+}
+
+const p = new Point(1, 2);
+const q = p with { y: 9 };
+p == new Point(1, 2);
+```
+
+- Se construye con `new`; los campos admiten valor por defecto y argumentos con nombre.
+- Los campos son inmutables. No hay `extends`, constructor, destructor ni setters.
+- Admite métodos, getters, miembros estáticos, genéricos e `implements`.
+- `==` compara campo a campo si todos los campos son tipos valor; con un campo de clase o array es error `VN3010`.
+- `with { campo: valor }` crea otra instancia y valida existencia (`VN3004`) y tipo (`VN3001`) de cada campo.
+- Dos structs iguales son la misma clave en `Map` y `Set`.
+- Las clases ya no se llaman sin `new` (`VN3003`).

@@ -1,0 +1,4 @@
+// expect: error[VN3005]
+struct Point { x: int; y: int }
+const p = new Point(1, 2)
+p.x = 5

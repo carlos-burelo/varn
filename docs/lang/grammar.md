@@ -198,8 +198,9 @@ InterfaceMember
 
 TypeAliasDecl = "type" Identifier [ TypeParams ] "=" Type [ ";" ] ;
 
-StructDecl    = "struct" Identifier "{" { StructField } "}" ;
-StructField   = Identifier ":" Type [ "=" Expression ] [ "," ] ;
+StructDecl    = "struct" Identifier [ TypeParams ] [ "implements" TypeList ]
+                "{" { StructField | MethodDecl | GetterDecl | StaticMember } "}" ;
+StructField   = Identifier ":" Type [ "=" Expression ] [ ";" | "," ] ;
 
 NamespaceDecl = ( "namespace" | "module" ) Identifier "{" { Declaration } "}" ;
 ```

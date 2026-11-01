@@ -1,0 +1,3 @@
+// expect: error[VN3001]
+struct Point { x: int; y: int }
+const q = new Point(1, 2) with { y: "a" }
