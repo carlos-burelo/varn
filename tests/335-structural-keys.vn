@@ -1,0 +1,45 @@
+import { describe, it, expect } from "std:test";
+
+enum Shape { Circle(float), Rect(float, float), Unit }
+
+await describe("335 structural keys", async () => {
+    await it("equal tuples are the same key of a Map", async () => {
+        const grid = new Map<(int, int), str>();
+        grid.set((1, 2), "a");
+        grid.set((1, 2), "b");
+        grid.set((2, 1), "c");
+        expect(grid.size).toBe(2);
+        expect(grid.get((1, 2))).toBe("b");
+        expect(grid.get((9, 9))).toBe(null);
+        expect(grid.has((2, 1))).toBe(true);
+        grid.delete((1, 2));
+        expect(grid.has((1, 2))).toBe(false);
+    });
+
+    await it("equal tuples are the same member of a Set", async () => {
+        const seen = new Set<(int, str)>();
+        seen.add((1, "a"));
+        seen.add((1, "a"));
+        seen.add((2, "a"));
+        expect(seen.size).toBe(2);
+        expect(seen.has((2, "a"))).toBe(true);
+    });
+
+    await it("nested tuples compare deeply as keys", async () => {
+        const m = new Map<((int, int), bool), int>();
+        m.set(((1, 2), true), 7);
+        expect(m.get(((1, 2), true))).toBe(7);
+        expect(m.get(((1, 3), true))).toBe(null);
+    });
+
+    await it("enum variants with the same payload are the same key", async () => {
+        const m = new Map<Shape, str>();
+        m.set(Shape.Circle(1.0), "small");
+        m.set(Shape.Circle(1.0), "unit");
+        m.set(Shape.Rect(1.0, 2.0), "rect");
+        expect(m.size).toBe(2);
+        expect(m.get(Shape.Circle(1.0))).toBe("unit");
+        expect(m.get(Shape.Circle(2.0))).toBe(null);
+        expect(m.get(Shape.Rect(1.0, 2.0))).toBe("rect");
+    });
+});

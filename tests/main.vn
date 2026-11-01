@@ -324,6 +324,7 @@ import "./330-regex-literals.vn"
 import "./331-regex-cache-is-bounded.vn"
 import "./332-tuple-syntax.vn"
 import "./334-struct.vn"
+import "./335-structural-keys.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

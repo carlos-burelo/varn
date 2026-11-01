@@ -3,10 +3,16 @@ use crate::error::{RuntimeError, VmResult};
 use crate::heap::HeapObj;
 use crate::value::VmValue;
 
+const TUPLE_BUCKET: u32 = u32::MAX;
+const ENUM_BUCKET: u32 = u32::MAX - 1;
+
 impl ExecCtx {
     pub(crate) fn hashable_key(&mut self, key: VmValue) -> VmResult<VmValue> {
         let Some(class_id) = self.instance_class_id(key) else {
-            return Ok(key);
+            return Ok(match self.composite_bucket(key) {
+                Some(bucket) => self.structural_key(key, bucket),
+                None => key,
+            });
         };
         let (Some(hash_fn), Some(equals_fn)) = (
             self.bound_method(key, "hash"),
@@ -45,10 +51,44 @@ impl ExecCtx {
         if !is_value {
             return key;
         }
-        let bucket_key = (
-            class_id,
-            super::value_hash::structural_hash(key, &self.heap),
-        );
+        self.structural_key(key, class_id)
+    }
+
+    fn composite_bucket(&self, v: VmValue) -> Option<u32> {
+        if !v.is_heap() {
+            return None;
+        }
+        match self.heap.get(v.as_heap()) {
+            Some(HeapObj::Tuple(_)) => Some(TUPLE_BUCKET),
+            Some(HeapObj::EnumVariant(_)) => Some(ENUM_BUCKET),
+            Some(
+                HeapObj::Str(_)
+                | HeapObj::Array(_)
+                | HeapObj::Object(_)
+                | HeapObj::Buffer(_)
+                | HeapObj::Module(_)
+                | HeapObj::FrozenModule(_)
+                | HeapObj::VmClosure(_)
+                | HeapObj::Class(_)
+                | HeapObj::NativeFn(..)
+                | HeapObj::BoundMethod(_)
+                | HeapObj::Map(_)
+                | HeapObj::Set(_)
+                | HeapObj::Task(_)
+                | HeapObj::TaskHandle(_)
+                | HeapObj::Range(_)
+                | HeapObj::Generator(_)
+                | HeapObj::Spread(_)
+                | HeapObj::Char(_)
+                | HeapObj::BigInt(_)
+                | HeapObj::Decimal(_),
+            )
+            | None => None,
+        }
+    }
+
+    fn structural_key(&mut self, key: VmValue, bucket: u32) -> VmValue {
+        let bucket_key = (bucket, super::value_hash::structural_hash(key, &self.heap));
         let candidates = unsafe { &*self.hashable_keys.get() }
             .get(&bucket_key)
             .cloned()
