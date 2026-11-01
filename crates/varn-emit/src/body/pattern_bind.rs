@@ -100,8 +100,7 @@ impl<'a> FnEmitter<'a> {
             } => {
                 for prop in properties {
                     let key = Arc::from(self.m.interner.resolve(prop.key));
-                    let ty = self.member_ty(src.ty, &key);
-                    let field = self.field_access(src.clone(), key, ty, src.span);
+                    let field = self.field_read(&src, key);
                     self.bind_pattern(&prop.value, field, out);
                 }
                 if let Some(rest_pat) = rest {
@@ -122,52 +121,9 @@ impl<'a> FnEmitter<'a> {
                 }
             }
             Pattern::Array { elements, rest, .. } | Pattern::Tuple { elements, rest, .. } => {
-                let tuple_elems = if let BackendTy::Tuple(slots) = src.ty.non_nullable(self.tt)
-                    && self.tt.contains_list(slots)
-                {
-                    Some(self.tt.get_list(slots).to_vec())
-                } else {
-                    None
-                };
-                let elem_ty = match src.ty.non_nullable(self.tt) {
-                    BackendTy::Array(e) => self.tt.get(e),
-                    BackendTy::Literal(_)
-                    | BackendTy::Int
-                    | BackendTy::Float
-                    | BackendTy::Bool
-                    | BackendTy::Char
-                    | BackendTy::Str
-                    | BackendTy::Bytes
-                    | BackendTy::Decimal
-                    | BackendTy::BigInt
-                    | BackendTy::Map(..)
-                    | BackendTy::Dict(_)
-                    | BackendTy::Set(_)
-                    | BackendTy::Tuple(_)
-                    | BackendTy::Class(_)
-                    | BackendTy::Enum(_)
-                    | BackendTy::Fn(_)
-                    | BackendTy::Nullable(_)
-                    | BackendTy::Void
-                    | BackendTy::Never
-                    | BackendTy::Dynamic(_) => BackendTy::Dynamic(DynReason::Unrecorded),
-                };
                 for (i, slot) in elements.iter().enumerate() {
                     let Some(el) = slot else { continue };
-
-                    let ty = tuple_elems
-                        .as_ref()
-                        .and_then(|els| els.get(i).copied())
-                        .unwrap_or(elem_ty);
-                    let idx = TirExpr {
-                        kind: TirExprKind::Index {
-                            object: Box::new(src.clone()),
-                            index: Box::new(int_lit(i as i64)),
-                        },
-                        ty,
-                        res: Resolution::None,
-                        span: src.span,
-                    };
+                    let idx = self.element_read(&src, i);
                     let read = if matches!(el.pattern, Pattern::Assignment { .. }) {
                         self.element_if_present(src.clone(), i, idx)
                     } else {
@@ -177,16 +133,7 @@ impl<'a> FnEmitter<'a> {
                 }
 
                 if let Some(rest_pat) = rest {
-                    let tail = TirExpr {
-                        kind: TirExprKind::MethodCall {
-                            recv: Box::new(src.clone()),
-                            name: Arc::from(varn_core::MemberKey::Slice.as_str()),
-                            args: vec![TirArg::Expr(int_lit(elements.len() as i64))],
-                        },
-                        ty: src.ty,
-                        res: self.by_name(Arc::from(varn_core::MemberKey::Slice.as_str()), src.ty),
-                        span: src.span,
-                    };
+                    let tail = self.tail_read(&src, elements.len());
                     self.bind_pattern(rest_pat, tail, out);
                 }
             }
@@ -222,6 +169,70 @@ impl<'a> FnEmitter<'a> {
 
             Pattern::Rest { argument, .. } => self.bind_pattern(argument, src, out),
         }
+    }
+
+    pub(super) fn element_read(&mut self, src: &TirExpr, i: usize) -> TirExpr {
+        let tuple_elems = if let BackendTy::Tuple(slots) = src.ty.non_nullable(self.tt)
+            && self.tt.contains_list(slots)
+        {
+            Some(self.tt.get_list(slots).to_vec())
+        } else {
+            None
+        };
+        let elem_ty = match src.ty.non_nullable(self.tt) {
+            BackendTy::Array(e) => self.tt.get(e),
+            BackendTy::Literal(_)
+            | BackendTy::Int
+            | BackendTy::Float
+            | BackendTy::Bool
+            | BackendTy::Char
+            | BackendTy::Str
+            | BackendTy::Bytes
+            | BackendTy::Decimal
+            | BackendTy::BigInt
+            | BackendTy::Map(..)
+            | BackendTy::Dict(_)
+            | BackendTy::Set(_)
+            | BackendTy::Tuple(_)
+            | BackendTy::Class(_)
+            | BackendTy::Enum(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Nullable(_)
+            | BackendTy::Void
+            | BackendTy::Never
+            | BackendTy::Dynamic(_) => BackendTy::Dynamic(DynReason::Unrecorded),
+        };
+        let ty = tuple_elems
+            .as_ref()
+            .and_then(|els| els.get(i).copied())
+            .unwrap_or(elem_ty);
+        TirExpr {
+            kind: TirExprKind::Index {
+                object: Box::new(src.clone()),
+                index: Box::new(int_lit(i as i64)),
+            },
+            ty,
+            res: Resolution::None,
+            span: src.span,
+        }
+    }
+
+    pub(super) fn tail_read(&mut self, src: &TirExpr, from: usize) -> TirExpr {
+        TirExpr {
+            kind: TirExprKind::MethodCall {
+                recv: Box::new(src.clone()),
+                name: Arc::from(varn_core::MemberKey::Slice.as_str()),
+                args: vec![TirArg::Expr(int_lit(from as i64))],
+            },
+            ty: src.ty,
+            res: self.by_name(Arc::from(varn_core::MemberKey::Slice.as_str()), src.ty),
+            span: src.span,
+        }
+    }
+
+    pub(super) fn field_read(&mut self, src: &TirExpr, key: Arc<str>) -> TirExpr {
+        let ty = self.member_ty(src.ty, &key);
+        self.field_access(src.clone(), key, ty, src.span)
     }
 
     fn member_ty(&mut self, recv: BackendTy, name: &str) -> BackendTy {

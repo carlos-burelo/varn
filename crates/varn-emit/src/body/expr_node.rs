@@ -1,7 +1,9 @@
 use super::context::FnEmitter;
+use super::expr_assign::AssignValue;
 use super::expr_closure::ClosureBody;
 use super::small_utils::{assign_bin_op, span_of};
 use std::sync::Arc;
+use varn_core::ast::destructure::is_destructuring_assign;
 use varn_core::ast::{ExprId, ExprKind};
 use varn_tir::{BackendTy, DynReason, Resolution, TirExpr, TirExprKind};
 
@@ -189,6 +191,12 @@ impl<'a> FnEmitter<'a> {
             }
 
             ExprKind::Assign { op, target, value }
+                if is_destructuring_assign(self.ast_arena, *op, *target) =>
+            {
+                let (target, value) = (*target, *value);
+                return self.lower_destructure_assign(target, value);
+            }
+            ExprKind::Assign { op, target, value }
                 if matches!(assign_bin_op(*op), Ok(None))
                     && matches!(&self.ast_arena.expr(*target).kind, ExprKind::Member { .. })
                     && self
@@ -198,7 +206,7 @@ impl<'a> FnEmitter<'a> {
                         .contains_key(&self.ast_arena.expr(*target).range.start.offset) =>
             {
                 let (target, value) = (*target, *value);
-                return self.lower_extension_assign(target, value, ty, span);
+                return self.lower_extension_assign(target, AssignValue::Expr(value), ty, span);
             }
             ExprKind::Assign {
                 op: varn_core::ast::operators::AssignOp::Assign,
@@ -230,7 +238,14 @@ impl<'a> FnEmitter<'a> {
                     unreachable!()
                 };
                 let (object, property) = (*object, *property);
-                return self.lower_index_assign(op, object, property, value, ty, span);
+                return self.lower_index_assign(
+                    op,
+                    object,
+                    property,
+                    AssignValue::Expr(value),
+                    ty,
+                    span,
+                );
             }
             ExprKind::Assign { op, target, value }
                 if matches!(
@@ -239,7 +254,7 @@ impl<'a> FnEmitter<'a> {
                 ) =>
             {
                 let (op, target, value) = (*op, *target, *value);
-                return self.lower_plain_assign(op, target, value, ty, span);
+                return self.lower_plain_assign(op, target, AssignValue::Expr(value), ty, span);
             }
 
             ExprKind::Update {

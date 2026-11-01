@@ -2,6 +2,7 @@ pub mod arena;
 pub mod decl;
 pub mod decorator_kind;
 pub mod decorators;
+pub mod destructure;
 pub mod expr;
 pub mod module_decl;
 pub mod operators;

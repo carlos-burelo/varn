@@ -1,5 +1,6 @@
 use super::patterns::walk_expr_children;
 use rustc_hash::FxHashSet;
+use varn_core::ast::destructure::{destructure_parts, is_destructuring_assign};
 use varn_core::ast::{AssignOp, AstArena, Decl, ExprId, ExprKind, ForInit, StmtId, StmtKind};
 use varn_core::source::SourceRange;
 use varn_core::Atom;
@@ -112,6 +113,21 @@ impl<'a> CtorFlow<'a> {
         match &arena.expr(e).kind {
             ExprKind::Assign { op, target, value } => {
                 self.expr(*value, assigned);
+                if is_destructuring_assign(arena, *op, *target) {
+                    let parts = destructure_parts(arena, *target);
+                    for read in parts.reads {
+                        self.expr(read, assigned);
+                    }
+                    for leaf in parts.leaves {
+                        match self.this_field(leaf) {
+                            Some(field) => {
+                                assigned.insert(field);
+                            }
+                            None => self.expr(leaf, assigned),
+                        }
+                    }
+                    return;
+                }
                 match (op, self.this_field(*target)) {
                     (AssignOp::Assign, Some(field)) => {
                         assigned.insert(field);

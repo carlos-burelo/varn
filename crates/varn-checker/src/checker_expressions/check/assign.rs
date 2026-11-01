@@ -1,5 +1,6 @@
 use super::Checker;
 use crate::checker::recorder::Recorder;
+use varn_core::ast::destructure::is_destructuring_assign;
 use varn_core::ast::ExprId;
 use varn_core::{Diagnostic, ErrorCode};
 use varn_sem::bind::BindResult;
@@ -16,6 +17,10 @@ impl<'r> Checker<'r> {
     ) {
         use varn_core::ast::AssignOp;
         let arena = self.ast_arena;
+        if is_destructuring_assign(arena, op, target) {
+            self.check_destructuring_assign(rec, target, value, bind);
+            return;
+        }
         let prev = self.is_assignment_target;
         self.is_assignment_target = true;
         self.check_expr(rec, target, bind);
@@ -58,37 +63,7 @@ impl<'r> Checker<'r> {
             }
         }
 
-        let target_ty =
-            if let varn_core::ast::ExprKind::Identifier { name } = &arena.expr(target).kind {
-                let name = *name;
-                let scope = bind.scopes.get(self.current_scope);
-                scope
-                    .resolve(name, &bind.scopes)
-                    .and_then(|id| {
-                        rec.symbol_types
-                            .get(&id)
-                            .cloned()
-                            .or_else(|| bind.arena.get(id).ty)
-                    })
-                    .unwrap_or_else(|| self.infer_type(rec, target, bind))
-            } else if let varn_core::ast::ExprKind::Member {
-                object,
-                property,
-                computed: true,
-                ..
-            } = &arena.expr(target).kind
-            {
-                self.computed_member_slot(rec, *object, *property, bind).0
-            } else if matches!(
-                &arena.expr(target).kind,
-                varn_core::ast::ExprKind::Member { .. }
-            ) {
-                self.member_path_declared(rec, target, bind)
-                    .map(|(_, declared)| declared)
-                    .unwrap_or_else(|| self.infer_type(rec, target, bind))
-            } else {
-                self.infer_type(rec, target, bind)
-            };
+        let target_ty = self.assign_target_type(rec, target, bind);
 
         let target_expected = if target_ty.is_dynamic() {
             None
@@ -113,40 +88,7 @@ impl<'r> Checker<'r> {
         }
 
         if let varn_core::ast::ExprKind::Identifier { name } = &arena.expr(target).kind {
-            let name = *name;
-            let scope = bind.scopes.get(self.current_scope);
-            if let Some(id) = scope.resolve(name, &bind.scopes) {
-                let sym = bind.arena.get(id);
-                let what = match sym.kind {
-                    varn_sem::symbol::SymbolKind::Const => Some("constant"),
-                    varn_sem::symbol::SymbolKind::Class => Some("class"),
-                    varn_sem::symbol::SymbolKind::Enum => Some("enum"),
-                    varn_sem::symbol::SymbolKind::Var
-                    | varn_sem::symbol::SymbolKind::Let
-                    | varn_sem::symbol::SymbolKind::Function
-                    | varn_sem::symbol::SymbolKind::Interface
-                    | varn_sem::symbol::SymbolKind::TypeAlias
-                    | varn_sem::symbol::SymbolKind::Parameter
-                    | varn_sem::symbol::SymbolKind::Property
-                    | varn_sem::symbol::SymbolKind::Method
-                    | varn_sem::symbol::SymbolKind::TypeParameter
-                    | varn_sem::symbol::SymbolKind::Namespace
-                    | varn_sem::symbol::SymbolKind::Extension
-                    | varn_sem::symbol::SymbolKind::EnumMember => None,
-                };
-                if let Some(what) = what {
-                    self.emit(
-                        Diagnostic::error(
-                            ErrorCode::NotAssignable,
-                            format!(
-                                "cannot reassign to {what} '{}'",
-                                bind.interner.resolve(name)
-                            ),
-                        )
-                        .with_range(range),
-                    );
-                }
-            }
+            self.check_reassignable(*name, range, bind);
         }
 
         let value_ty = self.infer_type(rec, value, bind);
@@ -169,6 +111,96 @@ impl<'r> Checker<'r> {
             );
         }
 
+        self.check_pure_assign_target(target, range, bind);
+    }
+
+    pub(super) fn assign_target_type(
+        &mut self,
+        rec: &mut Recorder,
+        target: ExprId,
+        bind: &BindResult,
+    ) -> varn_sem::types::Type {
+        let arena = self.ast_arena;
+        if let varn_core::ast::ExprKind::Identifier { name } = &arena.expr(target).kind {
+            let name = *name;
+            let scope = bind.scopes.get(self.current_scope);
+            scope
+                .resolve(name, &bind.scopes)
+                .and_then(|id| {
+                    rec.symbol_types
+                        .get(&id)
+                        .cloned()
+                        .or_else(|| bind.arena.get(id).ty)
+                })
+                .unwrap_or_else(|| self.infer_type(rec, target, bind))
+        } else if let varn_core::ast::ExprKind::Member {
+            object,
+            property,
+            computed: true,
+            ..
+        } = &arena.expr(target).kind
+        {
+            self.computed_member_slot(rec, *object, *property, bind).0
+        } else if matches!(
+            &arena.expr(target).kind,
+            varn_core::ast::ExprKind::Member { .. }
+        ) {
+            self.member_path_declared(rec, target, bind)
+                .map(|(_, declared)| declared)
+                .unwrap_or_else(|| self.infer_type(rec, target, bind))
+        } else {
+            self.infer_type(rec, target, bind)
+        }
+    }
+
+    pub(super) fn check_reassignable(
+        &mut self,
+        name: varn_core::Atom,
+        range: varn_core::SourceRange,
+        bind: &BindResult,
+    ) {
+        let scope = bind.scopes.get(self.current_scope);
+        if let Some(id) = scope.resolve(name, &bind.scopes) {
+            let sym = bind.arena.get(id);
+            let what = match sym.kind {
+                varn_sem::symbol::SymbolKind::Const => Some("constant"),
+                varn_sem::symbol::SymbolKind::Class => Some("class"),
+                varn_sem::symbol::SymbolKind::Enum => Some("enum"),
+                varn_sem::symbol::SymbolKind::Var
+                | varn_sem::symbol::SymbolKind::Let
+                | varn_sem::symbol::SymbolKind::Function
+                | varn_sem::symbol::SymbolKind::Interface
+                | varn_sem::symbol::SymbolKind::TypeAlias
+                | varn_sem::symbol::SymbolKind::Parameter
+                | varn_sem::symbol::SymbolKind::Property
+                | varn_sem::symbol::SymbolKind::Method
+                | varn_sem::symbol::SymbolKind::TypeParameter
+                | varn_sem::symbol::SymbolKind::Namespace
+                | varn_sem::symbol::SymbolKind::Extension
+                | varn_sem::symbol::SymbolKind::EnumMember => None,
+            };
+            if let Some(what) = what {
+                self.emit(
+                    Diagnostic::error(
+                        ErrorCode::NotAssignable,
+                        format!(
+                            "cannot reassign to {what} '{}'",
+                            bind.interner.resolve(name)
+                        ),
+                    )
+                    .with_range(range),
+                );
+            }
+        }
+    }
+
+    pub(super) fn check_pure_assign_target(
+        &mut self,
+        target: ExprId,
+        range: varn_core::SourceRange,
+        bind: &BindResult,
+    ) {
+        let arena = self.ast_arena;
         if self.pure_scope.is_some() {
             match &arena.expr(target).kind {
                 varn_core::ast::ExprKind::Identifier { name } => {

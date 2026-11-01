@@ -31,103 +31,17 @@ impl<'r> Checker<'r> {
                 }
             }
             Pattern::Array { elements, rest, .. } | Pattern::Tuple { elements, rest, .. } => {
-                let fixed: Option<Vec<Type>> =
-                    if let varn_core::TypeKind::Tuple(items) = self.ty_table.get(value_ty.0) {
-                        Some(
-                            self.ty_table
-                                .get_list(items)
-                                .iter()
-                                .map(|item| Type::resolved(*item))
-                                .collect(),
-                        )
-                    } else {
-                        None
-                    };
-                let tuple_pattern = matches!(pattern, Pattern::Tuple { .. });
-                let value_is_array =
-                    matches!(self.ty_table.get(value_ty.0), varn_core::TypeKind::Array(_));
-                let not_sequence = match self.ty_table.get(value_ty.0) {
-                    varn_core::TypeKind::Primitive(p) => !matches!(
-                        p,
-                        varn_core::LangPrimitive::Dynamic | varn_core::LangPrimitive::Str
-                    ),
-                    varn_core::TypeKind::Named(..)
-                    | varn_core::TypeKind::Generic(..)
-                    | varn_core::TypeKind::Object(_)
-                    | varn_core::TypeKind::Fn(_)
-                    | varn_core::TypeKind::EnumVariant { .. } => true,
-                    varn_core::TypeKind::Literal(_)
-                    | varn_core::TypeKind::This
-                    | varn_core::TypeKind::Array(_)
-                    | varn_core::TypeKind::Union(_)
-                    | varn_core::TypeKind::Intersection(_)
-                    | varn_core::TypeKind::Tuple(_)
-                    | varn_core::TypeKind::TemplateLiteral(_)
-                    | varn_core::TypeKind::Typeof(_)
-                    | varn_core::TypeKind::KeyOf(_)
-                    | varn_core::TypeKind::IndexedAccess { .. }
-                    | varn_core::TypeKind::Mapped { .. }
-                    | varn_core::TypeKind::Conditional { .. }
-                    | varn_core::TypeKind::Infer(_)
-                    | varn_core::TypeKind::TypePredicate { .. } => false,
-                };
-                if not_sequence {
-                    self.emit(
-                        varn_core::Diagnostic::error(
-                            varn_core::ErrorCode::TypeMismatch,
-                            format!(
-                                "'{}' is neither an array nor a tuple, so it cannot be destructured by position",
-                                value_ty.display(&self.ty_table, &bind.interner)
-                            ),
-                        )
-                        .with_range(*pattern.range()),
-                    );
+                let shape = self.sequence_shape(
+                    value_ty,
+                    matches!(pattern, Pattern::Tuple { .. }),
+                    elements.len(),
+                    rest.is_some(),
+                    *pattern.range(),
+                    bind,
+                );
+                let (fixed, elem_ty) = (shape.fixed, shape.element);
+                if !shape.sequence {
                     return;
-                }
-                if tuple_pattern && value_is_array {
-                    self.emit(
-                        varn_core::Diagnostic::error(
-                            varn_core::ErrorCode::TypeMismatch,
-                            format!(
-                                "'{}' is an array: destructure it with [a, b], not (a, b)",
-                                value_ty.display(&self.ty_table, &bind.interner)
-                            ),
-                        )
-                        .with_range(*pattern.range()),
-                    );
-                } else if !tuple_pattern && fixed.is_some() {
-                    self.emit(
-                        varn_core::Diagnostic::error(
-                            varn_core::ErrorCode::TypeMismatch,
-                            format!(
-                                "'{}' is a tuple: destructure it with (a, b), not [a, b]",
-                                value_ty.display(&self.ty_table, &bind.interner)
-                            ),
-                        )
-                        .with_range(*pattern.range()),
-                    );
-                }
-                let elem_ty = value_ty.get_array_element_type(&self.ty_table);
-                if let Some(items) = &fixed {
-                    let arity_ok = if rest.is_some() {
-                        elements.len() <= items.len()
-                    } else {
-                        elements.len() == items.len()
-                    };
-                    if !arity_ok {
-                        self.emit(
-                            varn_core::Diagnostic::error(
-                                varn_core::ErrorCode::TupleIndexOutOfBounds,
-                                format!(
-                                    "this pattern destructures {} elements, but '{}' has {}",
-                                    elements.len(),
-                                    value_ty.display(&self.ty_table, &bind.interner),
-                                    items.len()
-                                ),
-                            )
-                            .with_range(*pattern.range()),
-                        );
-                    }
                 }
                 for (at, el) in elements.iter().enumerate() {
                     let Some(el) = el else { continue };
@@ -384,5 +298,129 @@ impl<'r> Checker<'r> {
             }
         }
         Some((fields, mapping))
+    }
+}
+
+pub(crate) struct SequenceShape {
+    pub fixed: Option<Vec<Type>>,
+    pub element: Type,
+    pub sequence: bool,
+}
+
+impl Checker<'_> {
+    pub(crate) fn sequence_shape(
+        &mut self,
+        value_ty: &Type,
+        tuple_pattern: bool,
+        element_count: usize,
+        has_rest: bool,
+        range: varn_core::SourceRange,
+        bind: &BindResult,
+    ) -> SequenceShape {
+        let fixed: Option<Vec<Type>> =
+            if let varn_core::TypeKind::Tuple(items) = self.ty_table.get(value_ty.0) {
+                Some(
+                    self.ty_table
+                        .get_list(items)
+                        .iter()
+                        .map(|item| Type::resolved(*item))
+                        .collect(),
+                )
+            } else {
+                None
+            };
+        let value_is_array = matches!(self.ty_table.get(value_ty.0), varn_core::TypeKind::Array(_));
+        let not_sequence = match self.ty_table.get(value_ty.0) {
+            varn_core::TypeKind::Primitive(p) => !matches!(
+                p,
+                varn_core::LangPrimitive::Dynamic | varn_core::LangPrimitive::Str
+            ),
+            varn_core::TypeKind::Named(..)
+            | varn_core::TypeKind::Generic(..)
+            | varn_core::TypeKind::Object(_)
+            | varn_core::TypeKind::Fn(_)
+            | varn_core::TypeKind::EnumVariant { .. } => true,
+            varn_core::TypeKind::Literal(_)
+            | varn_core::TypeKind::This
+            | varn_core::TypeKind::Array(_)
+            | varn_core::TypeKind::Union(_)
+            | varn_core::TypeKind::Intersection(_)
+            | varn_core::TypeKind::Tuple(_)
+            | varn_core::TypeKind::TemplateLiteral(_)
+            | varn_core::TypeKind::Typeof(_)
+            | varn_core::TypeKind::KeyOf(_)
+            | varn_core::TypeKind::IndexedAccess { .. }
+            | varn_core::TypeKind::Mapped { .. }
+            | varn_core::TypeKind::Conditional { .. }
+            | varn_core::TypeKind::Infer(_)
+            | varn_core::TypeKind::TypePredicate { .. } => false,
+        };
+        if not_sequence {
+            self.emit(
+                varn_core::Diagnostic::error(
+                    varn_core::ErrorCode::TypeMismatch,
+                    format!(
+                        "'{}' is neither an array nor a tuple, so it cannot be destructured by position",
+                        value_ty.display(&self.ty_table, &bind.interner)
+                    ),
+                )
+                .with_range(range),
+            );
+            return SequenceShape {
+                fixed,
+                element: Type::Dynamic,
+                sequence: false,
+            };
+        }
+        if tuple_pattern && value_is_array {
+            self.emit(
+                varn_core::Diagnostic::error(
+                    varn_core::ErrorCode::TypeMismatch,
+                    format!(
+                        "'{}' is an array: destructure it with [a, b], not (a, b)",
+                        value_ty.display(&self.ty_table, &bind.interner)
+                    ),
+                )
+                .with_range(range),
+            );
+        } else if !tuple_pattern && fixed.is_some() {
+            self.emit(
+                varn_core::Diagnostic::error(
+                    varn_core::ErrorCode::TypeMismatch,
+                    format!(
+                        "'{}' is a tuple: destructure it with (a, b), not [a, b]",
+                        value_ty.display(&self.ty_table, &bind.interner)
+                    ),
+                )
+                .with_range(range),
+            );
+        }
+        let element = value_ty.get_array_element_type(&self.ty_table);
+        if let Some(items) = &fixed {
+            let arity_ok = if has_rest {
+                element_count <= items.len()
+            } else {
+                element_count == items.len()
+            };
+            if !arity_ok {
+                self.emit(
+                    varn_core::Diagnostic::error(
+                        varn_core::ErrorCode::TupleIndexOutOfBounds,
+                        format!(
+                            "this pattern destructures {} elements, but '{}' has {}",
+                            element_count,
+                            value_ty.display(&self.ty_table, &bind.interner),
+                            items.len()
+                        ),
+                    )
+                    .with_range(range),
+                );
+            }
+        }
+        SequenceShape {
+            fixed,
+            element,
+            sequence: true,
+        }
     }
 }

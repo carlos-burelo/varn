@@ -2,6 +2,7 @@ use super::flow::Flow;
 use super::hoist::block_bindings;
 use super::patterns::{pattern_names, walk_expr_children};
 use crate::checker::Checker;
+use varn_core::ast::destructure::{destructure_parts, is_destructuring_assign};
 use varn_core::ast::{ClassMember, Decl, ExportDecl, ExprId, ExprKind, Program, StmtId, StmtKind};
 use varn_core::{Atom, Diagnostic, ErrorCode};
 use varn_sem::bind::BindResult;
@@ -17,10 +18,22 @@ impl<'r> Checker<'r> {
         match &arena.expr(e).kind {
             ExprKind::Identifier { name } => self.da_read(*name, e, flow, bind),
 
-            ExprKind::Assign { target, value, .. } => {
-                let (target, value) = (*target, *value);
+            ExprKind::Assign { op, target, value } => {
+                let (op, target, value) = (*op, *target, *value);
                 self.da_expr(value, flow, bind);
-                if let ExprKind::Identifier { name } = &arena.expr(target).kind {
+                if is_destructuring_assign(arena, op, target) {
+                    let parts = destructure_parts(arena, target);
+                    for read in parts.reads {
+                        self.da_expr(read, flow, bind);
+                    }
+                    for leaf in parts.leaves {
+                        if let ExprKind::Identifier { name } = &arena.expr(leaf).kind {
+                            flow.assign(name);
+                        } else {
+                            self.da_expr(leaf, flow, bind);
+                        }
+                    }
+                } else if let ExprKind::Identifier { name } = &arena.expr(target).kind {
                     if flow.undeclared.contains(name) {
                         self.da_read(*name, target, flow, bind);
                     }

@@ -1,5 +1,6 @@
 use crate::checker::definite_assignment::walk_expr_children;
 use rustc_hash::FxHashSet;
+use varn_core::ast::destructure::{destructure_parts, is_destructuring_assign};
 use varn_core::ast::{AstArena, Decl, ExprId, ExprKind, ForInit, StmtId, StmtKind};
 use varn_core::Atom;
 
@@ -140,11 +141,18 @@ pub(crate) fn assigned_in_stmt(stmt: StmtId, arena: &AstArena, out: &mut Assigne
 }
 
 pub(crate) fn assigned_in_expr(expr: ExprId, arena: &AstArena, out: &mut AssignedTargets) {
-    if let ExprKind::Assign { target, .. } = &arena.expr(expr).kind {
-        if let ExprKind::Identifier { name } = &arena.expr(*target).kind {
-            out.vars.insert(*name);
-        } else if let Some((root, path)) = static_path_atoms(*target, arena) {
-            out.members.push((root, path));
+    if let ExprKind::Assign { op, target, .. } = &arena.expr(expr).kind {
+        let leaves = if is_destructuring_assign(arena, *op, *target) {
+            destructure_parts(arena, *target).leaves
+        } else {
+            vec![*target]
+        };
+        for leaf in leaves {
+            if let ExprKind::Identifier { name } = &arena.expr(leaf).kind {
+                out.vars.insert(*name);
+            } else if let Some((root, path)) = static_path_atoms(leaf, arena) {
+                out.members.push((root, path));
+            }
         }
     }
     walk_expr_children(expr, arena, &mut |child| {

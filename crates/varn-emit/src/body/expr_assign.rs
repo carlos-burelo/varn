@@ -7,7 +7,20 @@ use varn_tir::{
     BackendTy, DynReason, Resolution, Span, TirArg, TirExpr, TirExprKind, TirStmt, TirUnOp,
 };
 
+#[derive(Clone)]
+pub(super) enum AssignValue {
+    Expr(ExprId),
+    Lowered(TirExpr),
+}
+
 impl<'a> FnEmitter<'a> {
+    pub(super) fn assign_value(&mut self, value: AssignValue) -> TirExpr {
+        match value {
+            AssignValue::Expr(e) => self.lower_expr(e),
+            AssignValue::Lowered(t) => t,
+        }
+    }
+
     pub(crate) fn this_field_assign(&mut self, field: Arc<str>, value: TirExpr) -> TirStmt {
         let this = self.this_var(Span::EMPTY);
         let target = self.field_place(
@@ -45,7 +58,7 @@ impl<'a> FnEmitter<'a> {
     pub(super) fn lower_extension_assign(
         &mut self,
         target: ExprId,
-        value: ExprId,
+        value: AssignValue,
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
@@ -100,7 +113,7 @@ impl<'a> FnEmitter<'a> {
             | varn_core::ast::ExprKind::With { .. }
             | varn_core::ast::ExprKind::MetaAccess { .. } => unreachable!(),
         });
-        let v = self.lower_expr(value);
+        let v = self.assign_value(value);
         TirExpr {
             kind: TirExprKind::ExtensionCall {
                 func: mangled,
@@ -118,13 +131,13 @@ impl<'a> FnEmitter<'a> {
         op: AssignOp,
         object: ExprId,
         property: ExprId,
-        value: ExprId,
+        value: AssignValue,
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
         let obj = self.lower_expr(object);
         let index = self.lower_expr(property);
-        let v = self.lower_expr(value);
+        let v = self.assign_value(value);
         let node_ty = match obj.ty.non_nullable(self.tt) {
             BackendTy::Array(el) => self.tt.get(el),
             BackendTy::Map(_, val) | BackendTy::Dict(val) => self.tt.get(val),
@@ -201,11 +214,11 @@ impl<'a> FnEmitter<'a> {
         &mut self,
         op: AssignOp,
         target: ExprId,
-        value: ExprId,
+        value: AssignValue,
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
-        if let Some(assigned) = self.lower_accessor_assign(op, target, value, span) {
+        if let Some(assigned) = self.lower_accessor_assign(op, target, value.clone(), span) {
             return assigned;
         }
         self.place_target = true;
@@ -215,7 +228,7 @@ impl<'a> FnEmitter<'a> {
             Ok(None) => t,
             _ => self.pin_place(t),
         };
-        let v = self.lower_expr(value);
+        let v = self.assign_value(value);
         let declared = self.expr_ty(target);
         let v = self.as_assigned(op, v, declared);
         let rhs = match assign_bin_op(op) {

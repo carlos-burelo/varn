@@ -3,6 +3,7 @@ mod call_args;
 mod call_contract;
 mod call_verify;
 mod context;
+mod destructure_assign;
 mod enum_variant;
 mod expr_assign;
 mod expr_async;

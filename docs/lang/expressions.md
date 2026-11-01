@@ -149,6 +149,32 @@ const [head, ...tail] = [1, 2, 3, 4]         // rest
 const { coords: [cx, cy] } = { coords: [5, 6] }  // array en objeto
 ```
 
+### De tuplas
+
+```varn
+const (code, label) = (200, "OK")            // los paréntesis desestructuran una tupla
+const [a, b] = (1, 2)                         // error VN3001: una tupla se desestructura con (a, b)
+```
+
+### Asignación por desestructuración
+
+El lado izquierdo de `=` puede ser un literal de array, tupla u objeto cuyas hojas sean variables,
+miembros o índices ya declarados (`tests/337-destructuring-assignment.vn`). El lado derecho se evalúa
+una sola vez y el valor de la expresión es ese lado derecho.
+
+```varn
+let a = 1
+let b = 2
+;(a, b) = (b, a)                              // intercambio
+;[first, ...rest] = list                      // rest
+;({ x, y: renamed } = point)                  // objeto, con renombrado (entre paréntesis como sentencia)
+;(this.x, this.y) = (px, py)                  // miembros; cuenta como asignación del campo en el constructor
+;[a, b = 9] = [1, null]                       // default cuando el elemento es null
+```
+
+Las reglas son las de la declaración: `(a, b)` exige una tupla de esa aridad (`VN3016`), `[a, b]` exige un array
+(`VN3001`), cada hoja debe aceptar el tipo del elemento (`VN3001`) y no se puede reasignar una constante (`VN3005`).
+
 ---
 
 ## 9. Closures y Lambdas

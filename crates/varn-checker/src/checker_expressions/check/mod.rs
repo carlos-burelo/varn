@@ -5,6 +5,7 @@ mod closures;
 mod const_int;
 mod contextual;
 mod control;
+mod destructure_assign;
 mod exhaustiveness;
 mod match_arm;
 pub(crate) mod member_index;

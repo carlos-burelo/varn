@@ -1,0 +1,4 @@
+// expect: error[VN3005]
+const a = 1
+let b = 0
+;(a, b) = (2, 3)

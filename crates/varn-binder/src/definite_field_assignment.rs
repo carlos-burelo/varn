@@ -1,5 +1,6 @@
 use rustc_hash::FxHashSet;
 use std::sync::Arc;
+use varn_core::ast::destructure::{destructure_parts, is_destructure_target};
 use varn_core::ast::operators::AssignOp;
 use varn_core::ast::{AstArena, ExprId, ExprKind, StmtId, StmtKind};
 use varn_core::AtomInterner;
@@ -129,9 +130,17 @@ fn walk_expr(e: ExprId, arena: &AstArena, interner: &AtomInterner, out: &mut FxH
         target,
         ..
     } = &arena.expr(e).kind
-        && let Some(name) = this_field_target(*target, arena, interner)
     {
-        out.insert(name);
+        let leaves = if is_destructure_target(arena, *target) {
+            destructure_parts(arena, *target).leaves
+        } else {
+            vec![*target]
+        };
+        for leaf in leaves {
+            if let Some(name) = this_field_target(leaf, arena, interner) {
+                out.insert(name);
+            }
+        }
     }
 }
 

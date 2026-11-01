@@ -1,4 +1,5 @@
 use super::context::FnEmitter;
+use super::expr_assign::AssignValue;
 use super::small_utils::assign_bin_op;
 use std::sync::Arc;
 use varn_core::ast::{operators::AssignOp, ExprId};
@@ -9,7 +10,7 @@ impl<'a> FnEmitter<'a> {
         &mut self,
         op: AssignOp,
         target: ExprId,
-        value: ExprId,
+        value: AssignValue,
         span: Span,
     ) -> Option<TirExpr> {
         let varn_core::ast::ExprKind::Member {
@@ -49,7 +50,7 @@ impl<'a> FnEmitter<'a> {
         if Self::is_class_ref(&obj, &ci.name, self.m.globals) {
             return None;
         }
-        let v = self.lower_expr(value);
+        let v = self.assign_value(value);
         let v = match combine {
             None => self.widened(v, param),
             Some(_) => v,

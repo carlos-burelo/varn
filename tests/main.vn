@@ -326,6 +326,7 @@ import "./332-tuple-syntax.vn"
 import "./334-struct.vn"
 import "./335-structural-keys.vn"
 import "./336-edge-repairs.vn"
+import "./337-destructuring-assignment.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {
