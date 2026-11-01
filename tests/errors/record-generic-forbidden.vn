@@ -1,2 +1,0 @@
-// expect: error[VN3023]
-let r: Record<str, int> = #{ a: 1 }

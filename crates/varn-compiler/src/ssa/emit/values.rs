@@ -115,9 +115,6 @@ pub(super) fn emit_value(
             build::emit_build_object(chunk, d, pairs, reg, call_base, line);
         }
 
-        InstKind::BuildRecord { pairs } => {
-            build::emit_build_record(chunk, d, pairs, reg, call_base, line);
-        }
         InstKind::BuildMap { pairs } => {
             build::emit_build_map(chunk, d, pairs, reg, call_base, line);
         }

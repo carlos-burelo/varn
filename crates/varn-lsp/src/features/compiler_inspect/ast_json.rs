@@ -365,7 +365,6 @@ impl AstJson<'_> {
             | ExprKind::Array { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }
-            | ExprKind::Record { .. }
             | ExprKind::Update { .. }
             | ExprKind::Logical { .. }
             | ExprKind::Conditional { .. }

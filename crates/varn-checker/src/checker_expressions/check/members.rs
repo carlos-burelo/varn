@@ -214,7 +214,6 @@ impl<'r> Checker<'r> {
                 | TypeKind::TemplateLiteral(_)
                 | TypeKind::Fn(_)
                 | TypeKind::Object(_)
-                | TypeKind::Record(_)
                 | TypeKind::Typeof(_)
                 | TypeKind::KeyOf(_)
                 | TypeKind::IndexedAccess { .. }
@@ -262,7 +261,6 @@ impl<'r> Checker<'r> {
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
             | TypeKind::Object(_)
-            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -299,7 +297,6 @@ pub(crate) fn extension_type_name(
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
         | TypeKind::Object(_)
-        | TypeKind::Record(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }

@@ -318,7 +318,7 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
                 imm(hi(2), I::Count),
             ],
         ),
-        O::BuildObjectWithShape | O::BuildRecord => {
+        O::BuildObjectWithShape => {
             let fields = match constants.get(word(2)) {
                 Some(PoolEntry::Shape(keys)) => keys.len(),
                 Some(

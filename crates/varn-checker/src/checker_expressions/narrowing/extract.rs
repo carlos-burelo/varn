@@ -117,7 +117,6 @@ impl<'r> Checker<'r> {
             | ExprKind::Array { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }
-            | ExprKind::Record { .. }
             | ExprKind::Unary { .. }
             | ExprKind::Update { .. }
             | ExprKind::Logical { .. }

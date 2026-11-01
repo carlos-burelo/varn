@@ -110,7 +110,6 @@ fn sites(kind: &InstKind, has_dest: bool) -> u16 {
         | InstKind::BuildArray { .. }
         | InstKind::BuildTuple { .. }
         | InstKind::BuildObject { .. }
-        | InstKind::BuildRecord { .. }
         | InstKind::BuildMap { .. }
         | InstKind::ObjectRest { .. }
         | InstKind::ToString { .. }

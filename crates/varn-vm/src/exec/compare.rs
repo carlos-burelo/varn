@@ -71,8 +71,7 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
             }
             (Some(HeapObj::Array(_)), Some(HeapObj::Array(_))) => return false,
             (Some(HeapObj::Object(_)), Some(HeapObj::Object(_))) => return false,
-            (Some(HeapObj::Tuple(_)), Some(HeapObj::Tuple(_)))
-            | (Some(HeapObj::Record(_)), Some(HeapObj::Record(_))) => {
+            (Some(HeapObj::Tuple(_)), Some(HeapObj::Tuple(_))) => {
                 return composite_eq(a, b, heap);
             }
             _ => return false,
@@ -95,7 +94,6 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
                 | HeapObj::Array(_)
                 | HeapObj::Tuple(_)
                 | HeapObj::Object(_)
-                | HeapObj::Record(_)
                 | HeapObj::Buffer(_)
                 | HeapObj::Module(_)
                 | HeapObj::FrozenModule(_)
@@ -131,7 +129,6 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
                 | HeapObj::Array(_)
                 | HeapObj::Tuple(_)
                 | HeapObj::Object(_)
-                | HeapObj::Record(_)
                 | HeapObj::Buffer(_)
                 | HeapObj::Module(_)
                 | HeapObj::FrozenModule(_)
@@ -222,19 +219,6 @@ fn expand(
         (HeapObj::Array(x), HeapObj::Array(y)) if member => {
             Some(push_elements(x, y, pending, null))
         }
-        (HeapObj::Record(x), HeapObj::Record(y)) => {
-            let keys: Vec<_> = x.keys().collect();
-            if keys.len() != y.keys().count() {
-                return Some(false);
-            }
-            for key in &keys {
-                let (Some(va), Some(vb)) = (x.get(key.as_ref()), y.get(key.as_ref())) else {
-                    return Some(false);
-                };
-                pending.push((va, vb, true));
-            }
-            Some(true)
-        }
         (HeapObj::EnumVariant(x), HeapObj::EnumVariant(y)) => {
             let same_enum = match (x.enum_class_id, y.enum_class_id) {
                 (Some(p), Some(q)) => p == q,
@@ -300,7 +284,6 @@ fn text_bytes<'a>(
             HeapObj::Array(_)
             | HeapObj::Tuple(_)
             | HeapObj::Object(_)
-            | HeapObj::Record(_)
             | HeapObj::Buffer(_)
             | HeapObj::Module(_)
             | HeapObj::FrozenModule(_)

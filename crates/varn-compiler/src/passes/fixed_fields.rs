@@ -21,7 +21,7 @@ pub fn run(func: &mut SsaFunc) -> bool {
                     InstKind::ConstInt(n) => {
                         const_ints.insert(d.0, *n);
                     }
-                    InstKind::BuildObject { pairs } | InstKind::BuildRecord { pairs } => {
+                    InstKind::BuildObject { pairs } => {
                         let mut seen: Vec<_> = pairs.iter().map(|(k, _)| k.clone()).collect();
                         seen.sort();
                         seen.dedup();

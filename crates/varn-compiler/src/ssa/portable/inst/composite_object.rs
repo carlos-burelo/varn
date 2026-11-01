@@ -59,7 +59,6 @@ pub(super) fn project_object(kind: &InstKind) -> Option<SsaOp> {
         | InstKind::BuildArray { .. }
         | InstKind::BuildTuple { .. }
         | InstKind::BuildObject { .. }
-        | InstKind::BuildRecord { .. }
         | InstKind::BuildMap { .. }
         | InstKind::ToString { .. }
         | InstKind::BuildStr { .. }

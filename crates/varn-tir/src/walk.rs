@@ -140,7 +140,6 @@ pub fn expr_mut(expr: &mut TirExpr, f: &mut impl FnMut(&mut TirExpr)) {
                 }
             }
         }
-        TirExprKind::RecordLit { fields } => fields.iter_mut().for_each(|(_, e)| expr_mut(e, f)),
         TirExprKind::Await { future } => expr_mut(future, f),
         TirExprKind::Yield { value, .. } => {
             if let Some(e) = value.as_mut() {

@@ -284,7 +284,6 @@ pub(super) fn emit_effect(
         | InstKind::BuildArray { .. }
         | InstKind::BuildTuple { .. }
         | InstKind::BuildObject { .. }
-        | InstKind::BuildRecord { .. }
         | InstKind::BuildMap { .. }
         | InstKind::ObjectRest { .. }
         | InstKind::ToString { .. }

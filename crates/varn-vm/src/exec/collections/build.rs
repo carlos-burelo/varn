@@ -6,19 +6,17 @@ pub(crate) fn build_with_shape(
     start_reg: usize,
     shape: Rc<varn_types::Shape>,
     heap: &mut Heap,
-    is_record: bool,
 ) -> VmValue {
     let vals: Vec<VmValue> = (0..shape.property_names.len())
         .map(|i| store.box_reg(base, start_reg + i))
         .collect();
-    build_with_shape_slice(shape, &vals, heap, is_record)
+    build_with_shape_slice(shape, &vals, heap)
 }
 
 pub(crate) fn build_with_shape_slice(
     shape: Rc<varn_types::Shape>,
     vals: &[VmValue],
     heap: &mut Heap,
-    is_record: bool,
 ) -> VmValue {
-    heap.alloc_object_cell(is_record, shape, vals.len(), vals)
+    heap.alloc_object_cell(shape, vals.len(), vals)
 }

@@ -61,10 +61,6 @@ pub fn resolve_type_node(
             let members = objects::resolve_object_members(members, ctx, interner, table);
             Type::object(members, table)
         }
-        TypeKind::Record(members) => {
-            let members = objects::resolve_object_members(members, ctx, interner, table);
-            Type::record(members, table)
-        }
         TypeKind::TemplateLiteral(parts) => resolve_template_literal_type(parts, ctx, table),
         TypeKind::Typeof(expr) => match ctx.and_then(|c| c.ast_arena()) {
             Some(arena) => crate::infer::infer_expr_type(*expr, arena, ctx, table),

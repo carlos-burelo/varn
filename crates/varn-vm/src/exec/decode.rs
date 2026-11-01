@@ -115,7 +115,7 @@ fn walk(
             }
             heap.alloc_map_vm(map)
         }
-        TypeDesc::Object(fields) | TypeDesc::Record(fields) => {
+        TypeDesc::Object(fields) => {
             let Some(entries) = object_entries(heap, v) else {
                 return v;
             };
@@ -136,12 +136,7 @@ fn walk(
                     pairs.push((Arc::from(field.name.as_str()), projected));
                 }
             }
-            if matches!(desc, TypeDesc::Record(_)) {
-                let (shape, values) = varn_types::value::ObjData::pairs_layout(pairs);
-                heap.alloc_record_with_shape_slice(&shape, &values)
-            } else {
-                heap.alloc_object_pairs(pairs)
-            }
+            heap.alloc_object_pairs(pairs)
         }
         TypeDesc::Enclosing { up, .. } => {
             let Some(mut target) = scope else {

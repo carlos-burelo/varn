@@ -140,7 +140,6 @@ impl Collector<'_> {
             | ExprKind::Array { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }
-            | ExprKind::Record { .. }
             | ExprKind::Unary { .. }
             | ExprKind::Update { .. }
             | ExprKind::Binary { .. }

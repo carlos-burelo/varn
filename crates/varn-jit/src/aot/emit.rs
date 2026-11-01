@@ -232,7 +232,6 @@ pub(super) fn emit_module_body(
             | OpCode::BuildTuple
             | OpCode::BuildObject
             | OpCode::BuildObjectWithShape
-            | OpCode::BuildRecord
             | OpCode::GetIndex
             | OpCode::SetIndex
             | OpCode::ObjectRest

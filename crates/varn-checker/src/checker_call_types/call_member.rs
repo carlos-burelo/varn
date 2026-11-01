@@ -31,7 +31,6 @@ pub(super) fn infer_member(c: &mut CallTypeCtx, object: ExprId, property: ExprId
         | ExprKind::Array { .. }
         | ExprKind::Object { .. }
         | ExprKind::Tuple { .. }
-        | ExprKind::Record { .. }
         | ExprKind::Unary { .. }
         | ExprKind::Update { .. }
         | ExprKind::Binary { .. }
@@ -78,7 +77,6 @@ pub(super) fn infer_member(c: &mut CallTypeCtx, object: ExprId, property: ExprId
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
         | TypeKind::Object(_)
-        | TypeKind::Record(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }

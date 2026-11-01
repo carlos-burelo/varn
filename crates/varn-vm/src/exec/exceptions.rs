@@ -131,7 +131,7 @@ pub(crate) fn thrown_value_for(err: &RuntimeError, heap: &mut Heap) -> VmValue {
 ",
     ));
     let (shape, n) = cls.instance_shape();
-    let err_obj = heap.alloc_object_cell(false, shape, n, &[]);
+    let err_obj = heap.alloc_object_cell(shape, n, &[]);
     if let Some(HeapObj::Object(oref)) = heap.get(err_obj.as_heap()) {
         oref.set_field(
             std::sync::Arc::from(varn_core::MemberKey::Message.as_str()),

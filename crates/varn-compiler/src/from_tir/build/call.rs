@@ -183,7 +183,6 @@ impl<'m> Builder<'m> {
             | varn_tir::TirExprKind::ArrayLit(_)
             | varn_tir::TirExprKind::TupleLit(_)
             | varn_tir::TirExprKind::ObjectLit { .. }
-            | varn_tir::TirExprKind::RecordLit { .. }
             | varn_tir::TirExprKind::Await { .. }
             | varn_tir::TirExprKind::Yield { .. }
             | varn_tir::TirExprKind::Discriminant { .. }

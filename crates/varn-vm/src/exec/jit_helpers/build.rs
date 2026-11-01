@@ -80,23 +80,10 @@ pub(crate) extern "C" fn jit_build_object_with_shape(
         use crate::alloc_profile as prof;
         let on = prof::enabled();
         let t_all = if on { prof::read() } else { 0 };
-        let out = build_shaped_from_ptr(ctx, base, start_reg, shape, false);
+        let out = build_shaped_from_ptr(ctx, base, start_reg, shape);
         if on {
             prof::record(prof::Seg::HelperTotal, t_all, prof::read());
         }
-        (*ctx).jit_native_result = out;
-    }
-}
-
-#[varn_macros::jit_slow(field = "build_record_with_shape")]
-pub(crate) extern "C" fn jit_build_record_with_shape(
-    ctx: *mut ExecCtx,
-    base: usize,
-    start_reg: usize,
-    shape: *const varn_types::Shape,
-) {
-    unsafe {
-        let out = build_shaped_from_ptr(ctx, base, start_reg, shape, true);
         (*ctx).jit_native_result = out;
     }
 }
@@ -107,7 +94,6 @@ unsafe fn build_shaped_from_ptr(
     base: usize,
     start_reg: usize,
     shape: *const varn_types::Shape,
-    is_record: bool,
 ) -> VmValue {
     let ctx_ref = unsafe { &mut *ctx };
     let shape = unsafe { std::mem::ManuallyDrop::new(std::rc::Rc::from_raw(shape)) };
@@ -117,7 +103,6 @@ unsafe fn build_shaped_from_ptr(
         start_reg,
         (*shape).clone(),
         &mut ctx_ref.heap,
-        is_record,
     )
 }
 
@@ -127,7 +112,6 @@ pub(crate) extern "C" fn jit_build_object_window(
     vals_ptr: *const VmValue,
     count: usize,
     shape: *const varn_types::Shape,
-    is_record: usize,
 ) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -137,7 +121,6 @@ pub(crate) extern "C" fn jit_build_object_window(
             (*shape).clone(),
             vals,
             &mut ctx_ref.heap,
-            is_record != 0,
         );
         ctx_ref.jit_native_result = out;
     }

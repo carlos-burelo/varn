@@ -35,18 +35,14 @@ impl HeapInner {
 
     pub(crate) fn alloc_object_cell(
         &mut self,
-        record: bool,
         shape: std::rc::Rc<varn_types::Shape>,
         n: usize,
         values: &[VmValue],
     ) -> VmValue {
         if let Some(h) = &self.hotspot {
-            h.borrow_mut()
-                .record_alloc(if record { "record" } else { "object" });
+            h.borrow_mut().record_alloc("object");
         }
-        let r = self
-            .cells
-            .alloc_object(record, shape, n, values, SlotState::Young);
+        let r = self.cells.alloc_object(shape, n, values, SlotState::Young);
         self.young.born.push(r);
         VmValue::from_heap(r)
     }
@@ -70,7 +66,7 @@ impl HeapInner {
         I: IntoIterator<Item = (varn_types::RuntimeString, VmValue)>,
     {
         let (shape, values) = varn_types::value::ObjData::pairs_layout(pairs);
-        self.alloc_object_cell(false, shape, values.len(), &values)
+        self.alloc_object_cell(shape, values.len(), &values)
     }
 
     fn alloc_old(&mut self, obj: HeapObj) -> HeapRef {

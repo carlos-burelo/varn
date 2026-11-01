@@ -39,7 +39,6 @@ fn written_head(arena: &AstArena, d: &Decorator) -> Option<Atom> {
             | ExprKind::Array { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }
-            | ExprKind::Record { .. }
             | ExprKind::Unary { .. }
             | ExprKind::Update { .. }
             | ExprKind::Binary { .. }
@@ -86,7 +85,6 @@ fn written_head(arena: &AstArena, d: &Decorator) -> Option<Atom> {
         | ExprKind::Array { .. }
         | ExprKind::Object { .. }
         | ExprKind::Tuple { .. }
-        | ExprKind::Record { .. }
         | ExprKind::Unary { .. }
         | ExprKind::Update { .. }
         | ExprKind::Binary { .. }
@@ -165,7 +163,6 @@ fn str_arg(arena: &AstArena, id: ExprId) -> Option<String> {
         | ExprKind::Array { .. }
         | ExprKind::Object { .. }
         | ExprKind::Tuple { .. }
-        | ExprKind::Record { .. }
         | ExprKind::Unary { .. }
         | ExprKind::Update { .. }
         | ExprKind::Binary { .. }
@@ -236,7 +233,6 @@ pub fn match_builtin(
                 | ExprKind::Array { .. }
                 | ExprKind::Object { .. }
                 | ExprKind::Tuple { .. }
-                | ExprKind::Record { .. }
                 | ExprKind::Unary { .. }
                 | ExprKind::Update { .. }
                 | ExprKind::Binary { .. }
@@ -289,7 +285,6 @@ pub fn match_builtin(
             | ExprKind::Array { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }
-            | ExprKind::Record { .. }
             | ExprKind::Unary { .. }
             | ExprKind::Update { .. }
             | ExprKind::Binary { .. }

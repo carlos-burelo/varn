@@ -156,7 +156,6 @@ impl<'a> FnEmitter<'a> {
             | varn_core::TypeKind::Intersection(_)
             | varn_core::TypeKind::TemplateLiteral(_)
             | varn_core::TypeKind::Object(_)
-            | varn_core::TypeKind::Record(_)
             | varn_core::TypeKind::Typeof(_)
             | varn_core::TypeKind::KeyOf(_)
             | varn_core::TypeKind::IndexedAccess { .. }

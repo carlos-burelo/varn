@@ -34,7 +34,6 @@ pub enum TypeDesc {
         rest: Option<Box<TypeDesc>>,
     },
     Object(Vec<FieldDesc>),
-    Record(Vec<FieldDesc>),
     Enclosing {
         up: u32,
         name: String,
@@ -138,12 +137,8 @@ impl TypeDesc {
                 out.push_str(name);
                 out.push(';');
             }
-            TypeDesc::Object(fields) | TypeDesc::Record(fields) => {
-                out.push(if matches!(self, TypeDesc::Record(_)) {
-                    'Q'
-                } else {
-                    'O'
-                });
+            TypeDesc::Object(fields) => {
+                out.push('O');
                 out.push_str(&fields.len().to_string());
                 out.push(';');
                 for field in fields {
@@ -238,7 +233,7 @@ fn decode_one(rest: &mut &str) -> Option<TypeDesc> {
             let name = take_until(rest, ';')?.to_string();
             TypeDesc::Enclosing { up, name }
         }
-        'O' | 'Q' => {
+        'O' => {
             let count: usize = take_until(rest, ';')?.parse().ok()?;
             let mut fields = Vec::with_capacity(count);
             for _ in 0..count {
@@ -259,11 +254,7 @@ fn decode_one(rest: &mut &str) -> Option<TypeDesc> {
                     optional,
                 });
             }
-            if tag == 'Q' {
-                TypeDesc::Record(fields)
-            } else {
-                TypeDesc::Object(fields)
-            }
+            TypeDesc::Object(fields)
         }
         _ => return None,
     })
@@ -320,12 +311,8 @@ impl fmt::Display for TypeDesc {
                 f.write_str(")")
             }
             TypeDesc::Enclosing { name, .. } => f.write_str(name),
-            TypeDesc::Object(fields) | TypeDesc::Record(fields) => {
-                f.write_str(if matches!(self, TypeDesc::Record(_)) {
-                    "#{ "
-                } else {
-                    "{ "
-                })?;
+            TypeDesc::Object(fields) => {
+                f.write_str("{ ")?;
                 for (i, field) in fields.iter().enumerate() {
                     if i > 0 {
                         f.write_str(", ")?;

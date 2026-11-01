@@ -50,7 +50,6 @@ pub enum OpCode {
     BuildTuple,
     BuildObject,
     BuildObjectWithShape,
-    BuildRecord,
     GetIndex,
     SetIndex,
     ObjectRest,

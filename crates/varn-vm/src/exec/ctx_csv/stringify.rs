@@ -34,7 +34,7 @@ pub(crate) fn stringify_csv(
             }
 
             match ctx.heap.get(first.as_heap()) {
-                Some(HeapObj::Object(first_obj) | HeapObj::Record(first_obj)) => {
+                Some(HeapObj::Object(first_obj)) => {
                     let shape = first_obj.borrow().shape().clone();
                     let prop_names: Vec<String> = {
                         let mut names_with_slots: Vec<(String, usize)> = shape
@@ -58,9 +58,7 @@ pub(crate) fn stringify_csv(
                         if !item.is_heap() {
                             continue;
                         }
-                        if let Some(HeapObj::Object(obj) | HeapObj::Record(obj)) =
-                            ctx.heap.get(item.as_heap())
-                        {
+                        if let Some(HeapObj::Object(obj)) = ctx.heap.get(item.as_heap()) {
                             let o = obj.borrow();
                             let inline = o.inline_slice();
                             for (slot, _) in prop_names.iter().enumerate() {
@@ -184,7 +182,6 @@ pub(crate) fn stringify_csv(
             HeapObj::Str(_)
             | HeapObj::Tuple(_)
             | HeapObj::Object(_)
-            | HeapObj::Record(_)
             | HeapObj::Buffer(_)
             | HeapObj::Module(_)
             | HeapObj::FrozenModule(_)

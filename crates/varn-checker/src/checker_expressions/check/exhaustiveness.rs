@@ -281,7 +281,6 @@ fn closed_members(subject: &Type, table: &mut CheckerTyTable) -> Option<Vec<Type
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
         | TypeKind::Object(_)
-        | TypeKind::Record(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }
@@ -341,7 +340,7 @@ fn pattern_covers(
                 | kind @ TypeKind::Tuple(_)
                 | kind @ TypeKind::TemplateLiteral(_)
                 | kind @ TypeKind::Fn(_)
-                | kind @ (TypeKind::Object(_) | TypeKind::Record(_))
+                | kind @ TypeKind::Object(_)
                 | kind @ TypeKind::Typeof(_)
                 | kind @ TypeKind::KeyOf(_)
                 | kind @ TypeKind::IndexedAccess { .. }

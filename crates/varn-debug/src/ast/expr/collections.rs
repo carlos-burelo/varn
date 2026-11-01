@@ -119,7 +119,6 @@ pub(super) fn try_print(
         | ExprKind::ImportMeta(_)
         | ExprKind::Super
         | ExprKind::Tuple { .. }
-        | ExprKind::Record { .. }
         | ExprKind::Unary { .. }
         | ExprKind::Update { .. }
         | ExprKind::Binary { .. }

@@ -38,9 +38,7 @@ impl<'a> FnEmitter<'a> {
                     | BackendTy::Set(_)
                     | BackendTy::Tuple(_)
                     | BackendTy::Dynamic(
-                        varn_tir::DynReason::Shape(_)
-                            | varn_tir::DynReason::Record(_)
-                            | varn_tir::DynReason::Interface(_)
+                        varn_tir::DynReason::Shape(_) | varn_tir::DynReason::Interface(_)
                     )
             )
         };

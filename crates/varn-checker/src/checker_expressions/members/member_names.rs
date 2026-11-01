@@ -11,7 +11,7 @@ impl<'r> Checker<'r> {
         let ty = &resolved;
         let ty_kind = self.ty_table.get(ty.0);
         match ty_kind {
-            TypeKind::Object(mid) | TypeKind::Record(mid) => self
+            TypeKind::Object(mid) => self
                 .ty_table
                 .get_object_members(mid)
                 .iter()

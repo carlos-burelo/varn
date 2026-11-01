@@ -50,7 +50,6 @@ impl ExecCtx {
                 | crate::heap::HeapObj::Array(_)
                 | crate::heap::HeapObj::Tuple(_)
                 | crate::heap::HeapObj::Object(_)
-                | crate::heap::HeapObj::Record(_)
                 | crate::heap::HeapObj::Buffer(_)
                 | crate::heap::HeapObj::Module(_)
                 | crate::heap::HeapObj::FrozenModule(_)
@@ -145,7 +144,6 @@ impl ExecCtx {
             | OpCode::BuildTuple
             | OpCode::BuildObject
             | OpCode::BuildObjectWithShape
-            | OpCode::BuildRecord
             | OpCode::GetIndex
             | OpCode::SetIndex
             | OpCode::ObjectRest

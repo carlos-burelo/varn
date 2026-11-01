@@ -104,7 +104,6 @@ impl<'a> CallTypeCtx<'a> {
             | ExprKind::Array { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }
-            | ExprKind::Record { .. }
             | ExprKind::Unary { .. }
             | ExprKind::Update { .. }
             | ExprKind::Logical { .. }

@@ -83,7 +83,6 @@ impl<'r> Checker<'r> {
                                     | TypeKind::TemplateLiteral(_)
                                     | TypeKind::Fn(_)
                                     | TypeKind::Object(_)
-                                    | TypeKind::Record(_)
                                     | TypeKind::Typeof(_)
                                     | TypeKind::KeyOf(_)
                                     | TypeKind::IndexedAccess { .. }

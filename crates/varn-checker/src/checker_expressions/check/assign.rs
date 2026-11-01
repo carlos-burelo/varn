@@ -195,7 +195,6 @@ impl<'r> Checker<'r> {
                 | varn_core::ast::ExprKind::Array { .. }
                 | varn_core::ast::ExprKind::Object { .. }
                 | varn_core::ast::ExprKind::Tuple { .. }
-                | varn_core::ast::ExprKind::Record { .. }
                 | varn_core::ast::ExprKind::Unary { .. }
                 | varn_core::ast::ExprKind::Update { .. }
                 | varn_core::ast::ExprKind::Binary { .. }
@@ -258,7 +257,6 @@ impl<'r> Checker<'r> {
                 | varn_core::ast::ExprKind::Array { .. }
                 | varn_core::ast::ExprKind::Object { .. }
                 | varn_core::ast::ExprKind::Tuple { .. }
-                | varn_core::ast::ExprKind::Record { .. }
                 | varn_core::ast::ExprKind::Unary { .. }
                 | varn_core::ast::ExprKind::Update { .. }
                 | varn_core::ast::ExprKind::Binary { .. }

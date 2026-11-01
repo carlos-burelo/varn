@@ -54,7 +54,6 @@ impl<'r> Checker<'r> {
                     varn_core::TypeKind::Named(..)
                     | varn_core::TypeKind::Generic(..)
                     | varn_core::TypeKind::Object(_)
-                    | varn_core::TypeKind::Record(_)
                     | varn_core::TypeKind::Fn(_)
                     | varn_core::TypeKind::EnumVariant { .. } => true,
                     varn_core::TypeKind::Literal(_)
@@ -327,7 +326,6 @@ impl<'r> Checker<'r> {
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
             | TypeKind::Object(_)
-            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }

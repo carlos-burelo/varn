@@ -11,7 +11,7 @@ use varn_sem::types::Type;
 impl<'r> Checker<'r> {
     fn is_keyed_dictionary(&self, ty: &Type) -> bool {
         match self.ty_table.get(ty.0) {
-            varn_core::TypeKind::Object(members) | varn_core::TypeKind::Record(members) => self
+            varn_core::TypeKind::Object(members) => self
                 .ty_table
                 .get_object_members(members)
                 .iter()

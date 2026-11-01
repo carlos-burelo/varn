@@ -135,7 +135,6 @@ impl<'m> Builder<'m> {
             | TirExprKind::ArrayLit(_)
             | TirExprKind::TupleLit(_)
             | TirExprKind::ObjectLit { .. }
-            | TirExprKind::RecordLit { .. }
             | TirExprKind::Await { .. }
             | TirExprKind::Yield { .. }
             | TirExprKind::Discriminant { .. }

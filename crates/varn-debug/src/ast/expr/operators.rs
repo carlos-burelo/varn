@@ -196,7 +196,6 @@ pub(super) fn try_print(
         | ExprKind::Array { .. }
         | ExprKind::Object { .. }
         | ExprKind::Tuple { .. }
-        | ExprKind::Record { .. }
         | ExprKind::Member { .. }
         | ExprKind::Call { .. }
         | ExprKind::New { .. }

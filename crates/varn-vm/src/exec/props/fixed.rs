@@ -51,7 +51,7 @@ pub(crate) fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmR
             return Ok(v);
         }
         let found = match heap.get(obj.as_heap()) {
-            Some(HeapObj::Object(o)) | Some(HeapObj::Record(o)) => o.field_at(slot),
+            Some(HeapObj::Object(o)) => o.field_at(slot),
             Some(HeapObj::EnumVariant(ev)) => ev.slots.get(slot).copied(),
             Some(HeapObj::Class(cls)) => {
                 let fields = cls.static_fields.borrow();
@@ -133,7 +133,6 @@ pub(crate) fn set_fixed_field(
                     HeapObj::Str(_)
                     | HeapObj::Array(_)
                     | HeapObj::Tuple(_)
-                    | HeapObj::Record(_)
                     | HeapObj::Buffer(_)
                     | HeapObj::Module(_)
                     | HeapObj::FrozenModule(_)

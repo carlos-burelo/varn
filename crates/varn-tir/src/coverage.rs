@@ -32,7 +32,6 @@ fn reason_index(r: DynReason) -> usize {
         DynReason::TaskHandle(_) => 14,
         DynReason::CoreMember => 15,
         DynReason::Spread => 16,
-        DynReason::Record(_) => 17,
     }
 }
 
@@ -213,11 +212,6 @@ impl Coverage {
             TirExprKind::TupleLit(xs) => {
                 for x in xs {
                     self.walk_expr(x);
-                }
-            }
-            TirExprKind::RecordLit { fields } => {
-                for (_, v) in fields {
-                    self.walk_expr(v);
                 }
             }
             TirExprKind::ArrayLit(els) => {

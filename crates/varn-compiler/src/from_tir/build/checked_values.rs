@@ -173,7 +173,6 @@ impl Builder<'_> {
             | varn_tir::BackendTy::Dynamic(
                 varn_tir::DynReason::Callable
                 | varn_tir::DynReason::Shape(_)
-                | varn_tir::DynReason::Record(_)
                 | varn_tir::DynReason::Interface(_),
             ) => {
                 return self.lower_conform(v, node_ty, ty, kind);

@@ -106,7 +106,6 @@ pub(super) fn project_class(kind: &InstKind) -> Option<SsaOp> {
         | InstKind::BuildArray { .. }
         | InstKind::BuildTuple { .. }
         | InstKind::BuildObject { .. }
-        | InstKind::BuildRecord { .. }
         | InstKind::BuildMap { .. }
         | InstKind::ObjectRest { .. }
         | InstKind::ToString { .. }

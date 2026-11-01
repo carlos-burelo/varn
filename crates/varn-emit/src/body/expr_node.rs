@@ -137,9 +137,6 @@ impl<'a> FnEmitter<'a> {
             ExprKind::Tuple { elements } => {
                 return self.lower_tuple(elements, ty, span);
             }
-            ExprKind::Record { properties } => {
-                return self.lower_record(properties, ty, span);
-            }
             ExprKind::Object { properties } => {
                 return self.lower_object(properties, ty, span);
             }

@@ -234,7 +234,6 @@ fn merge_blocks(func: &mut SsaFunc) -> bool {
                         | InstKind::BuildArray { .. }
                         | InstKind::BuildTuple { .. }
                         | InstKind::BuildObject { .. }
-                        | InstKind::BuildRecord { .. }
                         | InstKind::BuildMap { .. }
                         | InstKind::ObjectRest { .. }
                         | InstKind::ToString { .. }

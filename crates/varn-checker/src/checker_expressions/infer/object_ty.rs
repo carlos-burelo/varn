@@ -21,7 +21,7 @@ impl Checker<'_> {
             let exp = expected.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
             let exp_kind = self.ty_table.get(exp.0);
             let is_index_signature = match exp_kind {
-                TypeKind::Object(mid) | TypeKind::Record(mid) => {
+                TypeKind::Object(mid) => {
                     let members = self.ty_table.get_object_members(mid);
                     members.len() == 1 && matches!(&members[0], ObjectTypeMember::Index { .. })
                 }
@@ -56,16 +56,6 @@ impl Checker<'_> {
         }
         let members = self.infer_object_members(rec, properties, bind);
         Type::object(members, Arc::make_mut(&mut self.ty_table))
-    }
-
-    pub(super) fn infer_record(
-        &mut self,
-        rec: &mut Recorder,
-        properties: &[varn_core::ast::ObjectProp],
-        bind: &BindResult,
-    ) -> Type {
-        let members = self.infer_object_members(rec, properties, bind);
-        Type::record(members, Arc::make_mut(&mut self.ty_table))
     }
 
     fn infer_object_members(
@@ -127,9 +117,7 @@ impl Checker<'_> {
                 varn_core::ast::ObjectProp::Spread { argument, .. } => {
                     let spread_ty = self.infer_type(rec, *argument, bind);
                     let spread_kind = self.ty_table.get(spread_ty.0);
-                    if let varn_core::TypeKind::Object(mid) | varn_core::TypeKind::Record(mid) =
-                        spread_kind
-                    {
+                    if let varn_core::TypeKind::Object(mid) = spread_kind {
                         for mut m in self.ty_table.get_object_members(mid).to_vec() {
                             if let ObjectTypeMember::Property { readonly, .. } = &mut m {
                                 *readonly = false;

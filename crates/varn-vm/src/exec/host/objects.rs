@@ -10,10 +10,7 @@ impl ExecCtx {
     }
     pub(super) fn host_is_object(&self, v: VmValue) -> bool {
         if v.is_heap() {
-            matches!(
-                self.heap.get(v.as_heap()),
-                Some(HeapObj::Object(_) | HeapObj::Record(_))
-            )
+            matches!(self.heap.get(v.as_heap()), Some(HeapObj::Object(_)))
         } else {
             false
         }
@@ -22,7 +19,7 @@ impl ExecCtx {
         if !obj.is_heap() {
             return;
         }
-        if let Some(HeapObj::Object(o) | HeapObj::Record(o)) = self.heap.get(obj.as_heap()) {
+        if let Some(HeapObj::Object(o)) = self.heap.get(obj.as_heap()) {
             for (k, v) in o.borrow().iter() {
                 f(k.as_ref(), v);
             }
@@ -49,7 +46,7 @@ impl ExecCtx {
         obj: VmValue,
     ) -> Option<std::rc::Rc<varn_types::Shape>> {
         if obj.is_heap()
-            && let Some(HeapObj::Object(o) | HeapObj::Record(o)) = self.heap.get(obj.as_heap())
+            && let Some(HeapObj::Object(o)) = self.heap.get(obj.as_heap())
         {
             return Some(std::rc::Rc::clone(o.borrow().shape()));
         }
@@ -57,7 +54,7 @@ impl ExecCtx {
     }
     pub(super) fn host_get_field(&self, obj: VmValue, key: &str) -> Option<VmValue> {
         if obj.is_heap() {
-            if let Some(HeapObj::Object(o) | HeapObj::Record(o)) = self.heap.get(obj.as_heap()) {
+            if let Some(HeapObj::Object(o)) = self.heap.get(obj.as_heap()) {
                 return o.borrow().get_field(key);
             }
 
@@ -123,7 +120,7 @@ impl ExecCtx {
     pub(super) fn host_alloc_instance(&mut self, class_name: &str) -> Option<VmValue> {
         let class_obj = self.get_class(class_name)?;
         let (shape, slots) = class_obj.instance_shape();
-        let instance_nv = self.heap.alloc_object_cell(false, shape, slots, &[]);
+        let instance_nv = self.heap.alloc_object_cell(shape, slots, &[]);
         if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get_mut(instance_nv.as_heap()) {
             o.set_class(class_obj);
         }

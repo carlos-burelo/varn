@@ -315,7 +315,6 @@ fn emit_inst(
             | InstKind::BuildArray { .. }
             | InstKind::BuildTuple { .. }
             | InstKind::BuildObject { .. }
-            | InstKind::BuildRecord { .. }
             | InstKind::BuildMap { .. }
             | InstKind::ObjectRest { .. }
             | InstKind::ToString { .. }

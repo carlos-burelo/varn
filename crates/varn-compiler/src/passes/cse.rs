@@ -196,7 +196,6 @@ fn key_of(kind: &InstKind, id: &impl Fn(Value) -> u32) -> Option<Key> {
         | InstKind::BuildArray { .. }
         | InstKind::BuildTuple { .. }
         | InstKind::BuildObject { .. }
-        | InstKind::BuildRecord { .. }
         | InstKind::BuildMap { .. }
         | InstKind::ObjectRest { .. }
         | InstKind::ToString { .. }

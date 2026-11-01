@@ -139,7 +139,6 @@ impl<'r> Checker<'r> {
                 self.infer_object_type(rec, &properties, bind, expr)
             }
             ExprKind::Tuple { elements } => self.infer_tuple(rec, elements, bind),
-            ExprKind::Record { properties } => self.infer_record(rec, properties, bind),
             ExprKind::As {
                 expression,
                 type_ann,
@@ -265,7 +264,6 @@ impl<'r> Checker<'r> {
                     | TypeKind::Generic(..)
                     | TypeKind::TemplateLiteral(_)
                     | TypeKind::Object(_)
-                    | TypeKind::Record(_)
                     | TypeKind::Typeof(_)
                     | TypeKind::KeyOf(_)
                     | TypeKind::IndexedAccess { .. }

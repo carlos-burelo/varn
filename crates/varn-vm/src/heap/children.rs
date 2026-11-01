@@ -67,7 +67,7 @@ fn for_each_heap_child(
                 }
             }
         },
-        HeapObj::Object(obj_ref) | HeapObj::Record(obj_ref) => {
+        HeapObj::Object(obj_ref) => {
             let guard = obj_ref.borrow();
             guard.for_each_field(|_, v| value(v));
             if let Some(cls) = guard.class() {

@@ -31,13 +31,13 @@ fn op_color(op: OpCode) -> &'static str {
         | GteFloat | EqFloat | NeqFloat | EqStr | NeqStr | StrConcat | StrSlice | AddImm
         | SubImm => GREEN,
         LoadNull | LoadTrue | LoadFalse | Move | CloseUpvalue | Negate | Not | ToString
-        | BuildTuple | BuildRecord | GetIndex | SetIndex | ObjectRest | ObjectKeys
-        | ObjectMerge | GetProperty | GetPropertyMaybe | SetProperty | GetFixedField
-        | SetFixedField | GetSuper | AllocInstance | Typeof | IsNull | IsArray | AssertNotNull
-        | StrLength | ArrayLength | ArrayPush | ArrayPop | ArrayExtend | WrapSpread
-        | GetEnumTag | Await | Yield | InvokeRuntimeStatic | Intrinsic | Nop | ArrayGetIndex
-        | ArraySetIndex | BytesGetIndex | BytesSetIndex | CallNativeOp | IntrinsicDirect
-        | BuildMap | MapGetIndex | MapSetIndex | Convert | BytesLength => "",
+        | BuildTuple | GetIndex | SetIndex | ObjectRest | ObjectKeys | ObjectMerge
+        | GetProperty | GetPropertyMaybe | SetProperty | GetFixedField | SetFixedField
+        | GetSuper | AllocInstance | Typeof | IsNull | IsArray | AssertNotNull | StrLength
+        | ArrayLength | ArrayPush | ArrayPop | ArrayExtend | WrapSpread | GetEnumTag | Await
+        | Yield | InvokeRuntimeStatic | Intrinsic | Nop | ArrayGetIndex | ArraySetIndex
+        | BytesGetIndex | BytesSetIndex | CallNativeOp | IntrinsicDirect | BuildMap
+        | MapGetIndex | MapSetIndex | Convert | BytesLength => "",
     }
 }
 

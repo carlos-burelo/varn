@@ -43,7 +43,6 @@ fn lower_nominal_shape(
     let shape_kind: fn(varn_tir::ShapeId) -> DynReason = match shape.kind {
         varn_sem::output::ShapeKind::Interface => DynReason::Interface,
         varn_sem::output::ShapeKind::Object => DynReason::Shape,
-        varn_sem::output::ShapeKind::Record => DynReason::Record,
     };
     if let Some(id) = tt.named_shape(index) {
         return BackendTy::Dynamic(shape_kind(id));
@@ -190,15 +189,6 @@ fn lower_kind(
             }
             lower_shape(members, table, interner, tt, names, DynReason::Shape)
         }
-        TypeKind::Record(members) => lower_shape(
-            table.get_object_members(members),
-            table,
-            interner,
-            tt,
-            names,
-            DynReason::Record,
-        ),
-
         TypeKind::Fn(_) => BackendTy::Dynamic(DynReason::Callable),
 
         TypeKind::Intersection(_) => interface(),
@@ -314,7 +304,6 @@ fn lower_builtin(
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
         | TypeKind::Object(_)
-        | TypeKind::Record(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }

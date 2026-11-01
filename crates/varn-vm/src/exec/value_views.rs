@@ -8,7 +8,7 @@ pub(crate) fn object_entries(
     if !v.is_heap() {
         return None;
     }
-    let Some(HeapObj::Object(obj) | HeapObj::Record(obj)) = heap.get(v.as_heap()) else {
+    let Some(HeapObj::Object(obj)) = heap.get(v.as_heap()) else {
         return None;
     };
     let obj = obj.borrow();

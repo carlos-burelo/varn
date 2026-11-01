@@ -64,7 +64,6 @@ impl Checker<'_> {
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
             | TypeKind::Object(_)
-            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -88,7 +87,6 @@ impl Checker<'_> {
         let holds = match self.ty_table.get(ty.0) {
             TypeKind::Primitive(p) => p != LangPrimitive::Dynamic,
             TypeKind::Literal(_)
-            | TypeKind::Record(_)
             | TypeKind::Tuple(_)
             | TypeKind::EnumVariant { .. }
             | TypeKind::TemplateLiteral(_)

@@ -18,7 +18,6 @@ pub(crate) fn freeze_module(
             | HeapObj::Array(_)
             | HeapObj::Tuple(_)
             | HeapObj::Object(_)
-            | HeapObj::Record(_)
             | HeapObj::Buffer(_)
             | HeapObj::FrozenModule(_)
             | HeapObj::VmClosure(_)
@@ -80,7 +79,6 @@ fn freeze_value(val: VmValue, heap: &crate::heap::HeapInner) -> Option<FrozenExp
         Some(
             HeapObj::Array(_)
             | HeapObj::Tuple(_)
-            | HeapObj::Record(_)
             | HeapObj::Buffer(_)
             | HeapObj::Module(_)
             | HeapObj::FrozenModule(_)

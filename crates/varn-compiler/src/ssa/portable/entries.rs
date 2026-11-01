@@ -175,7 +175,6 @@ fn is_suspend_site(kind: &InstKind) -> bool {
         | InstKind::BuildArray { .. }
         | InstKind::BuildTuple { .. }
         | InstKind::BuildObject { .. }
-        | InstKind::BuildRecord { .. }
         | InstKind::BuildMap { .. }
         | InstKind::ObjectRest { .. }
         | InstKind::ToString { .. }

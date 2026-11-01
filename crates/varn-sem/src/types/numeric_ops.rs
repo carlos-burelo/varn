@@ -23,7 +23,6 @@ pub fn numeric_operand(t: &Type, table: &CheckerTyTable) -> Option<varn_core::Nu
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
         | TypeKind::Object(_)
-        | TypeKind::Record(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }

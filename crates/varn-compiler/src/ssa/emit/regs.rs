@@ -58,9 +58,7 @@ pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignme
                 InstKind::BuildTuple { elements } => elements.len() as u32,
                 InstKind::BuildMap { pairs } => (pairs.len() * 2) as u32,
 
-                InstKind::BuildObject { pairs } | InstKind::BuildRecord { pairs } => {
-                    pairs.len() as u32
-                }
+                InstKind::BuildObject { pairs } => pairs.len() as u32,
 
                 InstKind::IntrinsicCall { args, .. } => args.len() as u32 + 1,
                 InstKind::CallNativeOp { args, .. } => args.len() as u32 + 1,

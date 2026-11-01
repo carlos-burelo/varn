@@ -124,7 +124,6 @@ pub(super) fn const_int_expr(e: ExprId, arena: &varn_core::ast::AstArena) -> Con
         | ExprKind::Array { .. }
         | ExprKind::Object { .. }
         | ExprKind::Tuple { .. }
-        | ExprKind::Record { .. }
         | ExprKind::Update { .. }
         | ExprKind::Logical { .. }
         | ExprKind::Assign { .. }

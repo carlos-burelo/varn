@@ -17,7 +17,6 @@ pub enum HeapObj {
     Array(VmArray),
     Tuple(VmArray),
     Object(ObjRef),
-    Record(ObjRef),
     Buffer(varn_types::VmBuffer),
 
     Module(Rc<ModuleObj>),
@@ -47,10 +46,9 @@ impl HeapObj {
             HeapObj::Str(_) => RuntimeKind::Str,
             HeapObj::Array(_) => RuntimeKind::Array,
             HeapObj::Tuple(_) => RuntimeKind::Tuple,
-            HeapObj::Object(_)
-            | HeapObj::Record(_)
-            | HeapObj::Module(_)
-            | HeapObj::FrozenModule(_) => RuntimeKind::Object,
+            HeapObj::Object(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) => {
+                RuntimeKind::Object
+            }
             HeapObj::VmClosure(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) => {
                 RuntimeKind::Function
             }

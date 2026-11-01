@@ -168,7 +168,6 @@ pub enum SsaOp {
     BuildObject {
         keys: Vec<Box<str>>,
         values: Vec<u32>,
-        is_record: bool,
     },
 
     GetProperty {

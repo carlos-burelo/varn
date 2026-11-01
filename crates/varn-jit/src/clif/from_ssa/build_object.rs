@@ -10,11 +10,7 @@ pub(super) fn emit_build_object(
     values: &[Option<Value>],
     ids: &[u32],
     keys: &[Box<str>],
-    is_record: bool,
 ) -> Result<Value, String> {
-    if is_record {
-        return emit_build_object_slow(b, ctx, values, ids, keys, true);
-    }
     let idx = ctx
         .proto
         .chunk
@@ -36,7 +32,7 @@ pub(super) fn emit_build_object(
     let count = ids.len();
     let total = ctx.helpers.object_layout.data_off + varn_types::ObjData::bytes_for(count);
     let Some(class_idx) = varn_types::cell::class_for(total) else {
-        return emit_build_object_slow(b, ctx, values, ids, keys, false);
+        return emit_build_object_slow(b, ctx, values, ids, keys);
     };
     emit_build_object_inline(b, ctx, values, ids, keys, idx, count, class_idx)
 }
@@ -169,7 +165,7 @@ fn emit_build_object_inline(
     b.ins().jump(join_blk, &[boxed.into()]);
 
     b.switch_to_block(slow_blk);
-    let slow_v = emit_build_object_slow(b, ctx, values, ids, keys, false)?;
+    let slow_v = emit_build_object_slow(b, ctx, values, ids, keys)?;
     b.ins().jump(join_blk, &[slow_v.into()]);
 
     b.switch_to_block(join_blk);
@@ -258,7 +254,6 @@ fn emit_build_object_slow(
     values: &[Option<Value>],
     ids: &[u32],
     keys: &[Box<str>],
-    is_record: bool,
 ) -> Result<Value, String> {
     let idx = ctx
         .proto
@@ -301,12 +296,11 @@ fn emit_build_object_slow(
     }
     let count_v = b.ins().iconst(types::I64, count as i64);
     let shape_v = crate::clif::reloc::abs_value(b, crate::clif::reloc::AbsSym::Shape(idx as u32));
-    let rec_v = b.ins().iconst(types::I64, is_record as i64);
     super::exceptions::call_checked(
         b,
         ctx,
         ctx.helpers.build_object_window,
-        &[ectx, addr, count_v, shape_v, rec_v],
+        &[ectx, addr, count_v, shape_v],
     )?;
     Ok(b.ins().load(
         types::I128,

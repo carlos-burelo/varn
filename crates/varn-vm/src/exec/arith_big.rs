@@ -28,7 +28,6 @@ fn bigint_of(v: VmValue, heap: &Heap) -> Option<BigInt> {
             | HeapObj::Array(_)
             | HeapObj::Tuple(_)
             | HeapObj::Object(_)
-            | HeapObj::Record(_)
             | HeapObj::Buffer(_)
             | HeapObj::Module(_)
             | HeapObj::FrozenModule(_)

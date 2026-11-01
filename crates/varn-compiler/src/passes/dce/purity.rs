@@ -50,7 +50,6 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         | BuildArray { .. }
         | BuildTuple { .. }
         | BuildObject { .. }
-        | BuildRecord { .. }
         | BuildMap { .. }
         | MakeClosure { .. }
         | MakeEnumVariant { .. }

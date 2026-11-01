@@ -150,10 +150,6 @@ pub enum TirExprKind {
         entries: Vec<TirObjectEntry>,
     },
 
-    RecordLit {
-        fields: Vec<(Arc<str>, TirExpr)>,
-    },
-
     Await {
         future: Box<TirExpr>,
     },

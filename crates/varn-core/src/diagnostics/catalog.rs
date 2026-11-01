@@ -49,7 +49,6 @@ pub enum ErrorCode {
     InvalidSatisfies = 3015,
     TupleIndexOutOfBounds = 3016,
     TupleArityMismatch = 3017,
-    RecordShapeMismatch = 3018,
     InvalidConstAssertion = 3019,
     InfiniteTypeExpansion = 3020,
     IntegerOverflow = 3021,
@@ -193,7 +192,6 @@ impl ErrorCode {
             ErrorCode::InvalidSatisfies => "invalid-satisfies",
             ErrorCode::TupleIndexOutOfBounds => "tuple-index-out-of-bounds",
             ErrorCode::TupleArityMismatch => "tuple-arity-mismatch",
-            ErrorCode::RecordShapeMismatch => "record-shape-mismatch",
             ErrorCode::InvalidConstAssertion => "invalid-const-assertion",
             ErrorCode::InfiniteTypeExpansion => "infinite-type-expansion",
 

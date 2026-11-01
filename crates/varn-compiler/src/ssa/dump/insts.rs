@@ -137,14 +137,6 @@ pub fn inst_kind(kind: &InstKind) -> String {
                 .join(", ");
             format!("object {{{inner}}}")
         }
-        InstKind::BuildRecord { pairs } => {
-            let inner = pairs
-                .iter()
-                .map(|(k, v)| format!("{k}: {}", val(*v)))
-                .collect::<Vec<_>>()
-                .join(", ");
-            format!("record {{{inner}}}")
-        }
         InstKind::BuildMap { pairs } => {
             let inner = pairs
                 .iter()

@@ -206,10 +206,6 @@ impl<'r> Checker<'r> {
                 let properties = properties.clone();
                 self.check_object_with_context(rec, &properties, bind)
             }
-            ExprKind::Record { properties } => {
-                let properties = properties.clone();
-                self.check_object_with_context(rec, &properties, bind)
-            }
 
             ExprKind::Template { parts } => {
                 for p in parts.clone() {

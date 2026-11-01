@@ -139,11 +139,6 @@ impl HeapInner {
                     crate::exec::value_views::object_entries(self, nv).unwrap_or_default();
                 self.write_fields("{", entries.into_iter(), out, path);
             }
-            HeapObj::Record(_) => {
-                let entries =
-                    crate::exec::value_views::object_entries(self, nv).unwrap_or_default();
-                self.write_fields("#{", entries.into_iter(), out, path);
-            }
             HeapObj::Map(m) => {
                 let entries: Vec<(VmValue, VmValue)> =
                     m.read().iter().map(|(k, v)| (k.0, *v)).collect();

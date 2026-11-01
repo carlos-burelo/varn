@@ -31,7 +31,7 @@ fn class_of(obj: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
         return get_class(obj, heap);
     }
     match heap.get(obj.as_heap())? {
-        HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Class(_) => get_class(obj, heap),
+        HeapObj::Object(_) | HeapObj::Class(_) => get_class(obj, heap),
         HeapObj::Str(_)
         | HeapObj::Array(_)
         | HeapObj::Tuple(_)
@@ -76,7 +76,7 @@ pub(crate) fn type_name(obj: VmValue, heap: &Heap) -> String {
     }
     match obj.is_heap().then(|| heap.get(obj.as_heap())).flatten() {
         Some(HeapObj::Class(cls)) => cls.name.as_str().into(),
-        Some(HeapObj::Object(_) | HeapObj::Record(_)) => {
+        Some(HeapObj::Object(_)) => {
             class_of(obj, heap).map_or_else(|| "Object".into(), |c| c.name.as_str().into())
         }
         Some(HeapObj::EnumVariant(ev)) => ev.def.enum_name.to_string(),
@@ -136,7 +136,7 @@ pub(crate) fn resolve_meta_property(
             let name: Option<String> =
                 match obj.is_heap().then(|| heap.get(obj.as_heap())).flatten() {
                     Some(HeapObj::EnumVariant(ev)) => Some(ev.def.variant_name.to_string()),
-                    Some(HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Class(_)) => Some(
+                    Some(HeapObj::Object(_) | HeapObj::Class(_)) => Some(
                         cls.as_ref()
                             .map_or_else(|| "Object".into(), |c| c.name.as_str().into()),
                     ),
@@ -186,7 +186,7 @@ pub(crate) fn resolve_meta_property(
                 obj.is_heap().then(|| heap.get(obj.as_heap())).flatten(),
             ) {
                 (Some(c), Some(HeapObj::Class(_))) => class_field_names(c),
-                (_, Some(HeapObj::Object(o) | HeapObj::Record(o))) => o.keys().collect(),
+                (_, Some(HeapObj::Object(o))) => o.keys().collect(),
                 _ => Vec::new(),
             };
             Ok(str_array(heap, names.into_iter()))

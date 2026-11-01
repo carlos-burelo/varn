@@ -22,7 +22,6 @@ pub(crate) fn find_getter(obj: VmValue, key: &str, heap: &Heap) -> Option<VmValu
             HeapObj::Str(_)
             | HeapObj::Array(_)
             | HeapObj::Tuple(_)
-            | HeapObj::Record(_)
             | HeapObj::Buffer(_)
             | HeapObj::Module(_)
             | HeapObj::FrozenModule(_)
@@ -59,7 +58,6 @@ pub(crate) fn find_setter(obj: VmValue, key: &str, heap: &Heap) -> Option<VmValu
             HeapObj::Str(_)
             | HeapObj::Array(_)
             | HeapObj::Tuple(_)
-            | HeapObj::Record(_)
             | HeapObj::Buffer(_)
             | HeapObj::Module(_)
             | HeapObj::FrozenModule(_)
@@ -184,7 +182,6 @@ pub(crate) fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Hea
             HeapObj::Str(_)
             | HeapObj::Array(_)
             | HeapObj::Tuple(_)
-            | HeapObj::Record(_)
             | HeapObj::Buffer(_)
             | HeapObj::Module(_)
             | HeapObj::FrozenModule(_)
@@ -220,7 +217,7 @@ pub(super) fn resolve_own_data_property(obj: VmValue, key: &str, heap: &Heap) ->
         return inst.read_field(f);
     }
     match heap.get(obj.as_heap()).cloned() {
-        Some(HeapObj::Object(o)) | Some(HeapObj::Record(o)) => o.get(key),
+        Some(HeapObj::Object(o)) => o.get(key),
         Some(HeapObj::Array(a)) | Some(HeapObj::Tuple(a)) if key == MemberKey::Length.as_str() => {
             Some(VmValue::from_int(a.len() as i64))
         }

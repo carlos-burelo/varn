@@ -24,13 +24,10 @@ pub(super) fn try_project(kind: &InstKind, value_tys: &[BackendTy], site: &Site)
         InstKind::BuildMap { pairs } => Some(SsaOp::BuildMap {
             pairs: pairs.iter().map(|(k, v)| (k.0, v.0)).collect(),
         }),
-        InstKind::BuildObject { pairs } | InstKind::BuildRecord { pairs } => {
-            Some(SsaOp::BuildObject {
-                keys: pairs.iter().map(|(k, _)| k.as_ref().into()).collect(),
-                values: pairs.iter().map(|(_, v)| v.0).collect(),
-                is_record: matches!(kind, InstKind::BuildRecord { .. }),
-            })
-        }
+        InstKind::BuildObject { pairs } => Some(SsaOp::BuildObject {
+            keys: pairs.iter().map(|(k, _)| k.as_ref().into()).collect(),
+            values: pairs.iter().map(|(_, v)| v.0).collect(),
+        }),
         InstKind::BuildTuple { elements } => Some(SsaOp::BuildTuple {
             elements: elements.iter().map(|v| v.0).collect(),
         }),
@@ -246,7 +243,6 @@ fn project_indexed(kind: &InstKind, value_tys: &[BackendTy]) -> Option<SsaOp> {
         | InstKind::BuildArray { .. }
         | InstKind::BuildTuple { .. }
         | InstKind::BuildObject { .. }
-        | InstKind::BuildRecord { .. }
         | InstKind::BuildMap { .. }
         | InstKind::ObjectRest { .. }
         | InstKind::ToString { .. }

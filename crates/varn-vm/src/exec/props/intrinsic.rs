@@ -21,7 +21,6 @@ pub(super) fn class_for_property(val: VmValue, heap: &Heap) -> Option<Rc<ClassOb
         | HeapObj::Array(_)
         | HeapObj::Tuple(_)
         | HeapObj::Object(_)
-        | HeapObj::Record(_)
         | HeapObj::Buffer(_)
         | HeapObj::Module(_)
         | HeapObj::FrozenModule(_)
@@ -54,7 +53,6 @@ pub(super) fn resolve_intrinsic_method_property(
                 | HeapObj::Array(_)
                 | HeapObj::Tuple(_)
                 | HeapObj::Object(_)
-                | HeapObj::Record(_)
                 | HeapObj::Buffer(_)
                 | HeapObj::Module(_)
                 | HeapObj::FrozenModule(_)
@@ -94,7 +92,7 @@ pub(crate) fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
             return ClassObj::find_by_id(inst.class_id);
         }
         return match heap.get(val.as_heap()) {
-            Some(HeapObj::Object(o) | HeapObj::Record(o)) => o.borrow().class(),
+            Some(HeapObj::Object(o)) => o.borrow().class(),
             Some(HeapObj::Class(cls)) => Some(cls.clone()),
             Some(HeapObj::Array(_) | HeapObj::Tuple(_)) => intrinsic(varn_core::RuntimeKind::Array),
             Some(HeapObj::Str(_)) => intrinsic(varn_core::RuntimeKind::Str),
@@ -159,7 +157,6 @@ pub(crate) fn bind_method_to_receiver(
             | HeapObj::Array(_)
             | HeapObj::Tuple(_)
             | HeapObj::Object(_)
-            | HeapObj::Record(_)
             | HeapObj::Buffer(_)
             | HeapObj::Module(_)
             | HeapObj::FrozenModule(_)

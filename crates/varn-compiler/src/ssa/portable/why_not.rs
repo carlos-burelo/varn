@@ -53,7 +53,6 @@ pub(super) fn why_not(kind: &InstKind, value_tys: &[BackendTy]) -> String {
         | other @ InstKind::BuildArray { .. }
         | other @ InstKind::BuildTuple { .. }
         | other @ InstKind::BuildObject { .. }
-        | other @ InstKind::BuildRecord { .. }
         | other @ InstKind::BuildMap { .. }
         | other @ InstKind::ObjectRest { .. }
         | other @ InstKind::ToString { .. }

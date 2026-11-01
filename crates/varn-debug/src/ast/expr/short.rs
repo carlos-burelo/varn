@@ -41,7 +41,6 @@ pub(crate) fn format_expr_short(
         | ExprKind::Array { .. }
         | ExprKind::Object { .. }
         | ExprKind::Tuple { .. }
-        | ExprKind::Record { .. }
         | ExprKind::Unary { .. }
         | ExprKind::Update { .. }
         | ExprKind::Binary { .. }

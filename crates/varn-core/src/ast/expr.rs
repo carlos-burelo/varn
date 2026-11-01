@@ -54,9 +54,6 @@ pub enum ExprKind {
     Tuple {
         elements: Vec<ExprId>,
     },
-    Record {
-        properties: Vec<ObjectProp>,
-    },
     Unary {
         op: super::operators::UnaryOp,
         prefix: bool,

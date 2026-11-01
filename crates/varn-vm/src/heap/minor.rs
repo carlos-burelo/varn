@@ -177,7 +177,6 @@ mod minor_gc_tests {
             crate::heap::HeapObj::Str(_)
             | crate::heap::HeapObj::Tuple(_)
             | crate::heap::HeapObj::Object(_)
-            | crate::heap::HeapObj::Record(_)
             | crate::heap::HeapObj::Buffer(_)
             | crate::heap::HeapObj::Module(_)
             | crate::heap::HeapObj::FrozenModule(_)

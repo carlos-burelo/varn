@@ -74,7 +74,6 @@ impl Census {
             | TirExprKind::ArrayLit(_)
             | TirExprKind::TupleLit(_)
             | TirExprKind::ObjectLit { .. }
-            | TirExprKind::RecordLit { .. }
             | TirExprKind::Discriminant { .. }
             | TirExprKind::VariantPayload { .. }
             | TirExprKind::TypeTest { .. }

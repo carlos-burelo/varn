@@ -65,7 +65,6 @@ impl ExecCtx {
                 crate::heap::HeapObj::Str(_)
                 | crate::heap::HeapObj::Array(_)
                 | crate::heap::HeapObj::Tuple(_)
-                | crate::heap::HeapObj::Record(_)
                 | crate::heap::HeapObj::Buffer(_)
                 | crate::heap::HeapObj::FrozenModule(_)
                 | crate::heap::HeapObj::VmClosure(_)

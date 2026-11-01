@@ -23,7 +23,6 @@ pub(super) fn is_structural(ty: BackendTy) -> bool {
             | BackendTy::Dynamic(
                 varn_tir::DynReason::Callable
                     | varn_tir::DynReason::Shape(_)
-                    | varn_tir::DynReason::Record(_)
                     | varn_tir::DynReason::Interface(_)
             )
     )

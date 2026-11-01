@@ -43,7 +43,6 @@ fn hoist_decl(arena: &AstArena, decl: &Decl, out: &mut Vec<Hoisted>) {
                         | ExprKind::Array { .. }
                         | ExprKind::Object { .. }
                         | ExprKind::Tuple { .. }
-                        | ExprKind::Record { .. }
                         | ExprKind::Unary { .. }
                         | ExprKind::Update { .. }
                         | ExprKind::Binary { .. }

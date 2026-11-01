@@ -92,8 +92,7 @@ impl ExecCtx {
                 self.stack.unbox_into_reg(base, dest, obj_nv)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
-            OpCode::BuildObjectWithShape | OpCode::BuildRecord => {
-                let is_record = op == OpCode::BuildRecord;
+            OpCode::BuildObjectWithShape => {
                 let w1 = code[*ip];
                 *ip += 1;
                 let shape_idx = code[*ip] as usize;
@@ -108,11 +107,7 @@ impl ExecCtx {
                 self.stack.unbox_into_reg(
                     base,
                     dest,
-                    if is_record {
-                        self.heap.alloc_record_with_shape_slice(&shape, &boxed)
-                    } else {
-                        self.heap.alloc_object_with_shape_slice(&shape, &boxed)
-                    },
+                    self.heap.alloc_object_with_shape_slice(&shape, &boxed),
                 )?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }

@@ -4,7 +4,7 @@ pub(crate) fn object_keys(obj: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
         let heap_idx = obj.as_heap();
         let maybe_obj = match heap.get(heap_idx) {
-            Some(HeapObj::Object(o) | HeapObj::Record(o)) => Some(*o),
+            Some(HeapObj::Object(o)) => Some(*o),
             Some(
                 HeapObj::Str(_)
                 | HeapObj::Array(_)
@@ -45,7 +45,6 @@ pub(crate) fn object_keys(obj: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
                 | HeapObj::Array(_)
                 | HeapObj::Tuple(_)
                 | HeapObj::Object(_)
-                | HeapObj::Record(_)
                 | HeapObj::Buffer(_)
                 | HeapObj::Module(_)
                 | HeapObj::FrozenModule(_)
@@ -78,8 +77,7 @@ pub(crate) fn object_rest(obj: VmValue, exclude: &[String], heap: &mut Heap) -> 
     if obj.is_heap() {
         let heap_idx = obj.as_heap();
         let maybe_obj = match heap.get(heap_idx) {
-            Some(HeapObj::Object(o)) => Some((false, *o)),
-            Some(HeapObj::Record(o)) => Some((true, *o)),
+            Some(HeapObj::Object(o)) => Some(*o),
             Some(
                 HeapObj::Str(_)
                 | HeapObj::Array(_)
@@ -105,14 +103,14 @@ pub(crate) fn object_rest(obj: VmValue, exclude: &[String], heap: &mut Heap) -> 
             )
             | None => None,
         };
-        if let Some((is_record, o)) = maybe_obj {
+        if let Some(o) = maybe_obj {
             let kept: Vec<(Arc<str>, VmValue)> = o
                 .borrow()
                 .iter()
                 .filter(|(k, _)| !exclude.iter().any(|e| e.as_str() == k.as_ref()))
                 .collect();
             let (shape, values) = varn_types::value::ObjData::pairs_layout(kept);
-            return Ok(heap.alloc_object_cell(is_record, shape, values.len(), &values));
+            return Ok(heap.alloc_object_cell(shape, values.len(), &values));
         }
         let maybe_map = match heap.get(heap_idx) {
             Some(HeapObj::Map(m)) => Some(*m),
@@ -121,7 +119,6 @@ pub(crate) fn object_rest(obj: VmValue, exclude: &[String], heap: &mut Heap) -> 
                 | HeapObj::Array(_)
                 | HeapObj::Tuple(_)
                 | HeapObj::Object(_)
-                | HeapObj::Record(_)
                 | HeapObj::Buffer(_)
                 | HeapObj::Module(_)
                 | HeapObj::FrozenModule(_)
@@ -168,7 +165,6 @@ pub(crate) fn object_merge(target: VmValue, spread: VmValue, heap: &mut Heap) ->
             HeapObj::Str(_)
             | HeapObj::Array(_)
             | HeapObj::Tuple(_)
-            | HeapObj::Record(_)
             | HeapObj::Buffer(_)
             | HeapObj::Module(_)
             | HeapObj::FrozenModule(_)
@@ -210,7 +206,6 @@ pub(crate) fn object_merge(target: VmValue, spread: VmValue, heap: &mut Heap) ->
                 | HeapObj::Array(_)
                 | HeapObj::Tuple(_)
                 | HeapObj::Object(_)
-                | HeapObj::Record(_)
                 | HeapObj::Buffer(_)
                 | HeapObj::Module(_)
                 | HeapObj::FrozenModule(_)
@@ -242,7 +237,7 @@ pub(crate) fn object_merge(target: VmValue, spread: VmValue, heap: &mut Heap) ->
         }
     }
     if spread.is_heap()
-        && let Some(HeapObj::Object(src) | HeapObj::Record(src)) = heap.get(spread.as_heap())
+        && let Some(HeapObj::Object(src)) = heap.get(spread.as_heap())
     {
         let pairs: Vec<(Arc<str>, VmValue)> = src.borrow().iter().collect();
         for (k, nv) in pairs {

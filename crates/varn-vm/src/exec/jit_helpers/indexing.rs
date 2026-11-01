@@ -76,7 +76,7 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
                 }
                 return;
             }
-            Some(crate::heap::HeapObj::Object(o) | crate::heap::HeapObj::Record(o)) => {
+            Some(crate::heap::HeapObj::Object(o)) => {
                 let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
                 let key_str = if key.is_sso() {
                     Some(key.sso_as_str(&mut buf))
@@ -87,7 +87,6 @@ pub(crate) unsafe extern "C" fn jit_array_get_fast(
                             crate::heap::HeapObj::Array(_)
                             | crate::heap::HeapObj::Tuple(_)
                             | crate::heap::HeapObj::Object(_)
-                            | crate::heap::HeapObj::Record(_)
                             | crate::heap::HeapObj::Buffer(_)
                             | crate::heap::HeapObj::Module(_)
                             | crate::heap::HeapObj::FrozenModule(_)
@@ -213,7 +212,6 @@ pub(crate) unsafe extern "C" fn jit_array_set_fast(
                         crate::heap::HeapObj::Array(_)
                         | crate::heap::HeapObj::Tuple(_)
                         | crate::heap::HeapObj::Object(_)
-                        | crate::heap::HeapObj::Record(_)
                         | crate::heap::HeapObj::Buffer(_)
                         | crate::heap::HeapObj::Module(_)
                         | crate::heap::HeapObj::FrozenModule(_)

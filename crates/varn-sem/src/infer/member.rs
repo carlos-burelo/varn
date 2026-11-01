@@ -57,7 +57,7 @@ pub(crate) fn infer_member(
             TypeKind::Generic(..) if obj_ty.is_builtin(varn_core::BuiltinType::Map, table) => {
                 obj_ty.builtin_arg(1, table)
             }
-            TypeKind::Object(mid) | TypeKind::Record(mid) => table
+            TypeKind::Object(mid) => table
                 .get_object_members(mid)
                 .iter()
                 .find_map(|m| match m {
@@ -107,7 +107,6 @@ pub(crate) fn infer_member(
         | varn_core::ast::ExprKind::Array { .. }
         | varn_core::ast::ExprKind::Object { .. }
         | varn_core::ast::ExprKind::Tuple { .. }
-        | varn_core::ast::ExprKind::Record { .. }
         | varn_core::ast::ExprKind::Unary { .. }
         | varn_core::ast::ExprKind::Update { .. }
         | varn_core::ast::ExprKind::Binary { .. }
@@ -195,7 +194,7 @@ pub(crate) fn infer_member(
                     return reintern_member_type(Some(ctx), origin, ty, table);
                 }
             }
-            TypeKind::Object(mid) | TypeKind::Record(mid) => {
+            TypeKind::Object(mid) => {
                 for m in table.get_object_members(mid).to_vec() {
                     if let Some(ty) = infer_object_member_type(&m, prop_name, table) {
                         return ty;

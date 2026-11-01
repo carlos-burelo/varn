@@ -222,7 +222,6 @@ impl ExecCtx {
             | OpCode::BuildTuple
             | OpCode::BuildObject
             | OpCode::BuildObjectWithShape
-            | OpCode::BuildRecord
             | OpCode::GetIndex
             | OpCode::SetIndex
             | OpCode::ObjectRest

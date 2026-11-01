@@ -68,19 +68,6 @@ fn feed(v: VmValue, heap: &Heap, h: &mut rustc_hash::FxHasher, depth: u32) {
                 }
             }
         }
-        Some(HeapObj::Record(record)) => {
-            11u8.hash(h);
-            let mut combined: u64 = 0;
-            for key in record.keys() {
-                let mut entry = rustc_hash::FxHasher::default();
-                key.as_ref().hash(&mut entry);
-                if let Some(value) = record.get(key.as_ref()) {
-                    feed(value, heap, &mut entry, depth + 1);
-                }
-                combined = combined.wrapping_add(entry.finish());
-            }
-            combined.hash(h);
-        }
         Some(HeapObj::EnumVariant(variant)) => {
             12u8.hash(h);
             variant.def.enum_name.as_ref().hash(h);

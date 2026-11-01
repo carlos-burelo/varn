@@ -190,7 +190,6 @@ pub(crate) fn static_path_atoms(expr: ExprId, arena: &AstArena) -> Option<(Membe
             | ExprKind::Array { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }
-            | ExprKind::Record { .. }
             | ExprKind::Unary { .. }
             | ExprKind::Update { .. }
             | ExprKind::Binary { .. }

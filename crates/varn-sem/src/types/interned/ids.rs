@@ -64,7 +64,6 @@ pub(super) fn seeded_id(kind: &InternedTypeKind) -> Option<CheckerTyId> {
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
         | TypeKind::Object(_)
-        | TypeKind::Record(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }

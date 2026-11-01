@@ -131,7 +131,6 @@ pub(super) fn to_sendable(
             }
             Some(
                 HeapObj::Tuple(_)
-                | HeapObj::Record(_)
                 | HeapObj::Buffer(_)
                 | HeapObj::Module(_)
                 | HeapObj::FrozenModule(_)

@@ -59,12 +59,8 @@ impl Checker<'_> {
                 return None;
             }
             let mut shape = match self.ty_table.get(target.0) {
-                TypeKind::Object(id) | TypeKind::Record(id) => {
-                    let kind = if matches!(self.ty_table.get(target.0), TypeKind::Record(_)) {
-                        ShapeKind::Record
-                    } else {
-                        ShapeKind::Object
-                    };
+                TypeKind::Object(id) => {
+                    let kind = ShapeKind::Object;
                     let mut fields = Vec::new();
                     for member in self.ty_table.get_object_members(id).to_vec() {
                         let field = match member {
@@ -168,7 +164,6 @@ impl Checker<'_> {
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
             | TypeKind::Object(_)
-            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -309,7 +304,6 @@ impl Checker<'_> {
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
             | TypeKind::Object(_)
-            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }

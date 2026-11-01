@@ -48,7 +48,6 @@ pub fn infer_expr_type(
                 | TypeKind::TemplateLiteral(_)
                 | TypeKind::Fn(_)
                 | TypeKind::Object(_)
-                | TypeKind::Record(_)
                 | TypeKind::Typeof(_)
                 | TypeKind::KeyOf(_)
                 | TypeKind::IndexedAccess { .. }
@@ -118,7 +117,6 @@ pub fn infer_expr_type(
                     | TypeKind::TemplateLiteral(_)
                     | TypeKind::Fn(_)
                     | TypeKind::Object(_)
-                    | TypeKind::Record(_)
                     | TypeKind::Typeof(_)
                     | TypeKind::KeyOf(_)
                     | TypeKind::IndexedAccess { .. }
@@ -214,10 +212,6 @@ pub fn infer_expr_type(
         ExprKind::Object { properties } => {
             let members = infer_object_members(properties, arena, ctx, table);
             Type::object(members, table)
-        }
-        ExprKind::Record { properties } => {
-            let members = infer_object_members(properties, arena, ctx, table);
-            Type::record(members, table)
         }
         ExprKind::Range { start, .. } => {
             let bound = infer_expr_type(*start, arena, ctx, table);

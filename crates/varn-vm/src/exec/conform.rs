@@ -251,22 +251,11 @@ fn fit_in(cx: &Cx, v: VmValue, desc: &TypeDesc, scope: Option<&Scope>) -> Option
             }
             Some(())
         }
-        TypeDesc::Object(fields) | TypeDesc::Record(fields) => {
+        TypeDesc::Object(fields) => {
             if !v.is_heap() {
                 return None;
             }
-            if matches!(desc, TypeDesc::Record(_))
-                && !matches!(heap.get(v.as_heap()), Some(HeapObj::Record(_)))
-            {
-                return None;
-            }
-            if matches!(heap.get(v.as_heap()), Some(HeapObj::Record(_)))
-                && matches!(desc, TypeDesc::Object(_))
-                && fields.iter().any(|field| !field.readonly)
-            {
-                return None;
-            }
-            let Some(HeapObj::Object(obj) | HeapObj::Record(obj)) = heap.get(v.as_heap()) else {
+            let Some(HeapObj::Object(obj)) = heap.get(v.as_heap()) else {
                 return None;
             };
             let obj = obj.borrow();

@@ -114,7 +114,6 @@ pub fn infer_new(
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
             | TypeKind::Object(_)
-            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -199,7 +198,7 @@ pub(crate) fn infer_object_members(
             }
             ObjectProp::Spread { argument, .. } => {
                 let spread_ty = infer_expr_type(*argument, arena, ctx, table);
-                if let TypeKind::Object(mid) | TypeKind::Record(mid) = table.get(spread_ty.0) {
+                if let TypeKind::Object(mid) = table.get(spread_ty.0) {
                     members.extend(table.get_object_members(mid).to_vec());
                 }
             }

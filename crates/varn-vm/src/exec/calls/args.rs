@@ -46,7 +46,6 @@ pub(crate) fn expand_spread_args(
                 | HeapObj::Array(_)
                 | HeapObj::Tuple(_)
                 | HeapObj::Object(_)
-                | HeapObj::Record(_)
                 | HeapObj::Buffer(_)
                 | HeapObj::Module(_)
                 | HeapObj::FrozenModule(_)
@@ -74,7 +73,6 @@ pub(crate) fn expand_spread_args(
             Some(
                 HeapObj::Str(_)
                 | HeapObj::Object(_)
-                | HeapObj::Record(_)
                 | HeapObj::Buffer(_)
                 | HeapObj::Module(_)
                 | HeapObj::FrozenModule(_)

@@ -175,9 +175,7 @@ macro_rules! inst_uses {
             BuildArray { elements, .. }
             | BuildTuple { elements }
             | BuildStr { parts: elements } => $iter!(elements).for_each(|v| $use!($f, v)),
-            BuildObject { pairs } | BuildRecord { pairs } => {
-                $iter!(pairs).for_each(|(_, v)| $use!($f, v))
-            }
+            BuildObject { pairs } => $iter!(pairs).for_each(|(_, v)| $use!($f, v)),
             BuildMap { pairs } => $iter!(pairs).for_each(|(k, v)| {
                 $use!($f, k);
                 $use!($f, v);

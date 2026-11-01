@@ -115,9 +115,7 @@ impl<'m> Describer<'m> {
                     TypeDesc::Nullable(Box::new(inner))
                 }
             }
-            BackendTy::Dynamic(
-                DynReason::Shape(id) | DynReason::Interface(id) | DynReason::Record(id),
-            ) => {
+            BackendTy::Dynamic(DynReason::Shape(id) | DynReason::Interface(id)) => {
                 if !self.tir.types.contains_shape(id) {
                     return Ok(TypeDesc::Any);
                 }
@@ -145,11 +143,7 @@ impl<'m> Describer<'m> {
                     })
                     .collect::<Result<_>>()?;
                 self.open.pop();
-                if matches!(ty, BackendTy::Dynamic(DynReason::Record(_))) {
-                    TypeDesc::Record(fields)
-                } else {
-                    TypeDesc::Object(fields)
-                }
+                TypeDesc::Object(fields)
             }
             BackendTy::Void
             | BackendTy::Never
@@ -210,7 +204,6 @@ pub(crate) fn param_contract(tir: &TirModule, f: &TirFunction) -> Result<Option<
                 | required @ TypeDesc::Enum { .. }
                 | required @ TypeDesc::Args { .. }
                 | required @ TypeDesc::Object(_)
-                | required @ TypeDesc::Record(_)
                 | required @ TypeDesc::Enclosing { .. }
                     if *defaulted =>
                 {
@@ -235,7 +228,6 @@ pub(crate) fn param_contract(tir: &TirModule, f: &TirFunction) -> Result<Option<
                 | required @ TypeDesc::Enum { .. }
                 | required @ TypeDesc::Args { .. }
                 | required @ TypeDesc::Object(_)
-                | required @ TypeDesc::Record(_)
                 | required @ TypeDesc::Enclosing { .. } => required,
             })
         })

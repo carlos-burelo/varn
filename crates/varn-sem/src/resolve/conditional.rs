@@ -163,7 +163,6 @@ fn resolve_extends_with_infer(
         | TypeKind::Named(..)
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Object(_)
-        | TypeKind::Record(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }

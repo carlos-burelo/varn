@@ -72,40 +72,6 @@ pub(super) fn emit_build_object(
     chunk.write(shape_idx, line);
 }
 
-pub(super) fn emit_build_record(
-    chunk: &mut Chunk,
-    d: u8,
-    pairs: &[(Arc<str>, Value)],
-    reg: &[u8],
-    call_base: u8,
-    line: u32,
-) {
-    let count = pairs.len();
-    let mut is_contiguous = count > 0;
-    let mut start_reg = call_base;
-    if count > 0 {
-        let first = reg[pairs[0].1 .0 as usize];
-        for (i, (_, v)) in pairs.iter().enumerate() {
-            if reg[v.0 as usize] != first + i as u8 {
-                is_contiguous = false;
-                break;
-            }
-        }
-        if is_contiguous {
-            start_reg = first;
-        } else {
-            for (i, (_, v)) in pairs.iter().enumerate() {
-                chunk.emit_rr(OpCode::Move, call_base + i as u8, reg[v.0 as usize], line);
-            }
-        }
-    }
-    let keys = pairs.iter().map(|(k, _)| Arc::from(k.as_ref())).collect();
-    let shape_idx = chunk.add_shape(keys);
-    chunk.emit(OpCode::BuildRecord, line);
-    chunk.write(Chunk::pack(d, start_reg), line);
-    chunk.write(shape_idx, line);
-}
-
 pub(super) fn emit_build_map(
     chunk: &mut Chunk,
     d: u8,

@@ -162,33 +162,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
         TokenKind::Class => parse_class_expr(s),
         TokenKind::Match => parse_match_expr(s),
 
-        TokenKind::Hash => {
-            let start_range = s.range();
-            if s.peek_kind(1) == TokenKind::LBrace {
-                s.advance();
-                let obj = parse_object_expr(s)?;
-                let full_range = s.span_from(start_range);
-                let ExprKind::Object { properties } = s.arena.expr(obj).kind.clone() else {
-                    unreachable!()
-                };
-                if properties.iter().any(|p| {
-                    !matches!(
-                        p,
-                        varn_core::ast::ObjectProp::Property {
-                            key: varn_core::ast::PropKey::Identifier(_)
-                                | varn_core::ast::PropKey::Str(_)
-                                | varn_core::ast::PropKey::Int(_),
-                            ..
-                        }
-                    )
-                }) {
-                    return Err("records require named fields; spread, methods and computed keys are not supported".into());
-                }
-                Ok(s.expr(full_range, ExprKind::Record { properties }))
-            } else {
-                Err(format!("Unexpected `#` at {}:{}", s.line(), s.column()))
-            }
-        }
+        TokenKind::Hash => Err(format!("Unexpected `#` at {}:{}", s.line(), s.column())),
 
         TokenKind::EOF
         | TokenKind::Dynamic

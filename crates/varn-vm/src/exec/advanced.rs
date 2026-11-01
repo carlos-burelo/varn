@@ -42,7 +42,6 @@ pub(crate) fn instanceof(obj: VmValue, class_nv: VmValue, heap: &Heap) -> bool {
             | HeapObj::Array(_)
             | HeapObj::Tuple(_)
             | HeapObj::Object(_)
-            | HeapObj::Record(_)
             | HeapObj::Buffer(_)
             | HeapObj::Module(_)
             | HeapObj::FrozenModule(_)
@@ -96,7 +95,7 @@ pub(crate) fn instanceof(obj: VmValue, class_nv: VmValue, heap: &Heap) -> bool {
     let obj_class = match heap.instance(obj.as_heap()) {
         Some(inst) => ClassObj::find_by_id(inst.class_id),
         None => match heap.get(obj.as_heap()) {
-            Some(HeapObj::Object(o) | HeapObj::Record(o)) => o.borrow().class().clone(),
+            Some(HeapObj::Object(o)) => o.borrow().class().clone(),
             Some(
                 HeapObj::Str(_)
                 | HeapObj::Array(_)
@@ -152,7 +151,6 @@ pub(crate) fn op_in(key: VmValue, obj: VmValue, heap: &Heap) -> bool {
         Some(
             HeapObj::Str(_)
             | HeapObj::Tuple(_)
-            | HeapObj::Record(_)
             | HeapObj::Buffer(_)
             | HeapObj::Module(_)
             | HeapObj::FrozenModule(_)

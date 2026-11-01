@@ -17,7 +17,7 @@ impl HeapInner {
     }
 
     pub(crate) fn alloc_object(&mut self) -> VmValue {
-        self.alloc_object_cell(false, varn_types::root_shape(), 0, &[])
+        self.alloc_object_cell(varn_types::root_shape(), 0, &[])
     }
 
     pub(crate) fn alloc_object_with_shape(
@@ -33,15 +33,7 @@ impl HeapInner {
         shape: &Rc<varn_types::Shape>,
         values: &[VmValue],
     ) -> VmValue {
-        self.alloc_object_cell(false, Rc::clone(shape), values.len(), values)
-    }
-
-    pub(crate) fn alloc_record_with_shape_slice(
-        &mut self,
-        shape: &Rc<varn_types::Shape>,
-        values: &[VmValue],
-    ) -> VmValue {
-        self.alloc_object_cell(true, Rc::clone(shape), values.len(), values)
+        self.alloc_object_cell(Rc::clone(shape), values.len(), values)
     }
 
     pub(crate) fn alloc_empty_map_vm(&mut self) -> VmValue {

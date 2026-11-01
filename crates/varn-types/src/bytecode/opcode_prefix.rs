@@ -51,7 +51,6 @@ pub(super) fn prefix(op: OpCode) -> Option<&'static str> {
         | OpCode::BuildTuple
         | OpCode::BuildObject
         | OpCode::BuildObjectWithShape
-        | OpCode::BuildRecord
         | OpCode::GetIndex
         | OpCode::SetIndex
         | OpCode::ObjectRest

@@ -44,7 +44,6 @@ fn this_field_target(e: ExprId, arena: &AstArena, interner: &AtomInterner) -> Op
                 | ExprKind::Array { .. }
                 | ExprKind::Object { .. }
                 | ExprKind::Tuple { .. }
-                | ExprKind::Record { .. }
                 | ExprKind::Unary { .. }
                 | ExprKind::Update { .. }
                 | ExprKind::Binary { .. }
@@ -93,7 +92,6 @@ fn this_field_target(e: ExprId, arena: &AstArena, interner: &AtomInterner) -> Op
         | ExprKind::Array { .. }
         | ExprKind::Object { .. }
         | ExprKind::Tuple { .. }
-        | ExprKind::Record { .. }
         | ExprKind::Unary { .. }
         | ExprKind::Update { .. }
         | ExprKind::Binary { .. }

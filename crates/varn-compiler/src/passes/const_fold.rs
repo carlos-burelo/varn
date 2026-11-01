@@ -134,7 +134,6 @@ fn fold_inst(kind: &InstKind, const_map: &FxHashMap<Value, InstKind>) -> Option<
                 | InstKind::BuildArray { .. }
                 | InstKind::BuildTuple { .. }
                 | InstKind::BuildObject { .. }
-                | InstKind::BuildRecord { .. }
                 | InstKind::BuildMap { .. }
                 | InstKind::ObjectRest { .. }
                 | InstKind::ToString { .. }
@@ -217,7 +216,6 @@ fn fold_inst(kind: &InstKind, const_map: &FxHashMap<Value, InstKind>) -> Option<
         | InstKind::BuildArray { .. }
         | InstKind::BuildTuple { .. }
         | InstKind::BuildObject { .. }
-        | InstKind::BuildRecord { .. }
         | InstKind::BuildMap { .. }
         | InstKind::ObjectRest { .. }
         | InstKind::ToString { .. }

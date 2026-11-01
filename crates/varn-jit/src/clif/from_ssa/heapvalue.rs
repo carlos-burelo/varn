@@ -244,12 +244,8 @@ pub(super) fn emit(
             let boxed = heap::emit_build_map(b, ctx, values, pairs)?;
             Out::Boxed(boxed)
         }
-        SsaOp::BuildObject {
-            keys,
-            values: ids,
-            is_record,
-        } => {
-            let boxed = build_object::emit_build_object(b, ctx, values, ids, keys, *is_record)?;
+        SsaOp::BuildObject { keys, values: ids } => {
+            let boxed = build_object::emit_build_object(b, ctx, values, ids, keys)?;
             Out::Boxed(boxed)
         }
         SsaOp::GetIndex { object, index } => {

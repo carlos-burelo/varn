@@ -33,7 +33,7 @@ pub(super) fn collect_expr(a: &AstArena, id: &ExprId, out: &mut Vec<SpatialEntry
                 }
             }
         }
-        ExprKind::Object { properties } | ExprKind::Record { properties } => {
+        ExprKind::Object { properties } => {
             for prop in properties {
                 collect_object_prop(a, prop, out);
             }

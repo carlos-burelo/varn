@@ -108,7 +108,6 @@ fn find_suspend_inst(func: &SsaFunc, operand: Value) -> Option<(BlockId, usize)>
                 | InstKind::BuildArray { .. }
                 | InstKind::BuildTuple { .. }
                 | InstKind::BuildObject { .. }
-                | InstKind::BuildRecord { .. }
                 | InstKind::BuildMap { .. }
                 | InstKind::ObjectRest { .. }
                 | InstKind::ToString { .. }

@@ -67,7 +67,6 @@ impl fmt::Display for TypeDisplay<'_> {
                 | TypeKind::Generic(..)
                 | TypeKind::TemplateLiteral(_)
                 | TypeKind::Object(_)
-                | TypeKind::Record(_)
                 | TypeKind::Typeof(_)
                 | TypeKind::KeyOf(_)
                 | TypeKind::IndexedAccess { .. }
@@ -147,9 +146,8 @@ impl fmt::Display for TypeDisplay<'_> {
                 }
                 write!(f, ") => {}", self.child(ft.return_type))
             }
-            TypeKind::Object(mid) | TypeKind::Record(mid) => {
-                let record = matches!(table.get(self.ty.0), TypeKind::Record(_));
-                write!(f, "{}{{ ", if record { "#" } else { "" })?;
+            TypeKind::Object(mid) => {
+                write!(f, "{{ ")?;
                 for (i, m) in table.get_object_members(mid).iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;
@@ -161,7 +159,7 @@ impl fmt::Display for TypeDisplay<'_> {
                             optional,
                             readonly,
                         } => {
-                            if *readonly && !record {
+                            if *readonly {
                                 write!(f, "readonly ")?;
                             }
                             let shown = self.child(*ty).to_string();
@@ -242,7 +240,6 @@ impl fmt::Display for TypeDisplay<'_> {
                         | TypeKind::TemplateLiteral(_)
                         | TypeKind::Fn(_)
                         | TypeKind::Object(_)
-                        | TypeKind::Record(_)
                         | TypeKind::Typeof(_)
                         | TypeKind::KeyOf(_)
                         | TypeKind::IndexedAccess { .. }

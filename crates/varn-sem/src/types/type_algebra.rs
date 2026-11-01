@@ -23,7 +23,6 @@ impl Type {
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
             | TypeKind::Object(_)
-            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -78,7 +77,6 @@ impl Type {
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
             | TypeKind::Object(_)
-            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -127,7 +125,6 @@ impl Type {
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
             | TypeKind::Object(_)
-            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -183,7 +180,6 @@ impl Type {
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
             | TypeKind::Object(_)
-            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -253,18 +249,13 @@ impl Type {
                     table,
                 )
             }
-            TypeKind::Object(mid) | TypeKind::Record(mid) => {
-                let record = matches!(table.get(self.0), TypeKind::Record(_));
+            TypeKind::Object(mid) => {
                 let members = table.get_object_members(mid).to_vec();
                 let new_members: Vec<ObjectTypeMember> = members
                     .into_iter()
                     .map(|m| m.map_generics(mapping, table))
                     .collect();
-                if record {
-                    Type::record(new_members, table)
-                } else {
-                    Type::object(new_members, table)
-                }
+                Type::object(new_members, table)
             }
             TypeKind::Tuple(els) => {
                 let ids = table.get_list(els).to_vec();
@@ -311,7 +302,6 @@ impl Type {
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
             | TypeKind::Object(_)
-            | TypeKind::Record(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }

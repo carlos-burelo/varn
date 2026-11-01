@@ -66,8 +66,6 @@ pub enum DynReason {
 
     Shape(ShapeId),
 
-    Record(ShapeId),
-
     Unrecorded,
 
     Generic,

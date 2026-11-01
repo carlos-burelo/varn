@@ -107,7 +107,6 @@ pub(crate) fn collect_type_inferences(
         | TypeKind::Named(..)
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Object(_)
-        | TypeKind::Record(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }

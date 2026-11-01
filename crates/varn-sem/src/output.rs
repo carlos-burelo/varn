@@ -116,7 +116,6 @@ pub struct Desugarings {
 pub enum ShapeKind {
     Interface,
     Object,
-    Record,
 }
 
 #[derive(Clone, Debug)]

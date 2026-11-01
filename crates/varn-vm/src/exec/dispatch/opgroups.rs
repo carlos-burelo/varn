@@ -112,7 +112,6 @@ macro_rules! object_ops {
             | OpCode::BuildTuple
             | OpCode::BuildObject
             | OpCode::BuildObjectWithShape
-            | OpCode::BuildRecord
             | OpCode::ObjectRest
             | OpCode::ObjectKeys
             | OpCode::ObjectMerge

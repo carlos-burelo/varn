@@ -39,7 +39,6 @@ pub(crate) fn has_alloc_scan(
                     | OpCode::BuildTuple
                     | OpCode::BuildObject
                     | OpCode::BuildObjectWithShape
-                    | OpCode::BuildRecord
                     | OpCode::ArrayPush
                     | OpCode::ArrayExtend
                     | OpCode::MakeEnumVariant

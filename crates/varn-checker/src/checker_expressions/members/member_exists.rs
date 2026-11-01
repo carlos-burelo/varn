@@ -247,7 +247,7 @@ impl<'r> Checker<'r> {
                 );
                 self.member_exists(&ty, key, bind)
             }
-            TypeKind::Object(mid) | TypeKind::Record(mid) => self
+            TypeKind::Object(mid) => self
                 .ty_table
                 .get_object_members(mid)
                 .iter()

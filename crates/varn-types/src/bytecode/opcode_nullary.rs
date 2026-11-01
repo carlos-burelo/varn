@@ -54,7 +54,6 @@ pub(super) fn implied(op: OpCode) -> Option<&'static str> {
         | OpCode::BuildTuple
         | OpCode::BuildObject
         | OpCode::BuildObjectWithShape
-        | OpCode::BuildRecord
         | OpCode::GetIndex
         | OpCode::SetIndex
         | OpCode::ObjectRest

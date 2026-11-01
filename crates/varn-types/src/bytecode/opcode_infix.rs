@@ -54,7 +54,6 @@ pub(super) fn infix(op: OpCode) -> Option<&'static str> {
         | O::BuildTuple
         | O::BuildObject
         | O::BuildObjectWithShape
-        | O::BuildRecord
         | O::GetIndex
         | O::SetIndex
         | O::ObjectRest

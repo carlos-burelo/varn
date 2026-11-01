@@ -51,7 +51,6 @@ pub(super) fn resolve_specialized_property(
         Some(
             HeapObj::Tuple(_)
             | HeapObj::Object(_)
-            | HeapObj::Record(_)
             | HeapObj::Module(_)
             | HeapObj::FrozenModule(_)
             | HeapObj::VmClosure(_)

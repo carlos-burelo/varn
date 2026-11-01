@@ -78,9 +78,7 @@ impl<'r> Checker<'r> {
         };
         if !matches!(
             self.ty_table.get(inferred.0),
-            varn_core::TypeKind::Named(..)
-                | varn_core::TypeKind::Object(_)
-                | varn_core::TypeKind::Record(_)
+            varn_core::TypeKind::Named(..) | varn_core::TypeKind::Object(_)
         ) {
             return None;
         }

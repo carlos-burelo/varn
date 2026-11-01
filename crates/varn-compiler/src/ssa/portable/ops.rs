@@ -96,7 +96,6 @@ pub(super) fn project_bin(
         | OpCode::BuildTuple
         | OpCode::BuildObject
         | OpCode::BuildObjectWithShape
-        | OpCode::BuildRecord
         | OpCode::GetIndex
         | OpCode::SetIndex
         | OpCode::ObjectRest

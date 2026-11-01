@@ -45,29 +45,6 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
-    pub(super) fn lower_record(
-        &mut self,
-        properties: &[ObjectProp],
-        ty: BackendTy,
-        span: Span,
-    ) -> TirExpr {
-        let fields = properties
-            .iter()
-            .filter_map(|p| match p {
-                ObjectProp::Property { key, value, .. } => {
-                    Some((prop_key_name(key)?, self.lower_expr(*value)))
-                }
-                ObjectProp::Method { .. } | ObjectProp::Spread { .. } => None,
-            })
-            .collect();
-        TirExpr {
-            kind: TirExprKind::RecordLit { fields },
-            ty,
-            res: Resolution::None,
-            span,
-        }
-    }
-
     pub(super) fn lower_object(
         &mut self,
         properties: &[ObjectProp],

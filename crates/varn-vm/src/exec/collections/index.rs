@@ -119,7 +119,6 @@ pub(crate) fn map_set_index(
                 | HeapObj::Array(_)
                 | HeapObj::Tuple(_)
                 | HeapObj::Object(_)
-                | HeapObj::Record(_)
                 | HeapObj::Buffer(_)
                 | HeapObj::Module(_)
                 | HeapObj::FrozenModule(_)
@@ -200,7 +199,7 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
         return index_instance_fallback(obj, key, heap);
     }
     match heap.get(obj.as_heap()) {
-        Some(HeapObj::Object(o) | HeapObj::Record(o)) => {
+        Some(HeapObj::Object(o)) => {
             let mut buf = [0u8; varn_types::vm_value::SSO_MAX_LEN];
             let key_str = if key.is_sso() {
                 key.sso_as_str(&mut buf)
@@ -278,7 +277,6 @@ fn index_instance_fallback(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmRes
                 HeapObj::Array(_)
                 | HeapObj::Tuple(_)
                 | HeapObj::Object(_)
-                | HeapObj::Record(_)
                 | HeapObj::Buffer(_)
                 | HeapObj::Module(_)
                 | HeapObj::FrozenModule(_)
@@ -368,7 +366,6 @@ pub(crate) fn set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Hea
         Some(
             HeapObj::Str(_)
             | HeapObj::Tuple(_)
-            | HeapObj::Record(_)
             | HeapObj::Module(_)
             | HeapObj::FrozenModule(_)
             | HeapObj::VmClosure(_)

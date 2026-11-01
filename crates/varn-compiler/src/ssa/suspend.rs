@@ -57,7 +57,6 @@ pub fn analyze(ssa: &SsaFunc) -> Vec<SuspendPoint> {
                 | InstKind::BuildArray { .. }
                 | InstKind::BuildTuple { .. }
                 | InstKind::BuildObject { .. }
-                | InstKind::BuildRecord { .. }
                 | InstKind::BuildMap { .. }
                 | InstKind::ObjectRest { .. }
                 | InstKind::ToString { .. }
@@ -164,7 +163,6 @@ pub fn suspend_live_regs(
                 | InstKind::BuildArray { .. }
                 | InstKind::BuildTuple { .. }
                 | InstKind::BuildObject { .. }
-                | InstKind::BuildRecord { .. }
                 | InstKind::BuildMap { .. }
                 | InstKind::ObjectRest { .. }
                 | InstKind::ToString { .. }
@@ -319,7 +317,6 @@ fn captured_home_regs(ssa: &SsaFunc, nparams: usize) -> Vec<u16> {
                 | InstKind::BuildArray { .. }
                 | InstKind::BuildTuple { .. }
                 | InstKind::BuildObject { .. }
-                | InstKind::BuildRecord { .. }
                 | InstKind::BuildMap { .. }
                 | InstKind::ObjectRest { .. }
                 | InstKind::ToString { .. }

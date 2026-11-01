@@ -179,10 +179,6 @@ pub enum InstKind {
         pairs: Vec<(Arc<str>, Value)>,
     },
 
-    BuildRecord {
-        pairs: Vec<(Arc<str>, Value)>,
-    },
-
     BuildMap {
         pairs: Vec<(Value, Value)>,
     },

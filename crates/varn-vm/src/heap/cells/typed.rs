@@ -33,7 +33,6 @@ impl CellSpace {
     #[inline]
     pub(crate) fn alloc_object(
         &mut self,
-        record: bool,
         shape: Rc<Shape>,
         n: usize,
         values: &[varn_types::VmValue],
@@ -42,14 +41,7 @@ impl CellSpace {
         let tail = std::mem::size_of::<HeapObj>();
         let r = self.take_cell(tail + ObjData::bytes_for(n), 0, state);
         let obj = unsafe { ObjData::init_at(body::<u8>(r).add(tail), shape, n, values) };
-        Self::place(
-            r,
-            if record {
-                HeapObj::Record(obj)
-            } else {
-                HeapObj::Object(obj)
-            },
-        );
+        Self::place(r, HeapObj::Object(obj));
         r
     }
 
@@ -106,7 +98,7 @@ impl CellSpace {
     pub(super) unsafe fn drop_object(r: HeapRef) {
         let obj = body::<HeapObj>(r);
         match unsafe { &*obj } {
-            HeapObj::Object(o) | HeapObj::Record(o) => unsafe { ObjData::drop_at(*o) },
+            HeapObj::Object(o) => unsafe { ObjData::drop_at(*o) },
             HeapObj::Array(a) | HeapObj::Tuple(a) => unsafe { a.drop_at() },
             HeapObj::Map(m) => unsafe { m.drop_at() },
             HeapObj::Set(t) => unsafe { t.drop_at() },

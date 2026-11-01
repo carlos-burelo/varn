@@ -42,7 +42,7 @@ impl<'r> Checker<'r> {
             TypeKind::Generic(name_atom, args_list, origin_atom) => {
                 self.member_generic(name_atom, args_list, origin_atom, key, bind)
             }
-            TypeKind::Object(mid) | TypeKind::Record(mid) => self.member_object(mid, key),
+            TypeKind::Object(mid) => self.member_object(mid, key),
             TypeKind::Union(list) => self.member_union(list, key, bind),
             TypeKind::Array(inner) => self.member_array(inner, key, bind),
             kind @ (TypeKind::Primitive(_) | TypeKind::Literal(_)) => {
@@ -133,7 +133,7 @@ impl<'r> Checker<'r> {
                 );
                 return self.find_member(&named, key, bind);
             }
-            TypeKind::Object(mid) | TypeKind::Record(mid) => self
+            TypeKind::Object(mid) => self
                 .ty_table
                 .get_object_members(mid)
                 .iter()
@@ -278,7 +278,6 @@ impl<'r> Checker<'r> {
                         | varn_core::TypeKind::Generic(..)
                         | varn_core::TypeKind::TemplateLiteral(_)
                         | varn_core::TypeKind::Object(_)
-                        | varn_core::TypeKind::Record(_)
                         | varn_core::TypeKind::Typeof(_)
                         | varn_core::TypeKind::KeyOf(_)
                         | varn_core::TypeKind::IndexedAccess { .. }

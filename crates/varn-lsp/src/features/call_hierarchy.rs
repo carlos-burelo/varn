@@ -206,7 +206,6 @@ fn calls_in(file: &DocumentState) -> impl Iterator<Item = (String, SourceRange)>
         | ExprKind::Array { .. }
         | ExprKind::Object { .. }
         | ExprKind::Tuple { .. }
-        | ExprKind::Record { .. }
         | ExprKind::Unary { .. }
         | ExprKind::Update { .. }
         | ExprKind::Binary { .. }
@@ -266,7 +265,6 @@ fn calls_in(file: &DocumentState) -> impl Iterator<Item = (String, SourceRange)>
             | ExprKind::Array { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }
-            | ExprKind::Record { .. }
             | ExprKind::Unary { .. }
             | ExprKind::Update { .. }
             | ExprKind::Binary { .. }
