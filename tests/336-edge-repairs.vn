@@ -1,0 +1,72 @@
+import { describe, it, expect } from "std:test";
+import { Point, Pair, origin } from "./helpers/struct-lib.vn";
+
+struct Node {
+    value: int;
+    next: Node?;
+}
+
+function lookup(items: int[]?, at: int): int? {
+    return items?.[at];
+}
+
+function slice(items: int[]?): int[]? {
+    return items?.[1..3];
+}
+
+let probes = 0;
+function probe(): int[]? {
+    probes = probes + 1;
+    return null;
+}
+
+await describe("336 edge repairs", async () => {
+    await it("optional index on null yields null instead of failing", async () => {
+        expect(lookup(null, 0)).toBe(null);
+        expect(lookup([5, 6], 1)).toBe(6);
+        expect(slice(null)).toBe(null);
+        expect(slice([1, 2, 3, 4])?.length).toBe(2);
+        const none: (int, int)? = null;
+        expect(none?.[1]).toBe(null);
+        const some: (int, int)? = (1, 2);
+        expect(some?.[1]).toBe(2);
+    });
+
+    await it("optional index evaluates its object once", async () => {
+        expect(probe()?.[0]).toBe(null);
+        expect(probes).toBe(1);
+    });
+
+    await it("a recursive struct compares by contents", async () => {
+        expect(new Node(1, new Node(2, null)) == new Node(1, new Node(2, null))).toBe(true);
+        expect(new Node(1, null) == new Node(1, new Node(2, null))).toBe(false);
+    });
+
+    await it("an imported struct keeps value semantics", async () => {
+        const a = new Point(1, 2);
+        expect(a == new Point(1, 2)).toBe(true);
+        expect(origin() == new Point(0, 0)).toBe(true);
+        expect((a with { y: 9 }).y).toBe(9);
+        expect(`${a with { y: 9 }}`).toBe("Point { x: 1, y: 9 }");
+        expect(a.sum()).toBe(3);
+        expect(new Pair<int, str>(1, "a") == new Pair<int, str>(1, "a")).toBe(true);
+    });
+
+    await it("an imported struct is a structural Map and Set key", async () => {
+        const names = new Map<Point, str>();
+        names.set(new Point(1, 2), "a");
+        expect(names.get(new Point(1, 2))).toBe("a");
+        expect(names.get(origin())).toBe(null);
+        const seen = new Set<Point>();
+        seen.add(new Point(1, 2));
+        seen.add(new Point(1, 2));
+        expect(seen.size).toBe(1);
+    });
+
+    await it("a tuple parameter is destructured with parentheses", async () => {
+        const add = ((a, b): (int, int)) => a + b;
+        expect(add((1, 2))).toBe(3);
+        const sums = [(1, 2), (3, 4)].map(((a, b)) => a + b);
+        expect(sums[1]).toBe(7);
+    });
+});

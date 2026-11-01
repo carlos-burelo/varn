@@ -1,0 +1,4 @@
+// expect: error[VN3032]
+struct P { x: int; y: int }
+const key = "x"
+const q = new P(1, 2) with { [key]: 5 }

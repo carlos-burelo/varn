@@ -1,0 +1,22 @@
+export struct Point {
+    x: int;
+    y: int;
+    sum(): int { return this.x + this.y }
+}
+
+export struct Pair<A, B> {
+    first: A;
+    second: B;
+}
+
+export class Plain {
+    constructor(public v: int) {}
+}
+
+export struct Holder {
+    plain: Plain;
+}
+
+export function origin(): Point {
+    return new Point(0, 0);
+}

@@ -1,0 +1,5 @@
+// expect: error[VN4110]
+struct Q {
+    x: int;
+    x(): int { return 1 }
+}

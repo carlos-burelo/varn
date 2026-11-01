@@ -1,0 +1,4 @@
+// expect: error[VN3010]
+class Box { constructor(readonly v: int) {} }
+struct Wrap<T> { value: T }
+const same = new Wrap<Box>(new Box(1)) == new Wrap<Box>(new Box(1))
