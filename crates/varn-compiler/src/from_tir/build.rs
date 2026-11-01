@@ -93,6 +93,7 @@ impl<'m> Builder<'m> {
 
             TirExprKind::ArrayLit(els) => self.lower_array_lit(els, ty),
             TirExprKind::TupleLit(xs) => self.lower_tuple_lit(xs, ty),
+            TirExprKind::MapLit(entries) => self.lower_map_lit(entries, ty),
             TirExprKind::RecordLit { fields } => self.lower_record_lit(fields, ty),
             TirExprKind::ObjectLit { entries } => self.lower_object_lit(entries, ty),
 

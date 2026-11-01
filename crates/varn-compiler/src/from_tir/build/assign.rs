@@ -134,6 +134,7 @@ impl<'m> Builder<'m> {
             | TirExprKind::Assign { .. }
             | TirExprKind::ArrayLit(_)
             | TirExprKind::TupleLit(_)
+            | TirExprKind::MapLit(_)
             | TirExprKind::ObjectLit { .. }
             | TirExprKind::RecordLit { .. }
             | TirExprKind::Await { .. }

@@ -154,6 +154,9 @@ fn expr_uses_receiver(arena: &AstArena, id: ExprId) -> bool {
             properties.iter().any(|p| prop_uses_receiver(arena, p))
         }
         ExprKind::Tuple { elements } => elements.iter().any(|e| expr_uses_receiver(arena, *e)),
+        ExprKind::MapLiteral { entries } => entries
+            .iter()
+            .any(|e| expr_uses_receiver(arena, e.key) || expr_uses_receiver(arena, e.value)),
         ExprKind::Unary { operand, .. } | ExprKind::Update { operand, .. } => {
             expr_uses_receiver(arena, *operand)
         }

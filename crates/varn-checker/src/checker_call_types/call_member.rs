@@ -29,6 +29,7 @@ pub(super) fn infer_member(c: &mut CallTypeCtx, object: ExprId, property: ExprId
         | ExprKind::ImportMeta(_)
         | ExprKind::Super
         | ExprKind::Array { .. }
+        | ExprKind::MapLiteral { .. }
         | ExprKind::Object { .. }
         | ExprKind::Tuple { .. }
         | ExprKind::Record { .. }

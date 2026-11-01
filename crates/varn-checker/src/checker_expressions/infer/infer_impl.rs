@@ -223,6 +223,7 @@ impl<'r> Checker<'r> {
             }
             ExprKind::Update { operand, .. } => self.infer_type(rec, *operand, bind),
             ExprKind::Assign { value, .. } => self.infer_type(rec, *value, bind),
+            ExprKind::MapLiteral { entries } => self.infer_map_literal(rec, entries, bind),
             ExprKind::Array { elements } => self.infer_array(rec, elements, bind),
             ExprKind::Template { .. } => Type::Str,
             ExprKind::Paren { expression } => self.infer_type(rec, *expression, bind),

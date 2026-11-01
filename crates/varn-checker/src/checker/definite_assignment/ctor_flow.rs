@@ -68,6 +68,7 @@ impl<'a> CtorFlow<'a> {
             | ExprKind::Super
             | ExprKind::ImportMeta(_)
             | ExprKind::Array { .. }
+            | ExprKind::MapLiteral { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }
             | ExprKind::Record { .. }
@@ -157,6 +158,7 @@ impl<'a> CtorFlow<'a> {
             | ExprKind::ImportMeta(_)
             | ExprKind::Super
             | ExprKind::Array { .. }
+            | ExprKind::MapLiteral { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }
             | ExprKind::Record { .. }

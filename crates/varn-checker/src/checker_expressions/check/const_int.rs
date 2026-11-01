@@ -122,6 +122,7 @@ pub(super) fn const_int_expr(e: ExprId, arena: &varn_core::ast::AstArena) -> Con
         | ExprKind::ImportMeta(_)
         | ExprKind::Super
         | ExprKind::Array { .. }
+        | ExprKind::MapLiteral { .. }
         | ExprKind::Object { .. }
         | ExprKind::Tuple { .. }
         | ExprKind::Record { .. }

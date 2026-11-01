@@ -39,6 +39,7 @@ pub(crate) fn format_expr_short(
         | ExprKind::This
         | ExprKind::Super
         | ExprKind::Array { .. }
+        | ExprKind::MapLiteral { .. }
         | ExprKind::Object { .. }
         | ExprKind::Tuple { .. }
         | ExprKind::Record { .. }

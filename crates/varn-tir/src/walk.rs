@@ -131,6 +131,12 @@ pub fn expr_mut(expr: &mut TirExpr, f: &mut impl FnMut(&mut TirExpr)) {
             }
         }
         TirExprKind::TupleLit(items) => items.iter_mut().for_each(|e| expr_mut(e, f)),
+        TirExprKind::MapLit(entries) => {
+            for (key, value) in entries {
+                expr_mut(key, f);
+                expr_mut(value, f);
+            }
+        }
         TirExprKind::ObjectLit { entries } => {
             for entry in entries {
                 match entry {

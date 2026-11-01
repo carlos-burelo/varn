@@ -38,6 +38,12 @@ pub(super) fn collect_expr(a: &AstArena, id: &ExprId, out: &mut Vec<SpatialEntry
                 collect_object_prop(a, prop, out);
             }
         }
+        ExprKind::MapLiteral { entries } => {
+            for entry in entries {
+                collect_expr(a, &entry.key, out);
+                collect_expr(a, &entry.value, out);
+            }
+        }
         ExprKind::Tuple { elements }
         | ExprKind::Sequence {
             expressions: elements,

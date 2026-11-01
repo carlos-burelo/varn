@@ -241,6 +241,12 @@ impl<'r> super::Binder<'r> {
                     self.bind_expr(e);
                 }
             }
+            ExprKind::MapLiteral { entries } => {
+                for entry in entries {
+                    self.bind_expr(entry.key);
+                    self.bind_expr(entry.value);
+                }
+            }
             ExprKind::Object { properties } | ExprKind::Record { properties } => {
                 for prop in properties {
                     match prop {

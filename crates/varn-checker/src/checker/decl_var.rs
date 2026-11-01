@@ -154,5 +154,14 @@ impl<'r> Checker<'r> {
                 .with_range(expr.range),
             );
         }
+        if matches!(&expr.kind, ExprKind::MapLiteral { entries } if entries.is_empty()) {
+            self.emit(
+                Diagnostic::warning(
+                    ErrorCode::UntypedEmptyMap,
+                    "an empty map literal has no key or value types; annotate it, e.g. `let m: Map<str, int> = [:]`",
+                )
+                .with_range(expr.range),
+            );
+        }
     }
 }

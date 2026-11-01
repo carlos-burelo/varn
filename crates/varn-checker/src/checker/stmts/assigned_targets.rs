@@ -189,6 +189,7 @@ pub(crate) fn static_path_atoms(expr: ExprId, arena: &AstArena) -> Option<(Membe
             | ExprKind::Super
             | ExprKind::ImportMeta(_)
             | ExprKind::Array { .. }
+            | ExprKind::MapLiteral { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }
             | ExprKind::Record { .. }

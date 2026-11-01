@@ -98,6 +98,7 @@ pub(super) fn try_print(
         | ExprKind::TaggedTemplate { .. }
         | ExprKind::Missing
         | ExprKind::Array { .. }
+        | ExprKind::MapLiteral { .. }
         | ExprKind::Object { .. }
         | ExprKind::Tuple { .. }
         | ExprKind::Record { .. }

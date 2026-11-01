@@ -323,6 +323,7 @@ import "./329-regex-index-in-code-points.vn"
 import "./330-regex-literals.vn"
 import "./331-regex-cache-is-bounded.vn"
 import "./332-tuple-syntax.vn"
+import "./333-map-literal.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

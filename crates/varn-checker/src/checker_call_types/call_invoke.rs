@@ -35,6 +35,7 @@ pub(super) fn infer_invoke(
             | ExprKind::ImportMeta(_)
             | ExprKind::Super
             | ExprKind::Array { .. }
+            | ExprKind::MapLiteral { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }
             | ExprKind::Record { .. }
@@ -82,6 +83,7 @@ pub(super) fn infer_invoke(
         | ExprKind::ImportMeta(_)
         | ExprKind::Super
         | ExprKind::Array { .. }
+        | ExprKind::MapLiteral { .. }
         | ExprKind::Object { .. }
         | ExprKind::Tuple { .. }
         | ExprKind::Record { .. }

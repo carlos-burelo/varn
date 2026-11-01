@@ -126,6 +126,7 @@ pub(super) fn try_print(
         | ExprKind::ImportMeta(_)
         | ExprKind::Super
         | ExprKind::Array { .. }
+        | ExprKind::MapLiteral { .. }
         | ExprKind::Object { .. }
         | ExprKind::Tuple { .. }
         | ExprKind::Record { .. }

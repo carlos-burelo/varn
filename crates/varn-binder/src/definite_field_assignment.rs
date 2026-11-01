@@ -42,6 +42,7 @@ fn this_field_target(e: ExprId, arena: &AstArena, interner: &AtomInterner) -> Op
                 | ExprKind::ImportMeta(_)
                 | ExprKind::Super
                 | ExprKind::Array { .. }
+                | ExprKind::MapLiteral { .. }
                 | ExprKind::Object { .. }
                 | ExprKind::Tuple { .. }
                 | ExprKind::Record { .. }
@@ -91,6 +92,7 @@ fn this_field_target(e: ExprId, arena: &AstArena, interner: &AtomInterner) -> Op
         | ExprKind::ImportMeta(_)
         | ExprKind::Super
         | ExprKind::Array { .. }
+        | ExprKind::MapLiteral { .. }
         | ExprKind::Object { .. }
         | ExprKind::Tuple { .. }
         | ExprKind::Record { .. }

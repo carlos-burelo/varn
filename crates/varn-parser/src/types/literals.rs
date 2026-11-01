@@ -36,6 +36,7 @@ pub(crate) fn parse_literal_type(
             | ExprKind::Super
             | ExprKind::ImportMeta(_)
             | ExprKind::Array { .. }
+            | ExprKind::MapLiteral { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }
             | ExprKind::Record { .. }
@@ -86,6 +87,7 @@ pub(crate) fn parse_literal_type(
         | ExprKind::Super
         | ExprKind::ImportMeta(_)
         | ExprKind::Array { .. }
+        | ExprKind::MapLiteral { .. }
         | ExprKind::Object { .. }
         | ExprKind::Tuple { .. }
         | ExprKind::Record { .. }

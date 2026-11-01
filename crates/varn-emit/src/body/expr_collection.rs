@@ -43,6 +43,24 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
+    pub(super) fn lower_map_literal(
+        &mut self,
+        entries: &[varn_core::ast::MapEntry],
+        ty: BackendTy,
+        span: Span,
+    ) -> TirExpr {
+        let lowered = entries
+            .iter()
+            .map(|entry| (self.lower_expr(entry.key), self.lower_expr(entry.value)))
+            .collect();
+        TirExpr {
+            kind: TirExprKind::MapLit(lowered),
+            ty,
+            res: Resolution::None,
+            span,
+        }
+    }
+
     pub(super) fn lower_record(
         &mut self,
         properties: &[ObjectProp],

@@ -202,6 +202,11 @@ impl<'r> Checker<'r> {
                 }
             }
 
+            ExprKind::MapLiteral { entries } => {
+                let entries = entries.clone();
+                self.check_map_literal_with_context(rec, &entries, bind)
+            }
+
             ExprKind::Object { properties } => {
                 let properties = properties.clone();
                 self.check_object_with_context(rec, &properties, bind)

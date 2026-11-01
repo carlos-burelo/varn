@@ -48,6 +48,9 @@ pub enum ExprKind {
     Array {
         elements: Vec<ArrayEl>,
     },
+    MapLiteral {
+        entries: Vec<MapEntry>,
+    },
     Object {
         properties: Vec<ObjectProp>,
     },
@@ -178,6 +181,12 @@ pub enum ExprKind {
         target: ExprId,
         property: Atom,
     },
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct MapEntry {
+    pub key: ExprId,
+    pub value: ExprId,
 }
 
 #[derive(Clone, Debug)]

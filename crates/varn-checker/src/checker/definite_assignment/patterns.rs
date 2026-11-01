@@ -47,6 +47,12 @@ pub(crate) fn walk_expr_children(e: ExprId, arena: &AstArena, f: &mut dyn FnMut(
             f(*tag);
             f(*template);
         }
+        ExprKind::MapLiteral { entries } => {
+            for entry in entries {
+                f(entry.key);
+                f(entry.value);
+            }
+        }
         ExprKind::Array { elements } => {
             for el in elements {
                 match el {

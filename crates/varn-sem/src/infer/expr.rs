@@ -142,6 +142,17 @@ pub fn infer_expr_type(
             let list = table.intern_list(&ids);
             Type::resolved(table.intern(TypeKind::Tuple(list)))
         }
+        ExprKind::MapLiteral { entries } => {
+            let Some(first) = entries.first() else {
+                return Type::Dynamic;
+            };
+            let key = infer_expr_type(first.key, arena, ctx, table);
+            let value = infer_expr_type(first.value, arena, ctx, table);
+            if key.is_dynamic() || value.is_dynamic() {
+                return Type::Dynamic;
+            }
+            Type::builtin(varn_core::BuiltinType::Map, vec![key, value], table)
+        }
         ExprKind::Array { elements } => {
             for el in elements {
                 if let ArrayEl::Expr(first) = el {

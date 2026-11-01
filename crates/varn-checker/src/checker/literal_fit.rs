@@ -58,6 +58,7 @@ impl Checker<'_> {
             | ExprKind::ImportMeta(_)
             | ExprKind::Super
             | ExprKind::Tuple { .. }
+            | ExprKind::MapLiteral { .. }
             | ExprKind::Record { .. }
             | ExprKind::Unary { .. }
             | ExprKind::Update { .. }

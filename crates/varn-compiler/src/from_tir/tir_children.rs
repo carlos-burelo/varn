@@ -66,6 +66,7 @@ pub(crate) fn child_exprs(e: &TirExpr) -> Vec<&TirExpr> {
             }
         }
         TupleLit(xs) => out.extend(xs.iter()),
+        MapLit(entries) => out.extend(entries.iter().flat_map(|(k, v)| [k, v])),
         RecordLit { fields } => out.extend(fields.iter().map(|(_, v)| v)),
         ObjectLit { entries } => {
             for en in entries {
