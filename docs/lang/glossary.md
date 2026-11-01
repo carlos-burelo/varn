@@ -233,9 +233,9 @@ Sintaxis compacta de constructor declarada en la firma de la clase: `class User(
 **`raw string` (`"""…"""`)**  
 Literal de cadena delimitado por triple comilla. No procesa secuencias de escape.
 
-**Record (`#{…}`)**
-Producto estructural inmutable con igualdad profunda (`==`); par de
-`Tuple` (`(…)`) (`tests/69-tuples-records.vn`).
+**Struct (`struct`)**
+Tipo valor nominal con campos inmutables e igualdad profunda (`==`); par de
+`Tuple` (`(…)`) (`tests/69-tuples-structs.vn`).
 
 **`return`**  
 Devuelve un valor desde una función y termina su ejecución.

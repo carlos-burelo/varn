@@ -1,6 +1,6 @@
 import { ParseError } from "std:error";
 
-export type FormPart = #{
+export type FormPart = {
     name: str,
     filename: str?,
     contentType?: str,
@@ -137,7 +137,7 @@ export namespace Multipart {
             const disposition = headers["content-disposition"];
             const attributes = disposition === null ? {} : parameters(disposition);
             const content = data.slice(bodyStart, next);
-            parts.push(#{
+            parts.push({
                 name: attributes["name"] ?? "",
                 filename: attributes["filename"],
                 contentType: headers["content-type"],

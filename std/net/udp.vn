@@ -1,7 +1,7 @@
 import { ClosedError } from "std:error";
 import { udpBind$, udpSendTo$, udpRecvFrom$, udpClose$ } from "runtime:net";
 
-export type UdpPacket = #{
+export type UdpPacket = {
     data: Bytes,
     host: str,
     port: int
@@ -34,7 +34,7 @@ export class UdpSocket {
         let raw = await udpRecvFrom$(this._id, maxLen ?? 65536);
         if (raw === null) return null;
         let parts = raw as (Bytes, str, int);
-        return #{
+        return {
             data: parts[0],
             host: parts[1],
             port: parts[2]

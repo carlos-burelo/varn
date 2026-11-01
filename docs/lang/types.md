@@ -61,25 +61,22 @@ let t2 = (1, "hello", true)
 assertTrue("tuple eq true", t1 == t2)   // igualdad estructural profunda
 ```
 
-### 2.3 Records (`#{…}`)
+### 2.3 Structs
 
-Objetos inmutables con igualdad estructural. Su tipo se escribe `#{ campo: Tipo }`;
-una vista `{ readonly campo: Tipo }` sigue siendo un tipo de objeto y no convierte
-el valor en record:
+Tipo valor nominal con igualdad por contenido (ver `docs/lang/classes_objects.md`, sección Structs):
 
 ```varn
-let r1 = #{ name: "Varn", version: 1 }   // tests/69-tuples-records.vn
-assertTrue("record field name",    r1.name == "Varn")
-assertTrue("record index name",    r1["name"] == "Varn")
+struct Release { name: str; version: int }   // tests/69-tuples-structs.vn
 
-let r2 = #{ name: "Varn", version: 1 }
-assertTrue("record eq true", r1 == r2)       // igualdad estructural
+let r1 = new Release("Varn", 1)
+assertTrue("struct field name", r1.name == "Varn")
+assertTrue("struct eq true", r1 == new Release("Varn", 1))
 ```
 
 `==` y `!=` requieren tipos con igualdad por valor: primitivos, enums, tuplas y
-records. Arrays, objetos, clases, funciones y colecciones mutables requieren
+structs. Arrays, objetos, clases, funciones y colecciones mutables requieren
 `sameValue(a, b)` para identidad o una llamada explícita a su método `equals`.
-`sameValue` usa igualdad por valor para primitivos, tuplas y records; conserva
+`sameValue` usa igualdad por valor para primitivos, tuplas y structs; conserva
 identidad para referencias mutables. Las comparaciones contra `null` se permiten.
 `dynamic` y parámetros de tipo abiertos también requieren comparación explícita.
 Los alias y las uniones deben demostrar que todos sus miembros admiten igualdad.
@@ -120,14 +117,14 @@ assertTrue("map size", m.size === 1)
 
 > [!NOTE]
 > No son intercambiables: `{ [key: K]: V }` baja a `BackendTy::Dict` (objeto con claves dinámicas) y `Map<K, V>` a `BackendTy::Map`. Asignar un literal de objeto a un `Map<K, V>` es error de tipos (VN3001).
-> La sintaxis `Record<K, V>` está estrictamente prohibida: la palabra `Record` se reserva exclusivamente para registros inmutables por valor (`#{}`).
+> La sintaxis `Record<K, V>` está prohibida: use `Map<K, V>` para una colección con clave o `{ [key: K]: V }` para un objeto indexable.
 
 ### 2.5 Matriz Comparativa Canónica de Tipos Contenedor
 
 | Tipo | Sintaxis de Creación | Sintaxis de Acceso | Igualdad | Mutabilidad |
 |---|---|---|---|---|
 | **`Object`** | `{ name: "Alice", age: 30 }` | `obj.name` (offset de compilación fijo) | Explícita (`sameValue(a, b)`) | Mutable |
-| **`Record`** | `#{ name: "Alice", age: 30 }` | `rec.name` | Estructural profunda (`==`) | Inmutable |
+| **`struct`** | `new Point(1, 2)` | `p.x` | Estructural profunda (`==`) | Inmutable |
 | **`Tuple`** | `( 1, "hello" )` | `tup[0]` | Estructural profunda (`==`) | Inmutable |
 | **`Map<K, V>`** | `new Map<K, V>()` | `m[k]`, `m.get(k)`, `m.set(k, v)` | Explícita (`sameValue(a, b)`) | Mutable |
 | **`{ [key: K]: V }`** | `{ "a": 1 }` | `d[k]` | Explícita (`sameValue(a, b)`) | Mutable |

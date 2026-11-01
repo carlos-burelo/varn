@@ -26,10 +26,10 @@ export function now(): float {
     return now$();
 }
 
-export type SystemInfoRecord = #{ platform: str, cwd: str, args: str[], now: float };
+export type SystemInfoRecord = { platform: str, cwd: str, args: str[], now: float };
 
 export function getSystemInfo(): SystemInfoRecord {
-    return #{
+    return {
         platform: platform$(),
         cwd: cwd$(),
         args: args$(),

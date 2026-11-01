@@ -2,7 +2,7 @@ import { ParseError } from "std:error";
 import { sleep } from "std:task/combinators";
 import { now, toParts, fromParts, TimeParts } from "std:time";
 
-export type CronSpec = #{
+export type CronSpec = {
     minutes: bool[],
     hours: bool[],
     days: bool[],
@@ -104,7 +104,7 @@ export namespace Cron {
         let wd8 = parseField(clean[4], 0, 7);
         let wd = wd8.slice(0, 7);
         wd[0] = wd[0] || wd8[7];
-        return #{
+        return {
             minutes: parseField(clean[0], 0, 59),
             hours: parseField(clean[1], 0, 23),
             days: parseField(clean[2], 1, 31),

@@ -466,13 +466,15 @@ assertTrue("tuple length", t1.length == 3)
 let t2 = (1, "hello", true)
 assertTrue("tuple eq true", t1 == t2)
 
-let r1 = #{ name: "Varn", version: 1 }
-assertTrue("record field", r1.name == "Varn")
-let r2 = #{ name: "Varn", version: 1 }
-assertTrue("record eq", r1 == r2)
+struct Release { name: str; version: int }
+let r1 = new Release("Varn", 1)
+assertTrue("struct field", r1.name == "Varn")
+let r2 = new Release("Varn", 1)
+assertTrue("struct eq", r1 == r2)
 
-let nested1 = #{ point: (10, 20), meta: #{ active: true } }
-let nested2 = #{ point: (10, 20), meta: #{ active: true } }
+struct Marker { point: (int, int); active: bool }
+let nested1 = new Marker((10, 20), true)
+let nested2 = new Marker((10, 20), true)
 assertTrue("nested eq true", nested1 == nested2)
 ```
 

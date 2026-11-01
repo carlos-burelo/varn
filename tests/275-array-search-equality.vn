@@ -1,5 +1,7 @@
 import { describe, it, expect } from "std:test";
 
+struct Key { k: int }
+
 await describe("275 array search equality", async () => {
     await it("indexOf and includes agree with == on NaN", () => {
         const nan = 0.0 / 0.0;
@@ -10,7 +12,7 @@ await describe("275 array search equality", async () => {
 
     await it("structural values are found by value", () => {
         expect([(1, 2), (3, 4)].indexOf((3, 4))).toBe(1);
-        expect([#{ k: 1 }].includes(#{ k: 1 })).toBeTruthy();
+        expect([new Key(1)].includes(new Key(1))).toBeTruthy();
     });
 
     await it("plain values keep working", () => {

@@ -6,10 +6,9 @@ class Point {
 }
 
 await describe("266 value display", async () => {
-    await it("objects and records show their fields", () => {
+    await it("objects show their fields", () => {
         const o = { a: 1, b: "x", c: [1, 2] };
         expect(`${o}`).toBe('{ a: 1, b: "x", c: [1, 2] }');
-        expect(`${#{ k: 1 }}`).toBe("#{ k: 1 }");
         expect(`${new Point()}`).toBe('Point { x: 1, label: "p" }');
     });
 

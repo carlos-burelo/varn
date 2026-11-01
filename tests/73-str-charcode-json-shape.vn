@@ -99,7 +99,7 @@ await describe("73 str charcode json shape", async () => {
         const tup = (1, "two", true)
         expect(Json.stringify(tup as dynamic)).toBe("[1,\"two\",true]")
         
-        const rec = #{ x: 3, y: 4 }
+        const rec = { x: 3, y: 4 }
         expect(Json.stringify(rec as dynamic)).toBe("{\"x\":3,\"y\":4}")
         
         // Round trip through the parser's shape cache, with a NESTED object of the

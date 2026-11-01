@@ -18,7 +18,7 @@ Este archivo no duplica esa lista; solo ancla lo ejercitado por la suite.
 - `Map` / `Set`: `tests/17-map-set.vn`.
 - `Range` (`..`, `..=`, `Range.from`, `step`, `toArray`, slicing):
   `tests/18-ranges.vn`, `tests/88-range-indexing.vn`.
-- Tuplas `(…)` / records `#{…}`: `tests/69-tuples-records.vn`.
+- Tuplas `(…)` / structs: `tests/69-tuples-structs.vn`.
 - `str`: `tests/03-strings.vn` (`trim`, `padStart/End`, `charCode`,
   `substr`, `isEmpty/isBlank/isDigit`, `capitalize`, `str.fromCharCode`, `str.join`).
 - `char`: `tests/34-char-type.vn` (`charCodeAt`, `char.fromCode`, `toString`).

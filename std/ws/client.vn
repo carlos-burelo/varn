@@ -43,12 +43,12 @@ export function bytesConcat(a: Bytes, b: Bytes): Bytes {
 const MAX_HANDSHAKE = 16384;
 const DEFAULT_MAX_MESSAGE = 16777216;
 
-export async function readHttpHead(connId: int): Task<#{ head: str, rest: Bytes }> {
+export async function readHttpHead(connId: int): Task<{ head: str, rest: Bytes }> {
     let buf = Bytes.alloc(0);
     while (true) {
         let end = findHeadEnd(buf);
         if (end >= 0) {
-            return #{ head: buf.slice(0, end).toString(), rest: buf.slice(end) };
+            return { head: buf.slice(0, end).toString(), rest: buf.slice(end) };
         }
         if (buf.length > MAX_HANDSHAKE) {
             throw new ProtocolError("the WebSocket handshake is too large");

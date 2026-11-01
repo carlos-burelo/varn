@@ -12,7 +12,7 @@ await describe("24 Record", async () => {
         expect(scores["charlie"]).toBe(72);
         scores["dave"] = 60;
         expect(scores["dave"]).toBe(60);
-        const rec = #{ x: 10, y: 20 };
+        const rec = { x: 10, y: 20 };
         expect(rec.x).toBe(10);
         expect(rec.y).toBe(20);
     });

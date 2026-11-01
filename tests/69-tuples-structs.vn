@@ -1,46 +1,48 @@
 import { describe, it, expect } from "std:test";
 
+struct Release {
+    name: str;
+    version: int;
+}
 
-await describe("69 tuples records", async () => {
-    await it("tests", async () => {
-        // Test suite for Tuples (...) and Records #{...} with deep structural equality ==
-        
-        // 1. Tuple creation and element access
+struct Marker {
+    point: (int, int);
+    active: bool;
+}
+
+await describe("69 tuples structs", async () => {
+    await it("tuple creation and element access", async () => {
         let t1 = (1, "hello", true)
         expect(t1[0] == 1).toBeTruthy()
         expect(t1[1] == "hello").toBeTruthy()
         expect(t1[2] == true).toBeTruthy()
         expect(t1.length == 3).toBeTruthy()
-        
-        // 2. Tuple structural equality (==)
+    });
+
+    await it("tuple structural equality", async () => {
+        let t1 = (1, "hello", true)
         let t2 = (1, "hello", true)
         let t3 = (1, "hello", false)
         expect(t1 == t2).toBeTruthy()
         expect(t1 != t3).toBeTruthy()
-        
+
         let a1 = [1, 2]
         let a2 = [1, 2]
         expect(!sameValue(a1, a2)).toBeTruthy()
-        
-        // 4. Record creation and field access
-        let r1 = #{ name: "Varn", version: 1 }
+    });
+
+    await it("struct creation, access and equality", async () => {
+        let r1 = new Release("Varn", 1)
         expect(r1.name == "Varn").toBeTruthy()
         expect(r1.version == 1).toBeTruthy()
         expect(r1["name"] == "Varn").toBeTruthy()
-        
-        // 5. Record structural equality (==)
-        let r2 = #{ name: "Varn", version: 1 }
-        let r3 = #{ name: "Varn", version: 2 }
-        expect(r1 == r2).toBeTruthy()
-        expect(r1 != r3).toBeTruthy()
-        
-        // 6. Nested Tuples and Records deep equality
-        let nested1 = #{ point: (10, 20), meta: #{ active: true } }
-        let nested2: #{ point: (int, int) } & #{ meta: #{ active: bool } } = #{ point: (10, 20), meta: #{ active: true } }
-        let nested3 = #{ point: (10, 99), meta: #{ active: true } }
-        expect(nested1 == nested2).toBeTruthy()
-        expect(nested1 != nested3).toBeTruthy()
-        
-        
+        expect(r1 == new Release("Varn", 1)).toBeTruthy()
+        expect(r1 != new Release("Varn", 2)).toBeTruthy()
+    });
+
+    await it("structs holding tuples compare deeply", async () => {
+        let a = new Marker((10, 20), true)
+        expect(a == new Marker((10, 20), true)).toBeTruthy()
+        expect(a != new Marker((10, 99), true)).toBeTruthy()
     });
 });

@@ -8,7 +8,7 @@ const p = pair()
 const u = (1, 2)
 const v = (1, 2)
 
-const r = #{ name: "x", age: 3, ok: true }
+const r = { name: "x", age: 3, ok: true }
 await describe("117 tuples", async () => {
         await it("group 1 part 1", async () => {
         expect(t[0]).toBe(1);

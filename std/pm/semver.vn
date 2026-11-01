@@ -1,5 +1,5 @@
 import { ParseError } from "std:error";
-export type SemVer = #{
+export type SemVer = {
     major: int,
     minor: int,
     patch: int,
@@ -95,7 +95,7 @@ export namespace Semver {
         if (nums.length !== 3) {
             throw new ParseError("Semver: expected major.minor.patch, got '" + text + "'");
         }
-        return #{
+        return {
             major: int.parse(nums[0]),
             minor: int.parse(nums[1]),
             patch: int.parse(nums[2]),

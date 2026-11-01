@@ -34,7 +34,7 @@ await describe("formas", async () => {
 
 - **Tipos estáticos de punta a punta**: el tipo que conoce el checker llega al TIR, al bytecode y al JIT. `dynamic` existe, pero es explícito.
 - **Nulos explícitos**: `T?`, `?.`, `??` y estrechamiento por flujo de control.
-- **Tipos algebraicos**: enums con payload, uniones, tuplas `#[…]` y records `#{…}` inmutables con igualdad estructural, `match` exhaustivo con guardas.
+- **Tipos algebraicos**: enums con payload, uniones, tuplas `(…)` y structs inmutables con igualdad estructural, `match` exhaustivo con guardas.
 - **Clases e interfaces**: herencia, abstractas, constructores primarios, getters/setters, extensiones, decoradores.
 - **Async real**: `async`/`await`, generadores y generadores async, tareas, `TaskGroup`, canales, isolates en hilos del SO.
 - **Errores**: `try`/`catch`/`finally`, multi-catch tipado y operador `try` sobre `Result`/`Option`/nulables.

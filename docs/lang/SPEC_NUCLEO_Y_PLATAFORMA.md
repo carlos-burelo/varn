@@ -17,7 +17,7 @@ Verificado (contrato real, detalle en `types.md` / `specification.md`):
 - `T?` = `T | null` (`tests/30-nullable-types.vn`); uniones `A | B`
   (`tests/15-unions.vn`); enums simples, con payload, genéricos
   (`tests/16-enums.vn`, `tests/41-advanced-enums.vn`).
-- `Array<T>` ≡ `T[]`; tuplas `(…)` y records `#{…}` inmutables con `==`
+- `Array<T>` ≡ `T[]`; tuplas `(…)` y structs inmutables con `==`
   estructural (`tests/69-tuples-records.vn`).
 - `dynamic` como frontera explícita (`tests/79-control-flow-narrowing.vn`,
   `tests/122-numeric-conversions.vn`).
