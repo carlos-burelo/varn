@@ -104,6 +104,11 @@ impl<'a> FnEmitter<'a> {
         }
 
         let obj = self.lower_expr(object);
+        let obj = if optional && computed {
+            self.pin(obj)
+        } else {
+            obj
+        };
 
         if computed {
             if let ExprKind::Range {
@@ -128,9 +133,9 @@ impl<'a> FnEmitter<'a> {
                     };
                 }
                 let recv_ty = obj.ty;
-                return TirExpr {
+                let slice = TirExpr {
                     kind: TirExprKind::MethodCall {
-                        recv: Box::new(obj),
+                        recv: Box::new(obj.clone()),
                         name: Arc::from(varn_core::MemberKey::Slice.as_str()),
                         args: vec![TirArg::Expr(s), TirArg::Expr(e)],
                     },
@@ -138,6 +143,7 @@ impl<'a> FnEmitter<'a> {
                     res: self.by_name(Arc::from(varn_core::MemberKey::Slice.as_str()), recv_ty),
                     span,
                 };
+                return self.guard_optional(optional, obj, slice, span);
             }
 
             let index = self.lower_expr(property);
@@ -174,15 +180,16 @@ impl<'a> FnEmitter<'a> {
                 | BackendTy::Dynamic(_) => ty,
             };
             let node_ty = self.keyed_read_ty(obj.ty, node_ty);
-            return TirExpr {
+            let read = TirExpr {
                 kind: TirExprKind::Index {
-                    object: Box::new(obj),
+                    object: Box::new(obj.clone()),
                     index: Box::new(index),
                 },
                 ty: node_ty,
                 res: Resolution::None,
                 span,
             };
+            return self.guard_optional(optional, obj, read, span);
         }
 
         let name = Self::member_name(self.ast_arena, property, self.m.interner)
@@ -220,6 +227,28 @@ impl<'a> FnEmitter<'a> {
             return self.field_place(obj, name, ty, span);
         }
         self.field_access(obj, name, ty, span)
+    }
+
+    fn guard_optional(
+        &mut self,
+        optional: bool,
+        recv: TirExpr,
+        access: TirExpr,
+        span: Span,
+    ) -> TirExpr {
+        if !optional {
+            return access;
+        }
+        let is_null = TirExpr {
+            kind: TirExprKind::Unary {
+                op: varn_tir::TirUnOp::IsNull,
+                operand: Box::new(recv),
+            },
+            ty: BackendTy::Bool,
+            res: Resolution::None,
+            span,
+        };
+        self.null_or(is_null, access, span)
     }
 
     fn inherited_read(
