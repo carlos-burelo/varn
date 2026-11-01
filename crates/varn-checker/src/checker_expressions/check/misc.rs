@@ -93,6 +93,13 @@ impl<'r> Checker<'r> {
                         varn_core::ast::PropKey::Identifier(name)
                         | varn_core::ast::PropKey::Str(name) => Some(name.clone()),
                         varn_core::ast::PropKey::Int(_) | varn_core::ast::PropKey::Computed(_) => {
+                            self.emit(
+                                Diagnostic::error(
+                                    ErrorCode::InvalidWithEntry,
+                                    "`with` replaces fields by name: a computed or numeric key is not statically known",
+                                )
+                                .with_range(*prop_range),
+                            );
                             None
                         }
                     };
@@ -136,10 +143,30 @@ impl<'r> Checker<'r> {
                         }
                     }
                 }
-                varn_core::ast::ObjectProp::Spread { argument, .. } => {
+                varn_core::ast::ObjectProp::Spread {
+                    argument,
+                    range: entry_range,
+                } => {
                     self.check_expr(rec, *argument, bind);
+                    self.emit(
+                        Diagnostic::error(
+                            ErrorCode::InvalidWithEntry,
+                            "`with` replaces named fields only: a spread entry has no statically known fields",
+                        )
+                        .with_range(*entry_range),
+                    );
                 }
-                varn_core::ast::ObjectProp::Method { .. } => {}
+                varn_core::ast::ObjectProp::Method {
+                    range: entry_range, ..
+                } => {
+                    self.emit(
+                        Diagnostic::error(
+                            ErrorCode::InvalidWithEntry,
+                            "`with` replaces fields: a method entry cannot be a replacement",
+                        )
+                        .with_range(*entry_range),
+                    );
+                }
             }
         }
         self.record_type(rec, range.start.offset, obj_ty);

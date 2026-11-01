@@ -62,6 +62,7 @@ pub enum ErrorCode {
     NotIterable = 3029,
     UntypedEmptyArray = 3030,
     UnusedTask = 3031,
+    InvalidWithEntry = 3032,
 
     TypeArgInferenceFailed = 3201,
     ConstraintViolation = 3202,
@@ -279,6 +280,7 @@ impl ErrorCode {
             ErrorCode::NeverNull => "never-null",
             ErrorCode::UntypedEmptyArray => "untyped-empty-array",
             ErrorCode::UnusedTask => "unused-task",
+            ErrorCode::InvalidWithEntry => "invalid-with-entry",
             ErrorCode::NotIterable => "not-iterable",
             ErrorCode::BytecodeOverflow => "bytecode-overflow",
             ErrorCode::ConstantPoolOverflow => "constant-pool-overflow",
