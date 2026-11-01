@@ -103,60 +103,6 @@ impl<'r> Checker<'r> {
         }
     }
 
-    pub(super) fn infer_map_literal(
-        &mut self,
-        rec: &mut Recorder,
-        entries: &[varn_core::ast::MapEntry],
-        bind: &BindResult,
-    ) -> Type {
-        let mut keys = Vec::new();
-        let mut values = Vec::new();
-        for entry in entries {
-            let key = self.infer_type(rec, entry.key, bind);
-            let value = self.infer_type(rec, entry.value, bind);
-            if key.is_dynamic() || value.is_dynamic() {
-                return Type::builtin(
-                    varn_core::BuiltinType::Map,
-                    vec![Type::Dynamic, Type::Dynamic],
-                    std::sync::Arc::make_mut(&mut self.ty_table),
-                );
-            }
-            keys.push(key);
-            values.push(value);
-        }
-        if keys.is_empty() {
-            let expected_map = self.expected_type.and_then(|expected| {
-                let non_null =
-                    expected.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
-                non_null
-                    .is_builtin(varn_core::BuiltinType::Map, &self.ty_table)
-                    .then_some(non_null)
-            });
-            return expected_map.unwrap_or_else(|| {
-                Type::builtin(
-                    varn_core::BuiltinType::Map,
-                    vec![Type::Dynamic, Type::Dynamic],
-                    std::sync::Arc::make_mut(&mut self.ty_table),
-                )
-            });
-        }
-        let join = |checker: &mut Self, tys: Vec<Type>| {
-            let first = tys[0];
-            if tys.iter().all(|t| t == &first) {
-                first
-            } else {
-                Type::union(tys, &mut *std::sync::Arc::make_mut(&mut checker.ty_table))
-            }
-        };
-        let key = join(self, keys);
-        let value = join(self, values);
-        Type::builtin(
-            varn_core::BuiltinType::Map,
-            vec![key, value],
-            std::sync::Arc::make_mut(&mut self.ty_table),
-        )
-    }
-
     pub(super) fn infer_tuple(
         &mut self,
         rec: &mut Recorder,

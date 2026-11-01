@@ -1,2 +1,0 @@
-// expect: error[VN3001]
-const m: Map<str, int> = ["a": "text"]

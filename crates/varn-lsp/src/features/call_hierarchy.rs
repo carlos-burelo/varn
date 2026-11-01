@@ -205,7 +205,6 @@ fn calls_in(file: &DocumentState) -> impl Iterator<Item = (String, SourceRange)>
         | ExprKind::ImportMeta(_)
         | ExprKind::Super
         | ExprKind::Array { .. }
-        | ExprKind::MapLiteral { .. }
         | ExprKind::Object { .. }
         | ExprKind::Tuple { .. }
         | ExprKind::Record { .. }
@@ -266,7 +265,6 @@ fn calls_in(file: &DocumentState) -> impl Iterator<Item = (String, SourceRange)>
             | ExprKind::ImportMeta(_)
             | ExprKind::Super
             | ExprKind::Array { .. }
-            | ExprKind::MapLiteral { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }
             | ExprKind::Record { .. }

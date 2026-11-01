@@ -66,7 +66,6 @@ impl<'r> Checker<'r> {
             | ExprKind::This
             | ExprKind::ImportMeta(_)
             | ExprKind::Array { .. }
-            | ExprKind::MapLiteral { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }
             | ExprKind::Record { .. }

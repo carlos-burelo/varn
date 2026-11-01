@@ -33,7 +33,6 @@ pub(super) fn prelude_imports(
             | ExprKind::ImportMeta(_)
             | ExprKind::Super
             | ExprKind::Array { .. }
-            | ExprKind::MapLiteral { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }
             | ExprKind::Record { .. }

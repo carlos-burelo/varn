@@ -151,7 +151,6 @@ impl<'a> FnEmitter<'a> {
             | TirExprKind::Assign { .. }
             | TirExprKind::ArrayLit(_)
             | TirExprKind::TupleLit(_)
-            | TirExprKind::MapLit(_)
             | TirExprKind::ObjectLit { .. }
             | TirExprKind::RecordLit { .. }
             | TirExprKind::Await { .. }
@@ -208,7 +207,6 @@ impl<'a> FnEmitter<'a> {
             | other @ TirExprKind::Assign { .. }
             | other @ TirExprKind::ArrayLit(_)
             | other @ TirExprKind::TupleLit(_)
-            | other @ TirExprKind::MapLit(_)
             | other @ TirExprKind::ObjectLit { .. }
             | other @ TirExprKind::RecordLit { .. }
             | other @ TirExprKind::Await { .. }

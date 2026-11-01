@@ -1,2 +1,0 @@
-// expect: warning[VN3099]
-const m = [:]

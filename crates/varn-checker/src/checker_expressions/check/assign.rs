@@ -194,7 +194,6 @@ impl<'r> Checker<'r> {
                 | varn_core::ast::ExprKind::ImportMeta(_)
                 | varn_core::ast::ExprKind::Super
                 | varn_core::ast::ExprKind::Array { .. }
-                | varn_core::ast::ExprKind::MapLiteral { .. }
                 | varn_core::ast::ExprKind::Object { .. }
                 | varn_core::ast::ExprKind::Tuple { .. }
                 | varn_core::ast::ExprKind::Record { .. }
@@ -258,7 +257,6 @@ impl<'r> Checker<'r> {
                 | varn_core::ast::ExprKind::ImportMeta(_)
                 | varn_core::ast::ExprKind::Super
                 | varn_core::ast::ExprKind::Array { .. }
-                | varn_core::ast::ExprKind::MapLiteral { .. }
                 | varn_core::ast::ExprKind::Object { .. }
                 | varn_core::ast::ExprKind::Tuple { .. }
                 | varn_core::ast::ExprKind::Record { .. }

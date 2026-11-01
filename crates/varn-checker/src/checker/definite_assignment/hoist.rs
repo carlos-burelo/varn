@@ -41,7 +41,6 @@ fn hoist_decl(arena: &AstArena, decl: &Decl, out: &mut Vec<Hoisted>) {
                         | ExprKind::Super
                         | ExprKind::ImportMeta(_)
                         | ExprKind::Array { .. }
-                        | ExprKind::MapLiteral { .. }
                         | ExprKind::Object { .. }
                         | ExprKind::Tuple { .. }
                         | ExprKind::Record { .. }

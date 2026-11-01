@@ -210,7 +210,6 @@ impl<'a> FnEmitter<'a> {
             | ExprKind::ImportMeta(_)
             | ExprKind::Super
             | ExprKind::Array { .. }
-            | ExprKind::MapLiteral { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }
             | ExprKind::Record { .. }

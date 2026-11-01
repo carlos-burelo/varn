@@ -62,7 +62,6 @@ pub enum ErrorCode {
     NeverNull = 3028,
     NotIterable = 3029,
     UntypedEmptyArray = 3030,
-    UntypedEmptyMap = 3099,
     UnusedTask = 3031,
 
     TypeArgInferenceFailed = 3201,
@@ -281,7 +280,6 @@ impl ErrorCode {
             ErrorCode::ConditionNeverFalse => "condition-never-false",
             ErrorCode::NeverNull => "never-null",
             ErrorCode::UntypedEmptyArray => "untyped-empty-array",
-            ErrorCode::UntypedEmptyMap => "untyped-empty-map",
             ErrorCode::UnusedTask => "unused-task",
             ErrorCode::NotIterable => "not-iterable",
             ErrorCode::BytecodeOverflow => "bytecode-overflow",

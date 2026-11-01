@@ -108,34 +108,6 @@ impl<'r> Checker<'r> {
         }
     }
 
-    pub(super) fn check_map_literal_with_context(
-        &mut self,
-        rec: &mut Recorder,
-        entries: &[varn_core::ast::MapEntry],
-        bind: &BindResult,
-    ) {
-        let expected_pair = self.expected_type.and_then(|expected| {
-            let non_null =
-                expected.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
-            non_null
-                .is_builtin(varn_core::BuiltinType::Map, &self.ty_table)
-                .then(|| {
-                    (
-                        non_null.builtin_arg(0, &self.ty_table),
-                        non_null.builtin_arg(1, &self.ty_table),
-                    )
-                })
-        });
-        for entry in entries {
-            self.with_expected(expected_pair.map(|p| p.0), |c| {
-                c.check_expr(rec, entry.key, bind)
-            });
-            self.with_expected(expected_pair.map(|p| p.1), |c| {
-                c.check_expr(rec, entry.value, bind)
-            });
-        }
-    }
-
     pub(super) fn check_object_with_context(
         &mut self,
         rec: &mut Recorder,

@@ -215,12 +215,6 @@ impl Coverage {
                     self.walk_expr(x);
                 }
             }
-            TirExprKind::MapLit(entries) => {
-                for (key, value) in entries {
-                    self.walk_expr(key);
-                    self.walk_expr(value);
-                }
-            }
             TirExprKind::RecordLit { fields } => {
                 for (_, v) in fields {
                     self.walk_expr(v);

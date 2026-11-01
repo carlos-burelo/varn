@@ -19,8 +19,8 @@ pub use decl::{
     SumVariant, TypeAliasDecl,
 };
 pub use expr::{
-    Arg, ArrayEl, ArrowBody, AstId, ExprKind, MapEntry, MatchBody, MatchCase, MetaProperty,
-    ObjectProp, PropKey, TemplatePart,
+    Arg, ArrayEl, ArrowBody, AstId, ExprKind, MatchBody, MatchCase, MetaProperty, ObjectProp,
+    PropKey, TemplatePart,
 };
 pub use module_decl::{
     ExportDecl, ExportDefaultDecl, ExportSpecifier, ImportDecl, ImportSpecifier,

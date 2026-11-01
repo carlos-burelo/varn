@@ -146,7 +146,6 @@ pub enum TirExprKind {
 
     ArrayLit(Vec<TirArrayEl>),
     TupleLit(Vec<TirExpr>),
-    MapLit(Vec<(TirExpr, TirExpr)>),
     ObjectLit {
         entries: Vec<TirObjectEntry>,
     },

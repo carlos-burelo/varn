@@ -93,20 +93,6 @@ impl<'m> Builder<'m> {
         Ok(self.emit(InstKind::BuildRecord { pairs }, ty))
     }
 
-    pub(super) fn lower_map_lit(
-        &mut self,
-        entries: &[(varn_tir::TirExpr, varn_tir::TirExpr)],
-        ty: BackendTy,
-    ) -> Result<Value> {
-        let mut pairs = Vec::with_capacity(entries.len());
-        for (key, value) in entries {
-            let key = self.lower_expr(key)?;
-            let value = self.lower_expr(value)?;
-            pairs.push((key, value));
-        }
-        Ok(self.emit(InstKind::BuildMap { pairs }, ty))
-    }
-
     pub(super) fn lower_object_lit(
         &mut self,
         entries: &[varn_tir::TirObjectEntry],

@@ -189,19 +189,6 @@ const ok = /^ab+c$/i.test("ABBC")
 - `/` es división después de un valor (identificador, literal, `)`, `]`, `}`); en cualquier otra
   posición empieza una expresión regular.
 
-### 4.12 Literales de mapa (`Map<K, V>`)
-
-```varn
-const edades = ["ana": 31, "luis": 27]            // Map<str, int>   (tests/333-map-literal.vn)
-const por_id: Map<int, str> = [1: "uno", 2: "dos"]
-const vacio: Map<str, int> = [:]                  // el vacío necesita su tipo
-```
-
-- `[clave: valor, ...]` es un `Map`; las claves pueden ser de cualquier tipo, no solo `str`.
-- Una clave repetida conserva el último valor; el orden de inserción se mantiene.
-- `[:]` es el mapa vacío. Sin anotación de tipo da el aviso `VN3099`.
-- Mezclar pares y elementos (`[1: 2, 3]`) es un error de sintaxis.
-
 ---
 
 ## 5. Operadores

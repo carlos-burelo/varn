@@ -1,2 +1,0 @@
-// expect: error[VN2007]
-const m = [1: 2, 3]
