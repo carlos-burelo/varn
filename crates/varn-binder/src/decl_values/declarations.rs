@@ -96,6 +96,11 @@ impl<'r> super::super::Binder<'r> {
                     .iter()
                     .map(|t| Arc::from(self.interner.resolve(t.name)))
                     .collect(),
+                type_param_defaults: f
+                    .type_params
+                    .iter()
+                    .map(|t| t.default.as_ref().map(|d| self.resolve_type(d).0))
+                    .collect(),
             },
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         );

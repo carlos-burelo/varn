@@ -146,6 +146,7 @@ impl<'r> super::Binder<'r> {
                         return_type: ret.0,
                         is_arrow: false,
                         type_params: fn_tps,
+                        type_param_defaults: Vec::new(),
                     },
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
@@ -234,6 +235,7 @@ impl<'r> super::Binder<'r> {
                         return_type: ret.0,
                         is_arrow: false,
                         type_params: vec![],
+                        type_param_defaults: Vec::new(),
                     },
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );

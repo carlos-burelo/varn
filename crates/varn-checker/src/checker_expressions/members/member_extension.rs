@@ -27,6 +27,7 @@ pub(super) fn collect_extension_members(
             return_type: ft.return_type,
             is_arrow: ft.is_arrow,
             type_params: ft.type_params.clone(),
+            type_param_defaults: ft.type_param_defaults.clone(),
         }
     };
 

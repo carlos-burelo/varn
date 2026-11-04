@@ -161,6 +161,7 @@ pub(super) fn resolve_indexed_access(
                                 return_type: *return_type,
                                 is_arrow: *is_arrow,
                                 type_params: type_params.clone(),
+                                type_param_defaults: Vec::new(),
                             },
                             table,
                         );

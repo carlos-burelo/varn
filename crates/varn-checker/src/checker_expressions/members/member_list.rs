@@ -77,6 +77,7 @@ pub fn get_members_of_type(
                                 return_type,
                                 is_arrow,
                                 type_params: type_params.clone(),
+                                type_param_defaults: Vec::new(),
                             },
                             table,
                         );

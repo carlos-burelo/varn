@@ -62,6 +62,7 @@ pub(super) fn fn_signature_compatible_type(
                     return_type,
                     is_arrow,
                     type_params: vec![],
+                    type_param_defaults: Vec::new(),
                 },
                 &mut owned_table,
             );
@@ -122,6 +123,7 @@ pub(super) fn types_compatible_with_fn_signature(
                     return_type,
                     is_arrow,
                     type_params: vec![],
+                    type_param_defaults: Vec::new(),
                 },
                 &mut owned_table,
             );

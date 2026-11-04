@@ -25,6 +25,7 @@ impl<'r> Binder<'r> {
                 return_type: Type::Void.0,
                 is_arrow: false,
                 type_params: vec![],
+                type_param_defaults: Vec::new(),
             },
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         );

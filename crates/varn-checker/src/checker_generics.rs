@@ -82,7 +82,15 @@ pub(crate) fn build_call_mapping(
         let mut mapping =
             infer_mapping_from_args(&fn_type_params, &ft.params, args, checker, rec, bind);
         for tp in &fn_type_params {
-            mapping.entry(tp.clone()).or_insert(Type::Dynamic);
+            let declared_default = ft
+                .type_params
+                .iter()
+                .position(|n| n == tp)
+                .and_then(|i| ft.type_param_defaults.get(i).copied().flatten())
+                .map(Type::resolved);
+            mapping
+                .entry(tp.clone())
+                .or_insert(declared_default.unwrap_or(Type::Dynamic));
         }
         mapping
     } else {
@@ -280,6 +288,7 @@ fn infer_arrow_with_context(
             return_type: ret_ty.0,
             is_arrow: true,
             type_params: Vec::new(),
+            type_param_defaults: Vec::new(),
         },
         &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
     ))

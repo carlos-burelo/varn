@@ -24,6 +24,7 @@ pub fn build_fn_type(
             return_type: ret.0,
             is_arrow,
             type_params: vec![],
+            type_param_defaults: Vec::new(),
         },
         table,
     )
@@ -79,6 +80,7 @@ pub fn infer_object_member_type(
                 return_type: *return_type,
                 is_arrow: *is_arrow,
                 type_params: type_params.clone(),
+                type_param_defaults: Vec::new(),
             },
             table,
         )),

@@ -34,6 +34,7 @@ pub(super) fn resolve_fn_type(
             return_type: ret_ty.0,
             is_arrow: false,
             type_params: vec![],
+            type_param_defaults: Vec::new(),
         },
         table,
     )

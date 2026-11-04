@@ -245,6 +245,7 @@ impl Type {
                         return_type: new_ret,
                         is_arrow: ft.is_arrow,
                         type_params: ft.type_params.clone(),
+                        type_param_defaults: ft.type_param_defaults.clone(),
                     },
                     table,
                 )

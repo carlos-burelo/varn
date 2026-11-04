@@ -47,13 +47,13 @@ await describe("179 explicit collection decoding", async () => {
         for (const (k, v) of dict) { total = total + v }
         expect(total).toBe(6)
         let caught = ""
-        try { const bad: { [k: str]: int } = Json.parse("{\"a\":\"x\"}") } catch (e) { caught = e.message }
+        try { const bad: { [k: str]: int } = Json.parse<{ [k: str]: int }>("{\"a\":\"x\"}") } catch (e) { caught = e.message }
         expect(caught).toBe("type mismatch: expected '{ [key: str]: int }', got 'object'")
     })
 
     await it("typed decoders check values and construct nested collections", () => {
-        expect(outcome(() => { const m: Map<str, int> = Json.parse("{\"a\":\"x\"}") }))
-            .toBe("type mismatch: expected 'Map<str, int>', got 'object'")
+        expect(outcome(() => { const m: Map<str, int> = Json.parse<Map<str, int>>("{\"a\":\"x\"}") }))
+            .toBe("type mismatch: expected 'Map<str, int>', got 'Map'")
         const nested = Json.parse<Map<str, Map<str, int>>>("{\"x\":{\"y\":1}}")
         expect(nested.get("x")?.get("y")).toBe(1)
         const cfg = Json.parse<Config>("{\"name\":\"n\",\"limits\":{\"cpu\":4}}")

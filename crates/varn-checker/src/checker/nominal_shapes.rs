@@ -91,6 +91,7 @@ impl Checker<'_> {
                                         return_type,
                                         is_arrow,
                                         type_params,
+                                        type_param_defaults: Vec::new(),
                                     },
                                     Arc::make_mut(&mut self.ty_table),
                                 );

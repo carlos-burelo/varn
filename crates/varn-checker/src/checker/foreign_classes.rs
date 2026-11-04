@@ -71,6 +71,7 @@ impl Checker<'_> {
                 return_type: Type::Void.0,
                 is_arrow: false,
                 type_params: Vec::new(),
+                type_param_defaults: Vec::new(),
             },
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         )

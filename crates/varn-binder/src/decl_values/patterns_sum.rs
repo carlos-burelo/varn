@@ -84,6 +84,7 @@ impl<'r> super::super::Binder<'r> {
                                         return_type: *return_type,
                                         is_arrow: *is_arrow,
                                         type_params: type_params.clone(),
+                                        type_param_defaults: Vec::new(),
                                     },
                                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                                 )),
@@ -221,6 +222,7 @@ impl<'r> super::super::Binder<'r> {
                             .iter()
                             .map(|tp| Arc::from(self.interner.resolve(tp.name)))
                             .collect(),
+                        type_param_defaults: Vec::new(),
                     },
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );

@@ -228,6 +228,7 @@ impl<'r> Checker<'r> {
                 return_type: ret_ty.0,
                 is_arrow: true,
                 type_params: vec![],
+                type_param_defaults: Vec::new(),
             },
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         )

@@ -217,6 +217,7 @@ pub(crate) fn infer_member(
                             return_type: Type::Int.0,
                             is_arrow: false,
                             type_params: vec![],
+                            type_param_defaults: Vec::new(),
                         },
                         table,
                     );

@@ -67,6 +67,7 @@ pub struct FunctionType {
     pub return_type: CheckerTyId,
     pub is_arrow: bool,
     pub type_params: Vec<Arc<str>>,
+    pub type_param_defaults: Vec<Option<CheckerTyId>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
