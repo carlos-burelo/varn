@@ -18,6 +18,7 @@ pub enum LangPrimitive {
     Void,
     Never,
     Dynamic,
+    Error,
 }
 
 impl LangPrimitive {
@@ -48,6 +49,7 @@ impl LangPrimitive {
             Self::Void => "void",
             Self::Never => "never",
             Self::Dynamic => "dynamic",
+            Self::Error => "error",
         }
     }
 
@@ -87,7 +89,7 @@ impl LangPrimitive {
             Self::Decimal => Some("core:types/decimal"),
             Self::Char => Some("core:types/char"),
             Self::Str => Some("core:types/str"),
-            Self::Null | Self::Void | Self::Never | Self::Dynamic => None,
+            Self::Null | Self::Void | Self::Never | Self::Dynamic | Self::Error => None,
         }
     }
 

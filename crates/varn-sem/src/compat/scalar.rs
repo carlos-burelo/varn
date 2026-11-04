@@ -17,7 +17,8 @@ pub(super) fn simple_types_compatible(
 ) -> bool {
     use varn_core::LangPrimitive as P;
     match (table.get(declared.0), table.get(inferred.0)) {
-        (TypeKind::Primitive(P::Dynamic), _) | (_, TypeKind::Primitive(P::Dynamic)) => true,
+        (TypeKind::Primitive(P::Dynamic | P::Error), _)
+        | (_, TypeKind::Primitive(P::Dynamic | P::Error)) => true,
         (a, b) if a == b => true,
         (_, TypeKind::Primitive(P::Never)) => true,
         (TypeKind::Primitive(P::Decimal | P::BigInt), TypeKind::Primitive(P::Int)) => true,

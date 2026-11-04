@@ -255,7 +255,7 @@ impl<'r> Checker<'r> {
                             .map(|node| self.resolve_type_node_cached(node, bind))
                             .unwrap_or(Type::Dynamic);
 
-                        if param_ty.is_dynamic()
+                        if param_ty.is_unresolved()
                             && let Some(ref class_name) = self.current_class
                             && let Some(members) =
                                 bind.get_class_entry(class_name).map(|e| e.members.clone())

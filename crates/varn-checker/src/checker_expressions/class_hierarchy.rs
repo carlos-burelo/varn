@@ -126,7 +126,7 @@ impl<'r> Checker<'r> {
             | varn_core::TypeKind::Conditional { .. }
             | varn_core::TypeKind::Infer(_)
             | varn_core::TypeKind::EnumVariant { .. }
-            | varn_core::TypeKind::TypePredicate { .. } => ty.is_dynamic(),
+            | varn_core::TypeKind::TypePredicate { .. } => ty.is_unresolved(),
         }
     }
 }

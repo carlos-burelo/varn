@@ -66,7 +66,7 @@ impl<'r> Checker<'r> {
 
                 if let Some(ann_ty) = &ann_ty_opt {
                     let init_ty = self.infer_type(rec, init_expr, bind);
-                    let is_empty_array = init_ty.is_dynamic()
+                    let is_empty_array = init_ty.is_unresolved()
                         && matches!(&self.ast_arena.expr(init_expr).kind, ExprKind::Array { elements } if elements.is_empty());
                     let is_compatible =
                         self.value_fits(rec, ann_ty, &init_ty, Some(init_expr), Some(bind));

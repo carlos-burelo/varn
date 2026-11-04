@@ -62,7 +62,7 @@ impl<'r> Checker<'r> {
                     let key = bind.interner.resolve(prop.key);
                     let defaulted = matches!(prop.value, Pattern::Assignment { .. });
                     if !defaulted
-                        && !value_ty.is_dynamic()
+                        && !value_ty.is_unresolved()
                         && !self.member_exists_cached(value_ty, key, bind)
                     {
                         self.emit(
@@ -189,8 +189,8 @@ impl<'r> Checker<'r> {
             MatchPattern::Literal(expr) => {
                 self.check_expr(rec, *expr, bind);
                 let given = self.infer_type(rec, *expr, bind);
-                if !value_ty.is_dynamic()
-                    && !given.is_dynamic()
+                if !value_ty.is_unresolved()
+                    && !given.is_unresolved()
                     && !self.value_fits(rec, value_ty, &given, Some(*expr), Some(bind))
                 {
                     let given_s = given.display(&self.ty_table, &bind.interner);
@@ -333,7 +333,9 @@ impl Checker<'_> {
         let not_sequence = match self.ty_table.get(value_ty.0) {
             varn_core::TypeKind::Primitive(p) => !matches!(
                 p,
-                varn_core::LangPrimitive::Dynamic | varn_core::LangPrimitive::Str
+                varn_core::LangPrimitive::Dynamic
+                    | varn_core::LangPrimitive::Error
+                    | varn_core::LangPrimitive::Str
             ),
             varn_core::TypeKind::Named(..)
             | varn_core::TypeKind::Generic(..)

@@ -34,7 +34,7 @@ impl<'r> Checker<'r> {
                     if let Some(ty) = original_ty {
                         let narrowed =
                             ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
-                        if !narrowed.is_dynamic() {
+                        if !narrowed.is_unresolved() {
                             out.push((id, narrowed));
                         }
                     }

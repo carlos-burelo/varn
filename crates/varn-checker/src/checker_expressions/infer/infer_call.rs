@@ -103,7 +103,7 @@ impl<'r> Checker<'r> {
         if matches!(ret_kind, TypeKind::This) {
             if let ExprKind::Member { object, .. } = &arena.expr(callee).kind {
                 let receiver_ty = self.infer_type(rec, *object, bind);
-                if !receiver_ty.is_dynamic() {
+                if !receiver_ty.is_unresolved() {
                     receiver_ty
                 } else {
                     ret
@@ -136,7 +136,7 @@ impl<'r> Checker<'r> {
                 }
             })
             .unwrap_or_default();
-        let dynamic_context = self.expected_type.is_some_and(|t| t.is_dynamic());
+        let dynamic_context = self.expected_type.is_some_and(|t| t.is_unresolved());
 
         let ps: Vec<FunctionParam> = params
             .iter()
@@ -151,7 +151,7 @@ impl<'r> Checker<'r> {
                         expected_params
                             .get(i)
                             .map(|ep| Type::resolved(ep.ty))
-                            .filter(|t| !t.is_dynamic())
+                            .filter(|t| !t.is_unresolved())
                     })
                     .or_else(|| {
                         p.default.map(|d| self.infer_type(rec, d, bind))

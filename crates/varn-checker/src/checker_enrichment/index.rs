@@ -30,7 +30,7 @@ pub(super) fn build_enrich_context(
                 let FunctionType { return_type, .. } = bind.ty_table.get_function(fid);
 
                 let raw = Type::resolved(*return_type);
-                if !raw.is_dynamic() {
+                if !raw.is_unresolved() {
                     fn_map.insert(name_rc.clone(), raw);
                 }
             }

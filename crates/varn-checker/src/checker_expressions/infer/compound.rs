@@ -16,7 +16,7 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) -> Type {
         let (slot, keyed) = self.computed_member_slot(rec, object, property, bind);
-        if keyed && !slot.is_dynamic() {
+        if keyed && !slot.is_unresolved() {
             Type::make_nullable(slot, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
         } else {
             slot

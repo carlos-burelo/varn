@@ -78,12 +78,12 @@ impl Checker<'_> {
                 target: inner,
                 value: default,
             } => {
-                let present = if ty.is_dynamic() {
+                let present = if ty.is_unresolved() {
                     ty
                 } else {
                     ty.non_nullified(Arc::make_mut(&mut self.ty_table))
                 };
-                let expected = (!present.is_dynamic()).then_some(present);
+                let expected = (!present.is_unresolved()).then_some(present);
                 self.with_expected(expected, |c| c.check_expr(rec, *default, bind));
                 self.check_destructure_target(rec, *inner, present, bind);
             }
@@ -115,7 +115,7 @@ impl Checker<'_> {
                         return;
                     }
                 };
-                let member_ty = if ty.is_dynamic() {
+                let member_ty = if ty.is_unresolved() {
                     Type::Dynamic
                 } else if let Some((found, _)) = self.find_member_info(ty, &member, bind) {
                     found
@@ -187,8 +187,8 @@ impl Checker<'_> {
             self.check_reassignable(*name, range, bind);
         }
         let target_ty = self.assign_target_type(rec, leaf, bind);
-        if !target_ty.is_dynamic()
-            && !item_ty.is_dynamic()
+        if !target_ty.is_unresolved()
+            && !item_ty.is_unresolved()
             && !self.types_compatible_cached(&target_ty, &item_ty, Some(bind))
         {
             self.emit(

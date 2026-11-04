@@ -77,7 +77,7 @@ pub fn infer_expr_type(
         } => match op {
             LogicalOp::Nullish => {
                 let rhs = infer_expr_type(*right, arena, ctx, table);
-                if !rhs.is_dynamic() {
+                if !rhs.is_unresolved() {
                     return rhs;
                 }
                 infer_expr_type(*left, arena, ctx, table)
@@ -144,7 +144,7 @@ pub fn infer_expr_type(
             for el in elements {
                 if let ArrayEl::Expr(first) = el {
                     let elem_ty = infer_expr_type(*first, arena, ctx, table);
-                    if !elem_ty.is_dynamic() {
+                    if !elem_ty.is_unresolved() {
                         return Type::array(elem_ty, table);
                     }
                 }
@@ -199,7 +199,7 @@ pub fn infer_expr_type(
                 match &case.body {
                     MatchBody::Expr(e) => {
                         let ty = infer_expr_type(*e, arena, ctx, table);
-                        if !ty.is_dynamic() && !ty.is_never() {
+                        if !ty.is_unresolved() && !ty.is_never() {
                             expr_arm_ty = Some(ty);
                             break;
                         }

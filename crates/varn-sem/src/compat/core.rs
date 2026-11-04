@@ -32,7 +32,7 @@ pub fn types_compatible_with_cache(
     if declared.0 == inferred.0 {
         return true;
     }
-    if declared.is_dynamic() || inferred.is_dynamic() {
+    if declared.is_unresolved() || inferred.is_unresolved() {
         return true;
     }
     if declared == inferred {
@@ -56,7 +56,7 @@ pub(super) fn types_compatible_impl(
     if declared.0 == inferred.0 {
         return true;
     }
-    if declared.is_dynamic() || inferred.is_dynamic() {
+    if declared.is_unresolved() || inferred.is_unresolved() {
         return true;
     }
     if declared == inferred {
@@ -108,8 +108,18 @@ pub(super) fn types_compatible_impl(
         return result;
     }
     let result = match (d, i) {
-        (TypeKind::Primitive(varn_core::LangPrimitive::Dynamic), _)
-        | (_, TypeKind::Primitive(varn_core::LangPrimitive::Dynamic)) => true,
+        (
+            TypeKind::Primitive(
+                varn_core::LangPrimitive::Dynamic | varn_core::LangPrimitive::Error,
+            ),
+            _,
+        )
+        | (
+            _,
+            TypeKind::Primitive(
+                varn_core::LangPrimitive::Dynamic | varn_core::LangPrimitive::Error,
+            ),
+        ) => true,
 
         (_, TypeKind::Primitive(varn_core::LangPrimitive::Never)) => true,
 

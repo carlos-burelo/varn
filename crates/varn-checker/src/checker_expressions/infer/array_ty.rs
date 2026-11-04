@@ -17,7 +17,7 @@ impl<'r> Checker<'r> {
             match el {
                 varn_core::ast::ArrayEl::Expr(e) => {
                     let ty = self.infer_type(rec, *e, bind);
-                    if ty.is_dynamic() {
+                    if ty.is_unresolved() {
                         holds_dynamic = true;
                     } else {
                         elem_tys.push(ty);
@@ -53,7 +53,7 @@ impl<'r> Checker<'r> {
                         | varn_core::TypeKind::TypePredicate { .. } => vec![Type::Dynamic],
                     };
                     for item in spread {
-                        if item.is_dynamic() {
+                        if item.is_unresolved() {
                             holds_dynamic = true;
                         } else {
                             elem_tys.push(item);

@@ -14,7 +14,7 @@ impl Type {
     pub const Null: Type = Type::resolved(CheckerTyId::NULL);
     pub const Never: Type = Type::resolved(CheckerTyId::NEVER);
     pub const Dynamic: Type = Type::resolved(CheckerTyId::DYNAMIC);
-    pub const Error: Type = Type(CheckerTyId::DYNAMIC, Origin::Error);
+    pub const Error: Type = Type::resolved(CheckerTyId::ERROR);
     pub const This: Type = Type::resolved(CheckerTyId::THIS);
 
     pub fn primitive(p: varn_core::LangPrimitive, table: &mut CheckerTyTable) -> Self {
@@ -29,9 +29,11 @@ impl Type {
                 P::Str => Type::Str,
                 P::Bool => Type::Bool,
                 P::Char => Type::Char,
-                P::Null | P::Float | P::BigInt | P::Decimal | P::Void | P::Never | P::Dynamic => {
+                P::Error => Type::Error,
+                P::Null | P::Float | P::BigInt | P::Decimal | P::Void | P::Never => {
                     Type::Dynamic
                 }
+                P::Dynamic => Type::Dynamic,
             }
         }
         match table.get(self.0) {
@@ -265,6 +267,10 @@ impl Type {
         self.0 == CheckerTyId::DYNAMIC
     }
 
+    pub fn is_unresolved(&self) -> bool {
+        self.is_dynamic() || self.is_error()
+    }
+
     pub fn is_int(&self) -> bool {
         self.0 == CheckerTyId::INT
     }
@@ -302,7 +308,8 @@ impl Type {
                 varn_core::LangPrimitive::Null
                 | varn_core::LangPrimitive::Void
                 | varn_core::LangPrimitive::Never
-                | varn_core::LangPrimitive::Dynamic => None,
+                | varn_core::LangPrimitive::Dynamic
+                | varn_core::LangPrimitive::Error => None,
             },
             TypeKind::Array(_) => Some(varn_core::BuiltinType::Array.name()),
             TypeKind::Named(..) if self.is_bytes(table) => {

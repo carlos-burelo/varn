@@ -6,7 +6,7 @@ pub fn settle_members(members: &mut [ClassMemberInfo], symbol_types: &FxHashMap<
     for member in members {
         match member.kind {
             ClassMemberKind::Variable => {
-                if member.ty.is_dynamic()
+                if member.ty.is_unresolved()
                     && let Some(ty) = member.symbol_id.and_then(|id| symbol_types.get(&id))
                 {
                     member.ty = *ty;

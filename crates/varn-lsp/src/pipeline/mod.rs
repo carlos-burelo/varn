@@ -133,7 +133,7 @@ pub fn run_pipeline(source: String, uri: String, session: &Session) -> DocumentA
             .get(&sym.offset)
             .filter(|info| info.symbol_id == Some(id))
             .map(|i| i.ty)
-            .filter(|t| !t.is_dynamic());
+            .filter(|t| !t.is_unresolved());
         if let Some(ty) = recorded.or(sym.ty) {
             resolved_types.insert(id, ty);
         }

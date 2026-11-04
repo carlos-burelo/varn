@@ -334,7 +334,10 @@ impl Checker<'_> {
     fn is_callable(&mut self, kind: varn_sem::types::InternedTypeKind, bind: &BindResult) -> bool {
         use varn_sem::types::TypeContext;
         let (name, origin) = match kind {
-            TypeKind::Fn(_) | TypeKind::Primitive(varn_core::LangPrimitive::Dynamic) => {
+            TypeKind::Fn(_)
+            | TypeKind::Primitive(
+                varn_core::LangPrimitive::Dynamic | varn_core::LangPrimitive::Error,
+            ) => {
                 return true;
             }
             TypeKind::Named(name, origin) | TypeKind::Generic(name, _, origin) => (name, origin),

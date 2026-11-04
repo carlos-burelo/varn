@@ -27,17 +27,11 @@ use varn_core::ast::operators::Visibility;
 use varn_core::TypeKind;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum Origin {
-    Resolved,
-    Error,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct Type(pub CheckerTyId, pub Origin);
+pub struct Type(pub CheckerTyId);
 
 impl Type {
     pub const fn resolved(id: CheckerTyId) -> Self {
-        Type(id, Origin::Resolved)
+        Type(id)
     }
 
     pub fn id(&self) -> CheckerTyId {
@@ -49,13 +43,13 @@ impl Type {
     }
 
     pub fn is_error(&self) -> bool {
-        self.1 == Origin::Error
+        self.0 == CheckerTyId::ERROR
     }
 }
 
 impl Default for Type {
     fn default() -> Self {
-        Type::resolved(CheckerTyId::DYNAMIC)
+        Type::Dynamic
     }
 }
 

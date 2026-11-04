@@ -88,7 +88,7 @@ impl Checker<'_> {
             return false;
         }
         let holds = match self.ty_table.get(ty.0) {
-            TypeKind::Primitive(p) => p != LangPrimitive::Dynamic,
+            TypeKind::Primitive(p) => !matches!(p, LangPrimitive::Dynamic | LangPrimitive::Error),
             TypeKind::Tuple(list) => self
                 .ty_table
                 .get_list(list)

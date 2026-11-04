@@ -276,6 +276,7 @@ fn lower_primitive(p: LangPrimitive) -> BackendTy {
         LangPrimitive::Never => BackendTy::Never,
         LangPrimitive::Null => NULL_TY,
         LangPrimitive::Dynamic => BackendTy::Dynamic(DynReason::Declared),
+        LangPrimitive::Error => BackendTy::Dynamic(DynReason::Unrecorded),
     }
 }
 

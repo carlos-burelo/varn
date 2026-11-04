@@ -36,8 +36,8 @@ impl<'r> Checker<'r> {
         self.check_expr(rec, end, bind);
         let lo = self.infer_type(rec, start, bind).apparent(&self.ty_table);
         let hi = self.infer_type(rec, end, bind).apparent(&self.ty_table);
-        let domain_ok = |t: &Type| t.is_dynamic() || *t == Type::Int || *t == Type::Char;
-        let same = lo.is_dynamic() || hi.is_dynamic() || lo == hi;
+        let domain_ok = |t: &Type| t.is_unresolved() || *t == Type::Int || *t == Type::Char;
+        let same = lo.is_unresolved() || hi.is_unresolved() || lo == hi;
         if !(domain_ok(&lo) && domain_ok(&hi) && same) {
             let lo_s = lo.display(&self.ty_table, &bind.interner);
             let hi_s = hi.display(&self.ty_table, &bind.interner);
@@ -103,7 +103,7 @@ impl<'r> Checker<'r> {
                             None
                         }
                     };
-                    let expected = match (&member, obj_ty.is_dynamic()) {
+                    let expected = match (&member, obj_ty.is_unresolved()) {
                         (Some(name), false) => {
                             let found = self.find_member_info(&obj_ty, name, bind);
                             if found.is_none() {
@@ -125,7 +125,7 @@ impl<'r> Checker<'r> {
                     self.with_expected(expected, |c| c.check_expr(rec, *value, bind));
                     if let Some(expected) = expected {
                         let actual = self.infer_type(rec, *value, bind);
-                        if !actual.is_dynamic()
+                        if !actual.is_unresolved()
                             && !self.value_fits(rec, &expected, &actual, Some(*value), Some(bind))
                         {
                             self.emit(

@@ -193,12 +193,12 @@ pub(super) fn assemble(
             let current_is_weak = match &sym.ty {
                 None => true,
                 Some(t) => {
-                    t.is_dynamic()
+                    t.is_unresolved()
                         || match checker.ty_table.get(t.0) {
                             varn_core::TypeKind::Fn(fid) => varn_sem::types::Type::resolved(
                                 checker.ty_table.get_function(fid).return_type,
                             )
-                            .is_dynamic(),
+                            .is_unresolved(),
                             varn_core::TypeKind::Primitive(_)
                             | varn_core::TypeKind::Literal(_)
                             | varn_core::TypeKind::This

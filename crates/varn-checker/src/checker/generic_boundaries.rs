@@ -49,7 +49,7 @@ impl Checker<'_> {
             if !seen.insert(ty.0) {
                 continue;
             }
-            if ty.is_dynamic() {
+            if ty.is_unresolved() {
                 return true;
             }
             pending.extend(ty.components(&self.ty_table));

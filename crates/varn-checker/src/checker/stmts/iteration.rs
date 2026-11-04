@@ -94,7 +94,7 @@ impl Checker<'_> {
                 }
                 BuiltinType::Range => {
                     let elem = source.builtin_arg(0, &self.ty_table);
-                    if elem == Type::Int || elem.is_dynamic() {
+                    if elem == Type::Int || elem.is_unresolved() {
                         return Some((ForOfPlan::IntRange, Type::Int));
                     }
                     return Some((

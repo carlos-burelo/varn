@@ -15,7 +15,7 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) -> Type {
         let callee_ty = self.infer_type(rec, callee, bind);
-        if callee_ty.is_dynamic() {
+        if callee_ty.is_unresolved() {
             return Type::Dynamic;
         }
         let callee_kind = self.ty_table.get(callee_ty.0);

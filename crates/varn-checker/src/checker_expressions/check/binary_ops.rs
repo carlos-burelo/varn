@@ -68,8 +68,8 @@ impl<'r> Checker<'r> {
         let l_base = l_base_raw.apparent(&self.ty_table);
         let r_base = r_base_raw.apparent(&self.ty_table);
         let is_type_param_b = |t: &Type, checker: &Checker| matches!(checker.ty_table.get(t.0), varn_core::TypeKind::Named(n, _) if checker.active_type_params.contains(bind.interner.try_resolve(n).unwrap_or_default()));
-        if !l_base.is_dynamic()
-            && !r_base.is_dynamic()
+        if !l_base.is_unresolved()
+            && !r_base.is_unresolved()
             && !is_type_param_b(&l_base, self)
             && !is_type_param_b(&r_base, self)
         {

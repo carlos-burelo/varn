@@ -46,6 +46,7 @@ pub fn resolve_type_node(
         TypeKind::Primitive(varn_core::LangPrimitive::Null) => Type::Null,
         TypeKind::Primitive(varn_core::LangPrimitive::Never) => Type::Never,
         TypeKind::Primitive(varn_core::LangPrimitive::Dynamic) => Type::Dynamic,
+        TypeKind::Primitive(varn_core::LangPrimitive::Error) => Type::Error,
         TypeKind::This => Type::This,
         TypeKind::Literal(l) => scalar::resolve_literal_type(*l, ctx, interner, table),
         TypeKind::Array(inner) => compound::resolve_array_type(inner, ctx, table),

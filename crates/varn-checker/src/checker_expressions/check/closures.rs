@@ -146,10 +146,10 @@ impl<'r> Checker<'r> {
     ) -> bool {
         let source_base = source.apparent(&self.ty_table);
         let target_base = target.apparent(&self.ty_table);
-        if source_base.is_dynamic()
+        if source_base.is_unresolved()
             || (!self.open_parameters(*source, bind).is_empty()
                 && self.open_parameters(*target, bind).is_empty())
-            || target_base.is_dynamic()
+            || target_base.is_unresolved()
             || (source_base.is_numeric() && target_base.is_numeric())
             || (source_base.is_int() && self.is_enum_type_of(&target_base, bind))
             || (target_base.is_int() && self.is_enum_type_of(&source_base, bind))
@@ -292,7 +292,7 @@ impl<'r> Checker<'r> {
         }
         self.check_expr(rec, argument, bind);
         let arg_ty = self.infer_type(rec, argument, bind);
-        if !arg_ty.is_dynamic() && !varn_sem::types::is_awaitable(&arg_ty, &self.ty_table) {
+        if !arg_ty.is_unresolved() && !varn_sem::types::is_awaitable(&arg_ty, &self.ty_table) {
             let arg_ty_s = arg_ty.display(&self.ty_table, &bind.interner);
             self.emit(
                 Diagnostic::warning(
@@ -333,7 +333,7 @@ impl<'r> Checker<'r> {
                         .with_range(self.ast_arena.expr(arg).range),
                     );
             }
-            if given == Type::Null || (!given.is_dynamic() && given.is_nullable(&self.ty_table)) {
+            if given == Type::Null || (!given.is_unresolved() && given.is_nullable(&self.ty_table)) {
                 let given_s = given.display(&self.ty_table, &bind.interner);
                 self.emit(
                     varn_core::Diagnostic::error(

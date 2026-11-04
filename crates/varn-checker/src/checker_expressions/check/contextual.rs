@@ -17,7 +17,7 @@ impl<'r> Checker<'r> {
         for (ap, ep) in params.iter().zip(expected_fn.params.iter()) {
             let has_ann = ap.type_ann.is_some();
             let ep_ty = Type::resolved(ep.ty);
-            if has_ann || ep_ty.is_dynamic() {
+            if has_ann || ep_ty.is_unresolved() {
                 continue;
             }
             if !matches!(ap.pattern, varn_core::ast::Pattern::Identifier { .. }) {
@@ -76,7 +76,7 @@ impl<'r> Checker<'r> {
                     if let Some(expected) = &elem_expected {
                         let actual = self.infer_type(rec, *e, bind);
 
-                        if !actual.is_dynamic()
+                        if !actual.is_unresolved()
                             && !self.value_fits(rec, expected, &actual, Some(*e), Some(bind))
                         {
                             let actual_s = actual.display(&self.ty_table, &bind.interner);
@@ -277,7 +277,7 @@ impl<'r> Checker<'r> {
                     self.with_expected(prop_expected, |c| c.check_expr(rec, *value, bind));
                     if let Some(expected) = &prop_expected {
                         let actual = self.infer_type(rec, *value, bind);
-                        if !actual.is_dynamic()
+                        if !actual.is_unresolved()
                             && !self.value_fits(rec, expected, &actual, Some(*value), Some(bind))
                         {
                             let actual_s = actual.display(&self.ty_table, &bind.interner);
@@ -342,7 +342,7 @@ impl<'r> Checker<'r> {
     pub(super) fn expected_return_from_fn_type(&self) -> Option<Type> {
         self.expected_fn_type()
             .map(|ft| Type::resolved(ft.return_type))
-            .filter(|t| !t.is_dynamic())
+            .filter(|t| !t.is_unresolved())
     }
 }
 

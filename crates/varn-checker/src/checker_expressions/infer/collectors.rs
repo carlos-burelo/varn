@@ -78,7 +78,7 @@ fn collect_returns(
                 Some(entry) => entry.ty,
                 None => checker.infer_type(rec, *e, bind),
             };
-            if ty.is_dynamic() {
+            if ty.is_unresolved() {
                 out.dynamic = true;
             } else {
                 out.typed.push(ty);

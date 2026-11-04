@@ -49,7 +49,7 @@ impl<'r> Checker<'r> {
         }
         if reads_operand {
             let read_ty = self.infer_type(rec, target, bind);
-            if !read_ty.is_dynamic() && read_ty.is_nullable(&self.ty_table) {
+            if !read_ty.is_unresolved() && read_ty.is_nullable(&self.ty_table) {
                 self.emit(
                     Diagnostic::error(
                         ErrorCode::InvalidTypeOperator,
@@ -65,7 +65,7 @@ impl<'r> Checker<'r> {
 
         let target_ty = self.assign_target_type(rec, target, bind);
 
-        let target_expected = if target_ty.is_dynamic() {
+        let target_expected = if target_ty.is_unresolved() {
             None
         } else {
             Some(target_ty)
@@ -92,7 +92,7 @@ impl<'r> Checker<'r> {
         }
 
         let value_ty = self.infer_type(rec, value, bind);
-        let is_empty_array_val = value_ty.is_dynamic()
+        let is_empty_array_val = value_ty.is_unresolved()
             && matches!(&arena.expr(value).kind, varn_core::ast::ExprKind::Array { elements } if elements.is_empty());
         let accepted = if reads_operand {
             self.types_compatible_cached(&target_ty, &value_ty, Some(bind))

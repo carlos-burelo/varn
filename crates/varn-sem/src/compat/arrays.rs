@@ -15,7 +15,7 @@ pub(super) fn array_arms(
     table: &CheckerTyTable,
 ) -> Option<bool> {
     match (d, i) {
-        (TypeKind::Array(_), TypeKind::Array(inf_elem)) if t(inf_elem).is_dynamic() => Some(true),
+        (TypeKind::Array(_), TypeKind::Array(inf_elem)) if t(inf_elem).is_unresolved() => Some(true),
         (TypeKind::Array(decl_elem), TypeKind::Array(inf_elem)) => Some(same_element(
             &t(decl_elem),
             &t(inf_elem),
@@ -38,7 +38,7 @@ pub(super) fn same_element(
     in_progress: &mut FxHashSet<(Type, Type, usize)>,
     table: &CheckerTyTable,
 ) -> bool {
-    if declared.is_dynamic() || given.is_dynamic() {
+    if declared.is_unresolved() || given.is_unresolved() {
         return true;
     }
     types_compatible_impl(declared, given, bind, cache, in_progress, table)

@@ -38,7 +38,7 @@ impl<'r> Checker<'r> {
                 Arg::Positional(e) => (None, self.infer_type(rec, *e, bind)),
                 Arg::Spread(e) => {
                     let arg_ty = self.infer_type(rec, *e, bind);
-                    if !arg_ty.is_dynamic()
+                    if !arg_ty.is_unresolved()
                         && !matches!(
                             self.ty_table.get(arg_ty.0),
                             TypeKind::Array(_) | TypeKind::Tuple(_)

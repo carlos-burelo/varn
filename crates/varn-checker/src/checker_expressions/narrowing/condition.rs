@@ -68,7 +68,8 @@ impl<'r> Checker<'r> {
                 | LangPrimitive::Bool
                 | LangPrimitive::Void
                 | LangPrimitive::Never
-                | LangPrimitive::Dynamic,
+                | LangPrimitive::Dynamic
+                | LangPrimitive::Error,
             ) => false,
             TypeKind::Literal(TypeLiteral::Bool(_)) => false,
             TypeKind::Literal(TypeLiteral::Int(_) | TypeLiteral::Str(_) | TypeLiteral::Char(_)) => {

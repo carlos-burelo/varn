@@ -50,7 +50,7 @@ impl<'r> Checker<'r> {
                 expected
             };
             let deferred = argument.is_some()
-                && actual.is_dynamic()
+                && actual.is_unresolved()
                 && self.can_defer_decoder_return(check_expected, bind);
             if !deferred && !self.value_fits(rec, &check_expected, &actual, argument, Some(bind)) {
                 let expected_s = expected.display(&self.ty_table, &bind.interner);

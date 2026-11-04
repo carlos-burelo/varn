@@ -89,9 +89,9 @@ impl<'r> Checker<'r> {
                 });
                 if self.source_file.as_ref() != bind.source_file.as_ref() {
                     t_ty
-                } else if t_ty.is_dynamic() {
+                } else if t_ty.is_unresolved() {
                     f_ty
-                } else if f_ty.is_dynamic() || t_ty == f_ty {
+                } else if f_ty.is_unresolved() || t_ty == f_ty {
                     t_ty
                 } else {
                     Type::union(

@@ -179,7 +179,7 @@ pub(super) fn resolve_indexed_access(
                 let resolved: Vec<Type> = ids
                     .into_iter()
                     .map(|m| resolve_indexed_access(obj, Type::resolved(m), ctx, table))
-                    .filter(|m| !m.is_dynamic())
+                    .filter(|m| !m.is_unresolved())
                     .collect();
                 return match resolved.len() {
                     0 => Type::Dynamic,

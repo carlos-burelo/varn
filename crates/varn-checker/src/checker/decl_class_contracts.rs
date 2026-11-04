@@ -271,7 +271,7 @@ impl<'r> Checker<'r> {
         };
         for promised in &c.implements {
             let contract = self.resolve_type_node_cached(promised, bind);
-            let satisfied = contract.is_dynamic()
+            let satisfied = contract.is_unresolved()
                 || match self.class_contract_satisfied(&contract, &instance, bind) {
                     Some(verdict) => verdict,
                     None => self.types_compatible_cached(&contract, &instance, Some(bind)),

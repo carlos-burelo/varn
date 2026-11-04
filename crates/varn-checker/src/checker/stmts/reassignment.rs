@@ -115,11 +115,11 @@ impl<'r> Checker<'r> {
         };
         let mut ty = self.infer_type(rec, root_expr, bind);
         for name in &key.1 {
-            if ty.is_dynamic() {
+            if ty.is_unresolved() {
                 return None;
             }
             let (next, _) = self.find_member_info(&ty, name, bind)?;
-            if next.is_dynamic() {
+            if next.is_unresolved() {
                 return None;
             }
             ty = next;
@@ -202,11 +202,11 @@ impl<'r> Checker<'r> {
         let Some((key, declared)) = self.member_path_declared(rec, target, bind) else {
             return Vec::new();
         };
-        if declared.is_dynamic() || !declared.is_nullable(&self.ty_table) {
+        if declared.is_unresolved() || !declared.is_nullable(&self.ty_table) {
             return Vec::new();
         }
         let given = self.infer_type(rec, value, bind);
-        if given.is_dynamic() || given.is_nullable(&self.ty_table) || given == Type::Null {
+        if given.is_unresolved() || given.is_nullable(&self.ty_table) || given == Type::Null {
             return Vec::new();
         }
         let present = declared.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
@@ -262,11 +262,11 @@ impl<'r> Checker<'r> {
         else {
             return Vec::new();
         };
-        if declared.is_dynamic() || !declared.is_nullable(&self.ty_table) {
+        if declared.is_unresolved() || !declared.is_nullable(&self.ty_table) {
             return Vec::new();
         }
         let given = self.infer_type(rec, *value, bind);
-        if given.is_dynamic() || given.is_nullable(&self.ty_table) || given == Type::Null {
+        if given.is_unresolved() || given.is_nullable(&self.ty_table) || given == Type::Null {
             return Vec::new();
         }
         let present = declared.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));

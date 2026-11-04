@@ -155,7 +155,7 @@ impl Checker<'_> {
             }
             {
                 let item = shape.get_array_element_type(&self.ty_table);
-                if item.is_dynamic() && !matches!(shape_kind, TypeKind::Array(_)) {
+                if item.is_unresolved() && !matches!(shape_kind, TypeKind::Array(_)) {
                     return false;
                 }
                 return elements.iter().all(|el| match el {
@@ -282,7 +282,7 @@ impl Checker<'_> {
         bind: &BindResult,
     ) -> bool {
         let given = self.infer_type(rec, spread, bind);
-        if given.is_dynamic() {
+        if given.is_unresolved() {
             return true;
         }
         let parts: Vec<Type> = match self.ty_table.get(given.0) {

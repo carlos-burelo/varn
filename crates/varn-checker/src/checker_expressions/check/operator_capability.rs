@@ -189,7 +189,7 @@ impl Checker<'_> {
         label: &str,
     ) {
         let ty = self.infer_type(rec, operand, bind);
-        if ty.is_dynamic() {
+        if ty.is_unresolved() {
             return;
         }
         let accepted = varn_sem::types::Type::union(

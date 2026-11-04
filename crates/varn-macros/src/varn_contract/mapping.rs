@@ -28,7 +28,7 @@ fn primitive_mapped(name: &str) -> Option<Mapped> {
         P::Char => Some(Mapped::Char),
         P::Str => Some(Mapped::Str),
         P::Void => Some(Mapped::Void),
-        P::Null | P::BigInt | P::Decimal | P::Never | P::Dynamic => None,
+        P::Null | P::BigInt | P::Decimal | P::Never | P::Dynamic | P::Error => None,
     }
 }
 

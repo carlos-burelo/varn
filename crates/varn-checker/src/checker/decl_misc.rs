@@ -18,7 +18,12 @@ impl<'r> Checker<'r> {
                 Some(Arc::from(bind.interner.resolve(n)))
             }
 
-            TypeKind::Primitive(p) if p != varn_core::LangPrimitive::Dynamic => {
+            TypeKind::Primitive(p)
+                if !matches!(
+                    p,
+                    varn_core::LangPrimitive::Dynamic | varn_core::LangPrimitive::Error
+                ) =>
+            {
                 Some(p.name().into())
             }
             TypeKind::Primitive(_)

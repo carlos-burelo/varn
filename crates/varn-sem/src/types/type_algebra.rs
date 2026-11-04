@@ -210,7 +210,7 @@ impl Type {
                     .map(|a| Type::resolved(a).map_generics(mapping, table).0)
                     .collect();
                 let new_list = table.intern_list(&new_args);
-                Type(table.intern(TypeKind::Generic(n, new_list, origin)), self.1)
+                Type(table.intern(TypeKind::Generic(n, new_list, origin)))
             }
             TypeKind::Array(inner) => {
                 let mapped = Type::resolved(inner).map_generics(mapping, table);
@@ -264,7 +264,7 @@ impl Type {
                     .map(|id| Type::resolved(id).map_generics(mapping, table).0)
                     .collect();
                 let new_list = table.intern_list(&new_els);
-                Type(table.intern(TypeKind::Tuple(new_list)), self.1)
+                Type(table.intern(TypeKind::Tuple(new_list)))
             }
             TypeKind::Primitive(_)
             | TypeKind::Literal(_)
@@ -285,12 +285,9 @@ impl Type {
     pub fn with_origin(self, origin: varn_core::Atom, table: &mut CheckerTyTable) -> Self {
         match table.get(self.0) {
             TypeKind::Named(n, None) => {
-                Type(table.intern(TypeKind::Named(n, Some(origin))), self.1)
+                Type(table.intern(TypeKind::Named(n, Some(origin))))
             }
-            TypeKind::Generic(n, args, None) => Type(
-                table.intern(TypeKind::Generic(n, args, Some(origin))),
-                self.1,
-            ),
+            TypeKind::Generic(n, args, None) => Type(table.intern(TypeKind::Generic(n, args, Some(origin)))),
             TypeKind::Named(_, Some(_)) | TypeKind::Generic(_, _, Some(_)) => self,
             TypeKind::Primitive(_)
             | TypeKind::Literal(_)

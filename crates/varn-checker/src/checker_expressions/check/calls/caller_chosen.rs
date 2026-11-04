@@ -17,7 +17,7 @@ impl<'r> Checker<'r> {
             return false;
         }
         type_params.iter().any(|name| {
-            mapping.get(name).is_some_and(|ty| !ty.is_dynamic())
+            mapping.get(name).is_some_and(|ty| !ty.is_unresolved())
                 && self.mentions_type_param(returned, name)
                 && !ft
                     .params

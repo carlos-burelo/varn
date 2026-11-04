@@ -45,7 +45,7 @@ impl<'r> Checker<'r> {
                 mapping
                     .get(bind.interner.resolve(*param))
                     .copied()
-                    .filter(|ty| !ty.is_dynamic())
+                    .filter(|ty| !ty.is_unresolved())
             })
             .collect();
         self.check_supplied_constraints(callee, &inferred, range, bind);

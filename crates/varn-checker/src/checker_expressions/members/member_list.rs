@@ -191,7 +191,9 @@ pub fn get_members_of_type(
             for v in &variants {
                 if matches!(
                     table.get(v.0),
-                    TypeKind::Primitive(varn_core::LangPrimitive::Dynamic)
+                    TypeKind::Primitive(
+                        varn_core::LangPrimitive::Dynamic | varn_core::LangPrimitive::Error
+                    )
                 ) {
                     continue;
                 }

@@ -34,7 +34,7 @@ impl<'r> Checker<'r> {
                 if is_true_branch {
                     let narrowed =
                         ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
-                    if !narrowed.is_dynamic() && narrowed != ty {
+                    if !narrowed.is_unresolved() && narrowed != ty {
                         out.push((id, narrowed));
                     }
                 } else if ty.is_nullable(&self.ty_table) {

@@ -276,7 +276,11 @@ fn find_rparen_col_on_line(state: &DocumentState, line: u32, after_col: u32) -> 
 fn worth_hinting(state: &DocumentState, ty: &varn_sem::types::Type) -> bool {
     !matches!(
         state.db.ty_kind(ty),
-        TypeKind::Primitive(varn_core::LangPrimitive::Void | varn_core::LangPrimitive::Dynamic)
+        TypeKind::Primitive(
+            varn_core::LangPrimitive::Void
+                | varn_core::LangPrimitive::Dynamic
+                | varn_core::LangPrimitive::Error
+        )
     )
 }
 

@@ -18,7 +18,7 @@ impl<'r> Checker<'r> {
         let operand = expr_ty.core_sum(&self.ty_table);
         let is_nullable = expr_ty.is_nullable(&self.ty_table);
 
-        if !expr_ty.is_dynamic() && operand.is_none() && !is_nullable {
+        if !expr_ty.is_unresolved() && operand.is_none() && !is_nullable {
             let expr_ty_s = expr_ty.display(&self.ty_table, &bind.interner);
             let shadowed = matches!(
                 self.ty_table.get(expr_ty.0),
@@ -50,7 +50,7 @@ impl<'r> Checker<'r> {
             return;
         };
 
-        if expected_ret.is_dynamic() {
+        if expected_ret.is_unresolved() {
             return;
         }
 

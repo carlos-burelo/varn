@@ -233,7 +233,9 @@ impl<'r> Checker<'r> {
     ) -> bool {
         matches!(
             table.get(id),
-            varn_core::TypeKind::Primitive(varn_core::LangPrimitive::Dynamic)
+            varn_core::TypeKind::Primitive(
+                varn_core::LangPrimitive::Dynamic | varn_core::LangPrimitive::Error
+            )
         )
     }
 
@@ -251,6 +253,7 @@ impl<'r> Checker<'r> {
             TypeKind::Primitive(p) => matches!(
                 p,
                 varn_core::LangPrimitive::Dynamic
+                    | varn_core::LangPrimitive::Error
                     | varn_core::LangPrimitive::Void
                     | varn_core::LangPrimitive::Null
             ),

@@ -61,6 +61,10 @@ impl CheckerTyTable {
                 CheckerTyId::DYNAMIC,
                 TypeKind::Primitive(LangPrimitive::Dynamic),
             ),
+            (
+                CheckerTyId::ERROR,
+                TypeKind::Primitive(LangPrimitive::Error),
+            ),
             (CheckerTyId::THIS, TypeKind::This),
         ] {
             base.entries.insert(id, kind);

@@ -51,7 +51,7 @@ pub(super) fn infer_member_type(
             }
             if let Some(res) = checker.find_member_info(&obj_ty, prop_name_str, bind) {
                 let m_ty = res.0;
-                if !m_ty.is_dynamic() {
+                if !m_ty.is_unresolved() {
                     return m_ty;
                 }
             }
@@ -77,7 +77,7 @@ pub(super) fn infer_member_type(
         | TypeKind::TypePredicate { .. } => {
             if let Some(res) = checker.find_member_info(&obj_ty, prop_name_str, bind) {
                 let m_ty = res.0;
-                if !m_ty.is_dynamic() {
+                if !m_ty.is_unresolved() {
                     return m_ty;
                 }
             }
@@ -130,7 +130,7 @@ pub(super) fn infer_binary_type(
             if l_raw.is_error() || r_raw.is_error() {
                 return Type::Error;
             }
-            if l.is_dynamic() || r.is_dynamic() {
+            if l.is_unresolved() || r.is_unresolved() {
                 return Type::Dynamic;
             }
             let is_type_param = |t: &Type| {

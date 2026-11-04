@@ -48,7 +48,7 @@ impl<'r> Checker<'r> {
             | TypeKind::EnumVariant { .. }
             | TypeKind::TypePredicate { .. } => true,
         };
-        if keyed || ty.is_dynamic() {
+        if keyed || ty.is_unresolved() {
             return;
         }
         self.emit(

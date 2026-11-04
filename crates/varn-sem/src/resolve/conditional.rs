@@ -178,7 +178,7 @@ fn type_satisfies_extends(check: &Type, extends: &Type, table: &CheckerTyTable) 
         return true;
     }
 
-    if check.0 == CheckerTyId::DYNAMIC || extends.0 == CheckerTyId::DYNAMIC {
+    if check.is_unresolved() || extends.is_unresolved() {
         return true;
     }
 

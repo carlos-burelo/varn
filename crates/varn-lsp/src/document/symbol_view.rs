@@ -12,7 +12,7 @@ pub struct SymbolView<'a> {
     pub(super) db: &'a SemanticDB,
 }
 
-pub(super) static DYNAMIC_TY: Type = Type::resolved(varn_sem::types::CheckerTyId::DYNAMIC);
+pub(super) static DYNAMIC_TY: Type = Type::Dynamic;
 
 impl std::fmt::Debug for SymbolView<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

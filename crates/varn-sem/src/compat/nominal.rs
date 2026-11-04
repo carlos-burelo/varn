@@ -182,7 +182,7 @@ pub(super) fn nominal_arms(
         (TypeKind::Fn(fid1), TypeKind::Fn(fid2)) => {
             let ft1 = table.get_function(fid1).clone();
             let ft2 = table.get_function(fid2).clone();
-            let return_ok = t(ft2.return_type).is_dynamic()
+            let return_ok = t(ft2.return_type).is_unresolved()
                 || matches!(
                     table.get(ft1.return_type),
                     TypeKind::Primitive(varn_core::LangPrimitive::Void)
@@ -199,7 +199,7 @@ pub(super) fn nominal_arms(
                 ft2.params.len() <= ft1.params.len()
                     && return_ok
                     && ft1.params.iter().zip(ft2.params.iter()).all(|(t1, t2)| {
-                        t(t2.ty).is_dynamic()
+                        t(t2.ty).is_unresolved()
                             || (types_compatible_impl(
                                 &t(t2.ty),
                                 &t(t1.ty),

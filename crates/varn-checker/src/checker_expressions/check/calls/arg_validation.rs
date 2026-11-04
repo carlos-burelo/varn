@@ -142,7 +142,7 @@ impl<'r> Checker<'r> {
                         .get_list(list)
                         .iter()
                         .any(|m| matches!(self.ty_table.get(*m), TypeKind::Array(_))));
-                let is_empty_array_arg = effective_arg_ty.is_dynamic()
+                let is_empty_array_arg = effective_arg_ty.is_unresolved()
                     && matches!(
                         &self.ast_arena.expr(expr).kind,
                         ExprKind::Array { elements } if elements.is_empty()
@@ -213,7 +213,7 @@ impl<'r> Checker<'r> {
                 };
                 match spread_inner {
                     Some(inner) => Ok(Supplied::Some(arg_ty, Some(inner))),
-                    None if arg_ty.is_dynamic() => Ok(Supplied::Some(arg_ty, None)),
+                    None if arg_ty.is_unresolved() => Ok(Supplied::Some(arg_ty, None)),
                     None => Err(arg_ty),
                 }
             }

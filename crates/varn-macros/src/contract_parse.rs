@@ -121,7 +121,8 @@ fn scalar(p: LangPrimitive) -> Mapped {
         | LangPrimitive::BigInt
         | LangPrimitive::Decimal
         | LangPrimitive::Never
-        | LangPrimitive::Dynamic => Mapped::Dynamic,
+        | LangPrimitive::Dynamic
+        | LangPrimitive::Error => Mapped::Dynamic,
     }
 }
 

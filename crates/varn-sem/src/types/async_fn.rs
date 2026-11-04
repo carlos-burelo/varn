@@ -2,7 +2,7 @@ use super::{CheckerTyTable, Type};
 use varn_core::{BuiltinType, TypeKind};
 
 pub fn async_fn_return(ret: Type, is_async: bool, table: &mut CheckerTyTable) -> Type {
-    if !is_async || ret.is_dynamic() || is_awaitable(&ret, table) {
+    if !is_async || ret.is_unresolved() || is_awaitable(&ret, table) {
         return ret;
     }
     Type::builtin(BuiltinType::Task, vec![ret], table)

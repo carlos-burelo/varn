@@ -77,7 +77,9 @@ impl<'r> Checker<'r> {
         let ty = &resolved;
         let ty_kind = self.ty_table.get(ty.0);
         let res = match ty_kind {
-            TypeKind::Primitive(varn_core::LangPrimitive::Dynamic) => true,
+            TypeKind::Primitive(
+                varn_core::LangPrimitive::Dynamic | varn_core::LangPrimitive::Error,
+            ) => true,
             TypeKind::Primitive(varn_core::LangPrimitive::Never) => false,
             TypeKind::Primitive(varn_core::LangPrimitive::Str) => {
                 if key == varn_core::MemberKey::Length.as_str() {

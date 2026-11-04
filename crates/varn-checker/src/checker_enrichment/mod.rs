@@ -43,7 +43,7 @@ pub fn enrich_call_returns(
                     .get(*sym_id)
                     .ty
                     .as_ref()
-                    .is_some_and(|t| !t.is_dynamic())
+                    .is_some_and(|t| !t.is_unresolved())
                 {
                     continue;
                 }
@@ -205,7 +205,7 @@ pub fn enrich_call_returns(
                 );
                 let ret = types::join_types(inferred, &mut table);
                 bind.ty_table = std::sync::Arc::new(table);
-                if !ret.is_dynamic() {
+                if !ret.is_unresolved() {
                     if let Some(ft_map) = bind.type_members.getters.get_mut(class_name_str.as_str())
                         && let Some(ty) = ft_map.get_mut(key_str.as_str())
                     {

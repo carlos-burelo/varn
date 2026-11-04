@@ -4,7 +4,7 @@ use varn_sem::types::{FunctionParam, Type};
 
 impl<'r> Checker<'r> {
     pub(super) fn accepted_param_type(&mut self, param: &FunctionParam, declared: Type) -> Type {
-        if param.optional && !param.is_rest && !declared.is_dynamic() {
+        if param.optional && !param.is_rest && !declared.is_unresolved() {
             Type::make_nullable(declared, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
         } else {
             declared

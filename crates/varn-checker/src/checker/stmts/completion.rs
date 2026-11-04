@@ -11,7 +11,7 @@ impl<'r> Checker<'r> {
         let Some(declared) = self.expected_return_type else {
             return;
         };
-        if declared.is_dynamic() || declared == Type::Void {
+        if declared.is_unresolved() || declared == Type::Void {
             return;
         }
         if !completes(body, self.ast_arena, &rec.expr_table) {

@@ -105,14 +105,14 @@ impl SemanticDB {
     pub fn is_dynamic(&self, ty: &Type) -> bool {
         matches!(
             self.ty_kind(ty),
-            TypeKind::Primitive(LangPrimitive::Dynamic)
+            TypeKind::Primitive(LangPrimitive::Dynamic | LangPrimitive::Error)
         )
     }
 
     pub fn decl_name(&self, ty: &Type) -> Option<String> {
         match self.ty_kind(ty) {
             TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(self.name(n).to_owned()),
-            TypeKind::Primitive(LangPrimitive::Dynamic) => None,
+            TypeKind::Primitive(LangPrimitive::Dynamic | LangPrimitive::Error) => None,
             TypeKind::Primitive(p) => Some(p.name().to_owned()),
             TypeKind::Array(_) => Some(BuiltinType::Array.name().to_owned()),
             TypeKind::Literal(_)

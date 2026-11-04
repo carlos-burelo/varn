@@ -36,6 +36,7 @@ impl CheckerTyId {
     pub const NEVER: CheckerTyId = CheckerTyId(9);
     pub const DYNAMIC: CheckerTyId = CheckerTyId(10);
     pub const THIS: CheckerTyId = CheckerTyId(11);
+    pub const ERROR: CheckerTyId = CheckerTyId(12);
 }
 
 pub(super) fn seeded_id(kind: &InternedTypeKind) -> Option<CheckerTyId> {
@@ -52,6 +53,7 @@ pub(super) fn seeded_id(kind: &InternedTypeKind) -> Option<CheckerTyId> {
             LangPrimitive::Null => CheckerTyId::NULL,
             LangPrimitive::Never => CheckerTyId::NEVER,
             LangPrimitive::Dynamic => CheckerTyId::DYNAMIC,
+            LangPrimitive::Error => CheckerTyId::ERROR,
         }),
         TypeKind::This => Some(CheckerTyId::THIS),
         TypeKind::Literal(_)

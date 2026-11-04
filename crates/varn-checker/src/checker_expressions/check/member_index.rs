@@ -96,7 +96,7 @@ impl<'r> Checker<'r> {
                 TypeKind::Array(_) | TypeKind::Primitive(varn_core::LangPrimitive::Str)
             ) || builtin == Some(varn_core::BuiltinType::Bytes))
                 && actual_k.is_range(&self.ty_table);
-            if !actual_k.is_dynamic()
+            if !actual_k.is_unresolved()
                 && !is_range_slice
                 && !self.types_compatible_cached(&expected_k, &actual_k, Some(bind))
             {
