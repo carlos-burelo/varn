@@ -46,6 +46,13 @@ impl<'r> Checker<'r> {
             _ => None,
         };
 
+        let is_discard_target = !self.in_pipeline_rhs
+            && matches!(&arena.expr(expr).kind, ExprKind::Identifier { name }
+                if bind.interner.resolve(*name) == varn_core::TokenKind::Placeholder.as_str());
+        if is_discard_target {
+            return;
+        }
+
         let seq = rec.next_seq();
 
         rec.expr_table.insert(
