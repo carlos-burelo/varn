@@ -27,6 +27,10 @@ pub(super) fn infer_member_type(
         obj_ty
     };
 
+    if obj_ty.is_unresolved() {
+        return obj_ty;
+    }
+
     let ExprKind::Identifier { name: prop_name } = &arena.expr(property).kind else {
         return varn_sem::infer::infer_expr_type(
             expr,
@@ -128,20 +132,12 @@ pub(super) fn infer_binary_type(
             let l = l_raw.apparent(&checker.ty_table);
             let r = r_raw.apparent(&checker.ty_table);
             if l_raw.is_error() || r_raw.is_error() {
-                return Type::Error;
+                return Type::Dynamic;
             }
             if l.is_unresolved() || r.is_unresolved() {
                 return Type::Dynamic;
             }
-            let is_type_param = |t: &Type| {
-                matches!(checker.ty_table.get(t.0), TypeKind::Named(n, _)
-                    if checker.active_type_params.contains(bind.interner.try_resolve(n).unwrap_or_default()))
-            };
-            let unresolved = if is_type_param(&l) || is_type_param(&r) {
-                Type::Dynamic
-            } else {
-                Type::Error
-            };
+            let unresolved = Type::Dynamic;
             let (l, r) = varn_sem::types::numeric_ops::adopt_literal_operands(
                 checker.ast_arena,
                 left,

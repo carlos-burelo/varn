@@ -32,6 +32,9 @@ impl<'r> Checker<'r> {
     ) -> (Type, bool) {
         let arena = self.ast_arena;
         let obj_ty = self.infer_type(rec, object, bind);
+        if obj_ty.is_unresolved() {
+            return (obj_ty, false);
+        }
         if matches!(
             arena.expr(property).kind,
             varn_core::ast::ExprKind::Range { .. }
