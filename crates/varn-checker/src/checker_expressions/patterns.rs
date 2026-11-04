@@ -83,7 +83,12 @@ impl<'r> Checker<'r> {
                     self.check_pattern(rec, &prop.value, &prop_ty, bind);
                 }
                 if let Some(r) = rest {
-                    self.check_pattern(rec, r, &Type::Dynamic, bind);
+                    let extracted: Vec<&str> = properties
+                        .iter()
+                        .map(|prop| bind.interner.resolve(prop.key))
+                        .collect();
+                    let rest_ty = self.object_rest_type(value_ty, &extracted, *r.range(), bind);
+                    self.check_pattern(rec, r, &rest_ty, bind);
                 }
             }
             Pattern::Rest { argument, .. } => self.check_pattern(rec, argument, value_ty, bind),
@@ -91,6 +96,46 @@ impl<'r> Checker<'r> {
                 self.check_pattern(rec, left, value_ty, bind);
             }
         }
+    }
+
+    fn object_rest_type(
+        &mut self,
+        value_ty: &Type,
+        extracted: &[&str],
+        range: varn_core::SourceRange,
+        bind: &BindResult,
+    ) -> Type {
+        if value_ty.is_unresolved() {
+            return *value_ty;
+        }
+        if let varn_core::TypeKind::Object(id) = self.ty_table.get(value_ty.0) {
+            let remaining: Vec<varn_sem::types::ObjectTypeMember> = self
+                .ty_table
+                .get_object_members(id)
+                .iter()
+                .filter(|m| match m {
+                    varn_sem::types::ObjectTypeMember::Property { name, .. }
+                    | varn_sem::types::ObjectTypeMember::Method { name, .. } => {
+                        !extracted.contains(&name.as_ref())
+                    }
+                    varn_sem::types::ObjectTypeMember::Index { .. }
+                    | varn_sem::types::ObjectTypeMember::Callable { .. } => true,
+                })
+                .cloned()
+                .collect();
+            return Type::object(remaining, std::sync::Arc::make_mut(&mut self.ty_table));
+        }
+        self.emit(
+            varn_core::Diagnostic::error(
+                varn_core::ErrorCode::TypeMismatch,
+                format!(
+                    "object rest needs an object type, found '{}'",
+                    value_ty.display(&self.ty_table, &bind.interner)
+                ),
+            )
+            .with_range(range),
+        );
+        Type::Error
     }
 
     pub(crate) fn check_pattern_match(

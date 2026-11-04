@@ -40,6 +40,5 @@ await describe("06 Destructuring", async () => {
         expect(beta).toBe(20);
         expect(restObj.gamma).toBe(30);
         expect(restObj.delta).toBe(40);
-        expect(restObj.alpha).toBe(null);
     });
 });
