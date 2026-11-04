@@ -41,7 +41,7 @@ impl Checker<'_> {
                 .map(|(variant, fields)| {
                     let payload = fields
                         .iter()
-                        .map(|(_, ty)| self.reintern_foreign_ty(owner, *ty))
+                        .map(|(field, ty)| (field.clone(), self.reintern_foreign_ty(owner, *ty)))
                         .collect();
                     (variant, payload)
                 })

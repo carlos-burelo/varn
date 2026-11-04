@@ -16,6 +16,8 @@ mod misc;
 mod namespace_use;
 mod operator_capability;
 mod ops;
+mod pattern_cover;
+mod pattern_matrix;
 
 use crate::checker::recorder::Recorder;
 use crate::checker::Checker;

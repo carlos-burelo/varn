@@ -42,9 +42,11 @@ pub struct ForeignEnum {
     pub origin: Arc<str>,
     pub binding: Option<Arc<str>>,
     pub type_params: Vec<Arc<str>>,
-    pub variants: Vec<(Arc<str>, Vec<Type>)>,
+    pub variants: Vec<ForeignVariant>,
     pub members: Vec<ForeignEnumMember>,
 }
+
+pub type ForeignVariant = (Arc<str>, Vec<(Arc<str>, Type)>);
 
 #[derive(Clone, Debug)]
 pub struct ForeignEnumMember {

@@ -1,0 +1,2 @@
+// expect: error[VN4001]
+function f(t: (bool, bool)): int { return match (t) { (true, true) => 1, (false, false) => 2 } }

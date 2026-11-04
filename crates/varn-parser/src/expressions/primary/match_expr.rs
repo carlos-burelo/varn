@@ -1,6 +1,6 @@
 use crate::stream::TokenStream;
 use varn_core::ast::expr::MatchCase;
-use varn_core::ast::{ExprId, MatchBody, MatchPattern};
+use varn_core::ast::{ExprId, MatchBody, MatchField, MatchPattern, SequenceRest, VariantPayload};
 use varn_core::TokenKind;
 
 pub(super) fn parse_match_expr(s: &mut TokenStream) -> Result<ExprId, String> {
@@ -69,6 +69,12 @@ fn parse_match_pattern(s: &mut TokenStream) -> Result<MatchPattern, String> {
             Ok(MatchPattern::Wildcard)
         }
         TokenKind::Identifier => parse_identifier_match_pattern(s),
+        TokenKind::LParen => parse_tuple_match_pattern(s),
+        TokenKind::LBracket => parse_array_match_pattern(s),
+        TokenKind::LBrace => {
+            let (fields, rest) = parse_match_fields(s)?;
+            Ok(MatchPattern::Record { fields, rest })
+        }
         TokenKind::EOF
         | TokenKind::Dynamic
         | TokenKind::IntegerLiteral
@@ -84,11 +90,8 @@ fn parse_match_pattern(s: &mut TokenStream) -> Result<MatchPattern, String> {
         | TokenKind::TemplateMiddle
         | TokenKind::TemplateTail
         | TokenKind::RegularExpression
-        | TokenKind::LParen
         | TokenKind::RParen
-        | TokenKind::LBrace
         | TokenKind::RBrace
-        | TokenKind::LBracket
         | TokenKind::RBracket
         | TokenKind::LAngle
         | TokenKind::RAngle
@@ -238,10 +241,21 @@ fn parse_identifier_match_pattern(s: &mut TokenStream) -> Result<MatchPattern, S
     let id_range = s.range();
     let name = s.consume_lexeme();
     if s.check(TokenKind::LParen) {
-        return parse_variant_tuple_pattern(s, name);
+        let payload =
+            VariantPayload::Positional(parse_match_list(s, TokenKind::LParen, TokenKind::RParen)?);
+        return Ok(MatchPattern::EnumVariant {
+            enum_name: name,
+            variant_name: name,
+            payload,
+        });
     }
     if s.check(TokenKind::LBrace) {
-        return parse_variant_record_pattern(s, name);
+        let (fields, rest) = parse_match_fields(s)?;
+        return Ok(MatchPattern::EnumVariant {
+            enum_name: name,
+            variant_name: name,
+            payload: VariantPayload::Named { fields, rest },
+        });
     }
 
     if s.check(TokenKind::Dot) {
@@ -267,69 +281,99 @@ fn parse_identifier_match_pattern(s: &mut TokenStream) -> Result<MatchPattern, S
     Ok(MatchPattern::Identifier(name))
 }
 
-fn parse_variant_tuple_pattern(
+fn parse_match_list(
     s: &mut TokenStream,
-    enum_name: varn_core::Atom,
-) -> Result<MatchPattern, String> {
-    use varn_core::ast::MatchBinding;
-    let variant_name = enum_name;
-    s.advance();
-    let mut bindings: Vec<MatchBinding> = Vec::new();
-    while !s.check(TokenKind::RParen) && !s.is_eof() {
-        let range = s.range();
-        if s.check(TokenKind::Placeholder) {
-            s.advance();
-            bindings.push(MatchBinding {
-                name: s
-                    .interner
-                    .intern(varn_core::TokenKind::Placeholder.as_str()),
-                range,
-            });
-        } else if s.check(TokenKind::Identifier) {
-            let name = s.consume_lexeme();
-            if s.eat(TokenKind::Colon) {
-                parse_match_pattern(s)?;
-            }
-            bindings.push(MatchBinding { name, range });
-        } else {
-            return Err(format!(
-                "expected binding name or `_` in variant pattern, got {:?}",
-                s.kind()
-            ));
-        }
+    open: TokenKind,
+    close: TokenKind,
+) -> Result<Vec<MatchPattern>, String> {
+    s.expect(open)?;
+    let mut items = Vec::new();
+    while !s.check(close) && !s.is_eof() {
+        items.push(parse_match_pattern(s)?);
         if !s.eat(TokenKind::Comma) {
             break;
         }
     }
-    s.expect(TokenKind::RParen)?;
-    Ok(MatchPattern::EnumVariant {
-        enum_name,
-        variant_name,
-        bindings,
-    })
+    s.expect(close)?;
+    Ok(items)
 }
 
-fn parse_variant_record_pattern(
-    s: &mut TokenStream,
-    name: varn_core::Atom,
-) -> Result<MatchPattern, String> {
-    use varn_core::ast::MatchBinding;
-    s.advance();
+fn parse_tuple_match_pattern(s: &mut TokenStream) -> Result<MatchPattern, String> {
+    s.expect(TokenKind::LParen)?;
+    let mut items = Vec::new();
+    let mut trailing_comma = false;
+    while !s.check(TokenKind::RParen) && !s.is_eof() {
+        items.push(parse_match_pattern(s)?);
+        trailing_comma = s.eat(TokenKind::Comma);
+        if !trailing_comma {
+            break;
+        }
+    }
+    s.expect(TokenKind::RParen)?;
+    if items.len() == 1 && !trailing_comma {
+        return Ok(items.remove(0));
+    }
+    Ok(MatchPattern::Tuple(items))
+}
 
-    let mut bindings: Vec<MatchBinding> = Vec::new();
+fn parse_array_match_pattern(s: &mut TokenStream) -> Result<MatchPattern, String> {
+    s.expect(TokenKind::LBracket)?;
+    let mut elements = Vec::new();
+    let mut rest = SequenceRest::Closed;
+    while !s.check(TokenKind::RBracket) && !s.is_eof() {
+        if s.eat(TokenKind::DotDotDot) {
+            rest = if s.check(TokenKind::Identifier) {
+                SequenceRest::Bind(s.consume_lexeme())
+            } else {
+                s.eat(TokenKind::Placeholder);
+                SequenceRest::Open
+            };
+            s.eat(TokenKind::Comma);
+            if !s.check(TokenKind::RBracket) {
+                return Err(
+                    "a rest pattern must be the last element of an array pattern".to_owned(),
+                );
+            }
+            break;
+        }
+        elements.push(parse_match_pattern(s)?);
+        if !s.eat(TokenKind::Comma) {
+            break;
+        }
+    }
+    s.expect(TokenKind::RBracket)?;
+    Ok(MatchPattern::Array { elements, rest })
+}
+
+fn parse_match_fields(s: &mut TokenStream) -> Result<(Vec<MatchField>, bool), String> {
+    s.expect(TokenKind::LBrace)?;
+    let mut fields: Vec<MatchField> = Vec::new();
     let mut rest = false;
     while !s.check(TokenKind::RBrace) && !s.is_eof() {
         if s.eat(TokenKind::DotDotDot) {
             rest = true;
+            s.eat(TokenKind::Comma);
+            if !s.check(TokenKind::RBrace) {
+                return Err("`...` must be the last entry of a record pattern".to_owned());
+            }
             break;
         }
         let range = s.range();
-        let field_name = s.expect_id()?;
-        if s.eat(TokenKind::Colon) {
-            parse_match_pattern(s)?;
+        let name = s.expect_id()?;
+        if fields.iter().any(|f| f.name == name) {
+            return Err(format!(
+                "the pattern already names the field '{}'",
+                s.interner.resolve(name)
+            ));
         }
-        bindings.push(MatchBinding {
-            name: field_name,
+        let pattern = if s.eat(TokenKind::Colon) {
+            Some(parse_match_pattern(s)?)
+        } else {
+            None
+        };
+        fields.push(MatchField {
+            name,
+            pattern,
             range,
         });
         if !s.eat(TokenKind::Comma) {
@@ -337,10 +381,5 @@ fn parse_variant_record_pattern(
         }
     }
     s.expect(TokenKind::RBrace)?;
-    let _ = rest;
-    Ok(MatchPattern::EnumVariant {
-        enum_name: name,
-        variant_name: name,
-        bindings,
-    })
+    Ok((fields, rest))
 }

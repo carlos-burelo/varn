@@ -1,0 +1,2 @@
+// expect: error[VN4001]
+function f(xs: int[]): int { return match (xs) { [] => 0, [a, b] => a } }

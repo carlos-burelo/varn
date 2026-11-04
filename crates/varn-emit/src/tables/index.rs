@@ -301,8 +301,9 @@ pub fn build(
                     tag: tag as u16,
                     payload: fields
                         .iter()
-                        .map(|ty| lower_type(ty, &bind.ty_table, &bind.interner, tt, &scoped))
+                        .map(|(_, ty)| lower_type(ty, &bind.ty_table, &bind.interner, tt, &scoped))
                         .collect(),
+                    field_names: fields.iter().map(|(field, _)| field.clone()).collect(),
                 })
                 .collect(),
         }

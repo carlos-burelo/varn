@@ -29,6 +29,9 @@ pub use module_decl::{
 pub use operators::{
     AssignOp, BinaryOp, LogicalOp, Modifiers, UnaryOp, UpdateOp, VarKind, Visibility,
 };
-pub use pattern::{ArrayPatternEl, MatchBinding, MatchPattern, ObjPatternProp, Param, Pattern};
+pub use pattern::{
+    literal_variant_name, ArrayPatternEl, MatchField, MatchPattern, ObjPatternProp, Param, Pattern,
+    SequenceRest, VariantPayload,
+};
 pub use stmt::{CatchClause, ForInit, StmtKind, SwitchCase, VarDeclarator, VariableDecl};
 pub use types::{AstTypeKind, Decorator, TypeNode, TypeParam};

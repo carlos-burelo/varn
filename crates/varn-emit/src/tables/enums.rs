@@ -48,6 +48,7 @@ pub(super) fn build_enums(
                         .iter()
                         .map(|(_, ty)| lower_type(ty, table, interner, tt, names))
                         .collect(),
+                    field_names: fields.iter().map(|(field, _)| field.clone()).collect(),
                 })
                 .collect(),
         })

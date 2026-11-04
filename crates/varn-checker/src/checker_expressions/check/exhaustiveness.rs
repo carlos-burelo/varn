@@ -1,3 +1,4 @@
+use super::pattern_cover::{lengths_covered, Cover};
 use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::ast::pattern::MatchPattern;
@@ -37,7 +38,7 @@ impl<'r> Checker<'r> {
                     MatchPattern::Wildcard | MatchPattern::Identifier(_)
                 )
         });
-        if !catch_all {
+        if !catch_all && !self.matrix_exhaustive(cases, subject_ty, bind) {
             let ty = subject_ty.display(&self.ty_table, &bind.interner);
             let message = format!("non-exhaustive match: a match on '{ty}' needs a `_` arm");
             self.report_gap(
@@ -65,6 +66,26 @@ impl<'r> Checker<'r> {
         if has_catch_all {
             return;
         }
+        let irrefutable_arms: Vec<&MatchCase> =
+            cases.iter().filter(|c| c.guard.is_none()).collect();
+        for case in irrefutable_arms {
+            if self.irrefutable_for(&case.pattern, subject_ty, bind) {
+                return;
+            }
+        }
+
+        let array_cover: Vec<Cover> = cases
+            .iter()
+            .filter(|c| c.guard.is_none())
+            .map(|c| self.case_cover(&c.pattern, subject_ty, bind))
+            .collect();
+        let lengths_done = lengths_covered(&array_cover);
+        if matches!(self.ty_table.get(subject_ty.0), TypeKind::Array(_)) {
+            if !lengths_done {
+                self.require_catch_all(rec, expr, subject_ty, cases, range, bind);
+            }
+            return;
+        }
 
         if let Some(members) =
             closed_members(subject_ty, std::sync::Arc::make_mut(&mut self.ty_table))
@@ -72,13 +93,16 @@ impl<'r> Checker<'r> {
             let uncovered: Vec<Type> = members
                 .into_iter()
                 .filter(|m| {
+                    if matches!(self.ty_table.get(m.0), TypeKind::Array(_)) {
+                        return !lengths_done;
+                    }
                     !cases.iter().any(|c| {
                         c.guard.is_none()
                             && pattern_covers(&c.pattern, m, &self.ty_table, self.ast_arena, bind)
                     })
                 })
                 .collect();
-            if !uncovered.is_empty() {
+            if !uncovered.is_empty() && !self.matrix_exhaustive(cases, subject_ty, bind) {
                 let text = |t: &Type| t.display(&self.ty_table, &bind.interner).to_string();
                 let names: Vec<String> = uncovered.iter().map(text).collect();
 
@@ -115,56 +139,26 @@ impl<'r> Checker<'r> {
         });
         let owner: &BindResult = foreign.as_deref().unwrap_or(bind);
 
+        let covers: Vec<Cover> = cases
+            .iter()
+            .filter(|c| c.guard.is_none())
+            .map(|c| self.case_cover(&c.pattern, subject_ty, bind))
+            .collect();
+        let covered = |name: &str| {
+            covers.iter().any(|cover| match cover {
+                Cover::All => true,
+                Cover::Variant(covered) => covered == name,
+                Cover::Exact(_) | Cover::AtLeast(_) | Cover::Nothing => false,
+            })
+        };
+
         if let Some(variants) = owner.sum_type_variants.get(type_name.as_ref()) {
             let uncovered: Vec<String> = variants
                 .iter()
-                .filter(|vname| {
-                    !cases.iter().any(|c| {
-                        if c.guard.is_some() {
-                            return false;
-                        }
-                        match &c.pattern {
-                            MatchPattern::Wildcard => true,
-                            MatchPattern::Identifier(name) => {
-                                bind.interner.resolve(*name) == vname.as_ref()
-                            }
-                            MatchPattern::EnumVariant { variant_name, .. } => {
-                                bind.interner.resolve(*variant_name) == vname.as_ref()
-                            }
-                            MatchPattern::Literal(lit) => {
-                                let arena = self.ast_arena;
-                                if let varn_core::ast::ExprKind::Member { property, .. } =
-                                    &arena.expr(*lit).kind
-                                {
-                                    if let varn_core::ast::ExprKind::Identifier { name } =
-                                        &arena.expr(*property).kind
-                                    {
-                                        bind.interner.resolve(*name) == vname.as_ref()
-                                    } else {
-                                        false
-                                    }
-                                } else if let varn_core::ast::ExprKind::Identifier { name } =
-                                    &arena.expr(*lit).kind
-                                {
-                                    bind.interner.resolve(*name) == vname.as_ref()
-                                } else {
-                                    false
-                                }
-                            }
-                            MatchPattern::Record { fields, .. } => {
-                                fields.first().is_some_and(|(key, sub)| {
-                                    bind.interner.resolve(*key) == varn_core::MemberKey::Variant.as_str()
-                                        && matches!(sub, Some(MatchPattern::Identifier(n)) if bind.interner.resolve(*n) == vname.as_ref())
-                                })
-                            }
-                            MatchPattern::Sequence(_)
-                            | MatchPattern::Type { .. } => false,
-                        }
-                    })
-                })
+                .filter(|vname| !covered(vname.as_ref()))
                 .map(|v| v.to_string())
                 .collect();
-            if !uncovered.is_empty() {
+            if !uncovered.is_empty() && !self.matrix_exhaustive(cases, subject_ty, bind) {
                 let missing = uncovered
                     .iter()
                     .map(|v| match owner.sum_variant_fields.get(v.as_str()) {
@@ -191,54 +185,15 @@ impl<'r> Checker<'r> {
             let uncovered: Vec<String> = variants
                 .iter()
                 .filter(|v| {
-                    let is_variant = owner
+                    owner
                         .sum_variant_parent
                         .get(v.name.as_ref())
-                        .is_some_and(|parent| parent.as_ref() == type_name.as_ref());
-                    if !is_variant {
-                        return false;
-                    }
-                    !cases.iter().any(|c| {
-                        if c.guard.is_some() {
-                            return false;
-                        }
-                        match &c.pattern {
-                            MatchPattern::Wildcard => true,
-                            MatchPattern::EnumVariant { variant_name, .. } => {
-                                let variant_name_str = bind.interner.resolve(*variant_name);
-                                let last_part = variant_name_str
-                                    .rsplit('.')
-                                    .next()
-                                    .unwrap_or(variant_name_str);
-                                last_part == v.name.as_ref()
-                            }
-                            MatchPattern::Literal(e) => {
-                                use varn_core::ast::ExprKind;
-                                let arena = self.ast_arena;
-                                if let ExprKind::Member { property, .. } = &arena.expr(*e).kind {
-                                    if let ExprKind::Identifier { name } =
-                                        &arena.expr(*property).kind
-                                    {
-                                        bind.interner.resolve(*name) == v.name.as_ref()
-                                    } else {
-                                        false
-                                    }
-                                } else if let ExprKind::Identifier { name } = &arena.expr(*e).kind {
-                                    bind.interner.resolve(*name) == v.name.as_ref()
-                                } else {
-                                    false
-                                }
-                            }
-                            MatchPattern::Identifier(_)
-                            | MatchPattern::Record { .. }
-                            | MatchPattern::Sequence(_)
-                            | MatchPattern::Type { .. } => false,
-                        }
-                    })
+                        .is_some_and(|parent| parent.as_ref() == type_name.as_ref())
                 })
+                .filter(|v| !covered(v.name.as_ref()))
                 .map(|v| v.name.to_string())
                 .collect();
-            if !uncovered.is_empty() {
+            if !uncovered.is_empty() && !self.matrix_exhaustive(cases, subject_ty, bind) {
                 let message = format!(
                     "non-exhaustive match: missing cases for {}",
                     uncovered.join(", ")
@@ -325,34 +280,9 @@ fn pattern_covers(
             }
             _ => false,
         },
-        MatchPattern::Type { type_name, .. } => {
-            let name = bind.interner.resolve(*type_name);
-            match table.get(member.0) {
-                TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => {
-                    bind.interner.try_resolve(n) == Some(name)
-                }
-                kind @ TypeKind::Primitive(_)
-                | kind @ TypeKind::Literal(_)
-                | kind @ TypeKind::This
-                | kind @ TypeKind::Array(_)
-                | kind @ TypeKind::Union(_)
-                | kind @ TypeKind::Intersection(_)
-                | kind @ TypeKind::Tuple(_)
-                | kind @ TypeKind::TemplateLiteral(_)
-                | kind @ TypeKind::Fn(_)
-                | kind @ TypeKind::Object(_)
-                | kind @ TypeKind::Typeof(_)
-                | kind @ TypeKind::KeyOf(_)
-                | kind @ TypeKind::IndexedAccess { .. }
-                | kind @ TypeKind::Mapped { .. }
-                | kind @ TypeKind::Conditional { .. }
-                | kind @ TypeKind::Infer(_)
-                | kind @ TypeKind::EnumVariant { .. }
-                | kind @ TypeKind::TypePredicate { .. } => kind.lang_name() == Some(name),
-            }
-        }
-        MatchPattern::Record { .. }
-        | MatchPattern::Sequence(_)
+        MatchPattern::Tuple(_)
+        | MatchPattern::Array { .. }
+        | MatchPattern::Record { .. }
         | MatchPattern::EnumVariant { .. } => false,
     }
 }

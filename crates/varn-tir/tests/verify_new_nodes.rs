@@ -144,6 +144,7 @@ fn module_with_enum(top_level: TirFunction) -> TirModule {
                 name: Arc::from("Circle"),
                 tag: 0,
                 payload: vec![BackendTy::Int],
+                field_names: vec![Arc::from("radius")],
             }],
             members: vec![],
         }],

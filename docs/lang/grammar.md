@@ -357,19 +357,26 @@ exploración previa (`could_be_arrow`) y un intento con retroceso.
 MatchExpr     = "match" ( "(" Expression ")" | Binary ) "{" { MatchCase } "}" ;
 MatchCase     = MatchPattern { "|" MatchPattern } [ "if" Conditional ] "=>" ( Block | Expression ) [ "," ] ;
 MatchPattern  = "_"
-              | Identifier "(" [ Binding { "," Binding } ] ")"          (* variante con payload posicional *)
-              | Identifier "{" [ Field { "," Field } [ "," "..." ] ] "}" (* variante con payload nombrado *)
-              | Identifier "." Identifier                                 (* Enum.Miembro *)
+              | Identifier "(" [ MatchPattern { "," MatchPattern } ] ")"   (* variante con payload posicional *)
+              | Identifier "{" [ Field { "," Field } [ "," "..." ] ] "}"   (* variante con payload nombrado *)
+              | Identifier "." Identifier                                  (* Enum.Miembro *)
+              | "(" MatchPattern "," [ MatchPattern { "," MatchPattern } ] ")"  (* tupla *)
+              | "[" [ MatchPattern { "," MatchPattern } ] [ "..." [ Identifier ] ] "]"  (* array *)
+              | "{" Field { "," Field } [ "," "..." ] "}"                  (* record: objeto, struct o clase *)
               | Identifier
-              | Primary ;                                                 (* literal *)
-Binding       = Identifier [ ":" MatchPattern ] | "_" ;
+              | Primary ;                                                  (* literal *)
 Field         = Identifier [ ":" MatchPattern ] ;
 ```
 
 La guarda es una `Conditional`: no admite flechas ni asignaciones, para que `n if ok => …`
 lea `=>` como separador del brazo.
 
-El parser acepta patrones anidados tras `:` pero hoy solo registra el nombre del enlace.
+Los patrones se anidan sin límite y cada sub-patrón se comprueba de verdad (`tests/338-match-patterns.vn`):
+
+- `Circle(1.0)` solo casa con un círculo de radio `1.0`; `Rect { h }` liga el campo **por nombre**, no por posición.
+- Una tupla `(a, b)` exige una tupla de esa aridad (`VN3016`); `[a, b]` exige un array (`VN3001`). Un array sin `...` casa por longitud exacta; con `...` por longitud mínima, y `...r` liga el resto.
+- Un record `{ x, y: 0 }` lee campos por nombre sobre cualquier tipo con esos campos (`VN3004` si no existen).
+- Exhaustividad: un brazo cubre una variante solo si sus sub-patrones son irrefutables; las combinaciones de tuplas y variantes anidadas se resuelven con el algoritmo de matrices de patrones. Booleanos dentro de tuplas y literales numéricos siguen necesitando un brazo `_`.
 
 ### Patrones de destructuración
 

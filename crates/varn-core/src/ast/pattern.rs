@@ -79,26 +79,137 @@ pub enum MatchPattern {
     Wildcard,
     Literal(ExprId),
     Identifier(Atom),
+    Tuple(Vec<MatchPattern>),
+    Array {
+        elements: Vec<MatchPattern>,
+        rest: SequenceRest,
+    },
     Record {
-        fields: Vec<(Atom, Option<MatchPattern>)>,
+        fields: Vec<MatchField>,
         rest: bool,
     },
-    Sequence(Vec<MatchPattern>),
-    Type {
-        type_name: Atom,
-        binding: Option<Atom>,
-    },
-
     EnumVariant {
         enum_name: Atom,
         variant_name: Atom,
-
-        bindings: Vec<MatchBinding>,
+        payload: VariantPayload,
     },
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SequenceRest {
+    Closed,
+    Open,
+    Bind(Atom),
+}
+
 #[derive(Clone, Debug)]
-pub struct MatchBinding {
+pub enum VariantPayload {
+    Positional(Vec<MatchPattern>),
+    Named { fields: Vec<MatchField>, rest: bool },
+}
+
+#[derive(Clone, Debug)]
+pub struct MatchField {
     pub name: Atom,
+    pub pattern: Option<MatchPattern>,
     pub range: SourceRange,
+}
+
+pub fn literal_variant_name(arena: &super::AstArena, expr: ExprId) -> Option<Atom> {
+    use super::ExprKind;
+    match &arena.expr(expr).kind {
+        ExprKind::Member { property, .. } => match &arena.expr(*property).kind {
+            ExprKind::Identifier { name } => Some(*name),
+            ExprKind::IntLiteral { .. }
+            | ExprKind::FloatLiteral { .. }
+            | ExprKind::BigIntLiteral { .. }
+            | ExprKind::DecimalLiteral { .. }
+            | ExprKind::StrLiteral { .. }
+            | ExprKind::CharLiteral { .. }
+            | ExprKind::BoolLiteral { .. }
+            | ExprKind::NullLiteral
+            | ExprKind::Template { .. }
+            | ExprKind::TaggedTemplate { .. }
+            | ExprKind::Missing
+            | ExprKind::This
+            | ExprKind::Super
+            | ExprKind::ImportMeta(_)
+            | ExprKind::Array { .. }
+            | ExprKind::Object { .. }
+            | ExprKind::Tuple { .. }
+            | ExprKind::Unary { .. }
+            | ExprKind::Update { .. }
+            | ExprKind::Binary { .. }
+            | ExprKind::Logical { .. }
+            | ExprKind::Assign { .. }
+            | ExprKind::Conditional { .. }
+            | ExprKind::Member { .. }
+            | ExprKind::Call { .. }
+            | ExprKind::New { .. }
+            | ExprKind::Function { .. }
+            | ExprKind::Arrow { .. }
+            | ExprKind::Sequence { .. }
+            | ExprKind::Paren { .. }
+            | ExprKind::Await { .. }
+            | ExprKind::Spawn { .. }
+            | ExprKind::Yield { .. }
+            | ExprKind::Spread { .. }
+            | ExprKind::Pipeline { .. }
+            | ExprKind::Range { .. }
+            | ExprKind::NonNull { .. }
+            | ExprKind::Try { .. }
+            | ExprKind::As { .. }
+            | ExprKind::Satisfies { .. }
+            | ExprKind::ClassExpr { .. }
+            | ExprKind::Match { .. }
+            | ExprKind::Is { .. }
+            | ExprKind::With { .. }
+            | ExprKind::MetaAccess { .. } => None,
+        },
+        ExprKind::Identifier { name } => Some(*name),
+        ExprKind::IntLiteral { .. }
+        | ExprKind::FloatLiteral { .. }
+        | ExprKind::BigIntLiteral { .. }
+        | ExprKind::DecimalLiteral { .. }
+        | ExprKind::StrLiteral { .. }
+        | ExprKind::CharLiteral { .. }
+        | ExprKind::BoolLiteral { .. }
+        | ExprKind::NullLiteral
+        | ExprKind::Template { .. }
+        | ExprKind::TaggedTemplate { .. }
+        | ExprKind::Missing
+        | ExprKind::This
+        | ExprKind::Super
+        | ExprKind::ImportMeta(_)
+        | ExprKind::Array { .. }
+        | ExprKind::Object { .. }
+        | ExprKind::Tuple { .. }
+        | ExprKind::Unary { .. }
+        | ExprKind::Update { .. }
+        | ExprKind::Binary { .. }
+        | ExprKind::Logical { .. }
+        | ExprKind::Assign { .. }
+        | ExprKind::Conditional { .. }
+        | ExprKind::Call { .. }
+        | ExprKind::New { .. }
+        | ExprKind::Function { .. }
+        | ExprKind::Arrow { .. }
+        | ExprKind::Sequence { .. }
+        | ExprKind::Paren { .. }
+        | ExprKind::Await { .. }
+        | ExprKind::Spawn { .. }
+        | ExprKind::Yield { .. }
+        | ExprKind::Spread { .. }
+        | ExprKind::Pipeline { .. }
+        | ExprKind::Range { .. }
+        | ExprKind::NonNull { .. }
+        | ExprKind::Try { .. }
+        | ExprKind::As { .. }
+        | ExprKind::Satisfies { .. }
+        | ExprKind::ClassExpr { .. }
+        | ExprKind::Match { .. }
+        | ExprKind::Is { .. }
+        | ExprKind::With { .. }
+        | ExprKind::MetaAccess { .. } => None,
+    }
 }

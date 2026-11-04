@@ -2,7 +2,7 @@ use super::patterns::{pattern_names, walk_expr_children};
 use rustc_hash::FxHashSet;
 use varn_core::ast::{
     ArrowBody, AstArena, Decl, ExportDecl, ExprId, ExprKind, ForInit, MatchBody, MatchPattern,
-    Param, StmtId, StmtKind, VarDeclarator,
+    Param, StmtId, StmtKind, VarDeclarator, VariantPayload,
 };
 use varn_core::Atom;
 
@@ -52,6 +52,17 @@ impl Collector<'_> {
         }
     }
 
+    fn match_fields(&mut self, fields: &[varn_core::ast::MatchField]) {
+        for field in fields {
+            match &field.pattern {
+                Some(p) => self.match_bindings(p),
+                None => {
+                    self.declared.insert(field.name);
+                }
+            }
+        }
+    }
+
     fn match_bindings(&mut self, pattern: &MatchPattern) {
         match pattern {
             MatchPattern::Wildcard => {}
@@ -59,21 +70,20 @@ impl Collector<'_> {
             MatchPattern::Identifier(name) => {
                 self.declared.insert(*name);
             }
-            MatchPattern::Record { fields, .. } => {
-                for (name, inner) in fields {
-                    match inner {
-                        Some(p) => self.match_bindings(p),
-                        None => {
-                            self.declared.insert(*name);
-                        }
-                    }
+            MatchPattern::Record { fields, .. } => self.match_fields(fields),
+            MatchPattern::Tuple(items) => items.iter().for_each(|p| self.match_bindings(p)),
+            MatchPattern::Array { elements, rest } => {
+                elements.iter().for_each(|p| self.match_bindings(p));
+                if let varn_core::ast::SequenceRest::Bind(name) = rest {
+                    self.declared.insert(*name);
                 }
             }
-            MatchPattern::Sequence(items) => items.iter().for_each(|p| self.match_bindings(p)),
-            MatchPattern::Type { binding, .. } => self.declared.extend(*binding),
-            MatchPattern::EnumVariant { bindings, .. } => {
-                self.declared.extend(bindings.iter().map(|b| b.name));
-            }
+            MatchPattern::EnumVariant { payload, .. } => match payload {
+                VariantPayload::Positional(items) => {
+                    items.iter().for_each(|p| self.match_bindings(p))
+                }
+                VariantPayload::Named { fields, .. } => self.match_fields(fields),
+            },
         }
     }
 

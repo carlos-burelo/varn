@@ -1,0 +1,3 @@
+// expect: error[VN3004]
+struct P { x: int; y: int }
+function f(p: P): int { return match (p) { { z } => z, _ => 0 } }

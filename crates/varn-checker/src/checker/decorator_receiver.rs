@@ -2,7 +2,7 @@ use varn_core::ast::arena::{AstArena, ExprId, StmtId};
 use varn_core::ast::expr::{
     Arg, ArrayEl, ArrowBody, ExprKind, MatchBody, MatchCase, ObjectProp, PropKey, TemplatePart,
 };
-use varn_core::ast::pattern::{MatchPattern, Param, Pattern};
+use varn_core::ast::pattern::{MatchPattern, Param, Pattern, VariantPayload};
 use varn_core::ast::stmt::{ForInit, StmtKind};
 use varn_core::ast::{Decl, ExportDecl};
 
@@ -239,16 +239,35 @@ fn key_uses_receiver(arena: &AstArena, k: &PropKey) -> bool {
     }
 }
 
-fn match_case_uses_receiver(arena: &AstArena, c: &MatchCase) -> bool {
-    (match &c.pattern {
+fn match_pattern_uses_receiver(arena: &AstArena, p: &MatchPattern) -> bool {
+    match p {
         MatchPattern::Literal(e) => expr_uses_receiver(arena, *e),
-        MatchPattern::Wildcard
-        | MatchPattern::Identifier(_)
-        | MatchPattern::Record { .. }
-        | MatchPattern::Sequence(_)
-        | MatchPattern::Type { .. }
-        | MatchPattern::EnumVariant { .. } => false,
-    }) || c.guard.is_some_and(|g| expr_uses_receiver(arena, g))
+        MatchPattern::Wildcard | MatchPattern::Identifier(_) => false,
+        MatchPattern::Tuple(items) => items.iter().any(|i| match_pattern_uses_receiver(arena, i)),
+        MatchPattern::Array { elements, .. } => elements
+            .iter()
+            .any(|i| match_pattern_uses_receiver(arena, i)),
+        MatchPattern::Record { fields, .. } => fields.iter().any(|f| {
+            f.pattern
+                .as_ref()
+                .is_some_and(|i| match_pattern_uses_receiver(arena, i))
+        }),
+        MatchPattern::EnumVariant { payload, .. } => match payload {
+            VariantPayload::Positional(items) => {
+                items.iter().any(|i| match_pattern_uses_receiver(arena, i))
+            }
+            VariantPayload::Named { fields, .. } => fields.iter().any(|f| {
+                f.pattern
+                    .as_ref()
+                    .is_some_and(|i| match_pattern_uses_receiver(arena, i))
+            }),
+        },
+    }
+}
+
+fn match_case_uses_receiver(arena: &AstArena, c: &MatchCase) -> bool {
+    match_pattern_uses_receiver(arena, &c.pattern)
+        || c.guard.is_some_and(|g| expr_uses_receiver(arena, g))
         || match &c.body {
             MatchBody::Block(s) => stmt_uses_receiver(arena, *s),
             MatchBody::Expr(e) => expr_uses_receiver(arena, *e),

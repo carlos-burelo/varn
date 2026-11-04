@@ -98,10 +98,12 @@ impl<'r> Checker<'r> {
         rec: &mut Recorder,
         pattern: &varn_core::ast::MatchPattern,
         value_ty: &Type,
+        range: varn_core::SourceRange,
         bind: &BindResult,
     ) {
-        use varn_core::ast::MatchPattern;
+        use varn_core::ast::{MatchPattern, SequenceRest, VariantPayload};
         match pattern {
+            MatchPattern::Wildcard => {}
             MatchPattern::Identifier(name) => {
                 if bind.interner.resolve(*name) == varn_core::TokenKind::Placeholder.as_str() {
                     return;
@@ -111,9 +113,70 @@ impl<'r> Checker<'r> {
                     self.record_type_with_symbol(rec, 0, *value_ty, id);
                 }
             }
+            MatchPattern::Tuple(items) => {
+                let present = self.present_subject(value_ty);
+                let shape = self.sequence_shape(&present, true, items.len(), false, range, bind);
+                for (at, item) in items.iter().enumerate() {
+                    let item_ty = match &shape.fixed {
+                        Some(fixed) => fixed.get(at).copied().unwrap_or(Type::Dynamic),
+                        None => shape.element,
+                    };
+                    self.check_pattern_match(rec, item, &item_ty, range, bind);
+                }
+            }
+            MatchPattern::Array { elements, rest } => {
+                let present = self.present_subject(value_ty);
+                let shape = self.sequence_shape(
+                    &present,
+                    false,
+                    elements.len(),
+                    !matches!(rest, SequenceRest::Closed),
+                    range,
+                    bind,
+                );
+                for (at, item) in elements.iter().enumerate() {
+                    let item_ty = match &shape.fixed {
+                        Some(fixed) => fixed.get(at).copied().unwrap_or(Type::Dynamic),
+                        None => shape.element,
+                    };
+                    self.check_pattern_match(rec, item, &item_ty, range, bind);
+                }
+                if let SequenceRest::Bind(name) = rest {
+                    let rest_ty =
+                        Type::array(shape.element, std::sync::Arc::make_mut(&mut self.ty_table));
+                    let scope = bind.scopes.get(self.current_scope);
+                    if let Some(id) = scope.resolve(*name, &bind.scopes) {
+                        self.record_type_with_symbol(rec, 0, rest_ty, id);
+                    }
+                }
+            }
+            MatchPattern::Record { fields, .. } => {
+                let present = self.present_subject(value_ty);
+                for field in fields {
+                    let name = bind.interner.resolve(field.name);
+                    let member_ty = if present.is_unresolved() {
+                        Type::Dynamic
+                    } else if let Some((found, _)) = self.find_member_info(&present, name, bind) {
+                        found
+                    } else {
+                        self.emit(
+                            varn_core::Diagnostic::error(
+                                varn_core::ErrorCode::MissingProperty,
+                                format!(
+                                    "property '{name}' does not exist on type '{}'",
+                                    present.display(&self.ty_table, &bind.interner)
+                                ),
+                            )
+                            .with_range(field.range),
+                        );
+                        Type::Dynamic
+                    };
+                    self.check_match_field(rec, field, &member_ty, range, bind);
+                }
+            }
             MatchPattern::EnumVariant {
                 variant_name,
-                bindings,
+                payload,
                 ..
             } => {
                 let variant_name_str = bind.interner.resolve(*variant_name).to_string();
@@ -122,68 +185,57 @@ impl<'r> Checker<'r> {
                 else {
                     return;
                 };
-                if let Some(extra) = bindings.get(fields.len()) {
-                    self.emit(
-                        varn_core::Diagnostic::error(
-                            varn_core::ErrorCode::MatchPatternTypeMismatch,
-                            format!(
-                                "variant '{variant_name_str}' carries {} value(s), but the pattern binds {}",
-                                fields.len(),
-                                bindings.len()
-                            ),
-                        )
-                        .with_range(extra.range),
-                    );
-                }
-                for (i, binding) in bindings.iter().enumerate() {
-                    if bind.interner.resolve(binding.name)
-                        == varn_core::TokenKind::Placeholder.as_str()
-                    {
-                        continue;
+                let field_ty = |checker: &mut Self, ty: &Type| {
+                    if mapping.is_empty() {
+                        *ty
+                    } else {
+                        crate::generic_substitution::map_generics_cached(checker, ty, &mapping)
                     }
-                    if let Some((_, field_ty)) = fields.get(i) {
-                        let resolved = if mapping.is_empty() {
-                            *field_ty
-                        } else {
-                            crate::generic_substitution::map_generics_cached(
-                                self, field_ty, &mapping,
-                            )
-                        };
-                        let scope = bind.scopes.get(self.current_scope);
-                        if let Some(id) = scope.resolve(binding.name, &bind.scopes) {
-                            self.record_type_with_symbol(
-                                rec,
-                                binding.range.start.offset,
-                                resolved,
-                                id,
+                };
+                match payload {
+                    VariantPayload::Positional(items) => {
+                        if items.len() != fields.len() {
+                            self.emit(
+                                varn_core::Diagnostic::error(
+                                    varn_core::ErrorCode::MatchPatternTypeMismatch,
+                                    format!(
+                                        "variant '{variant_name_str}' carries {} value(s), but the pattern has {}",
+                                        fields.len(),
+                                        items.len()
+                                    ),
+                                )
+                                .with_range(range),
                             );
                         }
-                    }
-                }
-            }
-            MatchPattern::Record { fields, .. } => {
-                for (key, sub_pat) in fields {
-                    let key_str = bind.interner.resolve(*key);
-                    let member_ty = self
-                        .find_member_info(value_ty, key_str, bind)
-                        .map(|(t, _)| t)
-                        .unwrap_or(Type::Dynamic);
-                    if let Some(sub) = sub_pat {
-                        self.check_pattern_match(rec, sub, &member_ty, bind);
-                    } else if key_str != varn_core::TokenKind::Placeholder.as_str()
-                        && key_str != varn_core::MemberKey::Variant.as_str()
-                    {
-                        let scope = bind.scopes.get(self.current_scope);
-                        if let Some(id) = scope.resolve(*key, &bind.scopes) {
-                            self.record_type_with_symbol(rec, 0, member_ty, id);
+                        for (at, item) in items.iter().enumerate() {
+                            let item_ty = match fields.get(at) {
+                                Some((_, ty)) => field_ty(self, ty),
+                                None => Type::Dynamic,
+                            };
+                            self.check_pattern_match(rec, item, &item_ty, range, bind);
                         }
                     }
-                }
-            }
-            MatchPattern::Sequence(pats) => {
-                let elem_ty = value_ty.get_array_element_type(&self.ty_table);
-                for p in pats {
-                    self.check_pattern_match(rec, p, &elem_ty, bind);
+                    VariantPayload::Named { fields: named, .. } => {
+                        for field in named {
+                            let name = bind.interner.resolve(field.name);
+                            let item_ty = match fields.iter().find(|(n, _)| n.as_ref() == name) {
+                                Some((_, ty)) => field_ty(self, ty),
+                                None => {
+                                    self.emit(
+                                        varn_core::Diagnostic::error(
+                                            varn_core::ErrorCode::MatchPatternTypeMismatch,
+                                            format!(
+                                                "variant '{variant_name_str}' has no field named '{name}'"
+                                            ),
+                                        )
+                                        .with_range(field.range),
+                                    );
+                                    Type::Dynamic
+                                }
+                            };
+                            self.check_match_field(rec, field, &item_ty, range, bind);
+                        }
+                    }
                 }
             }
             MatchPattern::Literal(expr) => {
@@ -206,11 +258,40 @@ impl<'r> Checker<'r> {
                     );
                 }
             }
-            MatchPattern::Wildcard | MatchPattern::Type { .. } => {}
         }
     }
 
-    fn variant_fields_with_subst(
+    fn present_subject(&mut self, value_ty: &Type) -> Type {
+        if value_ty.is_unresolved() {
+            *value_ty
+        } else {
+            value_ty.non_nullified(std::sync::Arc::make_mut(&mut self.ty_table))
+        }
+    }
+
+    fn check_match_field(
+        &mut self,
+        rec: &mut Recorder,
+        field: &varn_core::ast::MatchField,
+        field_ty: &Type,
+        range: varn_core::SourceRange,
+        bind: &BindResult,
+    ) {
+        match &field.pattern {
+            Some(sub) => self.check_pattern_match(rec, sub, field_ty, range, bind),
+            None => {
+                if bind.interner.resolve(field.name) == varn_core::TokenKind::Placeholder.as_str() {
+                    return;
+                }
+                let scope = bind.scopes.get(self.current_scope);
+                if let Some(id) = scope.resolve(field.name, &bind.scopes) {
+                    self.record_type_with_symbol(rec, field.range.start.offset, *field_ty, id);
+                }
+            }
+        }
+    }
+
+    pub(crate) fn variant_fields_with_subst(
         &mut self,
         variant: &str,
         value_ty: &Type,

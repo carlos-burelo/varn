@@ -162,6 +162,7 @@ pub struct VariantInfo {
     pub name: Arc<str>,
     pub tag: u16,
     pub payload: Vec<BackendTy>,
+    pub field_names: Vec<Arc<str>>,
 }
 
 #[derive(Debug, Clone)]

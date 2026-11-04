@@ -1,0 +1,282 @@
+import { describe, it, expect } from "std:test";
+
+enum Shape {
+    Rect(w: float, h: float),
+    Circle(float),
+    Dot,
+}
+
+enum Opt {
+    Some(int),
+    None,
+}
+
+enum Inner {
+    A(int),
+    B,
+}
+
+enum Wrapped {
+    Just(Inner),
+    Nothing,
+}
+
+enum Msg {
+    Text(str),
+    Quit,
+}
+
+enum Box<T> {
+    Full(T),
+    Empty,
+}
+
+struct Point {
+    x: int;
+    y: int;
+}
+
+function height(s: Shape): float {
+    return match (s) {
+        Rect { h } => h,
+        Circle(r) => r,
+        Dot => 0.0,
+    };
+}
+
+function width(s: Shape): float {
+    return match (s) {
+        Rect { w: 2.0, h } => h,
+        Rect { w } => w,
+        Circle(_) => 0.0,
+        Dot => 0.0,
+    };
+}
+
+function circle(s: Shape): str {
+    return match (s) {
+        Circle(1.0) => "unit",
+        Circle(r) => `r${r}`,
+        Rect(_, _) => "rect",
+        Dot => "dot",
+    };
+}
+
+function pair(t: (int, str)): str {
+    return match (t) {
+        (0, _) => "zero",
+        (n, "a") => `a${n}`,
+        (_, s) => s,
+    };
+}
+
+function swapped(t: (int, int)): int {
+    return match (t) {
+        (1, x) => x,
+        (a, b) => a + b,
+    };
+}
+
+function shape(xs: int[]): str {
+    return match (xs) {
+        [] => "empty",
+        [x] => "one",
+        [a, b] => "two",
+        [first, ...rest] => `many${rest.length}`,
+    };
+}
+
+function head(xs: int[]): int {
+    return match (xs) {
+        [first, ...rest] => first + rest.length,
+        [] => -1,
+    };
+}
+
+function startsWithOne(xs: int[]): bool {
+    return match (xs) {
+        [1, ...] => true,
+        _ => false,
+    };
+}
+
+function nullable(xs: int[]?): str {
+    return match (xs) {
+        null => "null",
+        [x] => "one",
+        _ => "other",
+    };
+}
+
+function onPoint(p: Point): str {
+    return match (p) {
+        { x: 0, y } => `onY${y}`,
+        { x, y: 0 } => `onX${x}`,
+        { x, y } => `at${x},${y}`,
+    };
+}
+
+function nullablePoint(p: Point?): int {
+    return match (p) {
+        null => -1,
+        { x: 0, y } => y,
+        { x, y } => x + y,
+    };
+}
+
+function both(t: (Opt, Opt)): int {
+    return match (t) {
+        (Some(a), Some(b)) => a + b,
+        (Some(a), None) => a,
+        (None, _) => 0,
+    };
+}
+
+function nested(w: Wrapped): int {
+    return match (w) {
+        Just(A(n)) => n,
+        Just(B) => -1,
+        Nothing => -2,
+    };
+}
+
+function message(m: Msg): int {
+    return match (m) {
+        Text("hi") => 1,
+        Text(_) => 2,
+        Quit => 3,
+    };
+}
+
+function unwrap(b: Box<int>): int {
+    return match (b) {
+        Full(n) => n + 1,
+        Empty => 0,
+    };
+}
+
+function relation(t: (int, int)): str {
+    return match (t) {
+        (a, b) if a > b => "gt",
+        (a, b) if a < b => "lt",
+        _ => "eq",
+    };
+}
+
+function axis(t: (int, int)): str {
+    return match (t) {
+        (0, _) | (_, 0) => "axis",
+        _ => "other",
+    };
+}
+
+function anything(s: Shape): str {
+    return match (s) {
+        Dot => "dot",
+        other => "shape",
+    };
+}
+
+function sum(t: (int, int)): int {
+    return match (t) {
+        (a, b) => a + b,
+    };
+}
+
+await describe("338 match patterns", async () => {
+    await it("a named variant field binds by name, not by position", async () => {
+        expect(height(Shape.Rect(2.0, 5.0))).toBe(5.0);
+        expect(height(Shape.Circle(3.0))).toBe(3.0);
+        expect(width(Shape.Rect(2.0, 5.0))).toBe(5.0);
+        expect(width(Shape.Rect(7.0, 5.0))).toBe(7.0);
+    });
+
+    await it("a payload pattern can be a literal", async () => {
+        expect(circle(Shape.Circle(1.0))).toBe("unit");
+        expect(circle(Shape.Circle(2.0))).toBe("r2.0");
+        expect(circle(Shape.Rect(1.0, 1.0))).toBe("rect");
+        expect(message(Msg.Text("hi"))).toBe(1);
+        expect(message(Msg.Text("yo"))).toBe(2);
+        expect(message(Msg.Quit)).toBe(3);
+    });
+
+    await it("tuple patterns match element by element", async () => {
+        expect(pair((0, "x"))).toBe("zero");
+        expect(pair((5, "a"))).toBe("a5");
+        expect(pair((7, "q"))).toBe("q");
+        expect(swapped((1, 9))).toBe(9);
+        expect(swapped((2, 3))).toBe(5);
+        expect(sum((4, 5))).toBe(9);
+    });
+
+    await it("array patterns test the length", async () => {
+        expect(shape([])).toBe("empty");
+        expect(shape([1])).toBe("one");
+        expect(shape([1, 2])).toBe("two");
+        expect(shape([1, 2, 3, 4])).toBe("many3");
+        expect(head([10, 1, 2])).toBe(12);
+        expect(head([])).toBe(-1);
+        expect(startsWithOne([1, 2])).toBe(true);
+        expect(startsWithOne([2, 1])).toBe(false);
+        expect(startsWithOne([])).toBe(false);
+    });
+
+    await it("an array pattern on a nullable subject needs the null arm", async () => {
+        expect(nullable(null)).toBe("null");
+        expect(nullable([1])).toBe("one");
+        expect(nullable([1, 2])).toBe("other");
+    });
+
+    await it("record patterns read fields by name", async () => {
+        expect(onPoint(new Point(0, 5))).toBe("onY5");
+        expect(onPoint(new Point(3, 0))).toBe("onX3");
+        expect(onPoint(new Point(1, 2))).toBe("at1,2");
+        expect(nullablePoint(null)).toBe(-1);
+        expect(nullablePoint(new Point(0, 4))).toBe(4);
+        expect(nullablePoint(new Point(2, 3))).toBe(5);
+    });
+
+    await it("variants nest inside tuples and inside other variants", async () => {
+        expect(both((Opt.Some(1), Opt.Some(2)))).toBe(3);
+        expect(both((Opt.Some(3), Opt.None))).toBe(3);
+        expect(both((Opt.None, Opt.Some(9)))).toBe(0);
+        expect(nested(Wrapped.Just(Inner.A(5)))).toBe(5);
+        expect(nested(Wrapped.Just(Inner.B))).toBe(-1);
+        expect(nested(Wrapped.Nothing)).toBe(-2);
+    });
+
+    await it("generic variants bind typed payloads", async () => {
+        expect(unwrap(Box.Full(4))).toBe(5);
+        expect(unwrap(Box.Empty)).toBe(0);
+    });
+
+    await it("guards, alternatives and binders compose with patterns", async () => {
+        expect(relation((2, 1))).toBe("gt");
+        expect(relation((1, 2))).toBe("lt");
+        expect(relation((1, 1))).toBe("eq");
+        expect(axis((0, 3))).toBe("axis");
+        expect(axis((3, 0))).toBe("axis");
+        expect(axis((1, 1))).toBe("other");
+        expect(anything(Shape.Dot)).toBe("dot");
+        expect(anything(Shape.Circle(1.0))).toBe("shape");
+    });
+
+    await it("patterns stay correct when the code is hot", async () => {
+        const arrays: int[][] = [[], [1], [1, 2], [1, 2, 3, 4]];
+        let viaPatterns = 0;
+        let viaBranches = 0;
+        for (let i = 0; i < 40000; i++) {
+            const xs = arrays[i % 4];
+            viaPatterns += head(xs);
+            viaBranches += xs.length == 0 ? -1 : xs[0] + xs.length - 1;
+            const left: Opt = i % 3 == 0 ? Opt.None : Opt.Some(i % 5);
+            const right: Opt = i % 2 == 0 ? Opt.None : Opt.Some(1);
+            viaPatterns += both((left, right));
+            viaBranches += (left == Opt.None) ? 0 : (right == Opt.None ? i % 5 : i % 5 + 1);
+            const at: Point? = i % 4 == 0 ? null : new Point(i % 3, 2);
+            viaPatterns += nullablePoint(at);
+            viaBranches += at == null ? -1 : (at.x == 0 ? at.y : at.x + at.y);
+        }
+        expect(viaPatterns).toBe(viaBranches);
+    });
+});

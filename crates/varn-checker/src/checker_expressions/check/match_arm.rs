@@ -81,9 +81,9 @@ impl<'r> Checker<'r> {
                 },
                 varn_core::ast::MatchPattern::Wildcard
                 | varn_core::ast::MatchPattern::Identifier(_)
+                | varn_core::ast::MatchPattern::Tuple(_)
+                | varn_core::ast::MatchPattern::Array { .. }
                 | varn_core::ast::MatchPattern::Record { .. }
-                | varn_core::ast::MatchPattern::Sequence(_)
-                | varn_core::ast::MatchPattern::Type { .. }
                 | varn_core::ast::MatchPattern::EnumVariant { .. } => None,
             };
 
@@ -129,7 +129,7 @@ impl<'r> Checker<'r> {
                 } else {
                     subject_ty
                 };
-                checker.check_pattern_match(rec, &case.pattern, &subject_ty, bind);
+                checker.check_pattern_match(rec, &case.pattern, &subject_ty, case.range, bind);
                 let guard_narrowings = if let Some(g) = case.guard {
                     checker.check_expr(rec, g, bind);
                     checker.require_condition(rec, g, bind);

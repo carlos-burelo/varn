@@ -93,111 +93,89 @@ impl<'r> Binder<'r> {
 }
 
 pub(super) fn bind_match_pattern_vars(b: &mut Binder, pattern: &MatchPattern) {
-    use varn_sem::symbol::Symbol;
-    use varn_sem::symbol::SymbolKind;
+    bind_typed_pattern_vars(b, pattern, None);
+}
+
+fn define_pattern_var(
+    b: &mut Binder,
+    name: varn_core::Atom,
+    range: Option<varn_core::SourceRange>,
+    ty: Type,
+) {
+    use varn_sem::symbol::{Symbol, SymbolKind};
+    if b.interner.resolve(name) == varn_core::TokenKind::Placeholder.as_str() {
+        return;
+    }
+    let line = range.map_or(0, |r| r.start.line);
+    let mut sym = Symbol::new(SymbolKind::Let, name, line).with_type(ty);
+    if let Some(r) = range {
+        sym.col = r.start.column;
+        sym.offset = r.start.offset;
+    }
+    b.define(name, sym);
+}
+
+fn bind_typed_pattern_vars(b: &mut Binder, pattern: &MatchPattern, ty: Option<Type>) {
     match pattern {
-        MatchPattern::Wildcard | MatchPattern::Type { .. } => {}
+        MatchPattern::Wildcard => {}
         MatchPattern::Literal(expr) => b.bind_expr(*expr),
+        MatchPattern::Identifier(name) => {
+            define_pattern_var(b, *name, None, ty.unwrap_or(Type::Dynamic));
+        }
+        MatchPattern::Tuple(items) => {
+            for item in items {
+                bind_typed_pattern_vars(b, item, None);
+            }
+        }
+        MatchPattern::Array { elements, rest } => {
+            for element in elements {
+                bind_typed_pattern_vars(b, element, None);
+            }
+            if let varn_core::ast::SequenceRest::Bind(name) = rest {
+                define_pattern_var(b, *name, None, Type::Dynamic);
+            }
+        }
+        MatchPattern::Record { fields, .. } => {
+            for field in fields {
+                bind_field_vars(b, field, Type::Dynamic);
+            }
+        }
         MatchPattern::EnumVariant {
             variant_name,
-            bindings,
+            payload,
             ..
         } => {
             let field_types = b
                 .sum_variant_fields
                 .get(b.interner.resolve(*variant_name))
-                .cloned();
-            for (i, binding) in bindings.iter().enumerate() {
-                if b.interner.resolve(binding.name) != varn_core::TokenKind::Placeholder.as_str() {
-                    let ty = field_types
-                        .as_ref()
-                        .and_then(|fields| fields.get(i))
-                        .map(|(_, t)| *t)
-                        .unwrap_or(Type::Dynamic);
-                    let mut sym =
-                        Symbol::new(SymbolKind::Let, binding.name, binding.range.start.line)
-                            .with_type(ty);
-                    sym.col = binding.range.start.column;
-                    sym.offset = binding.range.start.offset;
-                    b.define(binding.name, sym);
-                }
-            }
-        }
-
-        MatchPattern::Identifier(name) => {
-            if b.interner.resolve(*name) != varn_core::TokenKind::Placeholder.as_str() {
-                let sym = Symbol::new(SymbolKind::Let, *name, 0).with_type(Type::Dynamic);
-                b.define(*name, sym);
-            }
-        }
-        MatchPattern::Record { fields, .. } => {
-            let variant_name = fields.first().and_then(|(key, sub)| {
-                if b.interner.resolve(*key) == varn_core::MemberKey::Variant.as_str()
-                    && let Some(MatchPattern::Identifier(n)) = sub
-                {
-                    return Some(*n);
-                }
-                None
-            });
-
-            if let Some(vname) = variant_name {
-                let field_types: Vec<(Arc<str>, Type)> = b
-                    .sum_variant_fields
-                    .get(b.interner.resolve(vname))
-                    .cloned()
-                    .unwrap_or_default();
-
-                for (field_key, sub_pat) in fields.iter().skip(1) {
-                    let binding_name = match sub_pat {
-                        Some(MatchPattern::Identifier(n)) => *n,
-                        _ => *field_key,
-                    };
-                    if b.interner.resolve(binding_name)
-                        == varn_core::TokenKind::Placeholder.as_str()
-                    {
-                        continue;
-                    }
-
-                    let field_key_str = b.interner.resolve(*field_key);
-                    let ty = field_types
-                        .iter()
-                        .find(|(fname, _)| fname.as_ref() == field_key_str)
-                        .map(|(_, t)| *t)
-                        .unwrap_or(Type::Dynamic);
-                    let sym = Symbol::new(SymbolKind::Let, binding_name, 0).with_type(ty);
-                    b.define(binding_name, sym);
-
-                    if let Some(sub) = sub_pat
-                        && !matches!(sub, MatchPattern::Identifier(_))
-                    {
-                        bind_match_pattern_vars(b, sub);
+                .cloned()
+                .unwrap_or_default();
+            match payload {
+                varn_core::ast::VariantPayload::Positional(items) => {
+                    for (i, item) in items.iter().enumerate() {
+                        let field_ty = field_types.get(i).map(|(_, t)| *t);
+                        bind_typed_pattern_vars(b, item, field_ty);
                     }
                 }
-            } else {
-                for (field_name, sub_pat) in fields {
-                    let binding_name = match sub_pat {
-                        Some(MatchPattern::Identifier(n)) => *n,
-                        _ => *field_name,
-                    };
-                    if b.interner.resolve(binding_name)
-                        != varn_core::TokenKind::Placeholder.as_str()
-                    {
-                        let sym =
-                            Symbol::new(SymbolKind::Let, binding_name, 0).with_type(Type::Dynamic);
-                        b.define(binding_name, sym);
-                    }
-                    if let Some(sub) = sub_pat
-                        && !matches!(sub, MatchPattern::Identifier(_))
-                    {
-                        bind_match_pattern_vars(b, sub);
+                varn_core::ast::VariantPayload::Named { fields, .. } => {
+                    for field in fields {
+                        let field_name = b.interner.resolve(field.name);
+                        let field_ty = field_types
+                            .iter()
+                            .find(|(n, _)| n.as_ref() == field_name)
+                            .map(|(_, t)| *t)
+                            .unwrap_or(Type::Dynamic);
+                        bind_field_vars(b, field, field_ty);
                     }
                 }
             }
         }
-        MatchPattern::Sequence(pats) => {
-            for p in pats {
-                bind_match_pattern_vars(b, p);
-            }
-        }
+    }
+}
+
+fn bind_field_vars(b: &mut Binder, field: &varn_core::ast::MatchField, ty: Type) {
+    match &field.pattern {
+        Some(sub) => bind_typed_pattern_vars(b, sub, Some(ty)),
+        None => define_pattern_var(b, field.name, Some(field.range), ty),
     }
 }

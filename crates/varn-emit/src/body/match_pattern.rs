@@ -2,9 +2,9 @@ use super::context::FnEmitter;
 use super::small_utils::bool_lit;
 use crate::ty::NameResolver;
 use std::sync::Arc;
-use varn_core::ast::pattern::{MatchBinding, MatchPattern};
+use varn_core::ast::pattern::{MatchField, MatchPattern, SequenceRest, VariantPayload};
 use varn_tir::{
-    BackendTy, DynReason, LocalId, Resolution, TirBinOp, TirExpr, TirExprKind, TirStmt,
+    BackendTy, DynReason, LocalId, Resolution, TirBinOp, TirExpr, TirExprKind, TirStmt, TirUnOp,
 };
 
 #[derive(Clone, Copy)]
@@ -28,7 +28,12 @@ impl<'a> FnEmitter<'a> {
                     && let Some(info) = self.m.enums.get(eid.0 as usize)
                     && info.variants.iter().any(|v| v.name.as_ref() == name_str)
                 {
-                    return self.match_enum_variant(s, name_str, name_str, &[]);
+                    return self.match_enum_variant(
+                        s,
+                        name_str,
+                        name_str,
+                        &VariantPayload::Positional(Vec::new()),
+                    );
                 }
                 let local = self.bind_local(Arc::from(name_str), s.ty);
                 (
@@ -54,44 +59,145 @@ impl<'a> FnEmitter<'a> {
                 };
                 (cond, vec![])
             }
-            MatchPattern::Type { type_name, binding } => {
-                let Some(cid) = self.class_named(self.m.interner.resolve(*type_name)) else {
-                    return (bool_lit(false), vec![]);
+            MatchPattern::Tuple(items) => {
+                let mut cond = self.present_guard(s);
+                let mut binds = Vec::new();
+                for (at, item) in items.iter().enumerate() {
+                    let element = self.element_read(s, at);
+                    let (test, mut bound) = self.match_pattern(&element, item);
+                    cond = self.and_cond(cond, test);
+                    binds.append(&mut bound);
+                }
+                (cond, binds)
+            }
+            MatchPattern::Array { elements, rest } => {
+                let mut cond = self.present_guard(s);
+                let length = self.field_access(
+                    s.clone(),
+                    Arc::from(varn_core::MemberKey::Length.as_str()),
+                    BackendTy::Int,
+                    s.span,
+                );
+                let op = match rest {
+                    SequenceRest::Closed => TirBinOp::Eq,
+                    SequenceRest::Open | SequenceRest::Bind(_) => TirBinOp::Ge,
                 };
-                let cond = TirExpr {
-                    kind: TirExprKind::TypeTest {
-                        value: Box::new(s.clone()),
-                        class: cid,
+                let length_test = TirExpr {
+                    kind: TirExprKind::Binary {
+                        op,
+                        lhs: Box::new(length),
+                        rhs: Box::new(super::small_utils::int_lit(elements.len() as i64)),
                     },
                     ty: BackendTy::Bool,
                     res: Resolution::None,
                     span: s.span,
                 };
-                let mut binds = vec![];
-                if let Some(name) = binding {
-                    let local = self.bind_local(
-                        Arc::from(self.m.interner.resolve(*name)),
-                        BackendTy::Class(cid),
-                    );
+                cond = self.and_cond(cond, length_test);
+                let mut binds = Vec::new();
+                for (at, item) in elements.iter().enumerate() {
+                    let element = self.element_read(s, at);
+                    let (test, mut bound) = self.match_pattern(&element, item);
+                    cond = self.and_cond(cond, test);
+                    binds.append(&mut bound);
+                }
+                if let SequenceRest::Bind(name) = rest
+                    && self.m.interner.resolve(*name) != varn_core::TokenKind::Placeholder.as_str()
+                {
+                    let tail = self.tail_read(s, elements.len());
+                    let local = self.bind_local(Arc::from(self.m.interner.resolve(*name)), tail.ty);
                     binds.push(TirStmt::Let {
                         local,
-                        ty: BackendTy::Class(cid),
-                        init: Some(s.clone()),
+                        ty: tail.ty,
+                        init: Some(tail),
                     });
+                }
+                (cond, binds)
+            }
+            MatchPattern::Record { fields, .. } => {
+                let mut cond = self.present_guard(s);
+                let mut binds = Vec::new();
+                for field in fields {
+                    let value = self.field_read(s, Arc::from(self.m.interner.resolve(field.name)));
+                    let (test, mut bound) = self.match_field(&value, field);
+                    cond = self.and_cond(cond, test);
+                    binds.append(&mut bound);
                 }
                 (cond, binds)
             }
             MatchPattern::EnumVariant {
                 enum_name,
                 variant_name,
-                bindings,
+                payload,
             } => {
                 let enum_name = self.m.interner.resolve(*enum_name);
                 let variant_name = self.m.interner.resolve(*variant_name);
-                self.match_enum_variant(s, enum_name, variant_name, bindings)
+                self.match_enum_variant(s, enum_name, variant_name, payload)
             }
+        }
+    }
 
-            MatchPattern::Record { .. } | MatchPattern::Sequence(_) => (bool_lit(false), vec![]),
+    fn match_field(&mut self, value: &TirExpr, field: &MatchField) -> (TirExpr, Vec<TirStmt>) {
+        match &field.pattern {
+            Some(sub) => self.match_pattern(value, sub),
+            None => {
+                let name = self.m.interner.resolve(field.name);
+                if name == varn_core::TokenKind::Placeholder.as_str() {
+                    return (bool_lit(true), vec![]);
+                }
+                let local = self.bind_local(Arc::from(name), value.ty);
+                (
+                    bool_lit(true),
+                    vec![TirStmt::Let {
+                        local,
+                        ty: value.ty,
+                        init: Some(value.clone()),
+                    }],
+                )
+            }
+        }
+    }
+
+    fn present_guard(&mut self, s: &TirExpr) -> TirExpr {
+        if !matches!(s.ty, BackendTy::Nullable(_)) {
+            return bool_lit(true);
+        }
+        let is_null = TirExpr {
+            kind: TirExprKind::Unary {
+                op: TirUnOp::IsNull,
+                operand: Box::new(s.clone()),
+            },
+            ty: BackendTy::Bool,
+            res: Resolution::None,
+            span: s.span,
+        };
+        TirExpr {
+            kind: TirExprKind::Unary {
+                op: TirUnOp::Not,
+                operand: Box::new(is_null),
+            },
+            ty: BackendTy::Bool,
+            res: Resolution::None,
+            span: s.span,
+        }
+    }
+
+    fn and_cond(&mut self, left: TirExpr, right: TirExpr) -> TirExpr {
+        if matches!(left.kind, TirExprKind::BoolLit(true)) {
+            return right;
+        }
+        if matches!(right.kind, TirExprKind::BoolLit(true)) {
+            return left;
+        }
+        let span = left.span;
+        TirExpr {
+            kind: TirExprKind::Select {
+                cond: Box::new(left),
+                then_val: Box::new(right),
+                else_val: Box::new(bool_lit(false)),
+            },
+            ty: BackendTy::Bool,
+            res: Resolution::None,
+            span,
         }
     }
 
@@ -100,7 +206,7 @@ impl<'a> FnEmitter<'a> {
         s: &TirExpr,
         enum_name: &str,
         variant_name: &str,
-        bindings: &[MatchBinding],
+        payload_pattern: &VariantPayload,
     ) -> (TirExpr, Vec<TirStmt>) {
         let eid = self
             .m
@@ -131,20 +237,21 @@ impl<'a> FnEmitter<'a> {
             });
 
         let Some(eid) = eid else {
-            return self.match_variant_by_name(s, variant_name, bindings);
+            return self.match_variant_by_name(s, variant_name, payload_pattern);
         };
         let Some(info) = self.m.enums.get(eid.0 as usize) else {
-            return self.match_variant_by_name(s, variant_name, bindings);
+            return self.match_variant_by_name(s, variant_name, payload_pattern);
         };
         let Some(variant) = info
             .variants
             .iter()
             .find(|v| v.name.as_ref() == variant_name)
         else {
-            return self.match_variant_by_name(s, variant_name, bindings);
+            return self.match_variant_by_name(s, variant_name, payload_pattern);
         };
         let tag = variant.tag;
         let payload: Vec<BackendTy> = variant.payload.clone();
+        let field_names: Vec<Arc<str>> = variant.field_names.clone();
 
         let disc = TirExpr {
             kind: TirExprKind::Discriminant {
@@ -170,28 +277,45 @@ impl<'a> FnEmitter<'a> {
             span: s.span,
         };
 
+        let mut cond = cond;
         let mut binds = Vec::new();
-        for (i, b) in bindings.iter().enumerate() {
+        let read = |at: usize| {
             let fty = payload
-                .get(i)
+                .get(at)
                 .copied()
                 .unwrap_or(BackendTy::Dynamic(DynReason::Unrecorded));
-            let field = TirExpr {
+            TirExpr {
                 kind: TirExprKind::VariantPayload {
                     value: Box::new(s.clone()),
                     tag,
-                    field: i as u16,
+                    field: at as u16,
                 },
                 ty: fty,
                 res: Resolution::EnumVariant { enum_id: eid, tag },
                 span: s.span,
-            };
-            let local = self.bind_local(Arc::from(self.m.interner.resolve(b.name)), fty);
-            binds.push(TirStmt::Let {
-                local,
-                ty: fty,
-                init: Some(field),
-            });
+            }
+        };
+        match payload_pattern {
+            VariantPayload::Positional(items) => {
+                for (at, item) in items.iter().enumerate() {
+                    let field = read(at);
+                    let (test, mut bound) = self.match_pattern(&field, item);
+                    cond = self.and_cond(cond, test);
+                    binds.append(&mut bound);
+                }
+            }
+            VariantPayload::Named { fields, .. } => {
+                for field in fields {
+                    let name = self.m.interner.resolve(field.name);
+                    let Some(at) = field_names.iter().position(|n| n.as_ref() == name) else {
+                        continue;
+                    };
+                    let value = read(at);
+                    let (test, mut bound) = self.match_field(&value, field);
+                    cond = self.and_cond(cond, test);
+                    binds.append(&mut bound);
+                }
+            }
         }
         (cond, binds)
     }
@@ -200,7 +324,7 @@ impl<'a> FnEmitter<'a> {
         &mut self,
         s: &TirExpr,
         variant_name: &str,
-        bindings: &[MatchBinding],
+        payload_pattern: &VariantPayload,
     ) -> (TirExpr, Vec<TirStmt>) {
         let dyn_ty = BackendTy::Dynamic(DynReason::Unrecorded);
         let why = self.by_name_reason(s.ty);
@@ -217,7 +341,7 @@ impl<'a> FnEmitter<'a> {
             res: by_name(name),
             span: s.span,
         };
-        let cond = TirExpr {
+        let mut cond = TirExpr {
             kind: TirExprKind::Binary {
                 op: TirBinOp::Eq,
                 lhs: Box::new(field(
@@ -237,14 +361,13 @@ impl<'a> FnEmitter<'a> {
             span: s.span,
         };
         let mut binds = Vec::new();
-        for (i, b) in bindings.iter().enumerate() {
-            let init = field(s.clone(), &format!("value{i}"), dyn_ty);
-            let local = self.bind_local(Arc::from(self.m.interner.resolve(b.name)), dyn_ty);
-            binds.push(TirStmt::Let {
-                local,
-                ty: dyn_ty,
-                init: Some(init),
-            });
+        if let VariantPayload::Positional(items) = payload_pattern {
+            for (at, item) in items.iter().enumerate() {
+                let value = field(s.clone(), &format!("value{at}"), dyn_ty);
+                let (test, mut bound) = self.match_pattern(&value, item);
+                cond = self.and_cond(cond, test);
+                binds.append(&mut bound);
+            }
         }
         (cond, binds)
     }
