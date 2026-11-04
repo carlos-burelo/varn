@@ -281,8 +281,8 @@ impl<'r> Checker<'r> {
                 Some(last) => self.infer_type(rec, *last, bind),
                 None => Type::Dynamic,
             },
+            ExprKind::Yield { .. } => Type::Void,
             ExprKind::Spawn { .. }
-            | ExprKind::Yield { .. }
             | ExprKind::Spread { .. }
             | ExprKind::ClassExpr { .. } => Type::Dynamic,
         }
