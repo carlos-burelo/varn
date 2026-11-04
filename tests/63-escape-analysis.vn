@@ -33,7 +33,7 @@ function eaOrder(): int { const p = new EaPoint(7, 11); return p.y * 100 + p.x }
 function eaEscapeReturn(v: int): EaPoint { return new EaPoint(v, v) }
 
 function eaEscapeArray(n: int): int {
-  const acc = []
+  const acc: EaPoint[] = []
   for (let i = 0; i < n; i = i + 1) { acc.push(new EaPoint(i, i)) }
   return acc.length + acc[0].x + acc[4].y
 }

@@ -1,6 +1,6 @@
 import { Json } from "std:encoding";
 
-let items = [];
+let items: { id: int, name: str, active: bool, score: float }[] = [];
 for (let i = 0; i < 50000; i = i + 1) {
     items.push({
         id: i,

@@ -18,7 +18,7 @@ class GcVtB {
 
 let t0 = now()
 
-let gcJunk = []
+let gcJunk: str[] = []
 for (let i = 0; i < 400000; i = i + 1) {
     gcJunk.push(`gc_${i}`)
 }

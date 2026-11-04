@@ -41,9 +41,10 @@ function spIntsExactAcrossGc(n: int): int {
 class SpBox { v: int
   constructor(v: int) { this.v = v } }
 function spArraySurvives(n: int): int {
-  const arr = []
-  for (let i = 0; i < n; i = i + 1) { arr.push(new SpBox(i)); arr.push(`s${i}`) }
-  return arr.length + arr[0].v + arr[(n - 1) * 2].v
+  const boxes: SpBox[] = []
+  const names: str[] = []
+  for (let i = 0; i < n; i = i + 1) { boxes.push(new SpBox(i)); names.push(`s${i}`) }
+  return boxes.length + names.length + boxes[0].v + boxes[n - 1].v
 }
 
 // Nested: an outer heap ref live across an inner allocating loop.
@@ -107,7 +108,7 @@ function spSpreadUnderPressure(n: int): int {
 // `arr.push(x)` is a CallNativeOp: the receiver and argument are read out of
 // the home slots by register number, and the pushed value here is an int.
 function spNativeOpUnderPressure(n: int): int {
-  const acc = []
+  const acc: int[] = []
   let junk = ""
   for (let i = 0; i < n; i = i + 1) {
     junk = `n${i}`

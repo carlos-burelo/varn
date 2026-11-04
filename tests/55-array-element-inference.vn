@@ -1,15 +1,7 @@
 import { describe, it, expect } from "std:test";
 
-
-// Task A0.3': evolving element-type inference for `let x = []` (empty
-// array literal, no annotation). These asserts must hold identically
-// whether the checker inferred `Array<int>` for `a` below or left it
-// `Dynamic` (the whole point of the design's "escape/conflict => Dynamic,
-// never guess" rule): runtime behavior never depends on which one it
-// picked, only whether hot-loop arithmetic gets typed opcodes.
-
-function evolvePushInt(): int {
-    let a = []
+function pushInt(): int {
+    let a: int[] = []
     a.push(1)
     a.push(2)
     a.push(3)
@@ -20,8 +12,8 @@ function evolvePushInt(): int {
     return sum
 }
 
-function evolveIndexWrite(): int {
-    let a = []
+function indexWrite(): int {
+    let a: int[] = []
     for (let i = 0; i < 5; i = i + 1) {
         a.push(0)
     }
@@ -35,26 +27,14 @@ function evolveIndexWrite(): int {
     return sum
 }
 
-// push int then push str: conflicting writes must fall back to Dynamic
-// rather than error or silently pick one type — the program still has to
-// run correctly with mixed contents.
-function evolveMixedStaysPermissive(): str {
-    let a = []
+function mixedContents(): str {
+    let a: (int | str)[] = []
     a.push(1)
     a.push("two")
     return `${a[0]}-${a[1]}`
 }
 
-// The existing `let a: int[] = []` annotated path must be completely
-// unaffected by this feature.
-function annotatedUnchanged(): int {
-    let a: int[] = []
-    a.push(10)
-    a.push(20)
-    return a[0] + a[1]
-}
-
-function sumOf(arr: dynamic): int {
+function sumOf(arr: int[]): int {
     let total = 0
     for (let i = 0; i < arr.length; i = i + 1) {
         total = total + arr[i]
@@ -62,25 +42,19 @@ function sumOf(arr: dynamic): int {
     return total
 }
 
-// Passing the array to another function is an escape (rule 3): the
-// binding must stay permissive (Dynamic), and the program must still run
-// correctly.
-function evolveEscapeStaysPermissive(): int {
-    let a = []
+function passedToAnotherFunction(): int {
+    let a: int[] = []
     a.push(1)
     a.push(2)
     a.push(3)
     return sumOf(a)
 }
 
-// matmul-shaped nested-loop pattern (see tests/benchmarks/bench_matrix.vn):
-// push to grow, then index-write to mutate in a later pass, reading two
-// other evolved arrays via `x[i]` inside the inner accumulation loop.
-function evolveMatmulShape(): int {
+function matmulShape(): int {
     let n = 4
-    let a = []
-    let b = []
-    let c = []
+    let a: int[] = []
+    let b: int[] = []
+    let c: int[] = []
     for (let i = 0; i < n * n; i = i + 1) {
         a.push(i + 1)
         b.push(i + 1)
@@ -98,15 +72,8 @@ function evolveMatmulShape(): int {
     return c[0] + c[n * n - 1]
 }
 
-// --- Pattern-shadowing governance (A0.3 review finding) ----------------
-// A destructuring declarator that reuses an evolving array's name must
-// un-govern it from the annotation overlay: without the fix, `a[i]` in
-// the shadowed region below stayed typed against the OUTER `Array<int>`
-// (from `let a = []; a.push(1)`), compiling `AddInt` over what is
-// actually a float array — wrong result, and a miscompile in release
-// builds where the guard is trusted. Array-pattern variant:
-function staleB(): float {
-    let a = []
+function shadowedByArrayPattern(): float {
+    let a: int[] = []
     a.push(1)
     let r = 0.0
     {
@@ -116,9 +83,8 @@ function staleB(): float {
     return r
 }
 
-// Same shape, object-pattern variant.
-function staleC(): float {
-    let a = []
+function shadowedByObjectPattern(): float {
+    let a: int[] = []
     a.push(1)
     let r = 0.0
     {
@@ -128,44 +94,6 @@ function staleC(): float {
     return r
 }
 
-// --- Rule-4 regression coverage (A0.3' review) ------------------------
-// Each of these PROVED that routing the evolved element type into
-// diagnostic typing turned a previously-valid program into a `vn check`
-// failure: the element `int` reaching an argument position, a return
-// position, and a member-existence check. Post-fix the evolved type is an
-// OPTIMIZATION-ONLY annotation and never reaches a diagnostic, so all three
-// must type-check with 0 errors. They are exercised through `if (false)`
-// so they type-check AND compile but do not execute at runtime —
-// `rule4ReturnPosition` deliberately returns an `int` from a `: str`
-// function (legal because the element stays `Dynamic` for diagnostics), so
-// actually running it would surface a runtime int-where-str.
-
-function rule4Label(prefix: str): str { return "item:" + prefix }
-
-function rule4ArgPosition(): str {
-    let ids = []
-    ids.push(100)
-    ids.push(200)
-    return rule4Label(ids[0])
-}
-
-function rule4ReturnPosition(): str {
-    let a = []
-    a.push(1)
-    return a[0]
-}
-
-function rule4MemberExists(): int {
-    let a = []
-    a.push(1)
-    return sameValue(a[0].toUpperCase(), "") ? 0 : 1
-}
-
-// --- `Array<T>` and `T[]` are one type --------------------------------
-// The two spellings must produce identical behavior AND identical
-// bytecode. They used to resolve to different checker types, so only the
-// `T[]` form was recognized as an array index — the `Array<T>` form fell
-// back to the generic index opcodes and lost the fast path everywhere.
 function genericSpelling(): int {
     let a: Array<int> = []
     a.push(10)
@@ -190,43 +118,31 @@ function genericSpellingParam(arr: Array<float>): float {
     return total
 }
 
-// --- Unboxed element buffers are not observable -----------------------
-// An array whose elements are all numbers is backed by a raw buffer; a
-// mismatched write migrates it back in place. Identity, contents and
-// element order must survive both transitions.
 function reprRoundTrip(): str {
-    let ints = []
+    let ints: (int | str)[] = []
     ints.push(7)
     ints.push(-3)
     let alias = ints
-    ints.push("s")          // migrate: raw buffer -> boxed, in place
+    ints.push("s")
     alias.push(9)
     let floats: float[] = []
     floats.push(1.5)
     floats.push(-0.25)
     return `${ints[0]}${ints[1]}${ints[2]}${ints[3]}${alias.length}${floats[0] + floats[1]}`
 }
-await describe("55 array element inference", async () => {
+
+await describe("55 array element types", async () => {
     await it("tests", async () => {
-        expect(evolvePushInt()).toBe(6)
-        expect(evolveIndexWrite()).toBe(20)
-        expect(evolveMixedStaysPermissive()).toBe("1-two")
-        expect(annotatedUnchanged()).toBe(30)
-        expect(evolveEscapeStaysPermissive()).toBe(6)
-        expect(evolveMatmulShape()).toBe(690)
-        expect(staleB()).toBe(6.0)
-        expect(staleC()).toBe(6.0)
+        expect(pushInt()).toBe(6)
+        expect(indexWrite()).toBe(20)
+        expect(mixedContents()).toBe("1-two")
+        expect(passedToAnotherFunction()).toBe(6)
+        expect(matmulShape()).toBe(690)
+        expect(shadowedByArrayPattern()).toBe(6.0)
+        expect(shadowedByObjectPattern()).toBe(6.0)
         expect(genericSpelling()).toBe(suffixSpelling())
         expect(genericSpelling()).toBe(37)
         expect(genericSpellingParam([1.5, 2.5])).toBe(4.0)
         expect(reprRoundTrip()).toBe("7-3s941.25")
-    
-        // Compile the Rule-4 regression shapes without executing them (see above).
-        if (false) {
-            rule4ArgPosition()
-            rule4ReturnPosition()
-            rule4MemberExists()
-        }
-        
     });
 });

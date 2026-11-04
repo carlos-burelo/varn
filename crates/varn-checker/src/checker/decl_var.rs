@@ -34,7 +34,7 @@ impl<'r> Checker<'r> {
 
             if ann.is_none() {
                 self.declare_annotated_function(rec, d, bind);
-                self.warn_untyped_empty_array(d);
+                self.require_typed_empty_array(d);
             }
 
             if let Some(init_expr) = d.init {
@@ -140,14 +140,14 @@ impl<'r> Checker<'r> {
         rec.symbol_types.insert(id, ty);
     }
 
-    fn warn_untyped_empty_array(&mut self, d: &varn_core::ast::VarDeclarator) {
+    fn require_typed_empty_array(&mut self, d: &varn_core::ast::VarDeclarator) {
         let Some(init) = d.init else {
             return;
         };
         let expr = self.ast_arena.expr(init);
         if matches!(&expr.kind, ExprKind::Array { elements } if elements.is_empty()) {
             self.emit(
-                Diagnostic::warning(
+                Diagnostic::error(
                     ErrorCode::UntypedEmptyArray,
                     "an empty array literal has no element type; annotate it, e.g. `let a: int[] = []`",
                 )
