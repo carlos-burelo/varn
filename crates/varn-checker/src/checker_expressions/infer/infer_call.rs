@@ -70,6 +70,10 @@ impl<'r> Checker<'r> {
             | ExprKind::MetaAccess { .. } => return Type::Dynamic,
         };
 
+        if matches!(arena.expr(callee).kind, ExprKind::Super) {
+            return Type::Void;
+        }
+
         let callee_ty_raw = self.infer_type(rec, callee, bind);
         let callee_ty =
             callee_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
