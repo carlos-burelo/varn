@@ -1,4 +1,4 @@
-use super::patterns::{pattern_names, walk_expr_children};
+use super::patterns::walk_expr_children;
 use rustc_hash::FxHashSet;
 use varn_core::ast::{
     ArrowBody, AstArena, Decl, ExportDecl, ExprId, ExprKind, ForInit, MatchBody, MatchPattern,
@@ -36,7 +36,7 @@ struct Collector<'a> {
 impl Collector<'_> {
     fn params(&mut self, params: &[Param]) {
         for p in params {
-            self.declared.extend(pattern_names(&p.pattern));
+            self.declared.extend(p.pattern.bound_names());
             if let Some(d) = p.default {
                 self.expr(d);
             }
@@ -45,7 +45,7 @@ impl Collector<'_> {
 
     fn declarators(&mut self, declarators: &[VarDeclarator]) {
         for d in declarators {
-            self.declared.extend(pattern_names(&d.id));
+            self.declared.extend(d.id.bound_names());
             if let Some(init) = d.init {
                 self.expr(init);
             }
@@ -250,7 +250,7 @@ impl Collector<'_> {
             | StmtKind::ForOf {
                 left, right, body, ..
             } => {
-                self.declared.extend(pattern_names(left));
+                self.declared.extend(left.bound_names());
                 self.expr(*right);
                 self.stmt(*body);
             }
@@ -274,7 +274,7 @@ impl Collector<'_> {
                 self.stmt(*block);
                 for clause in catches {
                     if let Some(p) = &clause.param {
-                        self.declared.extend(pattern_names(p));
+                        self.declared.extend(p.bound_names());
                     }
                     self.stmt(clause.body);
                 }

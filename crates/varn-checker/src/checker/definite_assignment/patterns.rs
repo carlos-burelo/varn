@@ -1,37 +1,4 @@
 use varn_core::ast::{AstArena, ExprId};
-use varn_core::Atom;
-
-pub(super) fn pattern_names(p: &varn_core::ast::Pattern) -> Vec<Atom> {
-    use varn_core::ast::Pattern;
-    let mut out = Vec::new();
-    fn go(p: &Pattern, out: &mut Vec<Atom>) {
-        match p {
-            Pattern::Identifier { name, .. } => out.push(*name),
-            Pattern::Array { elements, rest, .. } | Pattern::Tuple { elements, rest, .. } => {
-                for e in elements.iter().flatten() {
-                    go(&e.pattern, out);
-                }
-                if let Some(r) = rest {
-                    go(r, out);
-                }
-            }
-            Pattern::Object {
-                properties, rest, ..
-            } => {
-                for pr in properties {
-                    go(&pr.value, out);
-                }
-                if let Some(r) = rest {
-                    go(r, out);
-                }
-            }
-            Pattern::Assignment { left, .. } => go(left, out),
-            Pattern::Rest { argument, .. } => go(argument, out),
-        }
-    }
-    go(p, &mut out);
-    out
-}
 
 pub(crate) fn walk_expr_children(e: ExprId, arena: &AstArena, f: &mut dyn FnMut(ExprId)) {
     use varn_core::ast::{Arg, ArrayEl, ExprKind, MatchBody, ObjectProp, TemplatePart};

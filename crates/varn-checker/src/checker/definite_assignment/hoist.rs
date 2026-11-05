@@ -1,6 +1,5 @@
 use super::flow::Hoisted;
 use super::free_names::{free_reads, Body};
-use super::patterns::pattern_names;
 use varn_core::ast::{AstArena, Decl, ExportDecl, ExprKind, Pattern, StmtId, StmtKind};
 
 pub(super) fn block_bindings(arena: &AstArena, stmts: &[StmtId]) -> Vec<Hoisted> {
@@ -72,7 +71,7 @@ fn hoist_decl(arena: &AstArena, decl: &Decl, out: &mut Vec<Hoisted>) {
                     },
                     _ => None,
                 };
-                for name in pattern_names(&d.id) {
+                for name in d.id.bound_names() {
                     out.push(Hoisted {
                         name,
                         is_binding: true,

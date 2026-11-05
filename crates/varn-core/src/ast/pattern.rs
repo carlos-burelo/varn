@@ -38,6 +38,38 @@ pub enum Pattern {
 }
 
 impl Pattern {
+    pub fn bound_names(&self) -> Vec<Atom> {
+        let mut out = Vec::new();
+        self.collect_bound_names(&mut out);
+        out
+    }
+
+    fn collect_bound_names(&self, out: &mut Vec<Atom>) {
+        match self {
+            Pattern::Identifier { name, .. } => out.push(*name),
+            Pattern::Array { elements, rest, .. } | Pattern::Tuple { elements, rest, .. } => {
+                for element in elements.iter().flatten() {
+                    element.pattern.collect_bound_names(out);
+                }
+                if let Some(rest) = rest {
+                    rest.collect_bound_names(out);
+                }
+            }
+            Pattern::Object {
+                properties, rest, ..
+            } => {
+                for property in properties {
+                    property.value.collect_bound_names(out);
+                }
+                if let Some(rest) = rest {
+                    rest.collect_bound_names(out);
+                }
+            }
+            Pattern::Assignment { left, .. } => left.collect_bound_names(out),
+            Pattern::Rest { argument, .. } => argument.collect_bound_names(out),
+        }
+    }
+
     pub fn range(&self) -> &SourceRange {
         match self {
             Pattern::Identifier { range, .. } => range,

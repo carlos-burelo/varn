@@ -1,6 +1,6 @@
 use super::flow::Flow;
 use super::hoist::block_bindings;
-use super::patterns::{pattern_names, walk_expr_children};
+use super::patterns::walk_expr_children;
 use crate::checker::Checker;
 use varn_core::ast::destructure::{destructure_parts, is_destructuring_assign};
 use varn_core::ast::{ClassMember, Decl, ExportDecl, ExprId, ExprKind, Program, StmtId, StmtKind};
@@ -161,7 +161,7 @@ impl<'r> Checker<'r> {
         };
         let names: Vec<Atom> = params
             .iter()
-            .flat_map(|p| pattern_names(&p.pattern))
+            .flat_map(|p| p.pattern.bound_names())
             .collect();
         for hoisted in block_bindings(self.ast_arena, stmts) {
             if hoisted.is_binding && names.contains(&hoisted.name) {
@@ -299,7 +299,7 @@ impl<'r> Checker<'r> {
                         if let Some(init) = d.init {
                             self.da_expr(init, flow, bind);
                         }
-                        for name in pattern_names(&d.id) {
+                        for name in d.id.bound_names() {
                             flow.declare(&name, d.init.is_some());
                         }
                     }
@@ -362,7 +362,7 @@ impl<'r> Checker<'r> {
                                 if let Some(e) = d.init {
                                     self.da_expr(e, flow, bind);
                                 }
-                                for n in pattern_names(&d.id) {
+                                for n in d.id.bound_names() {
                                     flow.assigned.insert(n);
                                 }
                             }
@@ -389,7 +389,7 @@ impl<'r> Checker<'r> {
                 self.da_expr(right, flow, bind);
                 let mut inner = flow.clone();
                 inner.diverged = false;
-                for n in pattern_names(&left) {
+                for n in left.bound_names() {
                     inner.assigned.insert(n);
                 }
                 self.da_stmt(body, &mut inner, bind);
@@ -454,7 +454,7 @@ impl<'r> Checker<'r> {
                     if let Some(e) = d.init {
                         self.da_expr(e, flow, bind);
                     }
-                    for n in pattern_names(&d.id) {
+                    for n in d.id.bound_names() {
                         flow.assigned.insert(n);
                     }
                 }
