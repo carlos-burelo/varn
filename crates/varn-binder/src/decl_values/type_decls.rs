@@ -55,13 +55,15 @@ impl<'r> super::super::Binder<'r> {
         let saved = self.current;
         self.current = child;
         self.bind_type_params(&e.type_params, line);
-        self.sum_type_variants.insert(
-            id_rc.clone(),
-            e.members
-                .iter()
-                .map(|m| Arc::from(self.interner.resolve(m.id)))
-                .collect(),
-        );
+        let variant_names: Vec<Arc<str>> = e
+            .members
+            .iter()
+            .map(|m| Arc::from(self.interner.resolve(m.id)))
+            .collect();
+        self.sum_type_variants
+            .entry(id_rc.clone())
+            .and_modify(|held: &mut Vec<Arc<str>>| held.extend(variant_names.clone()))
+            .or_insert(variant_names);
 
         let mut variants_info = Vec::new();
         let type_param_names: Vec<Arc<str>> = e
@@ -290,11 +292,19 @@ impl<'r> super::super::Binder<'r> {
             ..Default::default()
         };
 
-        self.type_members.classes.insert(id_rc.clone(), class_info);
+        self.type_members
+            .classes
+            .entry(id_rc.clone())
+            .and_modify(|held| held.members.extend(class_info.members.clone()))
+            .or_insert(class_info);
 
         variants_info.extend(members);
         if !variants_info.is_empty() {
-            self.type_members.enums.insert(id_rc, variants_info);
+            self.type_members
+                .enums
+                .entry(id_rc)
+                .and_modify(|held| held.extend(variants_info.clone()))
+                .or_insert(variants_info);
         }
 
         self.current = saved;

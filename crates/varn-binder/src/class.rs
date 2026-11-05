@@ -152,7 +152,7 @@ impl<'r> super::Binder<'r> {
         };
 
         self.declare_kind(name.clone(), varn_sem::bind::DeclKind::Class);
-        self.type_members.classes.insert(name, class_info);
+        self.type_members.classes.entry(name).or_insert(class_info);
         self.current = saved;
     }
 
