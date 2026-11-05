@@ -52,56 +52,89 @@ pub(crate) fn collect_frames(frames: &[CallFrame]) -> Vec<FrameInfo> {
     out
 }
 
-fn extract_error_message(val: VmValue, heap: &Heap) -> String {
-    if val.is_heap() {
-        if let Some(inst) = heap.instance(val.as_heap())
-            && let Some(cls) = varn_types::ClassObj::find_by_id(inst.class_id)
-        {
-            let layout = cls.layout();
-            let message = layout
-                .get_field(varn_core::MemberKey::Message.as_str())
-                .and_then(|f| inst.read_field(f))
-                .map(|nv| heap.str_repr(nv));
-            return match message {
-                Some(msg) if &*cls.name == varn_core::RuntimeErrorKind::Error.class_name() => msg,
-                Some(msg) => format!("{}: {}", cls.name, msg),
-                None => format!("[{}]", cls.name),
-            };
-        }
-        if let Some(HeapObj::Object(obj_ref)) = heap.get(val.as_heap()) {
-            let obj = obj_ref.borrow();
-
-            if let Some(msg_nv) = obj.get_field(varn_core::MemberKey::Message.as_str()) {
-                let msg = heap.str_repr(msg_nv);
-
-                if let Some(name_nv) = obj.get_field(varn_core::MemberKey::Name.as_str()) {
-                    let name = heap.str_repr(name_nv);
-                    if !name.is_empty()
-                        && name != varn_core::RuntimeErrorKind::Error.class_name()
-                        && name != RuntimeKind::Null.name()
-                    {
-                        return format!("{}: {}", name, msg);
-                    }
-                }
-                return msg;
-            }
-
-            let class_name = obj.class_name();
-            if class_name != RuntimeKind::Object.name() {
-                return format!("[{}]", class_name);
-            }
-            return "[object Object]".into();
-        }
-    }
-    heap.str_repr(val)
+struct ThrownParts {
+    class: String,
+    message: String,
+    cause: Option<VmValue>,
 }
 
+fn describe_thrown(val: VmValue, heap: &Heap) -> ThrownParts {
+    let plain = |message: String| ThrownParts {
+        class: varn_core::RuntimeErrorKind::Error.class_name().to_owned(),
+        message,
+        cause: None,
+    };
+    if !val.is_heap() {
+        return plain(heap.str_repr(val));
+    }
+    if let Some(inst) = heap.instance(val.as_heap())
+        && let Some(cls) = varn_types::ClassObj::find_by_id(inst.class_id)
+    {
+        let layout = cls.layout();
+        let field = |key: varn_core::MemberKey| {
+            layout
+                .get_field(key.as_str())
+                .and_then(|f| inst.read_field(f))
+        };
+        return ThrownParts {
+            class: cls.name.to_string(),
+            message: field(varn_core::MemberKey::Message)
+                .map(|nv| heap.str_repr(nv))
+                .unwrap_or_default(),
+            cause: field(varn_core::MemberKey::Cause).filter(|c| !c.is_null()),
+        };
+    }
+    if let Some(HeapObj::Object(obj_ref)) = heap.get(val.as_heap()) {
+        let obj = obj_ref.borrow();
+        let message = obj
+            .get_field(varn_core::MemberKey::Message.as_str())
+            .map(|nv| heap.str_repr(nv));
+        let named = obj
+            .get_field(varn_core::MemberKey::Name.as_str())
+            .map(|nv| heap.str_repr(nv))
+            .filter(|name| !name.is_empty() && name != RuntimeKind::Null.name());
+        return match (message, named) {
+            (Some(message), Some(class)) => ThrownParts {
+                class,
+                message,
+                cause: None,
+            },
+            (Some(message), None) => plain(message),
+            (None, _) => {
+                let class_name = obj.class_name();
+                if class_name == RuntimeKind::Object.name() {
+                    plain("[object Object]".to_owned())
+                } else {
+                    plain(format!("[{class_name}]"))
+                }
+            }
+        };
+    }
+    plain(heap.str_repr(val))
+}
+
+const MAX_CAUSE_DEPTH: usize = 8;
+
 pub fn build_thrown_error(val: VmValue, heap: &Heap, frames: &[CallFrame]) -> RuntimeError {
-    let msg = extract_error_message(val, heap);
-    let frame_infos = collect_frames(frames);
+    build_thrown_chain(val, heap, collect_frames(frames), MAX_CAUSE_DEPTH)
+}
+
+fn build_thrown_chain(
+    val: VmValue,
+    heap: &Heap,
+    frames: Vec<FrameInfo>,
+    remaining: usize,
+) -> RuntimeError {
+    let parts = describe_thrown(val, heap);
+    let cause = parts
+        .cause
+        .filter(|_| remaining > 0)
+        .map(|inner| Box::new(build_thrown_chain(inner, heap, Vec::new(), remaining - 1)));
     RuntimeError {
-        message: msg,
-        frames: frame_infos,
+        class: parts.class,
+        message: parts.message,
+        frames,
+        cause,
         thrown: Some(val),
         kind: varn_core::RuntimeErrorKind::Error,
         std: None,

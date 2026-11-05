@@ -9,8 +9,10 @@ pub struct FrameInfo {
 
 #[derive(Debug, Clone)]
 pub struct RuntimeError {
+    pub class: String,
     pub message: String,
     pub frames: Vec<FrameInfo>,
+    pub cause: Option<Box<RuntimeError>>,
 
     pub thrown: Option<crate::value::VmValue>,
     pub kind: varn_core::RuntimeErrorKind,
@@ -47,8 +49,10 @@ impl RuntimeError {
 
     fn of_kind(kind: varn_core::RuntimeErrorKind, message: impl Into<String>) -> Self {
         Self {
+            class: kind.class_name().to_owned(),
             message: message.into(),
             frames: Vec::new(),
+            cause: None,
             thrown: None,
             kind,
             std: None,
@@ -58,7 +62,13 @@ impl RuntimeError {
 
 impl From<varn_types::NativeError> for RuntimeError {
     fn from(e: varn_types::NativeError) -> Self {
+        let class = e
+            .std
+            .as_ref()
+            .map_or_else(|| e.kind.class_name(), |info| info.class.name())
+            .to_owned();
         Self {
+            class,
             thrown: e.thrown,
             std: e.std,
             ..Self::of_kind(e.kind, e.message)
@@ -77,20 +87,9 @@ impl From<RuntimeError> for varn_types::NativeError {
 
 impl fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "\x1b[1m\x1b[31mUncaught Runtime Error\x1b[0m: \x1b[1m{}\x1b[0m",
-            self.message
-        )?;
-        if !self.frames.is_empty() {
-            write!(f, "\n\x1b[1mStack Trace:\x1b[0m")?;
-            for frame in &self.frames {
-                write!(
-                    f,
-                    "\n    \x1b[34mat\x1b[0m {} \x1b[2m({}:{})\x1b[0m",
-                    frame.fn_name, frame.file, frame.line
-                )?;
-            }
+        write!(f, "{}: {}", self.class, self.message)?;
+        for frame in &self.frames {
+            write!(f, "\n    at {} ({}:{})", frame.fn_name, frame.file, frame.line)?;
         }
         Ok(())
     }
@@ -99,16 +98,3 @@ impl fmt::Display for RuntimeError {
 impl std::error::Error for RuntimeError {}
 
 pub type VmResult<T> = Result<T, RuntimeError>;
-
-#[cfg(test)]
-mod size_probe {
-    #[test]
-    fn sizes() {
-        eprintln!(
-            "RuntimeError={} VmResult<VmValue>={} Boxed={}",
-            std::mem::size_of::<super::RuntimeError>(),
-            std::mem::size_of::<Result<crate::value::VmValue, super::RuntimeError>>(),
-            std::mem::size_of::<Result<crate::value::VmValue, Box<super::RuntimeError>>>()
-        );
-    }
-}
