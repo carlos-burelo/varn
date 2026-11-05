@@ -226,16 +226,28 @@ impl Type {
             }
             TypeKind::Fn(fid) => {
                 let ft = table.get_function(fid).clone();
-                let new_params: Vec<FunctionParam> = ft
-                    .params
-                    .iter()
-                    .map(|p| FunctionParam {
+                let mut new_params: Vec<FunctionParam> = Vec::with_capacity(ft.params.len());
+                for p in &ft.params {
+                    if p.is_rest
+                        && let Some(slots) = rest_pack_slots(p.ty, mapping, table)
+                    {
+                        for (at, slot) in slots.into_iter().enumerate() {
+                            new_params.push(FunctionParam {
+                                name: Some(std::sync::Arc::from(format!("arg{at}"))),
+                                ty: slot,
+                                optional: false,
+                                is_rest: false,
+                            });
+                        }
+                        continue;
+                    }
+                    new_params.push(FunctionParam {
                         name: p.name.clone(),
                         ty: Type::resolved(p.ty).map_generics(mapping, table).0,
                         optional: p.optional,
                         is_rest: p.is_rest,
-                    })
-                    .collect();
+                    });
+                }
                 let new_ret = Type::resolved(ft.return_type)
                     .map_generics(mapping, table)
                     .0;
@@ -310,4 +322,24 @@ impl Type {
             | TypeKind::TypePredicate { .. } => self,
         }
     }
+}
+
+fn rest_pack_slots(
+    rest_ty: CheckerTyId,
+    mapping: &FxHashMap<varn_core::Atom, Type>,
+    table: &CheckerTyTable,
+) -> Option<Vec<CheckerTyId>> {
+    let element = if let TypeKind::Array(inner) = table.get(rest_ty) {
+        inner
+    } else {
+        rest_ty
+    };
+    let TypeKind::Named(name, _) = table.get(element) else {
+        return None;
+    };
+    let packed = mapping.get(&name)?;
+    let TypeKind::Tuple(slots) = table.get(packed.0) else {
+        return None;
+    };
+    Some(table.get_list(slots).to_vec())
 }

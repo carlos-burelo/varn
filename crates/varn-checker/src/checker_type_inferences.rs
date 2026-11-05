@@ -71,7 +71,20 @@ pub(crate) fn collect_type_inferences(
             if let TypeKind::Fn(a_fid) = table.get(actual.0) {
                 let e_ft = table.get_function(e_fid).clone();
                 let a_ft = table.get_function(a_fid).clone();
-                for (ep, ap) in e_ft.params.iter().zip(a_ft.params.iter()) {
+                let mut paired = e_ft.params.len();
+                if let Some(pack) = e_ft.params.last().filter(|p| p.is_rest)
+                    && let Some(name) = pack_param_name(pack.ty, table)
+                    && params.iter().any(|p| p.as_ref() == interner.resolve(name))
+                {
+                    paired = e_ft.params.len() - 1;
+                    let fixed = e_ft.params.len() - 1;
+                    let slots: Vec<varn_sem::types::CheckerTyId> =
+                        a_ft.params.iter().skip(fixed).map(|p| p.ty).collect();
+                    let slot_list = table.intern_list(&slots);
+                    let tuple = Type::resolved(table.intern(TypeKind::Tuple(slot_list)));
+                    out.insert(Arc::from(interner.resolve(name)), tuple);
+                }
+                for (ep, ap) in e_ft.params.iter().take(paired).zip(a_ft.params.iter()) {
                     collect_type_inferences(
                         &Type::resolved(ep.ty),
                         &Type::resolved(ap.ty),
@@ -132,5 +145,55 @@ pub(crate) fn collect_type_inferences(
         | TypeKind::Infer(_)
         | TypeKind::EnumVariant { .. }
         | TypeKind::TypePredicate { .. } => {}
+    }
+}
+
+fn pack_param_name(
+    rest_ty: varn_sem::types::CheckerTyId,
+    table: &CheckerTyTable,
+) -> Option<varn_core::Atom> {
+    let element = match table.get(rest_ty) {
+        TypeKind::Array(inner) => inner,
+        TypeKind::Named(..) => rest_ty,
+        TypeKind::Primitive(_)
+        | TypeKind::Literal(_)
+        | TypeKind::This
+        | TypeKind::Union(_)
+        | TypeKind::Intersection(_)
+        | TypeKind::Tuple(_)
+        | TypeKind::Generic(..)
+        | TypeKind::TemplateLiteral(_)
+        | TypeKind::Fn(_)
+        | TypeKind::Object(_)
+        | TypeKind::Typeof(_)
+        | TypeKind::KeyOf(_)
+        | TypeKind::IndexedAccess { .. }
+        | TypeKind::Mapped { .. }
+        | TypeKind::Conditional { .. }
+        | TypeKind::Infer(_)
+        | TypeKind::EnumVariant { .. }
+        | TypeKind::TypePredicate { .. } => return None,
+    };
+    match table.get(element) {
+        TypeKind::Named(name, _) => Some(name),
+        TypeKind::Primitive(_)
+        | TypeKind::Literal(_)
+        | TypeKind::This
+        | TypeKind::Array(_)
+        | TypeKind::Union(_)
+        | TypeKind::Intersection(_)
+        | TypeKind::Tuple(_)
+        | TypeKind::Generic(..)
+        | TypeKind::TemplateLiteral(_)
+        | TypeKind::Fn(_)
+        | TypeKind::Object(_)
+        | TypeKind::Typeof(_)
+        | TypeKind::KeyOf(_)
+        | TypeKind::IndexedAccess { .. }
+        | TypeKind::Mapped { .. }
+        | TypeKind::Conditional { .. }
+        | TypeKind::Infer(_)
+        | TypeKind::EnumVariant { .. }
+        | TypeKind::TypePredicate { .. } => None,
     }
 }
