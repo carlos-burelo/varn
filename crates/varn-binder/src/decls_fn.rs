@@ -120,7 +120,7 @@ fn bind_typed_pattern_vars(b: &mut Binder, pattern: &MatchPattern, ty: Option<Ty
         MatchPattern::Wildcard => {}
         MatchPattern::Literal(expr) => b.bind_expr(*expr),
         MatchPattern::Identifier(name) => {
-            define_pattern_var(b, *name, None, ty.unwrap_or(Type::Dynamic));
+            define_pattern_var(b, *name, None, ty.unwrap_or(Type::Error));
         }
         MatchPattern::Tuple(items) => {
             for item in items {
@@ -132,12 +132,12 @@ fn bind_typed_pattern_vars(b: &mut Binder, pattern: &MatchPattern, ty: Option<Ty
                 bind_typed_pattern_vars(b, element, None);
             }
             if let varn_core::ast::SequenceRest::Bind(name) = rest {
-                define_pattern_var(b, *name, None, Type::Dynamic);
+                define_pattern_var(b, *name, None, Type::Error);
             }
         }
         MatchPattern::Record { fields, .. } => {
             for field in fields {
-                bind_field_vars(b, field, Type::Dynamic);
+                bind_field_vars(b, field, Type::Error);
             }
         }
         MatchPattern::EnumVariant {
@@ -164,7 +164,7 @@ fn bind_typed_pattern_vars(b: &mut Binder, pattern: &MatchPattern, ty: Option<Ty
                             .iter()
                             .find(|(n, _)| n.as_ref() == field_name)
                             .map(|(_, t)| *t)
-                            .unwrap_or(Type::Dynamic);
+                            .unwrap_or(Type::Error);
                         bind_field_vars(b, field, field_ty);
                     }
                 }

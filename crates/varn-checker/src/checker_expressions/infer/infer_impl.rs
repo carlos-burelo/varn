@@ -20,7 +20,7 @@ impl<'r> Checker<'r> {
                 let name_str = bind.interner.resolve(*name);
 
                 if name_str == varn_core::TokenKind::Placeholder.as_str() && self.in_pipeline_rhs {
-                    return self.pipeline_value_type.unwrap_or(Type::Dynamic);
+                    return self.pipeline_value_type.unwrap_or(Type::Error);
                 }
                 let scope = bind.scopes.get(self.current_scope);
                 if let Some(sid) = scope.resolve(*name, &bind.scopes) {
@@ -40,7 +40,7 @@ impl<'r> Checker<'r> {
                 }
                 varn_sem::bind::BindView::new(bind, self.resolver)
                     .resolve_symbol(name_str)
-                    .unwrap_or(Type::Dynamic)
+                    .unwrap_or(Type::Error)
             }
             ExprKind::ImportMeta(varn_core::ast::MetaProperty::Main) => Type::Bool,
             ExprKind::This => self
@@ -54,7 +54,7 @@ impl<'r> Checker<'r> {
                         )
                     })
                 })
-                .unwrap_or(Type::Dynamic),
+                .unwrap_or(Type::Error),
 
             ExprKind::Super => self
                 .current_class
@@ -62,7 +62,7 @@ impl<'r> Checker<'r> {
                 .and_then(|cn| bind.class_parents.get(cn))
                 .cloned()
                 .map(|parent| self.parent_type(&parent))
-                .unwrap_or(Type::Dynamic),
+                .unwrap_or(Type::Error),
             ExprKind::New {
                 callee,
                 type_args,
@@ -238,7 +238,7 @@ impl<'r> Checker<'r> {
                                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                             )
                         } else {
-                            Type::Dynamic
+                            Type::Error
                         }
                     }
                 }

@@ -188,6 +188,9 @@ impl Type {
     }
 
     pub fn union(members: Vec<Type>, table: &mut CheckerTyTable) -> Self {
+        if members.iter().any(|m| m.is_error()) {
+            return Type::Error;
+        }
         let had_members = !members.is_empty();
         let members: Vec<Type> = members
             .into_iter()

@@ -95,7 +95,7 @@ impl<'r> Checker<'r> {
             return callee_ty;
         }
         let TypeKind::Fn(fid) = callee_kind else {
-            return Type::Dynamic;
+            return Type::Error;
         };
         let ft = self.ty_table.get_function(fid).clone();
 
@@ -180,7 +180,6 @@ impl<'r> Checker<'r> {
                 }
             })
             .unwrap_or_default();
-        let dynamic_context = self.expected_type.is_some_and(|t| t.is_unresolved());
 
         let ps: Vec<FunctionParam> = params
             .iter()
@@ -201,8 +200,8 @@ impl<'r> Checker<'r> {
                         p.default.map(|d| self.infer_type(rec, d, bind))
                     })
                     .unwrap_or_else(|| {
-                        if dynamic_context {
-                            return Type::Dynamic;
+                        if self.expected_type.is_some_and(|t| t.is_error()) {
+                            return Type::Error;
                         }
                         self.emit(
                             Diagnostic::error(

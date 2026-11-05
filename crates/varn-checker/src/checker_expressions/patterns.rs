@@ -46,7 +46,7 @@ impl<'r> Checker<'r> {
                 for (at, el) in elements.iter().enumerate() {
                     let Some(el) = el else { continue };
                     let item_ty = match &fixed {
-                        Some(items) => items.get(at).copied().unwrap_or(Type::Dynamic),
+                        Some(items) => items.get(at).copied().unwrap_or(Type::Error),
                         None => elem_ty,
                     };
                     self.check_pattern(rec, &el.pattern, &item_ty, bind);
@@ -88,7 +88,7 @@ impl<'r> Checker<'r> {
                         .find_member_info(value_ty, key, bind)
                         .map(|(t, _)| t)
                         .or(default_ty)
-                        .unwrap_or(Type::Dynamic);
+                        .unwrap_or(Type::Error);
                     self.check_pattern(rec, &prop.value, &prop_ty, bind);
                 }
                 if let Some(r) = rest {
@@ -172,7 +172,7 @@ impl<'r> Checker<'r> {
                 let shape = self.sequence_shape(&present, true, items.len(), false, range, bind);
                 for (at, item) in items.iter().enumerate() {
                     let item_ty = match &shape.fixed {
-                        Some(fixed) => fixed.get(at).copied().unwrap_or(Type::Dynamic),
+                        Some(fixed) => fixed.get(at).copied().unwrap_or(Type::Error),
                         None => shape.element,
                     };
                     self.check_pattern_match(rec, item, &item_ty, range, bind);
@@ -190,7 +190,7 @@ impl<'r> Checker<'r> {
                 );
                 for (at, item) in elements.iter().enumerate() {
                     let item_ty = match &shape.fixed {
-                        Some(fixed) => fixed.get(at).copied().unwrap_or(Type::Dynamic),
+                        Some(fixed) => fixed.get(at).copied().unwrap_or(Type::Error),
                         None => shape.element,
                     };
                     self.check_pattern_match(rec, item, &item_ty, range, bind);
@@ -209,7 +209,7 @@ impl<'r> Checker<'r> {
                 for field in fields {
                     let name = bind.interner.resolve(field.name);
                     let member_ty = if present.is_unresolved() {
-                        Type::Dynamic
+                        Type::Error
                     } else if let Some((found, _)) = self.find_member_info(&present, name, bind) {
                         found
                     } else {
@@ -223,7 +223,7 @@ impl<'r> Checker<'r> {
                             )
                             .with_range(field.range),
                         );
-                        Type::Dynamic
+                        Type::Error
                     };
                     self.check_match_field(rec, field, &member_ty, range, bind);
                 }
@@ -264,7 +264,7 @@ impl<'r> Checker<'r> {
                         for (at, item) in items.iter().enumerate() {
                             let item_ty = match fields.get(at) {
                                 Some((_, ty)) => field_ty(self, ty),
-                                None => Type::Dynamic,
+                                None => Type::Error,
                             };
                             self.check_pattern_match(rec, item, &item_ty, range, bind);
                         }
@@ -284,7 +284,7 @@ impl<'r> Checker<'r> {
                                         )
                                         .with_range(field.range),
                                     );
-                                    Type::Dynamic
+                                    Type::Error
                                 }
                             };
                             self.check_match_field(rec, field, &item_ty, range, bind);
@@ -505,7 +505,7 @@ impl Checker<'_> {
             );
             return SequenceShape {
                 fixed,
-                element: Type::Dynamic,
+                element: Type::Error,
                 sequence: false,
             };
         }

@@ -39,7 +39,7 @@ impl Checker<'_> {
                 let shape = self.sequence_shape(&ty, true, fixed_count, has_rest, range, bind);
                 for (at, element) in elements.iter().enumerate() {
                     if let ExprKind::Spread { argument } = &arena.expr(*element).kind {
-                        self.check_destructure_target(rec, *argument, Type::Dynamic, bind);
+                        self.check_destructure_target(rec, *argument, Type::Error, bind);
                     } else {
                         let item = Self::sequence_item(&shape, at);
                         self.check_destructure_target(rec, *element, item, bind);
@@ -158,7 +158,7 @@ impl Checker<'_> {
                     }
                 };
                 let member_ty = if ty.is_unresolved() {
-                    Type::Dynamic
+                    Type::Error
                 } else if let Some((found, _)) = self.find_member_info(ty, &member, bind) {
                     found
                 } else {
@@ -172,12 +172,12 @@ impl Checker<'_> {
                         )
                         .with_range(*range),
                     );
-                    Type::Dynamic
+                    Type::Error
                 };
                 self.check_destructure_target(rec, *value, member_ty, bind);
             }
             ObjectProp::Spread { argument, .. } => {
-                self.check_destructure_target(rec, *argument, Type::Dynamic, bind);
+                self.check_destructure_target(rec, *argument, Type::Error, bind);
             }
             ObjectProp::Method { range, .. } => {
                 self.emit(
@@ -193,7 +193,7 @@ impl Checker<'_> {
 
     fn sequence_item(shape: &SequenceShape, at: usize) -> Type {
         match &shape.fixed {
-            Some(items) => items.get(at).copied().unwrap_or(Type::Dynamic),
+            Some(items) => items.get(at).copied().unwrap_or(Type::Error),
             None => shape.element,
         }
     }

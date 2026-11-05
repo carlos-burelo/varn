@@ -19,7 +19,7 @@ impl<'r> Binder<'r> {
                     self.report_missing_param_annotation(p);
                     Type::Error
                 }
-                ParamSite::Closure => Type::Dynamic,
+                ParamSite::Closure => Type::Error,
             },
         };
         if p.is_rest && !matches!(self.ty_table.get(ty.0), varn_core::TypeKind::Array(_)) {

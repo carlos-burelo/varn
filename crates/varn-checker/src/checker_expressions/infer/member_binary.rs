@@ -88,12 +88,17 @@ pub(super) fn infer_member_type(
         }
     }
 
-    varn_sem::infer::infer_expr_type(
+    let inferred = varn_sem::infer::infer_expr_type(
         expr,
         arena,
         Some(&varn_sem::bind::BindView::new(bind, checker.resolver).settled(&rec.symbol_types)),
         &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
-    )
+    );
+    if inferred == Type::Dynamic {
+        Type::Error
+    } else {
+        inferred
+    }
 }
 
 pub(super) fn infer_binary_type(
@@ -135,9 +140,9 @@ pub(super) fn infer_binary_type(
                 return Type::Error;
             }
             if l.is_unresolved() || r.is_unresolved() {
-                return Type::Dynamic;
+                return Type::Error;
             }
-            let unresolved = Type::Dynamic;
+            let unresolved = Type::Error;
             let (l, r) = varn_sem::types::numeric_ops::adopt_literal_operands(
                 checker.ast_arena,
                 left,

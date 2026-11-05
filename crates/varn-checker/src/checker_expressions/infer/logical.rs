@@ -89,11 +89,11 @@ impl<'r> Checker<'r> {
     ) -> Type {
         let ty = self.infer_type(rec, expression, bind);
         match ty.core_sum(&self.ty_table) {
-            Some((_, args)) => args.first().copied().unwrap_or(Type::Dynamic),
+            Some((_, args)) => args.first().copied().unwrap_or(Type::Error),
             None if ty.is_nullable(&self.ty_table) => {
                 ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table))
             }
-            None => Type::Dynamic,
+            None => Type::Error,
         }
     }
 

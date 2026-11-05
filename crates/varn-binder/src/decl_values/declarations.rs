@@ -21,13 +21,9 @@ impl<'r> super::super::Binder<'r> {
             }
             let line = d.range.start.line;
             let has_explicit_ann = d.type_ann.is_some();
-            let ty = d
-                .type_ann
-                .as_ref()
-                .map(|ann| self.resolve_type(ann))
-                .or_else(|| d.init.map(|_| Type::Dynamic));
+            let ty = d.type_ann.as_ref().map(|ann| self.resolve_type(ann));
 
-            let ty = if ty.is_none() {
+            let ty = if ty.is_none() && d.init.is_none() {
                 self.report_missing_variable_annotation(d);
                 Some(Type::Error)
             } else {
