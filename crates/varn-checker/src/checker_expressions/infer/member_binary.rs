@@ -55,7 +55,7 @@ pub(super) fn infer_member_type(
             }
             if let Some(res) = checker.find_member_info(&obj_ty, prop_name_str, bind) {
                 let m_ty = res.0;
-                if !m_ty.is_unresolved() {
+                if !m_ty.is_error() {
                     return m_ty;
                 }
             }
@@ -81,7 +81,7 @@ pub(super) fn infer_member_type(
         | TypeKind::TypePredicate { .. } => {
             if let Some(res) = checker.find_member_info(&obj_ty, prop_name_str, bind) {
                 let m_ty = res.0;
-                if !m_ty.is_unresolved() {
+                if !m_ty.is_error() {
                     return m_ty;
                 }
             }
