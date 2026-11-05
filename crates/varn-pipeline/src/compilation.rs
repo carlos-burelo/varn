@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use varn_core::{AtomInterner, Diagnostic};
+use varn_core::AtomInterner;
 
 use crate::cache::CacheLookup;
 use crate::lex::Tokens;
@@ -54,8 +54,16 @@ impl Compilation {
         }
     }
 
-    pub fn warnings(&self) -> impl Iterator<Item = &Diagnostic> {
-        self.checked.iter().flat_map(|c| c.diagnostics.iter())
+    pub fn warning_report(&self) -> Option<crate::DiagnosticReport> {
+        let checked = self.checked.as_ref()?;
+        if checked.diagnostics.is_empty() {
+            return None;
+        }
+        Some(crate::DiagnosticReport::new(
+            self.source.path(),
+            self.source.text(),
+            checked.diagnostics.clone(),
+        ))
     }
 
     pub fn interner(&self) -> Option<&AtomInterner> {

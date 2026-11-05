@@ -57,9 +57,9 @@ pub(crate) fn warnings_of(
     if diagnostics.is_empty() {
         return Ok(None);
     }
-    Ok(Some(DiagnosticReport {
-        file: filename.into(),
-        source: source.into(),
-        diagnostics: diagnostics.clone(),
-    }))
+    Ok(Some(DiagnosticReport::new(
+        filename,
+        source,
+        diagnostics.clone(),
+    )))
 }

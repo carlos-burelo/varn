@@ -9,6 +9,25 @@ pub struct DiagnosticReport {
     pub diagnostics: DiagnosticBag,
 }
 
+impl DiagnosticReport {
+    pub fn new(file: &str, source: &str, mut diagnostics: DiagnosticBag) -> Self {
+        diagnostics.normalize();
+        let items = diagnostics.take();
+        for mut diagnostic in items {
+            diagnostic.file = Arc::from(relative_path(&diagnostic.file));
+            for related in &mut diagnostic.related {
+                related.file = Arc::from(relative_path(&related.file));
+            }
+            diagnostics.push(diagnostic);
+        }
+        Self {
+            file: Arc::from(relative_path(file)),
+            source: Arc::from(source),
+            diagnostics,
+        }
+    }
+}
+
 pub struct RuntimeFailure {
     pub class: String,
     pub message: String,
@@ -44,21 +63,8 @@ impl Failure {
         Failure::Internal(message.into())
     }
 
-    pub fn diagnostics(file: &str, source: &str, mut diagnostics: DiagnosticBag) -> Self {
-        diagnostics.normalize();
-        let items = diagnostics.take();
-        for mut diagnostic in items {
-            diagnostic.file = Arc::from(relative_path(&diagnostic.file));
-            for related in &mut diagnostic.related {
-                related.file = Arc::from(relative_path(&related.file));
-            }
-            diagnostics.push(diagnostic);
-        }
-        Failure::Diagnostics(DiagnosticReport {
-            file: Arc::from(relative_path(file)),
-            source: Arc::from(source),
-            diagnostics,
-        })
+    pub fn diagnostics(file: &str, source: &str, diagnostics: DiagnosticBag) -> Self {
+        Failure::Diagnostics(DiagnosticReport::new(file, source, diagnostics))
     }
 }
 

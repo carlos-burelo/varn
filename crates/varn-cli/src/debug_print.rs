@@ -43,13 +43,11 @@ pub fn report(compilation: &Compilation, debug: &DebugFlags, verbose: bool) {
         return;
     };
     let source = compilation.source.text();
-    for diagnostic in compilation.warnings() {
-        terminal::log(varn_core::diagnostics::format_diagnostic(
-            diagnostic, source,
-        ));
+    if let Some(report) = compilation.warning_report() {
+        print_report(&report);
     }
     for report in &compilation.dependency_warnings {
-        dependency_warnings(report);
+        print_report(report);
     }
     if debug.symbols {
         varn_debug::symbols::debug_symbols(checked, &parsed.program.filename, debug);
@@ -91,7 +89,7 @@ fn cache_lines(status: &CacheStatus) {
     }
 }
 
-fn dependency_warnings(report: &DiagnosticReport) {
+fn print_report(report: &DiagnosticReport) {
     for diagnostic in report.diagnostics.iter() {
         terminal::log(varn_core::diagnostics::format_diagnostic(
             diagnostic,
