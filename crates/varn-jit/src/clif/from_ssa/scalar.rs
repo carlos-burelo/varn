@@ -75,7 +75,9 @@ pub(super) fn emit_inst(
                 }
                 (SlotKind::Int, SlotKind::Int)
                 | (SlotKind::Float, SlotKind::Float)
-                | (SlotKind::Bool, SlotKind::Bool) => Out::Native(a),
+                | (SlotKind::Bool, SlotKind::Bool)
+                | (SlotKind::Bool, SlotKind::Int)
+                | (SlotKind::Int, SlotKind::Bool) => Out::Native(a),
                 (SlotKind::Int | SlotKind::Float | SlotKind::Bool, to) if is_heap(to) => {
                     Out::Boxed(heap::boxed_value(b, ctx, values, *operand)?)
                 }
