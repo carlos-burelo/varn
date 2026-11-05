@@ -1,2 +1,2 @@
-// expect: error[VN2007]
+// expect: error[VN2002]
 const t = #[1, 2]

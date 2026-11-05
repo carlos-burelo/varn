@@ -1,2 +1,2 @@
-// expect: error[VN2007]
+// expect: error[VN2001]
 interface I { a }

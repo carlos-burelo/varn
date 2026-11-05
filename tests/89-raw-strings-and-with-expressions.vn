@@ -13,7 +13,7 @@ await describe("89 raw strings and with expressions", async () => {
         "escapes": "\n \t \r"
         }""";
         expect(jsonStr.includes("\"name\": \"Varn\"")).toBe(true);
-        expect(jsonStr.includes("C:\Program Files\Varn")).toBe(true);
+        expect(jsonStr.includes("C:\\Program Files\\Varn")).toBe(true);
         expect(jsonStr.includes("""\n \t \r""")).toBe(true);
         });
         await it("Single-line raw string with double quotes", async () => {

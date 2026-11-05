@@ -1,0 +1,2 @@
+// expect: error[VN2005]
+const xs: int[] = [1, 2

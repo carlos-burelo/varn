@@ -1,0 +1,3 @@
+// expect: error[VN2004]
+function f(): int {
+    return 1

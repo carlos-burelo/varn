@@ -1,0 +1,8 @@
+// expect: error[VN1006]
+// expect: error[VN1008]
+// expect: error[VN1006]
+// expect: error[VN2002]
+const a = "bad \q escape"
+const b = "u \u{110000}"
+const c = "x \xZZ"
+const t = (1 +

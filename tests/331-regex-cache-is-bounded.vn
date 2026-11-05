@@ -2,14 +2,14 @@ import { describe, it, expect } from "std:test";
 
 await describe("331 regex cache is bounded", async () => {
     await it("regexes keep working after far more distinct patterns than the cache holds", async () => {
-        const first = new Regex("first-(\d+)");
+        const first = new Regex("first-(\\d+)");
         const kept: Regex[] = [];
         for (let i = 0; i < 9000; i++) {
             kept.push(new Regex("p" + i.toString() + "x"));
         }
         expect(first.test("first-7")).toBe(true);
         expect(first.exec("a first-42")!.groups[0]).toBe("42");
-        expect(first.pattern).toBe("first-(\d+)");
+        expect(first.pattern).toBe("first-(\\d+)");
         expect(kept[0].test("p0x")).toBe(true);
         expect(kept[4500].test("p4500x")).toBe(true);
         expect(kept[8999].pattern).toBe("p8999x");

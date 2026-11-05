@@ -1,0 +1,1 @@
+export const v: str = "bad \q escape";

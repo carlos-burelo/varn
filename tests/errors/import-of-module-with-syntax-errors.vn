@@ -1,0 +1,3 @@
+// expect: error[VN2010]
+import { v } from "../helpers/broken-escape.vn"
+print(v)
