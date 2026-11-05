@@ -150,13 +150,4 @@ impl ObjectTypeMember {
             ObjectTypeMember::Callable { .. } => "",
         }
     }
-
-    pub fn ty(&self) -> CheckerTyId {
-        match self {
-            ObjectTypeMember::Property { ty, .. } => *ty,
-            ObjectTypeMember::Method { .. } => CheckerTyId::DYNAMIC,
-            ObjectTypeMember::Index { value_ty, .. } => *value_ty,
-            ObjectTypeMember::Callable { return_type, .. } => *return_type,
-        }
-    }
 }
