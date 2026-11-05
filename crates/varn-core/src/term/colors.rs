@@ -88,7 +88,6 @@ impl Display for Color {
 
 pub fn colored<D: Display>(text: D, color: Color) -> String {
     style_for(color)
-        .force_styling(true)
         .for_stderr()
         .apply_to(text.to_string())
         .to_string()

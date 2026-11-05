@@ -39,6 +39,6 @@ impl Suggestion {
 
 impl std::fmt::Display for Suggestion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "💡 {}", self.message)
+        write!(f, "{}", self.message)
     }
 }
