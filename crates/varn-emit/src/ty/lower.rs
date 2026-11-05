@@ -337,6 +337,9 @@ fn lower_builtin(
             BackendTy::Dynamic(DynReason::TaskHandle(lower(result, tt)))
         }
         (BuiltinType::Range, [bound]) => BackendTy::Dynamic(DynReason::Range(lower(bound, tt))),
+        (BuiltinType::Class, [instance]) => {
+            BackendTy::Dynamic(DynReason::ClassObject(lower(instance, tt)))
+        }
         (BuiltinType::Bytes, _) => BackendTy::Bytes,
         (
             BuiltinType::Array
@@ -344,7 +347,8 @@ fn lower_builtin(
             | BuiltinType::Task
             | BuiltinType::TaskHandle
             | BuiltinType::Generator
-            | BuiltinType::AsyncGenerator,
+            | BuiltinType::AsyncGenerator
+            | BuiltinType::Class,
             _,
         ) => bare(),
     }

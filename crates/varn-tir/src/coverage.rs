@@ -32,10 +32,11 @@ fn reason_index(r: DynReason) -> usize {
         DynReason::TaskHandle(_) => 14,
         DynReason::CoreMember => 15,
         DynReason::Spread => 16,
+        DynReason::ClassObject(_) => 18,
     }
 }
 
-const REASON_COUNT: usize = 18;
+const REASON_COUNT: usize = 19;
 
 const REASON_LABELS: [&str; REASON_COUNT] = [
     "host boundary",
@@ -56,6 +57,7 @@ const REASON_LABELS: [&str; REASON_COUNT] = [
     "core member",
     "spread",
     "record type",
+    "class object",
 ];
 
 impl Coverage {

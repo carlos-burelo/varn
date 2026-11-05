@@ -110,7 +110,8 @@ impl Checker<'_> {
                 | BuiltinType::Generator
                 | BuiltinType::AsyncGenerator
                 | BuiltinType::Task
-                | BuiltinType::TaskHandle => {}
+                | BuiltinType::TaskHandle
+                | BuiltinType::Class => {}
             }
         }
         let iter_result = self.method_return(&source, MemberKey::Iter.as_str(), bind);

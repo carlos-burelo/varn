@@ -58,6 +58,8 @@ pub enum DynReason {
 
     TaskHandle(TyId),
 
+    ClassObject(TyId),
+
     CoreMember,
 
     Spread,

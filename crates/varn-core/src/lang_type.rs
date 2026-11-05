@@ -118,10 +118,11 @@ pub enum BuiltinType {
     TaskHandle,
     Generator,
     AsyncGenerator,
+    Class,
 }
 
 impl BuiltinType {
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::Array,
         Self::Map,
         Self::Set,
@@ -131,6 +132,7 @@ impl BuiltinType {
         Self::TaskHandle,
         Self::Generator,
         Self::AsyncGenerator,
+        Self::Class,
     ];
 
     pub const fn name(self) -> &'static str {
@@ -144,11 +146,12 @@ impl BuiltinType {
             Self::TaskHandle => "TaskHandle",
             Self::Generator => "Generator",
             Self::AsyncGenerator => "AsyncGenerator",
+            Self::Class => "Class",
         }
     }
 
-    const IDENTITY: [(Atom, Atom, Self); 9] = {
-        let mut out = [(Atom::of_const(""), Atom::of_const(""), Self::Array); 9];
+    const IDENTITY: [(Atom, Atom, Self); 10] = {
+        let mut out = [(Atom::of_const(""), Atom::of_const(""), Self::Array); 10];
         let mut i = 0;
         while i < Self::ALL.len() {
             let b = Self::ALL[i];
@@ -178,6 +181,7 @@ impl BuiltinType {
             Self::TaskHandle => K::TaskHandle,
             Self::Generator => K::Generator,
             Self::AsyncGenerator => K::AsyncGenerator,
+            Self::Class => K::Class,
         }
     }
 
@@ -188,6 +192,7 @@ impl BuiltinType {
             Self::Set => "core:types/set",
             Self::Range => "core:types/range",
             Self::Bytes => "core:types/bytes",
+            Self::Class => "core:types/class",
             Self::Task | Self::TaskHandle | Self::Generator | Self::AsyncGenerator => {
                 "core:types/iteration"
             }

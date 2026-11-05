@@ -156,6 +156,7 @@ impl<'m> Describer<'m> {
                 | DynReason::Yields(_)
                 | DynReason::Range(_)
                 | DynReason::TaskHandle(_)
+                | DynReason::ClassObject(_)
                 | DynReason::CoreMember
                 | DynReason::Spread
                 | DynReason::Unrecorded

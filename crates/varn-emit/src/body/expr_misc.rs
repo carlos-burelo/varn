@@ -102,6 +102,7 @@ impl<'a> FnEmitter<'a> {
                             | varn_tir::DynReason::Generic
                             | varn_tir::DynReason::Interface(_)
                             | varn_tir::DynReason::TaskHandle(_)
+                            | varn_tir::DynReason::ClassObject(_)
                             | varn_tir::DynReason::CoreMember
                             | varn_tir::DynReason::Spread
                     )
@@ -116,6 +117,7 @@ impl<'a> FnEmitter<'a> {
                 | varn_tir::DynReason::Range(_)
                 | varn_tir::DynReason::Interface(_)
                 | varn_tir::DynReason::TaskHandle(_)
+                | varn_tir::DynReason::ClassObject(_)
                 | varn_tir::DynReason::CoreMember
                 | varn_tir::DynReason::Spread
                 | varn_tir::DynReason::Unrecorded
@@ -188,6 +190,7 @@ pub(super) fn untyped_reason(reason: varn_tir::DynReason) -> bool {
         | varn_tir::DynReason::Range(_)
         | varn_tir::DynReason::Interface(_)
         | varn_tir::DynReason::TaskHandle(_)
+        | varn_tir::DynReason::ClassObject(_)
         | varn_tir::DynReason::CoreMember
         | varn_tir::DynReason::Spread
         | varn_tir::DynReason::Shape(_)

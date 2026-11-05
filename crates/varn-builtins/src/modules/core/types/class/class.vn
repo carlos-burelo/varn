@@ -1,0 +1,6 @@
+/**
+ * The runtime class of a value: `value::class` has type `Class<T>` for the static type `T` of `value`.
+ */
+export declare class Class<T> {
+    name: str;
+}

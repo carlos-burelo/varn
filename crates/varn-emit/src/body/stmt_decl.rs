@@ -230,6 +230,7 @@ impl<'a> FnEmitter<'a> {
                                 | DynReason::Range(_)
                                 | DynReason::Interface(_)
                                 | DynReason::TaskHandle(_)
+                                | DynReason::ClassObject(_)
                                 | DynReason::CoreMember
                                 | DynReason::Spread
                                 | DynReason::Unrecorded
