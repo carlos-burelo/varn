@@ -98,7 +98,12 @@ impl<'r> Checker<'r> {
                             Diagnostic::error(ErrorCode::TypeMismatch, format!(
                                 "type mismatch: declared as '{ann_ty_s}' but initialised with '{init_ty_s}'"
                             ))
-                            .with_range(*decl_range),
+                            .with_range(self.ast_arena.expr(init_expr).range)
+                            .with_related(
+                                "the declared type",
+                                self.source_file.clone(),
+                                d.type_ann.as_ref().map_or(*decl_range, |node| node.range),
+                            ),
                         );
                     }
                     self.check_pattern(rec, &d.id, ann_ty, bind);
