@@ -52,6 +52,28 @@ pub(crate) fn check_call_type_arg_arity(
     }
 }
 
+fn signature_mentions(ft: &FunctionType, name: &str, checker: &Checker, bind: &BindResult) -> bool {
+    let mut pending: Vec<Type> = ft
+        .params
+        .iter()
+        .map(|p| Type::resolved(p.ty))
+        .chain([Type::resolved(ft.return_type)])
+        .collect();
+    let mut visited = std::collections::BTreeSet::new();
+    while let Some(current) = pending.pop() {
+        if !visited.insert(current.0) {
+            continue;
+        }
+        if let TypeKind::Named(atom, _) = checker.ty_table.get(current.0)
+            && bind.interner.resolve(atom) == name
+        {
+            return true;
+        }
+        pending.extend(current.components(&checker.ty_table));
+    }
+    false
+}
+
 pub(crate) fn build_call_mapping(
     call_index: u32,
     callee: ExprId,
@@ -61,15 +83,15 @@ pub(crate) fn build_call_mapping(
     checker: &mut Checker,
     rec: &mut Recorder,
     bind: &BindResult,
-) -> FxHashMap<Arc<str>, Type> {
+) -> (FxHashMap<Arc<str>, Type>, Vec<Arc<str>>) {
     let fn_type_params = fn_type_param_names(callee, ft, checker, bind);
 
     if fn_type_params.is_empty() {
-        return FxHashMap::default();
+        return (FxHashMap::default(), Vec::new());
     }
 
     if !type_args.is_empty() && type_args.len() == fn_type_params.len() {
-        fn_type_params
+        let explicit = fn_type_params
             .iter()
             .zip(
                 type_args
@@ -77,12 +99,14 @@ pub(crate) fn build_call_mapping(
                     .map(|a| checker.resolve_type_node_cached(a, bind)),
             )
             .map(|(k, v)| (k.clone(), v))
-            .collect()
+            .collect();
+        (explicit, Vec::new())
     } else if type_args.is_empty() {
         let mut mapping =
             infer_mapping_from_args(&fn_type_params, &ft.params, args, checker, rec, bind);
         if let Some(expected) = checker
             .expected_type
+            .filter(|expected| !expected.is_unresolved())
             .filter(|_| checker.expected_owner == Some(call_index))
         {
             let mut from_return = FxHashMap::default();
@@ -98,23 +122,31 @@ pub(crate) fn build_call_mapping(
                 mapping.entry(name).or_insert(ty);
             }
         }
+        let mut uninferred = Vec::new();
         for tp in &fn_type_params {
+            if mapping.contains_key(tp) {
+                continue;
+            }
             let declared_default = ft
                 .type_params
                 .iter()
                 .position(|n| n == tp)
                 .and_then(|i| ft.type_param_defaults.get(i).copied().flatten())
                 .map(Type::resolved);
-            mapping
-                .entry(tp.clone())
-                .or_insert(declared_default.unwrap_or(Type::Dynamic));
+            if declared_default.is_none() && signature_mentions(ft, tp, checker, bind) {
+                uninferred.push(tp.clone());
+            }
+            mapping.insert(tp.clone(), declared_default.unwrap_or(Type::Error));
         }
-        mapping
+        (mapping, uninferred)
     } else {
-        fn_type_params
-            .iter()
-            .map(|k| (k.clone(), Type::Dynamic))
-            .collect()
+        (
+            fn_type_params
+                .iter()
+                .map(|k| (k.clone(), Type::Error))
+                .collect(),
+            Vec::new(),
+        )
     }
 }
 

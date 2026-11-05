@@ -1,0 +1,3 @@
+// expect: error[VN3011]
+function nothing<T>(): T[] { return [] }
+const xs = nothing()

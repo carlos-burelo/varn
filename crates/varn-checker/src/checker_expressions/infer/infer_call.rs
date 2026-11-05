@@ -99,7 +99,7 @@ impl<'r> Checker<'r> {
         };
         let ft = self.ty_table.get_function(fid).clone();
 
-        let mapping = build_call_mapping(
+        let (mapping, _) = build_call_mapping(
             expr.index(),
             callee,
             &type_args,

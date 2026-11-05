@@ -162,11 +162,13 @@ impl<'r> Checker<'r> {
             );
         }
 
+        let mut uninferred: Vec<std::sync::Arc<str>> = Vec::new();
         let effective_callee_ty = if let TypeKind::Fn(fid) = callee_kind {
             let ft = self.ty_table.get_function(fid).clone();
             check_call_type_arg_arity(callee, type_args, &ft, self, range, bind);
-            let mapping =
+            let (mapping, missing) =
                 build_call_mapping(call_id, callee, type_args, args, &ft, self, rec, bind);
+            uninferred = missing;
             let type_params = fn_type_param_names(callee, &ft, self, bind);
             if self.returns_caller_chosen_type(&ft, &type_params, &mapping) {
                 let result = map_generics_cached(self, &Type::resolved(ft.return_type), &mapping);
@@ -208,11 +210,25 @@ impl<'r> Checker<'r> {
         } else {
             vec![]
         };
+        let arguments_mark = self.diagnostics_mark();
         self.check_call_args_with_context(rec, args, &params_for_context, bind);
 
         if let TypeKind::Fn(fid) = effective_kind {
             let params = self.ty_table.get_function(fid).params.clone();
             self.validate_call_arguments(rec, args, &params, range, call_id, bind);
+        }
+        if !self.errors_since(arguments_mark) {
+            for name in &uninferred {
+                self.emit(
+                    Diagnostic::error(
+                        ErrorCode::TypeAnnotationRequired,
+                        format!(
+                            "cannot infer type parameter '{name}': pass it explicitly, as in `f<Type>(...)`"
+                        ),
+                    )
+                    .with_range(*range),
+                );
+            }
         }
 
         if rec.enabled
