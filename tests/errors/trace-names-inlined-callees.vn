@@ -1,0 +1,7 @@
+// expect: error[division by zero]
+// expect: error[at divide (tests/errors/trace-names-inlined-callees.vn:5)]
+// expect: error[at ratio (tests/errors/trace-names-inlined-callees.vn:6)]
+// expect: error[at <module> (tests/errors/trace-names-inlined-callees.vn:7)]
+function divide(a: int, b: int): int { return a / b }
+function ratio(a: int, b: int): int { return divide(a, b) + 1 }
+print(ratio(1, 0))

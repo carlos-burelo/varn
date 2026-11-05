@@ -9,7 +9,7 @@ enum Expect {
         suggestions: Vec<String>,
     },
     Failure {
-        text: String,
+        fragments: Vec<String>,
     },
 }
 
@@ -22,6 +22,7 @@ fn repo_root() -> PathBuf {
 
 fn parse_expect(source: &str) -> Option<Expect> {
     let mut tokens = Vec::new();
+    let mut fragments = Vec::new();
     let mut suggestions = Vec::new();
     for line in source
         .lines()
@@ -35,18 +36,18 @@ fn parse_expect(source: &str) -> Option<Expect> {
         let inner = inner.strip_suffix(']')?;
         match (level, inner.starts_with("VN")) {
             ("error" | "warning", true) => tokens.push(format!("{level}[{inner}]")),
-            ("error", false) if tokens.is_empty() => {
-                return Some(Expect::Failure {
-                    text: inner.to_owned(),
-                });
-            }
+            ("error", false) => fragments.push(inner.to_owned()),
             _ => return None,
         }
     }
-    (!tokens.is_empty()).then_some(Expect::Diagnostics {
-        tokens,
-        suggestions,
-    })
+    match (tokens.is_empty(), fragments.is_empty()) {
+        (false, true) => Some(Expect::Diagnostics {
+            tokens,
+            suggestions,
+        }),
+        (true, false) => Some(Expect::Failure { fragments }),
+        (true, true) | (false, false) => None,
+    }
 }
 
 fn emitted_tokens(text: &str) -> Vec<String> {
@@ -73,9 +74,11 @@ fn invalid_locations(text: &str) -> Vec<String> {
 }
 
 fn vn(sub: &str, file: &Path, cache: &Path) -> Output {
+    let root = repo_root();
     Command::new(env!("CARGO_BIN_EXE_vn"))
+        .current_dir(&root)
         .arg(sub)
-        .arg(file)
+        .arg(file.strip_prefix(&root).unwrap_or(file))
         .env(varn_core::env::EnvVar::CacheDir.name(), cache)
         .env("NO_COLOR", "1")
         .output()
@@ -130,7 +133,7 @@ fn check_fixture(path: &Path, cache: &Path) -> Result<(), String> {
             }
             Ok(())
         }
-        Expect::Failure { text: wanted } => {
+        Expect::Failure { fragments } => {
             let checked = vn("check", path, cache);
             let out = if checked.status.success() {
                 vn("run", path, cache)
@@ -138,8 +141,8 @@ fn check_fixture(path: &Path, cache: &Path) -> Result<(), String> {
                 checked
             };
             let text = combined(&out);
-            if out.status.success() || !text.contains(&wanted) {
-                return Err(format!("esperaba fallo {wanted:?}, salida:\n{text}"));
+            if out.status.success() || fragments.iter().any(|f| !text.contains(f.as_str())) {
+                return Err(format!("esperaba fallo {fragments:?}, salida:\n{text}"));
             }
             Ok(())
         }
