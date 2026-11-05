@@ -5,6 +5,33 @@ use varn_sem::bind::BindResult;
 use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
+    fn field_value_type(&mut self, target_ty: Type, bind: &BindResult) -> Type {
+        if target_ty.is_unresolved() {
+            return target_ty;
+        }
+        let members = crate::checker_expressions::members::get_members_of_type(
+            self.resolver,
+            &target_ty,
+            bind,
+            std::sync::Arc::make_mut(&mut self.ty_table),
+        );
+        let field_tys: Vec<Type> = members
+            .iter()
+            .filter(|m| {
+                matches!(m.kind, varn_sem::semantic_info::ResolvedMemberKind::Property)
+                    && !m.is_static
+            })
+            .map(|m| m.ty)
+            .collect();
+        if field_tys.is_empty() {
+            return Type::Never;
+        }
+        Type::union(
+            field_tys,
+            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+        )
+    }
+
     pub(super) fn infer_meta_access(
         &mut self,
         rec: &mut Recorder,
@@ -12,10 +39,14 @@ impl<'r> Checker<'r> {
         property: varn_core::Atom,
         bind: &BindResult,
     ) -> Type {
-        let _target_ty = self.infer_type(rec, target, bind);
+        let target_ty = self.infer_type(rec, target, bind);
         match varn_core::MemberKey::from_str(bind.interner.resolve(property)) {
             Some(varn_core::MemberKey::Name) | Some(varn_core::MemberKey::Type) => Type::Str,
-            Some(varn_core::MemberKey::Class) => Type::Dynamic,
+            Some(varn_core::MemberKey::Class) => Type::builtin(
+                varn_core::BuiltinType::Class,
+                vec![target_ty],
+                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+            ),
             Some(varn_core::MemberKey::Fields) | Some(varn_core::MemberKey::Methods) => {
                 Type::array(
                     Type::Str,
@@ -39,8 +70,9 @@ impl<'r> Checker<'r> {
                 )
             }
             Some(varn_core::MemberKey::Values) => {
+                let value_ty = self.field_value_type(target_ty, bind);
                 let ret = Type::array(
-                    Type::Dynamic,
+                    value_ty,
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
                 Type::fn_(
@@ -55,7 +87,8 @@ impl<'r> Checker<'r> {
                 )
             }
             Some(varn_core::MemberKey::Entries) => {
-                let ids: Vec<varn_sem::types::CheckerTyId> = vec![Type::Str.0, Type::Dynamic.0];
+                let value_ty = self.field_value_type(target_ty, bind);
+                let ids: Vec<varn_sem::types::CheckerTyId> = vec![Type::Str.0, value_ty.0];
                 let list = std::sync::Arc::make_mut(&mut self.ty_table).intern_list(&ids);
                 let entry = Type::resolved(
                     std::sync::Arc::make_mut(&mut self.ty_table)
