@@ -63,14 +63,13 @@ function mcVariant(i: int): McToken {
     return t
 }
 
-// `push` / `pop` on an array whose type is not known statically.
-function mcDynArray(xs: dynamic, v: int): dynamic {
+function mcDynArray(xs: int[], v: int): int {
     xs.push(v)
-    return xs.pop()
+    return xs.pop() ?? 0
 }
 
 // A function-valued property called as a method.
-function mcCallback(o: dynamic, x: int): dynamic {
+function mcCallback(o: { apply: (x: int) => int }, x: int): int {
     const r = o.apply(x)
     return r
 }
@@ -105,8 +104,8 @@ let mGuard = 0
 const mcShape = new McShape(3)
 const mcSquare = new McSquare(3)
 const mcFailing = new McFailing()
-const mcObj: dynamic = { apply: (x: int) => x + 100 }
-const mcArr: dynamic = [1, 2]
+const mcObj = { apply: (x: int) => x + 100 }
+const mcArr: int[] = [1, 2]
 
 // 9 * 2 + 3 = 21 for the shape, 10 * 2 + 3 = 23 for the square.
 // Digits of 0..2999: 10 + 90 * 2 + 900 * 3 + 2000 * 4.
@@ -128,8 +127,8 @@ await describe("144 jit method calls", async () => {
         }
         mNumbers = mNumbers + num
         mWords = mWords + wordLen
-        mDyn = mDyn + (mcDynArray(mcArr, i) as int)
-        mCb = mCb + (mcCallback(mcObj, i) as int)
+        mDyn = mDyn + mcDynArray(mcArr, i)
+        mCb = mCb + mcCallback(mcObj, i)
         mGuard = mGuard + mcGuarded(mcFailing, i)
         }
         expect(mArea).toBe(1500 * 21 + 1500 * 23);
@@ -139,7 +138,7 @@ await describe("144 jit method calls", async () => {
     });
 
     await it("group 1 part 2", async () => {
-        expect(mDyn === 4498500 && (mcArr as int[]).length).toBe(2);
+        expect(mDyn === 4498500 && mcArr.length).toBe(2);
         expect(mCb).toBe(4498500 + 300000);
         expect(mGuard).toBe(4498500 - (7 * 428 * 429 / 2) - 429);
     });

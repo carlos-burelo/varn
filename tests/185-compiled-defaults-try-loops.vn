@@ -113,7 +113,7 @@ await describe("185 compiled defaults, try/catch and fixed-bound loops", async (
     await it("a supplied value of the wrong type is rejected", () => {
         const loose: dynamic = "tres"
         let caught = ""
-        try { stepInt(1, loose) } catch (e) { caught = (e as Error).name }
+        try { stepInt(1, loose as int?) } catch (e) { caught = (e as Error).name }
         expect(caught).toBe("TypeError")
     })
 

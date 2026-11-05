@@ -75,7 +75,7 @@ function callMethods(a: Acc, i: int): int {
 }
 function callValues(f: (n: int?) => int, i: int): int { return f(i) + f(null) }
 function imported(init: dynamic): str {
-    try { const h = new Headers(init); return h.get("a") ?? "absent" } catch (e) { return (e as Error).name }
+    try { const h = new Headers(init as { [key: str]: str }?); return h.get("a") ?? "absent" } catch (e) { return (e as Error).name }
 }
 function build(i: int): int { return new Acc(i).total + new Pt(i).x + (new Pt(i, 3).y ?? 0) }
 

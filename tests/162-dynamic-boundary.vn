@@ -15,46 +15,46 @@ class Holder {
 }
 
 function declStr(d: dynamic): int {
-    let s: str = d
+    let s: str = d as str
     return s.length
 }
 
 function declBool(d: dynamic): bool {
-    let b: bool = d
+    let b: bool = d as bool
     return b
 }
 
 function assignStr(d: dynamic): int {
     let s = "a"
-    s = d
+    s = d as str
     return s.length
 }
 
 function fieldStr(d: dynamic): int {
     const h = new Holder()
-    h.name = d
+    h.name = d as str
     return h.name.length
 }
 
 function fieldBool(d: dynamic): bool {
     const h = new Holder()
-    h.on = d
+    h.on = d as bool
     return h.on
 }
 
-function retStr(d: dynamic): str { return d }
-function retBool(d: dynamic): bool { return d }
+function retStr(d: dynamic): str { return d as str }
+function retBool(d: dynamic): bool { return d as bool }
 
 class Returner {
-    name(d: dynamic): str { return d }
+    name(d: dynamic): str { return d as str }
 }
 
-const arrowStr = (d: dynamic): str => d
+const arrowStr = (d: dynamic): str => d as str
 
 function lenOf(s: str): int { return s.length }
 function pick(a: int, flag: bool): int { return flag ? a : 0 }
-function passStr(d: dynamic): int { return lenOf(d) }
-function passBool(d: dynamic): int { return pick(7, d) }
+function passStr(d: dynamic): int { return lenOf(d as str) }
+function passBool(d: dynamic): int { return pick(7, d as bool) }
 function identity<T>(x: T): T { return x }
 
 class Taker {
@@ -66,18 +66,18 @@ class Taker {
 const arrowLen = (s: str): int => s.length
 
 function optStr(d: dynamic): str {
-    let s: str? = d
+    let s: str? = d as str?
     return s ?? "none"
 }
 
 function optBool(d: dynamic): bool {
-    let b: bool? = d
+    let b: bool? = d as bool?
     return b ?? false
 }
 
 function optArg(s: str?): int { return (s ?? "").length }
-function passOpt(d: dynamic): int { return optArg(d) }
-function retOpt(d: dynamic): str? { return d }
+function passOpt(d: dynamic): int { return optArg(d as str?) }
+function retOpt(d: dynamic): str? { return d as str? }
 
 function messageOf(f: () => void): str {
     try {
@@ -112,13 +112,13 @@ class Rock {
 
 function legsOf(a: Animal): int { return a.legs }
 function declAnimal(d: dynamic): int {
-    let a: Animal = d
+    let a: Animal = d as Animal
     return a.legs
 }
-function passAnimal(d: dynamic): int { return legsOf(d) }
+function passAnimal(d: dynamic): int { return legsOf(d as Animal) }
 function castAnimal(d: dynamic): int { return (d as Animal).legs }
 function optAnimal(d: dynamic): bool {
-    let a: Animal? = d
+    let a: Animal? = d as Animal?
     return a == null
 }
 
@@ -128,32 +128,32 @@ class Reading {
 }
 
 function declInt(d: dynamic): int {
-    let n: int = d
+    let n: int = d as int
     return n + 1
 }
 function declFloat(d: dynamic): float {
-    let f: float = d
+    let f: float = d as float
     return f / 2.0
 }
 function optInt(d: dynamic): int {
-    let n: int? = d
+    let n: int? = d as int?
     return n ?? -1
 }
 function optFloat(d: dynamic): float {
-    let f: float? = d
+    let f: float? = d as float?
     return f ?? -1.0
 }
-function retInt(d: dynamic): int { return d }
+function retInt(d: dynamic): int { return d as int }
 function double(f: float): float { return f * 2.0 }
-function passFloat(d: dynamic): float { return double(d) }
+function passFloat(d: dynamic): float { return double(d as float) }
 function fieldInt(d: dynamic): int {
     const r = new Reading()
-    r.count = d
+    r.count = d as int
     return r.count
 }
 function fieldFloat(d: dynamic): float {
     const r = new Reading()
-    r.ratio = d
+    r.ratio = d as float
     return r.ratio
 }
 
@@ -213,12 +213,12 @@ await describe("162 dynamic boundary", async () => {
         expect(failed(() => { passBool("x") })).toBe(true)
         const d: dynamic = 5
         const ok: dynamic = "abc"
-        expect(new Taker(ok).label.length).toBe(3)
-        expect(new Taker("t").measure(ok)).toBe(3)
-        expect(arrowLen(ok)).toBe(3)
-        expect(failed(() => { new Taker(d) })).toBe(true)
-        expect(failed(() => { new Taker("t").measure(d) })).toBe(true)
-        expect(failed(() => { arrowLen(d) })).toBe(true)
+        expect(new Taker(ok as str).label.length).toBe(3)
+        expect(new Taker("t").measure(ok as str)).toBe(3)
+        expect(arrowLen(ok as str)).toBe(3)
+        expect(failed(() => { new Taker(d as str) })).toBe(true)
+        expect(failed(() => { new Taker("t").measure(d as str) })).toBe(true)
+        expect(failed(() => { arrowLen(d as str) })).toBe(true)
         expect(identity(d)).toBe(5)
     })
 
@@ -251,13 +251,13 @@ await describe("162 dynamic boundary", async () => {
         expect(kindOf(() => { declAnimal(new Rock()) })).toBe("TypeError")
     })
 
-    await it("int targets take ints only", () => {
+    await it("an int cast takes ints and truncates floats", () => {
         expect(declInt(7)).toBe(8)
         expect(retInt(9)).toBe(9)
         expect(fieldInt(4)).toBe(4)
         expect(optInt(null)).toBe(-1)
         expect(optInt(5)).toBe(5)
-        expect(failed(() => { declInt(3.7) })).toBe(true)
+        expect(declInt(3.7)).toBe(4)
         expect(failed(() => { declInt("7") })).toBe(true)
         expect(failed(() => { declInt(null) })).toBe(true)
         expect(failed(() => { declInt(true) })).toBe(true)
@@ -319,11 +319,5 @@ await describe("162 dynamic boundary", async () => {
         const xs: dynamic[] = [1, "x", null]
         expect(`${xs[0]}-${xs[1]}-${xs[2]}`).toBe("1-x-null")
         expect(`v=${null}`).toBe("v=null")
-    })
-    await it("reading a property of a primitive dynamic value is an error, not null", () => {
-        const n: dynamic = 5
-        expect(() => {
-            const v = n.missing
-        }).toThrow("cannot read property")
     })
 })

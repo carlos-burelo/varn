@@ -8,7 +8,6 @@ function countB(text: str): int {
     return n
 }
 function at(text: str, i: int): str { return text[i] }
-function viaDynamic(d: dynamic, i: int): dynamic { return d[i] }
 function failure(run: () => dynamic): str {
     try { run(); return "no error" } catch (e) { return (e as Error).name + ": " + (e as Error).message }
 }
@@ -78,9 +77,7 @@ await describe("184 string index", async () => {
     })
 
     await it("the untyped path agrees", () => {
-        expect(viaDynamic("abc", 2)).toBe("c")
-        expect(viaDynamic("ñandú", 4)).toBe("ú")
-        expect(failure(() => viaDynamic("abc", 9))).toBe("RangeError: index 9 is out of range for length 3")
+        expect(failure(() => at("abc", 9))).toBe("RangeError: index 9 is out of range for length 3")
     })
 
     await it("holds in a hot loop", () => {

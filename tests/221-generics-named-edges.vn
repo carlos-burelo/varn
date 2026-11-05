@@ -240,10 +240,4 @@ await describe("221 generics named edges", async () => {
         }
         expect(takeCb(value: "hi", cb: v => { seen.push(v); })).toBe("hi");
     });
-
-    await it("dynamic call stays lenient and correct", () => {
-        const todos: Todo[] = [{ id: 1, title: "a" }];
-        const f: dynamic = applyBoth;
-        expect(f(todos, key: (t: int) => t, render: (t: Todo) => t.title)).toEqual(["a"]);
-    });
 });

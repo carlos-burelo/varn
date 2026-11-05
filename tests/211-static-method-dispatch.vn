@@ -21,7 +21,7 @@ class Kid extends Base {
     static override who(): str { return "kid" }
 }
 
-function callDyn(f: dynamic, x: int, y: int): int { return f(x, y) }
+function callDyn(f: dynamic, x: int, y: int): int { return (f as (a: int, b: int) => int)(x, y) }
 
 await describe("211 static methods dispatch direct", async () => {
     await it("each static resolves to its own slot", () => {
@@ -38,7 +38,7 @@ await describe("211 static methods dispatch direct", async () => {
 
     await it("dynamic args are shaped", () => {
         const d: dynamic = 21
-        expect(Calc.add(d, 21)).toBe(42)
+        expect(Calc.add(d as int, 21)).toBe(42)
         expect(callDyn(Calc.add, 21, 21)).toBe(42)
     })
 

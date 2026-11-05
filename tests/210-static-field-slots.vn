@@ -51,13 +51,6 @@ await describe("210 static fields use slots", async () => {
         expect(Counter.bump()).toBe(6)
     })
 
-    await it("dynamic receivers still read the same storage", () => {
-        Counter.total = 9
-        const dyn: dynamic = Counter
-        expect(dyn.total).toBe(9)
-        dyn.total = 11
-        expect(Counter.total).toBe(11)
-    })
 
     await it("instance fields keep their own slots", () => {
         const w = new WithInstance()

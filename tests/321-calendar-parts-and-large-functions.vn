@@ -18,7 +18,7 @@ function manyReads(p: Probe): int {
     return t;
 }
 
-function dynamicReads(d: dynamic): int {
+function dynamicReads(d: { x: int }): int {
     let t = 0;
     t = t + d.x;
     t = t + d.x;
@@ -362,7 +362,7 @@ await describe("321 calendar parts carry the weekday and big functions still com
             total = total + inlinedDates(1700000000000 + i * 86400000);
         }
         expect(total > 0).toBe(true);
-        const holder: dynamic = { x: 2 };
+        const holder: { x: int } = { x: 2 };
         expect(dynamicReads(holder)).toBe(600);
     });
 });

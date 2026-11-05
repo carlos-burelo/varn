@@ -56,7 +56,7 @@ enum ExtendedEnum {
         return ExtendedEnum.val;
     }
 }
-let AnonClass: dynamic = class {
+let AnonClass = class {
     x: int;
     constructor(x: int) {
         this.x = x;
@@ -65,7 +65,7 @@ let AnonClass: dynamic = class {
         return this.x;
     }
 };
-let namedExpr: dynamic = function foo(x: int): int {
+let namedExpr = function foo(x: int): int {
     return x + 1;
 };
 await describe("51 opt unsupported phase4", async () => {

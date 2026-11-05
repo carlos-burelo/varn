@@ -24,7 +24,7 @@ await describe("120 int division", async () => {
         expect(dz).toBe("zero");
         try { d(0 - 9223372036854775807 - 1, 0 - 1) } catch (e) { if (e instanceof IntegerOverflow) { ov = "ovf" } }
         expect(ov).toBe("ovf");
-        expect(dyn / 2).toBe(3);
+        expect((dyn as int) / 2).toBe(3);
         expect(f).toBe(2.5);
     });
 

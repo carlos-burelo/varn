@@ -3,12 +3,12 @@ import { describe, it, expect } from "std:test";
 
 // Test Suite 86: Tagged Template Functions End-to-End
 
-function customTag(strings: str[], ...values: dynamic[]): str {
+function customTag(strings: str[], ...values: (str | int)[]): str {
     let res = "";
     for (let i = 0; i < strings.length; i = i + 1) {
         res = res + strings[i];
         if (i < values.length) {
-            res = res + "[" + values[i] + "]";
+            res = res + `[${values[i]}]`;
         }
     }
     return res;
@@ -17,12 +17,12 @@ function customTag(strings: str[], ...values: dynamic[]): str {
 class Formatter {
     prefix: str = ">> ";
 
-    format(strings: str[], ...values: dynamic[]): str {
+    format(strings: str[], ...values: (str | int)[]): str {
         let res = this.prefix;
         for (let i = 0; i < strings.length; i = i + 1) {
             res = res + strings[i];
             if (i < values.length) {
-                res = res + values[i];
+                res = res + `${values[i]}`;
             }
         }
         return res;

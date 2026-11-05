@@ -48,7 +48,7 @@ await describe("123 int api", async () => {
         expect(kind(() => int.parse("abc"))).toBe("other");
         expect(int.parse(" 42 ")).toBe(42);
         expect(int.tryParse("abc")).toBe(null);
-        expect(kind(() => dyn.abs())).toBe("ovf");
+        expect(kind(() => (dyn as int).abs())).toBe("ovf");
     });
 
 

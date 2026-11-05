@@ -16,29 +16,29 @@ function outcome(f: () => void): str {
     }
 }
 
-function ints(d: dynamic): int { const xs: int[] = d; return xs.length }
+function ints(d: dynamic): int { const xs: int[] = d as int[]; return xs.length }
 function floatSum(d: dynamic): float {
-    const xs: float[] = d
+    const xs: float[] = d as float[]
     let total = 0.0
     for (const x of xs) { total = total + x }
     return total
 }
-function strs(d: dynamic): str[] { return d }
+function strs(d: dynamic): str[] { return d as str[] }
 function legs(d: dynamic): int {
-    const xs: Beast[] = d
+    const xs: Beast[] = d as Beast[]
     let total = 0
     for (const b of xs) { total = total + b.legs }
     return total
 }
-function mapSize(d: dynamic): int { const m: Map<str, int> = d; return m.size }
-function setSize(d: dynamic): int { const s: Set<int> = d; return s.size }
-function first(d: dynamic): int { const t: (int, str) = d; return t[0] }
-function tint(d: dynamic): Tint { return d }
-function apply(d: dynamic): int { const f: (x: int) => int = d; return f(2) }
-function absent(d: dynamic): bool { const xs: int[]? = d; return xs == null }
-function rows(d: dynamic): int { const xs: int[][] = d; return xs.length }
+function mapSize(d: dynamic): int { const m: Map<str, int> = d as Map<str, int>; return m.size }
+function setSize(d: dynamic): int { const s: Set<int> = d as Set<int>; return s.size }
+function first(d: dynamic): int { const t: (int, str) = d as (int, str); return t[0] }
+function tint(d: dynamic): Tint { return d as Tint }
+function apply(d: dynamic): int { const f: (x: int) => int = d as (x: int) => int; return f(2) }
+function absent(d: dynamic): bool { const xs: int[]? = d as int[]?; return xs == null }
+function rows(d: dynamic): int { const xs: int[][] = d as int[][]; return xs.length }
 function takeInts(xs: int[]): int { return xs.length }
-function passInts(d: dynamic): int { return takeInts(d) }
+function passInts(d: dynamic): int { return takeInts(d as int[]) }
 
 await describe("167 dynamic boundary: collections", async () => {
     await it("an array is checked as a container and by element", () => {

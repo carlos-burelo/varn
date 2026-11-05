@@ -4,7 +4,7 @@ enum Hue { Red, Green }
 enum Figure { Circle(r: float), Square }
 
 function isHue(d: dynamic): bool { return d instanceof Hue }
-function asHue(d: dynamic): Hue { return d }
+function asHue(d: dynamic): Hue { return d as Hue }
 
 await describe("175 enum instanceof", async () => {
     await it("a variant is an instance of its own enum", () => {

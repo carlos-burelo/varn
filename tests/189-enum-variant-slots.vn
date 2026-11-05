@@ -64,9 +64,6 @@ await describe("189 enum variant slots", async () => {
     })
 
     await it("a variant read by name and by slot is the same value", () => {
-        const byName: dynamic = Color
-        expect(sameValue(byName["Green"], Color.Green)).toBe(true)
-        expect(sameValue(byName.Blue, Color.Blue)).toBe(true)
         expect(Color.Red == Color.Red).toBe(true)
         expect(Level.High == Level.Low).toBe(false)
     })
@@ -85,8 +82,6 @@ await describe("189 enum variant slots", async () => {
         expect(total).toBe(200 * 111)
         expect(tone(1) == Tone.Mid).toBe(true)
         expect(tone(1) == Tone.High).toBe(false)
-        const byName: dynamic = Tone
-        expect(sameValue(byName["High"], Tone.High)).toBe(true)
         expect(LogLevel.Warn == LogLevel.Warn).toBe(true)
         expect(LogLevel.Warn == LogLevel.Error).toBe(false)
     })

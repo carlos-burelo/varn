@@ -1,4 +1,5 @@
 import { HttpServer, Request, Response, json, HttpStatus, fetch, HttpMethod } from "std:http";
+import { JsonValue } from "std:encoding";
 import { describe, it, expect } from "std:test";
 import { delay } from "std:task";
 
@@ -13,7 +14,7 @@ let reqJson = new Request("http://localhost:3000/api", { method: HttpMethod.POST
     "content-type": "application/json"
 }, body: "{\"name\":\"Varn\",\"version\":1}" });
 
-let parsedJson: dynamic = reqJson.json();
+let parsedJson = reqJson.json() as { [key: str]: JsonValue };
 
 let reqForm = new Request("http://localhost:3000/api", { method: HttpMethod.POST, headers: {
     "content-type": "application/x-www-form-urlencoded"
@@ -29,11 +30,11 @@ await describe("100 stdlib http enrichments", async () => {
         expect(reqWithCookies.cookies["session_id"]).toBe("xyz789");
         expect(reqWithCookies.cookies["theme"]).toBe("dark");
         expect(reqWithCookies.cookies["logged_in"]).toBe("true");
-        expect(parsedJson.name).toBe("Varn");
+        expect(parsedJson["name"]).toBe("Varn");
     });
 
     await it("group 1 part 2", async () => {
-        expect(parsedJson.version).toBe(1);
+        expect(parsedJson["version"]).toBe(1);
         expect(parsedForm["user"]).toBe("alice");
         expect(parsedForm["action"]).toBe("login");
         server.use(async (req: Request, next: () => Task<Response?>) => {

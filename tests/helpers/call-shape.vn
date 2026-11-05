@@ -1,3 +1,4 @@
+import { ClassRef } from "std:reflect"
 export class Tally {
     total: int
     constructor(start: int? = null) { this.total = start ?? 0 }
@@ -6,7 +7,7 @@ export class Tally {
     label(prefix: str, n: int?, suffix?: str): str { return prefix + (n ?? 0).toString() + (suffix ?? "") }
 }
 
-function marked(cls: dynamic): dynamic { cls.marked = true; return cls }
+function marked(cls: ClassRef): ClassRef { return cls }
 
 @marked
 export class Marked {

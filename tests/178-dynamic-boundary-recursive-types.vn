@@ -15,7 +15,7 @@ function outcome(f: () => void): str {
 }
 
 function count(d: dynamic): int {
-    let node: Chain? = d
+    let node: Chain? = d as Chain?
     let total = 0
     while (node != null) {
         total = total + 1
@@ -23,9 +23,9 @@ function count(d: dynamic): int {
     }
     return total
 }
-function folder(d: dynamic): Folder { return d }
+function folder(d: dynamic): Folder { return d as Folder }
 function head(d: dynamic): int {
-    const node: Chain = d
+    const node: Chain = d as Chain
     return node.value
 }
 
@@ -48,8 +48,9 @@ await describe("178 dynamic boundary: recursive types", async () => {
     })
 
     await it("cyclic data terminates", () => {
-        const loop: dynamic = { value: 1, next: null }
-        loop.next = loop
+        const cycle: Chain = { value: 1, next: null }
+        cycle.next = cycle
+        const loop: dynamic = cycle
         expect(head(loop)).toBe(1)
     })
 })
