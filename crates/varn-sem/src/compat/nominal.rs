@@ -1,6 +1,6 @@
 use super::compat_lookup::{
-    class_members_match_object, compatible_named, is_known_named, named_members,
-    object_matches_class_members,
+    class_members_match_object, class_value_satisfies, compatible_named, is_known_named,
+    named_members, object_matches_class_members,
 };
 use super::core::types_compatible_impl;
 use super::resolve::{m_ty, resolve_atom};
@@ -8,7 +8,89 @@ use super::scalar::t;
 use crate::bind::BindView;
 use crate::types::{CheckerTyTable, InternedTypeKind, Type};
 use rustc_hash::{FxHashMap, FxHashSet};
-use varn_core::{MemberKey, TypeKind};
+use varn_core::{BuiltinType, MemberKey, TypeKind};
+
+pub(super) fn class_value_arm(
+    declared: &Type,
+    inferred: &Type,
+    d: InternedTypeKind,
+    bind: Option<&BindView>,
+    cache: &mut FxHashMap<(Type, Type, usize), bool>,
+    in_progress: &mut FxHashSet<(Type, Type, usize)>,
+    table: &CheckerTyTable,
+) -> Option<bool> {
+    if inferred.builtin_of(table) == Some(BuiltinType::Class)
+        && declared.builtin_of(table) != Some(BuiltinType::Class)
+        && let TypeKind::Named(dn, origin_d) | TypeKind::Generic(dn, _, origin_d) = d
+    {
+        let instance = inferred.builtin_arg(0, table);
+        let declared_args: Vec<Type> = match d {
+            TypeKind::Generic(_, args, _) => table
+                .get_list(args)
+                .iter()
+                .map(|id| Type::resolved(*id))
+                .collect(),
+            TypeKind::Named(..)
+            | TypeKind::Primitive(_)
+            | TypeKind::Literal(_)
+            | TypeKind::This
+            | TypeKind::Array(_)
+            | TypeKind::Union(_)
+            | TypeKind::Intersection(_)
+            | TypeKind::Tuple(_)
+            | TypeKind::TemplateLiteral(_)
+            | TypeKind::Fn(_)
+            | TypeKind::Object(_)
+            | TypeKind::Typeof(_)
+            | TypeKind::KeyOf(_)
+            | TypeKind::IndexedAccess { .. }
+            | TypeKind::Mapped { .. }
+            | TypeKind::Conditional { .. }
+            | TypeKind::Infer(_)
+            | TypeKind::EnumVariant { .. }
+            | TypeKind::TypePredicate { .. } => Vec::new(),
+        };
+        return Some(
+            match table.get(instance.0) {
+                TypeKind::Named(inst, origin_i) | TypeKind::Generic(inst, _, origin_i) => {
+                    match (resolve_atom(bind, dn), resolve_atom(bind, inst)) {
+                        (Some(declared_name), Some(instance_name)) => class_value_satisfies(
+                            &declared_name,
+                            origin_d.and_then(|o| resolve_atom(bind, o)).as_deref(),
+                            &declared_args,
+                            &instance_name,
+                            origin_i.and_then(|o| resolve_atom(bind, o)).as_deref(),
+                            bind,
+                            cache,
+                            in_progress,
+                            table,
+                        ),
+                        _ => false,
+                    }
+                }
+                TypeKind::Primitive(_)
+                | TypeKind::Literal(_)
+                | TypeKind::This
+                | TypeKind::Array(_)
+                | TypeKind::Union(_)
+                | TypeKind::Intersection(_)
+                | TypeKind::Tuple(_)
+                | TypeKind::TemplateLiteral(_)
+                | TypeKind::Fn(_)
+                | TypeKind::Object(_)
+                | TypeKind::Typeof(_)
+                | TypeKind::KeyOf(_)
+                | TypeKind::IndexedAccess { .. }
+                | TypeKind::Mapped { .. }
+                | TypeKind::Conditional { .. }
+                | TypeKind::Infer(_)
+                | TypeKind::EnumVariant { .. }
+                | TypeKind::TypePredicate { .. } => false,
+            },
+        );
+    }
+    None
+}
 
 pub(super) fn nominal_arms(
     declared: &Type,

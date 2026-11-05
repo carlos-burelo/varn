@@ -1,6 +1,6 @@
 use super::arrays::array_arms;
 use super::generics::generic_arms;
-use super::nominal::nominal_arms;
+use super::nominal::{class_value_arm, nominal_arms};
 use super::objects::object_arm;
 use super::scalar::{is_simple_type, simple_types_compatible, t};
 use super::unions::union_arms;
@@ -158,7 +158,10 @@ pub(super) fn types_compatible_impl(
             .any(|m| types_compatible_impl(declared, &t(*m), bind, cache, in_progress, table)),
 
         _ => {
-            if let Some(r) = array_arms(d, i, bind, cache, in_progress, table) {
+            if let Some(r) = class_value_arm(declared, inferred, d, bind, cache, in_progress, table)
+            {
+                r
+            } else if let Some(r) = array_arms(d, i, bind, cache, in_progress, table) {
                 r
             } else if let Some(r) = generic_arms(d, i, bind, cache, in_progress, table) {
                 r

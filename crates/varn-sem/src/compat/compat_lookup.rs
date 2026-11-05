@@ -90,7 +90,63 @@ pub(super) fn compatible_named(
 
     match (decl_members, inf_members) {
         (Some(decl), Some(inf)) => {
-            class_members_compatible(&decl, &inf, bind, cache, in_progress, table)
+            let instance_members: Vec<ClassMemberInfo> =
+                inf.into_iter().filter(|m| !m.is_static).collect();
+            class_members_compatible(&decl, &instance_members, bind, cache, in_progress, table)
+        }
+        _ => false,
+    }
+}
+
+pub(super) fn class_value_satisfies(
+    declared: &str,
+    origin_decl: Option<&str>,
+    declared_args: &[Type],
+    instance: &str,
+    origin_inst: Option<&str>,
+    bind: Option<&BindView>,
+    cache: &mut FxHashMap<(Type, Type, usize), bool>,
+    in_progress: &mut FxHashSet<(Type, Type, usize)>,
+    table: &CheckerTyTable,
+) -> bool {
+    let Some(bind) = bind else {
+        return true;
+    };
+    use crate::types::TypeContext;
+    if bind.get_interface_members(declared, origin_decl).is_none() {
+        return false;
+    }
+    match (
+        named_members(bind, declared, origin_decl),
+        named_members(bind, instance, origin_inst),
+    ) {
+        (Some(decl), Some(inst)) => {
+            let own_members = named_members(
+                bind,
+                varn_core::BuiltinType::Class.name(),
+                Some(varn_core::BuiltinType::Class.core_module()),
+            )
+            .unwrap_or_default();
+            let value_members: Vec<ClassMemberInfo> = own_members
+                .into_iter()
+                .chain(inst.into_iter().filter(|m| m.is_static))
+                .collect();
+            let mapping: FxHashMap<varn_core::Atom, Type> = bind
+                .type_param_names(declared, origin_decl)
+                .unwrap_or_default()
+                .iter()
+                .zip(declared_args)
+                .map(|(param, arg)| (varn_core::Atom::of(param), *arg))
+                .collect();
+            let mut scratch = table.clone();
+            let decl: Vec<ClassMemberInfo> = decl
+                .into_iter()
+                .map(|mut m| {
+                    m.ty = m.ty.map_generics(&mapping, &mut scratch);
+                    m
+                })
+                .collect();
+            class_members_compatible(&decl, &value_members, bind, cache, in_progress, &scratch)
         }
         _ => false,
     }
