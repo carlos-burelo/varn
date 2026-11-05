@@ -1,1 +1,2 @@
 export declare function deepEq$<T>(a: T, b: T): bool;
+export declare function contains$<T, E>(container: T, item: E): bool;

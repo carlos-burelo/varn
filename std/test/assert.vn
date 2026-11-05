@@ -1,4 +1,4 @@
-import { deepEq$ } from "runtime:testing";
+import { deepEq$, contains$ } from "runtime:testing";
 
 export class AssertionError extends Error {
     constructor(message: str) {
@@ -111,7 +111,7 @@ export class Expectation<T> {
     }
 
     toBeCloseTo(expected: float, epsilon: float = 0.00001): void {
-        let a = (this.actual as dynamic) as float;
+        let a = this.actual as float;
         let diff = a - expected;
         if (diff < 0.0) diff = -diff;
         if (diff > epsilon) {
@@ -127,12 +127,7 @@ export class Expectation<T> {
         if (actual is str) {
             found = item is str && actual.includes(item);
         } else {
-            for (let elem of (actual as dynamic) as dynamic[]) {
-                if (isEq<dynamic>(elem, item)) {
-                    found = true;
-                    break;
-                }
-            }
+            found = contains$(actual, item);
         }
         if (!found) {
             failedCount = failedCount + 1;
