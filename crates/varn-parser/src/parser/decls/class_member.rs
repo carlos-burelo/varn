@@ -41,10 +41,13 @@ pub fn parse_class_member(
         TokenKind::Let | TokenKind::Const | TokenKind::Var | TokenKind::Function
     ) && s.peek_kind(1) == TokenKind::Identifier;
     if stray {
-        return Err(
+        s.push_diagnostic(
+            varn_core::ErrorCode::InvalidStatement,
             "a class member takes no 'let', 'const', 'var' or 'function': write 'name: Type' or 'name(...) { ... }'"
                 .to_owned(),
+            s.range(),
         );
+        s.advance();
     }
 
     if s.check(TokenKind::Constructor) {

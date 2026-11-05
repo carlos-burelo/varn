@@ -114,8 +114,12 @@ impl TokenStream {
     }
 
     pub fn push_error(&mut self, message: String, range: SourceRange) {
+        self.push_diagnostic(ErrorCode::UnexpectedToken, message, range);
+    }
+
+    pub fn push_diagnostic(&mut self, code: ErrorCode, message: String, range: SourceRange) {
         self.errors.push(
-            varn_core::Diagnostic::error(ErrorCode::UnexpectedToken, message)
+            varn_core::Diagnostic::error(code, message)
                 .with_range(range)
                 .with_file(self.filename.clone()),
         );
