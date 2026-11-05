@@ -1,0 +1,3 @@
+// expect: error[VN3006]
+const v: int | str = 1
+const x = v[0]

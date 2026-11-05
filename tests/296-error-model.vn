@@ -1,6 +1,6 @@
 import { describe, it, expect, AssertionError } from "std:test";
 import { spawnIsolate, Task } from "std:task";
-import { Json } from "std:encoding";
+import { Json, JsonValue } from "std:encoding";
 import { fromISO } from "std:time";
 import { readText, readTextAsync } from "std:fs";
 import {
@@ -172,7 +172,7 @@ await describe("296 error model", async () => {
     });
     await it("an error serializes to JSON with its code and fields", async () => {
         const text = Json.stringify(new FsNotFoundError("/x/y"));
-        const parsed = Json.parse(text);
+        const parsed = Json.parse<{ [k: str]: JsonValue }>(text);
         expect(parsed["code"]).toBe("fs.not_found");
         expect(parsed["name"]).toBe("FsNotFoundError");
         expect(parsed["path"]).toBe("/x/y");

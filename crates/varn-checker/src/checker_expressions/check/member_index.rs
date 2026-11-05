@@ -119,6 +119,44 @@ impl<'r> Checker<'r> {
             self.check_named_index(rec, object, property, &check_ty, property_range, bind);
         } else {
             self.check_expr(rec, property, bind);
+            let not_indexable = match check_kind {
+                TypeKind::Union(_) | TypeKind::Fn(_) => true,
+                TypeKind::Primitive(p) => !matches!(
+                    p,
+                    varn_core::LangPrimitive::Str
+                        | varn_core::LangPrimitive::Dynamic
+                        | varn_core::LangPrimitive::Error
+                ),
+                TypeKind::Literal(_)
+                | TypeKind::This
+                | TypeKind::Array(_)
+                | TypeKind::Intersection(_)
+                | TypeKind::Tuple(_)
+                | TypeKind::Named(..)
+                | TypeKind::Generic(..)
+                | TypeKind::TemplateLiteral(_)
+                | TypeKind::Object(_)
+                | TypeKind::Typeof(_)
+                | TypeKind::KeyOf(_)
+                | TypeKind::IndexedAccess { .. }
+                | TypeKind::Mapped { .. }
+                | TypeKind::Conditional { .. }
+                | TypeKind::Infer(_)
+                | TypeKind::EnumVariant { .. }
+                | TypeKind::TypePredicate { .. } => false,
+            };
+            if not_indexable {
+                self.emit(
+                    Diagnostic::error(
+                        ErrorCode::NotIndexable,
+                        format!(
+                            "'{}' cannot be indexed: narrow it to an array, tuple, Map or object type first",
+                            check_ty.display(&self.ty_table, &bind.interner)
+                        ),
+                    )
+                    .with_range(property_range),
+                );
+            }
         }
     }
 

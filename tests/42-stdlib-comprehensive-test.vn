@@ -2,7 +2,7 @@ import { describe, it, expect } from "std:test";
 import { Duration, PlainDateTime, nowInstant, Instant } from 'std:time';
 import { List, Stack, Queue } from 'std:collections';
 import { fetch, HttpServer, Request, Response } from 'std:http';
-import { Json } from 'std:encoding';
+import { Json, JsonValue } from 'std:encoding';
 import { uuid, sha256 } from 'std:crypto';
 import { writeText as fsWrite, exists as fsExists, readText as fsRead, tempDir as fsTempDir, remove as fsRemove } from 'std:fs';
 import { write as ioWrite, writeln as ioWriteln } from 'std:io';
@@ -49,7 +49,7 @@ async function runComprehensiveTest(): Task<void> {
 
     // 4. std:json
     let serialized = Json.stringify({ test: "json", value: 123 });
-    let parsed = Json.parse(serialized);
+    let parsed = Json.parse<{ [k: str]: JsonValue }>(serialized);
     expect(parsed["test"]).toBe("json");
     expect(parsed["value"]).toBe(123);
 

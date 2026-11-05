@@ -1,7 +1,7 @@
 import { describe, it, expect } from "std:test";
 import { List } from "std:collections";
 import { fetch } from "std:http";
-import { Json } from "std:encoding";
+import { Json, JsonValue } from "std:encoding";
 import { uuid, sha256 } from "std:crypto";
 import { Duration, PlainDateTime, nowInstant, Instant } from "std:time";
 
@@ -74,7 +74,7 @@ await describe("31 stdlib migration test", async () => {
         expect(json_str.length > 0).toBeTruthy()
         expect(json_str.includes("Varn")).toBeTruthy()
         
-        let back = Json.parse(json_str);
+        let back = Json.parse<{ [k: str]: JsonValue }>(json_str);
         expect(back["name"]).toBe("Varn")
         expect(back["version"]).toBe(1)
         
