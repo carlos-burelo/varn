@@ -2,13 +2,11 @@ import { errorCode$, registerErrorClasses$ } from "runtime:error";
 
 export class StdError extends Error {
     code: str = "";
-    cause: Error? = null;
 
     constructor(message: str, cause?: Error) {
-        super(message);
+        super(message, cause);
         this.name = "StdError";
         this.code = errorCode$("StdError");
-        this.cause = cause ?? null;
     }
 }
 

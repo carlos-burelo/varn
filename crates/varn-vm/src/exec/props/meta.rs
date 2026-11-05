@@ -242,6 +242,7 @@ pub(crate) fn resolve_meta_property(
                 | MemberKey::LastIndexOf
                 | MemberKey::Message
                 | MemberKey::Stack
+                | MemberKey::Cause
                 | MemberKey::IsStatic
                 | MemberKey::IsPrivate
                 | MemberKey::Inclusive
@@ -294,6 +295,7 @@ pub(crate) fn resolve_meta_property(
         | MemberKey::LastIndexOf
         | MemberKey::Message
         | MemberKey::Stack
+        | MemberKey::Cause
         | MemberKey::IsStatic
         | MemberKey::IsPrivate
         | MemberKey::Inclusive

@@ -88,6 +88,7 @@ member_keys! {
     CharCode => "charCode",
     Message => "message",
     Stack => "stack",
+    Cause => "cause",
     IsStatic => "isStatic",
     IsPrivate => "isPrivate",
     Inclusive => "inclusive",
