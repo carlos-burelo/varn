@@ -22,6 +22,16 @@ pub fn types_compatible(
     types_compatible_with_cache(declared, inferred, bind, &mut cache, table)
 }
 
+pub(super) fn unknown_shortcut(declared: &Type, inferred: &Type) -> Option<bool> {
+    if declared.is_error() || inferred.is_error() || declared.is_dynamic() {
+        Some(true)
+    } else if inferred.is_dynamic() {
+        Some(false)
+    } else {
+        None
+    }
+}
+
 pub fn types_compatible_with_cache(
     declared: &Type,
     inferred: &Type,
@@ -32,8 +42,8 @@ pub fn types_compatible_with_cache(
     if declared.0 == inferred.0 {
         return true;
     }
-    if declared.is_unresolved() || inferred.is_unresolved() {
-        return true;
+    if let Some(fits) = unknown_shortcut(declared, inferred) {
+        return fits;
     }
     if declared == inferred {
         return true;
@@ -56,8 +66,8 @@ pub(super) fn types_compatible_impl(
     if declared.0 == inferred.0 {
         return true;
     }
-    if declared.is_unresolved() || inferred.is_unresolved() {
-        return true;
+    if let Some(fits) = unknown_shortcut(declared, inferred) {
+        return fits;
     }
     if declared == inferred {
         return true;
@@ -109,17 +119,13 @@ pub(super) fn types_compatible_impl(
     }
     let result = match (d, i) {
         (
-            TypeKind::Primitive(
-                varn_core::LangPrimitive::Dynamic | varn_core::LangPrimitive::Error,
-            ),
+            TypeKind::Primitive(varn_core::LangPrimitive::Error),
             _,
         )
-        | (
-            _,
-            TypeKind::Primitive(
-                varn_core::LangPrimitive::Dynamic | varn_core::LangPrimitive::Error,
-            ),
-        ) => true,
+        | (_, TypeKind::Primitive(varn_core::LangPrimitive::Error))
+        | (TypeKind::Primitive(varn_core::LangPrimitive::Dynamic), _) => true,
+
+        (_, TypeKind::Primitive(varn_core::LangPrimitive::Dynamic)) => false,
 
         (_, TypeKind::Primitive(varn_core::LangPrimitive::Never)) => true,
 
