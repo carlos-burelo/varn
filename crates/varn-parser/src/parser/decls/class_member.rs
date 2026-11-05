@@ -91,11 +91,17 @@ pub fn parse_class_member(
 
     let is_get = s.check(TokenKind::Get) && {
         let nk = s.peek_kind(1);
-        nk != TokenKind::LParen && nk != TokenKind::Semicolon && nk != TokenKind::Colon
+        nk != TokenKind::LParen
+            && nk != TokenKind::LAngle
+            && nk != TokenKind::Semicolon
+            && nk != TokenKind::Colon
     };
     let is_set = s.check(TokenKind::Set) && {
         let nk = s.peek_kind(1);
-        nk != TokenKind::LParen && nk != TokenKind::Semicolon && nk != TokenKind::Colon
+        nk != TokenKind::LParen
+            && nk != TokenKind::LAngle
+            && nk != TokenKind::Semicolon
+            && nk != TokenKind::Colon
     };
 
     if is_get {
