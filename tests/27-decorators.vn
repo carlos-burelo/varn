@@ -83,15 +83,15 @@ await describe("27 Decorators", async () => {
         @routeDeco("/api/items")
         @rolesDeco("admin", "user")
         class ItemController {}
-        const decoPerms: str[] = RolesKey.get(ItemController::class) ?? [];
-        expect(RouteKey.get(ItemController::class)).toBe("/api/items");
+        const decoPerms: str[] = RolesKey.get(ItemController) ?? [];
+        expect(RouteKey.get(ItemController)).toBe("/api/items");
         expect(decoPerms.length).toBe(2);
         expect(decoPerms[0]).toBe("admin");
-        expect(RouteKey.get(DecoratedA::class)).toBe(null);
-        TagKey.set(DecoratedA::class, "tag-a");
-        TagKey2.set(DecoratedA::class, "tag-b");
-        expect(TagKey.get(DecoratedA::class)).toBe("tag-a");
-        expect(TagKey2.get(DecoratedA::class)).toBe("tag-b");
+        expect(RouteKey.get(DecoratedA)).toBe(null);
+        TagKey.set(DecoratedA, "tag-a");
+        TagKey2.set(DecoratedA, "tag-b");
+        expect(TagKey.get(DecoratedA)).toBe("tag-a");
+        expect(TagKey2.get(DecoratedA)).toBe("tag-b");
     });
 
     await it("method decorators", () => {

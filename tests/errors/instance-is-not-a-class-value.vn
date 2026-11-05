@@ -1,0 +1,4 @@
+// expect: error[VN3001]
+class A {}
+function take(c: Class<A>): void {}
+take(new A())

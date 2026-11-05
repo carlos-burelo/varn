@@ -75,6 +75,13 @@ impl<'r> Checker<'r> {
     pub(crate) fn member_exists(&mut self, ty: &Type, key: &str, bind: &BindResult) -> bool {
         let resolved = self.member_input(*ty, bind);
         let ty = &resolved;
+        if ty.builtin_of(&self.ty_table) == Some(varn_core::BuiltinType::Class) {
+            if key == varn_core::MemberKey::Name.as_str() {
+                return true;
+            }
+            let instance = ty.builtin_arg(0, &self.ty_table);
+            return self.member_exists(&instance, key, bind);
+        }
         let ty_kind = self.ty_table.get(ty.0);
         let res = match ty_kind {
             TypeKind::Primitive(

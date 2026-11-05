@@ -64,6 +64,10 @@ impl<'r> Checker<'r> {
             | TypeKind::Infer(_)
             | TypeKind::TypePredicate { .. } => None,
         };
+        if res.is_none() && ty.builtin_of(&self.ty_table) == Some(varn_core::BuiltinType::Class) {
+            let instance = ty.builtin_arg(0, &self.ty_table);
+            return self.find_member_info_uncached(&instance, key, bind);
+        }
         if res.is_none()
             && let Some(tn) = crate::checker_expressions::check::members::extension_type_name(
                 self,

@@ -15,6 +15,15 @@ impl<'r> Checker<'r> {
         range: &SourceRange,
         bind: &BindResult,
     ) {
+        if matches!(self.ast_arena.expr(object).kind, ExprKind::Super) {
+            return;
+        }
+        let through_class = owner.builtin_of(&self.ty_table) == Some(varn_core::BuiltinType::Class);
+        let owner = if through_class {
+            owner.builtin_arg(0, &self.ty_table)
+        } else {
+            *owner
+        };
         let (name, origin) = match self.ty_table.get(owner.0) {
             TypeKind::Named(name, origin) | TypeKind::Generic(name, _, origin) => (
                 self.resolve_bind_atom(bind, name),
@@ -48,54 +57,6 @@ impl<'r> Checker<'r> {
         if bind.interner.get(&name).and_then(kind_of) != Some(SymbolKind::Class) {
             return;
         }
-        let through_class = match &self.ast_arena.expr(object).kind {
-            ExprKind::Identifier { name } => kind_of(*name) == Some(SymbolKind::Class),
-            ExprKind::Super => return,
-            ExprKind::IntLiteral { .. }
-            | ExprKind::FloatLiteral { .. }
-            | ExprKind::BigIntLiteral { .. }
-            | ExprKind::DecimalLiteral { .. }
-            | ExprKind::StrLiteral { .. }
-            | ExprKind::CharLiteral { .. }
-            | ExprKind::BoolLiteral { .. }
-            | ExprKind::NullLiteral
-            | ExprKind::Template { .. }
-            | ExprKind::TaggedTemplate { .. }
-            | ExprKind::Missing
-            | ExprKind::This
-            | ExprKind::ImportMeta(_)
-            | ExprKind::Array { .. }
-            | ExprKind::Object { .. }
-            | ExprKind::Tuple { .. }
-            | ExprKind::Unary { .. }
-            | ExprKind::Update { .. }
-            | ExprKind::Binary { .. }
-            | ExprKind::Logical { .. }
-            | ExprKind::Assign { .. }
-            | ExprKind::Conditional { .. }
-            | ExprKind::Member { .. }
-            | ExprKind::Call { .. }
-            | ExprKind::New { .. }
-            | ExprKind::Function { .. }
-            | ExprKind::Arrow { .. }
-            | ExprKind::Sequence { .. }
-            | ExprKind::Paren { .. }
-            | ExprKind::Await { .. }
-            | ExprKind::Spawn { .. }
-            | ExprKind::Yield { .. }
-            | ExprKind::Spread { .. }
-            | ExprKind::Pipeline { .. }
-            | ExprKind::Range { .. }
-            | ExprKind::NonNull { .. }
-            | ExprKind::Try { .. }
-            | ExprKind::As { .. }
-            | ExprKind::Satisfies { .. }
-            | ExprKind::ClassExpr { .. }
-            | ExprKind::Match { .. }
-            | ExprKind::Is { .. }
-            | ExprKind::With { .. }
-            | ExprKind::MetaAccess { .. } => false,
-        };
         let Some(members) = varn_sem::bind::BindView::new(bind, self.resolver)
             .get_class_members(&name, origin.as_deref())
         else {

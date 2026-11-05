@@ -28,6 +28,13 @@ impl<'r> Checker<'r> {
                         return *ty;
                     }
                     if let Some(ty) = bind.arena.get(sid).ty {
+                        if bind.arena.get(sid).kind == varn_sem::symbol::SymbolKind::Class {
+                            return Type::builtin(
+                                varn_core::BuiltinType::Class,
+                                vec![ty],
+                                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                            );
+                        }
                         return ty;
                     }
                 }
