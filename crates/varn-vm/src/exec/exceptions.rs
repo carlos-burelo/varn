@@ -22,31 +22,34 @@ pub(crate) fn pop_try(handlers: &mut Vec<TryHandler>) {
 }
 
 pub(crate) fn collect_frames(frames: &[CallFrame]) -> Vec<FrameInfo> {
-    frames
-        .iter()
-        .rev()
-        .map(|f| {
-            let proto = &f.closure().proto;
-            let fn_name = proto
-                .name
-                .as_deref()
-                .map(|s| s.to_owned())
-                .unwrap_or_else(|| "<anonymous>".to_owned());
-            let raw_file = proto.chunk.source_file.as_ref();
-            let file = if let Some(stripped) = raw_file.strip_prefix(r"\\?\") {
-                stripped.to_owned()
+    let mut out = Vec::with_capacity(frames.len());
+    for frame in frames.iter().rev() {
+        let proto = &frame.closure().proto;
+        let function_name = proto
+            .name
+            .as_deref()
+            .map_or_else(|| "<anonymous>".to_owned(), str::to_owned);
+        let file = proto.chunk.source_file.as_ref().to_owned();
+        let at = frame.ip.saturating_sub(1);
+        let mut scope = proto.chunk.lines.get_scope(at);
+        let mut line = proto.chunk.lines.get_line(at).max(1);
+        loop {
+            let enclosing = if scope == 0 {
+                None
             } else {
-                raw_file.to_owned()
+                proto.chunk.inline_scopes.get(scope as usize - 1)
             };
-            let raw_line = proto.chunk.lines.get_line(f.ip.saturating_sub(1));
-            let line = if raw_line > 0 { raw_line } else { 1 };
-            FrameInfo {
-                fn_name,
-                file,
+            out.push(FrameInfo {
+                fn_name: enclosing.map_or_else(|| function_name.clone(), |s| s.function.clone()),
+                file: file.clone(),
                 line,
-            }
-        })
-        .collect()
+            });
+            let Some(enclosing) = enclosing else { break };
+            line = enclosing.call_line.max(1);
+            scope = enclosing.parent;
+        }
+    }
+    out
 }
 
 fn extract_error_message(val: VmValue, heap: &Heap) -> String {
