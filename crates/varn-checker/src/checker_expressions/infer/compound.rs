@@ -12,11 +12,15 @@ impl<'r> Checker<'r> {
         rec: &mut Recorder,
         object: ExprId,
         property: ExprId,
-        _expr: ExprId,
+        expr: ExprId,
         bind: &BindResult,
     ) -> Type {
         let (slot, keyed) = self.computed_member_slot(rec, object, property, bind);
-        if keyed && !slot.is_unresolved() {
+        let optional = matches!(
+            self.ast_arena.expr(expr).kind,
+            varn_core::ast::ExprKind::Member { optional: true, .. }
+        );
+        if (keyed || optional) && !slot.is_unresolved() {
             Type::make_nullable(slot, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
         } else {
             slot
@@ -35,6 +39,7 @@ impl<'r> Checker<'r> {
         if obj_ty.is_unresolved() {
             return (obj_ty, false);
         }
+        let obj_ty = obj_ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
         if matches!(
             arena.expr(property).kind,
             varn_core::ast::ExprKind::Range { .. }
