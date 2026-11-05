@@ -143,11 +143,11 @@ impl<'r> super::super::Binder<'r> {
                 Decl::Variable(v) => {
                     for d in &v.declarators {
                         let name: Arc<str> = Arc::from(pattern_lead_name(&d.id, &self.interner));
-                        let ty = d
-                            .type_ann
-                            .as_ref()
-                            .map(|ann| self.resolve_type(ann))
-                            .unwrap_or(Type::Dynamic);
+                        let ty = match (&d.type_ann, d.init) {
+                            (Some(ann), _) => self.resolve_type(ann),
+                            (None, Some(init)) => self.infer_expr_type_self(init),
+                            (None, None) => Type::Error,
+                        };
                         let scope = self.scopes.get(self.current);
                         let symbol_id = self
                             .interner
