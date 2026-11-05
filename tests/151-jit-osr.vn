@@ -54,8 +54,15 @@ function osDown(n: int): int {
     return s
 }
 
+// Direct calls to small functions are inlined into the caller; calling through
+// a function value keeps each function a frame of its own to resume.
+const callSingle: (n: int) => str = osSingle
+const callNested: (n: int) => int = osNested
+const callTriple: (n: int) => int = osTriple
+const callDown: (n: int) => int = osDown
+
 // Expected values, computed with closed forms.
-const single = osSingle(30000)
+const single = callSingle(30000)
 // sum over row of (row * sum k) + row = (sum k)(sum row) + sum row.
 const n = 400
 const tri = n * (n - 1) / 2
@@ -65,12 +72,12 @@ const trm = m * (m - 1) / 2
 await describe("151 jit osr", async () => {
         await it("group 1 part 1", async () => {
         expect(single == "60000/15000.0/...").toBeTruthy();
-        expect(osNested(n)).toBe(tri * tri + tri);
+        expect(callNested(n)).toBe(tri * tri + tri);
     });
 
     await it("group 1 part 2", async () => {
-        expect(osTriple(m)).toBe(m * m * trm + m * trm * trm);
-        expect(osDown(50000)).toBe(50000 * 50001 / 2);
+        expect(callTriple(m)).toBe(m * m * trm + m * trm * trm);
+        expect(callDown(50000)).toBe(50000 * 50001 / 2);
     });
 
 
