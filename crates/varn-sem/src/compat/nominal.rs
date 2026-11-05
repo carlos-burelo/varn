@@ -158,7 +158,7 @@ pub(super) fn nominal_arms(
                     table,
                 ));
             }
-            Some(true)
+            Some(false)
         }
         (TypeKind::Generic(..), TypeKind::Object(_)) => Some(false),
         (TypeKind::Named(dn, origin_d), TypeKind::Object(inf_fields)) => Some(

@@ -139,7 +139,7 @@ async function runComprehensiveTest(): Task<void> {
     async function threeHundred(): Task<int> {
         return 100 + 200;
     }
-    let h1 = spawn(threeHundred);
+    let h1 = spawn(threeHundred());
     let val = await h1;
     expect(val).toBe(300);
 

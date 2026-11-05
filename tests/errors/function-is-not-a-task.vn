@@ -1,0 +1,4 @@
+// expect: error[VN3001]
+import { spawn } from "std:task"
+async function work(): Task<int> { return 1 }
+spawn(work)

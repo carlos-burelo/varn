@@ -117,7 +117,7 @@ export function setTimeout(callback: () => void, ms: int): TaskHandle<void> {
         await sleep(ms);
         callback();
     }
-    return spawn(timerRunner);
+    return spawn(timerRunner());
 }
 
 export function clearTimeout(handle: TaskHandle<void>): void {
