@@ -42,6 +42,7 @@ impl Reach {
         let f = table.get_function(id).clone();
         self.push_params(&f.params);
         self.pending.push(f.return_type);
+        self.pending.extend(f.type_param_defaults.iter().flatten().copied());
         self.functions.insert(id, f);
     }
 

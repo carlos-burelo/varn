@@ -15,6 +15,7 @@ impl Type {
                 let f = table.get_function(id);
                 ids.extend(f.params.iter().map(|p| p.ty));
                 ids.push(f.return_type);
+                ids.extend(f.type_param_defaults.iter().flatten().copied());
             }
             TypeKind::Object(id) => {
                 for member in table.get_object_members(id) {
