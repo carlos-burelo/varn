@@ -101,18 +101,34 @@ impl Compilation {
         }
 
         let source = self.source.clone();
-        let tokens = self.timed(Stage::Lex, || {
-            crate::lex::scan(source.text(), source.path())
-        })?;
+        let (tokens, _, lex_diagnostics) = self.timed(Stage::Lex, || {
+            crate::lex::scan_tolerant(source.text(), source.path())
+        });
         let (token_vec, lexeme_buf) = (tokens.tokens.clone(), tokens.lexeme_buf.clone());
         self.tokens = Some(tokens);
         if request.goal == Goal::Tokens {
-            return Ok(());
+            return if lex_diagnostics.is_empty() {
+                Ok(())
+            } else {
+                Err(Failure::diagnostics(
+                    source.path(),
+                    source.text(),
+                    lex_diagnostics,
+                ))
+            };
         }
 
-        let parsed = self.timed(Stage::Parse, || {
-            crate::parse::parse(token_vec, lexeme_buf, source.text(), source.path())
-        })?;
+        let (parsed, mut diagnostics) = self.timed(Stage::Parse, || {
+            crate::parse::parse_tolerant(token_vec, lexeme_buf, source.path())
+        });
+        diagnostics.extend(lex_diagnostics);
+        if !diagnostics.is_empty() {
+            return Err(Failure::diagnostics(
+                source.path(),
+                source.text(),
+                diagnostics,
+            ));
+        }
         if request.goal == Goal::Ast {
             self.parsed = Some(parsed);
             return Ok(());
