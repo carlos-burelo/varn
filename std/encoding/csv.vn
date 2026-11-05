@@ -1,5 +1,7 @@
 import { parse$, stringify$ } from "runtime:csv";
 
+export type CsvValue = int | float | str | bool;
+
 export interface CsvOptions {
     delimiter?: str;
     hasHeader?: bool;
@@ -7,7 +9,7 @@ export interface CsvOptions {
 }
 
 export namespace Csv {
-    export function parse<T = dynamic>(text: str, options?: CsvOptions): T[] {
+    export function parse<T = { [key: str]: CsvValue }>(text: str, options?: CsvOptions): T[] {
         let delim = ",";
         let hasHeader = true;
         let trim = true;

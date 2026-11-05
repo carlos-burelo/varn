@@ -1,4 +1,4 @@
-import { Csv, Json } from "std:encoding";
+import { Csv, CsvValue, Json, JsonValue } from "std:encoding";
 import { describe, it, expect } from "std:test";
 
 // 1. Basic CSV parsing with header and automatic type coercion via Csv.parse
@@ -18,7 +18,7 @@ let items = Csv.parse(csvQuotes);
 
 // 4. Raw Matrix Parsing (hasHeader = false)
 let csvMatrix = "10,20,30\n40,50,60\n70,80,90";
-let matrix = Csv.parse(csvMatrix, { hasHeader: false });
+let matrix = Csv.parse<CsvValue[]>(csvMatrix, { hasHeader: false });
 
 // 5. Stringify Objects to CSV
 let serialized = Csv.stringify(users);
@@ -28,10 +28,10 @@ let roundtrip = Csv.parse(serialized);
 
 // 7. Stringify Raw Rows (Arrays of Arrays)
 let serializedMatrix = Csv.stringify(matrix);
-let roundtripMatrix = Csv.parse(serializedMatrix, { hasHeader: false });
+let roundtripMatrix = Csv.parse<CsvValue[]>(serializedMatrix, { hasHeader: false });
 
 // 8. JSON Namespace validation (Json.parse, Json.stringify)
-let jsonObj = Json.parse("{\"message\": \"hello\", \"status\": 200}");
+let jsonObj = Json.parse<{ [key: str]: JsonValue }>("{\"message\": \"hello\", \"status\": 200}");
 let jsonStr = Json.stringify(jsonObj);
 
 // 9. Generic Typed Json.parse<T> & Csv.parse<T>
@@ -52,33 +52,33 @@ let typedJson = Json.parse<ApiResponse>("{\"message\": \"hello\", \"status\": 20
 await describe("82 std csv", async () => {
         await it("group 1 part 1", async () => {
         expect(users.length).toBe(3);
-        expect(users[0].id).toBe(1);
-        expect(users[0].name).toBe("Alice");
-        expect(users[0].age).toBe(30);
-        expect(users[0].active).toBe(true);
-        expect(users[0].score).toBe(95.5);
-        expect(users[1].id).toBe(2);
-        expect(users[1].name).toBe("Bob");
-        expect(users[1].active).toBe(false);
+        expect(users[0]["id"]).toBe(1);
+        expect(users[0]["name"]).toBe("Alice");
+        expect(users[0]["age"]).toBe(30);
+        expect(users[0]["active"]).toBe(true);
+        expect(users[0]["score"]).toBe(95.5);
+        expect(users[1]["id"]).toBe(2);
+        expect(users[1]["name"]).toBe("Bob");
+        expect(users[1]["active"]).toBe(false);
         expect(products.length).toBe(2);
-        expect(products[0].id).toBe(101);
-        expect(products[0].product).toBe("Mechanical Keyboard");
-        expect(products[0].price).toBe(129.99);
-        expect(products[0].inStock).toBe(true);
-        expect(products[1].id).toBe(102);
-        expect(products[1].product).toBe("Wireless Mouse");
+        expect(products[0]["id"]).toBe(101);
+        expect(products[0]["product"]).toBe("Mechanical Keyboard");
+        expect(products[0]["price"]).toBe(129.99);
+        expect(products[0]["inStock"]).toBe(true);
+        expect(products[1]["id"]).toBe(102);
+        expect(products[1]["product"]).toBe("Wireless Mouse");
     });
 
     await it("group 1 part 2", async () => {
-        expect(products[1].price).toBe(49.50);
-        expect(products[1].inStock).toBe(false);
+        expect(products[1]["price"]).toBe(49.50);
+        expect(products[1]["inStock"]).toBe(false);
         expect(items.length).toBe(2);
-        expect(items[0].id).toBe(1);
-        expect(items[0].title).toBe("Special, Item");
-        expect(items[0].description).toBe("Item with \"double quotes\" inside");
-        expect(items[1].id).toBe(2);
-        expect(items[1].title).toBe("Multi-line\nItem");
-        expect(items[1].description).toBe("Second line content");
+        expect(items[0]["id"]).toBe(1);
+        expect(items[0]["title"]).toBe("Special, Item");
+        expect(items[0]["description"]).toBe("Item with \"double quotes\" inside");
+        expect(items[1]["id"]).toBe(2);
+        expect(items[1]["title"]).toBe("Multi-line\nItem");
+        expect(items[1]["description"]).toBe("Second line content");
         expect(matrix.length).toBe(3);
         expect(matrix[0][0]).toBe(10);
         expect(matrix[0][1]).toBe(20);
@@ -92,13 +92,13 @@ await describe("82 std csv", async () => {
         expect(serialized.includes("1,Alice,30,true,95.5")).toBeTruthy();
         expect(serialized.includes("2,Bob,25,false,88.0")).toBeTruthy();
         expect(roundtrip.length).toBe(3);
-        expect(roundtrip[0].id).toBe(1);
-        expect(roundtrip[0].name).toBe("Alice");
-        expect(roundtrip[2].id).toBe(3);
-        expect(roundtrip[2].score).toBe(99.25);
+        expect(roundtrip[0]["id"]).toBe(1);
+        expect(roundtrip[0]["name"]).toBe("Alice");
+        expect(roundtrip[2]["id"]).toBe(3);
+        expect(roundtrip[2]["score"]).toBe(99.25);
         expect(roundtripMatrix.length).toBe(3);
         expect(roundtripMatrix[1][1]).toBe(50);
-        expect((jsonObj as dynamic).status).toBe(200);
+        expect(jsonObj["status"]).toBe(200);
         expect(jsonStr.includes("\"status\":200")).toBeTruthy();
         expect(typedUsers[0].name).toBe("Alice");
         expect(typedUsers[1].id).toBe(2);
