@@ -4,6 +4,7 @@ pub enum ExitCode {
     Usage = 2,
     Diagnostics = 3,
     Uncaught = 4,
+    Internal = 101,
 }
 
 impl ExitCode {

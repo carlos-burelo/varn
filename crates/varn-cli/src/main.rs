@@ -20,6 +20,7 @@ mod error;
 mod exec;
 mod exit;
 mod formatter;
+mod ice;
 mod pipeline;
 mod policy;
 mod source_name;
@@ -41,6 +42,7 @@ fn main() {
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
 
+    ice::install();
     varn_vm::configure_process(varn_core::env::install_from_process_or_exit());
 
     match std::thread::Builder::new()
@@ -48,8 +50,8 @@ fn main() {
         .spawn(run_cli)
     {
         Ok(handle) => {
-            if let Err(panic) = handle.join() {
-                std::panic::resume_unwind(panic);
+            if handle.join().is_err() {
+                process::exit(exit::ExitCode::Internal.code());
             }
         }
         Err(e) => {
@@ -92,7 +94,9 @@ fn run_cli() {
     if let Err(e) = result {
         match e.exit_code() {
             exit::ExitCode::Diagnostics | exit::ExitCode::Uncaught => eprintln!("{e}"),
-            exit::ExitCode::Fatal | exit::ExitCode::Usage => terminal::error(&e),
+            exit::ExitCode::Fatal | exit::ExitCode::Usage | exit::ExitCode::Internal => {
+                terminal::error(&e)
+            }
         }
         process::exit(e.exit_code().code());
     }
