@@ -141,6 +141,11 @@ impl<'r> Checker<'r> {
             };
             return Some((ty, m.symbol_id));
         }
+        if let Some(members) = bind.type_members.namespaces.get(&name)
+            && let Some(m) = members.iter().find(|m| m.name.as_ref() == key)
+        {
+            return Some((m.ty, m.symbol_id));
+        }
         if let Some(members) = bind.get_enum_members_local(name.as_ref())
             && let Some(m) = members.iter().find(|m| m.name.as_ref() == key)
         {
@@ -214,6 +219,12 @@ impl<'r> Checker<'r> {
             return Some((self.reintern_foreign_ty(ext_bind, ty), m.symbol_id));
         }
         if let Some(members) = ext_bind.type_members.interfaces.get(name)
+            && let Some(m) = members.iter().find(|m| m.name.as_ref() == key)
+        {
+            let ty = m.ty;
+            return Some((self.reintern_foreign_ty(ext_bind, ty), m.symbol_id));
+        }
+        if let Some(members) = ext_bind.type_members.namespaces.get(name)
             && let Some(m) = members.iter().find(|m| m.name.as_ref() == key)
         {
             let ty = m.ty;
