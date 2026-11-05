@@ -1,7 +1,7 @@
 use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::ast::{ExprId, ExprKind};
-use varn_core::{Diagnostic, ErrorCode, TypeKind};
+use varn_core::TypeKind;
 use varn_sem::bind::BindResult;
 use varn_sem::types::{Type, TypeContext};
 
@@ -171,29 +171,9 @@ impl<'r> Checker<'r> {
                 self.check_expr(rec, expression, bind);
                 self.resolve_type_node_cached(&type_ann, bind)
             }
-            ExprKind::Satisfies {
-                expression,
-                type_ann,
-                ..
-            } => {
-                let (expression, type_ann) = (*expression, type_ann.clone());
-                let ty = self.infer_type(rec, expression, bind);
-                let target = self.resolve_type_node_cached(&type_ann, bind);
-                if !self.types_compatible_cached(&target, &ty, Some(bind)) {
-                    let range = arena.expr(expression).range;
-                    self.emit(
-                        Diagnostic::error(
-                            ErrorCode::InvalidSatisfies,
-                            format!(
-                                "type '{}' does not satisfy '{}'",
-                                ty.display(&self.ty_table, &bind.interner),
-                                target.display(&self.ty_table, &bind.interner)
-                            ),
-                        )
-                        .with_range(range),
-                    );
-                }
-                ty
+            ExprKind::Satisfies { expression, .. } => {
+                let expression = *expression;
+                self.infer_type(rec, expression, bind)
             }
             ExprKind::MetaAccess { target, property } => {
                 self.infer_meta_access(rec, *target, *property, bind)
