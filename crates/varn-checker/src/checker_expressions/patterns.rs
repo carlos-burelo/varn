@@ -76,9 +76,18 @@ impl<'r> Checker<'r> {
                             .with_range(*prop.value.range()),
                         );
                     }
+                    let default_ty = match &prop.value {
+                        Pattern::Assignment { right, .. } => Some(self.infer_type(rec, *right, bind)),
+                        Pattern::Identifier { .. }
+                        | Pattern::Array { .. }
+                        | Pattern::Tuple { .. }
+                        | Pattern::Object { .. }
+                        | Pattern::Rest { .. } => None,
+                    };
                     let prop_ty = self
                         .find_member_info(value_ty, key, bind)
                         .map(|(t, _)| t)
+                        .or(default_ty)
                         .unwrap_or(Type::Dynamic);
                     self.check_pattern(rec, &prop.value, &prop_ty, bind);
                 }
