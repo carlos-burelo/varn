@@ -46,6 +46,17 @@ impl<'a> CallTypeCtx<'a> {
                     Type::named_with_origin(Arc::from(n), origin.map(Arc::from), self.table)
                 })
             }
+            ExprKind::Super => {
+                let ctx = self.ctx?;
+                let current = self.current_class?;
+                let origin = ctx.source_file();
+                let parent = ctx.class_parent(current, origin)?;
+                Some(Type::named_with_origin(
+                    parent.name,
+                    parent.origin,
+                    self.table,
+                ))
+            }
             ExprKind::Identifier { name } => {
                 let key = self.interner.resolve(name);
                 self.sym_map.get(key).cloned()
@@ -100,7 +111,6 @@ impl<'a> CallTypeCtx<'a> {
             | ExprKind::Template { .. }
             | ExprKind::TaggedTemplate { .. }
             | ExprKind::Missing
-            | ExprKind::Super
             | ExprKind::Array { .. }
             | ExprKind::Object { .. }
             | ExprKind::Tuple { .. }

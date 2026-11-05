@@ -30,6 +30,10 @@ pub trait TypeContext {
         None
     }
 
+    fn class_parent(&self, _name: &str, _origin: Option<&str>) -> Option<crate::bind::ClassParent> {
+        None
+    }
+
     fn symbol_origin(&self, _name: &str) -> Option<varn_core::Atom> {
         None
     }

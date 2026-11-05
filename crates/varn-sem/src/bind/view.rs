@@ -99,6 +99,10 @@ impl<'r> BindView<'r> {
 }
 
 impl TypeContext for BindView<'_> {
+    fn class_parent(&self, name: &str, origin: Option<&str>) -> Option<super::ClassParent> {
+        BindView::class_parent(self, name, origin)
+    }
+
     fn interner(&self) -> Option<&varn_core::AtomInterner> {
         Some(&self.bind.interner)
     }
