@@ -296,7 +296,7 @@ impl<'r> Checker<'r> {
             let arg_ty_s = arg_ty.display(&self.ty_table, &bind.interner);
             self.emit(
                 Diagnostic::warning(
-                    ErrorCode::TypeMismatch,
+                    ErrorCode::AwaitHasNoEffect,
                     format!("'await' applied to non-Future type '{arg_ty_s}' has no effect"),
                 )
                 .with_range(range),

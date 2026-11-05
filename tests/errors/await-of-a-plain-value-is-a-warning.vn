@@ -1,0 +1,3 @@
+// expect: warning[VN3034]
+const n: int = await 5
+print(n)
