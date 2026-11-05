@@ -121,16 +121,29 @@ impl<'r> Binder<'r> {
             ClassMember::Property {
                 key,
                 type_ann,
+                init,
                 modifiers,
                 range,
                 decorators,
                 ..
             } => {
                 let key_rc: Arc<str> = Arc::from(self.interner.resolve(*key));
-                let ty = type_ann
-                    .as_ref()
-                    .map(|ann| self.resolve_type(ann))
-                    .unwrap_or(Type::Dynamic);
+                let ty = match (type_ann, init) {
+                    (Some(ann), _) => self.resolve_type(ann),
+                    (None, Some(init)) => self.infer_expr_type_self(*init),
+                    (None, None) => {
+                        self.emit(
+                            varn_core::Diagnostic::error(
+                                varn_core::ErrorCode::TypeAnnotationRequired,
+                                format!(
+                                    "property '{key_rc}' needs a type annotation or an initializer"
+                                ),
+                            )
+                            .with_range(*range),
+                        );
+                        Type::Error
+                    }
+                };
 
                 let mut sym =
                     Symbol::new(SymbolKind::Property, *key, range.start.line).with_type(ty);
