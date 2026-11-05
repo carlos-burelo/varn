@@ -58,7 +58,7 @@ async function testUsingDispose(): void {
 async function testCrossIsolate(): void {
     const a = channel<int>(4)
     const b = channel<int>(4)
-    const handle = await spawnIsolate(echoWorker, [a.rx, b.tx])
+    const handle = await spawnIsolate(echoWorker, (a.rx, b.tx))
     await a.tx.send(21)
     expect(await b.rx.receive()).toBe(42)
     a.tx.close()

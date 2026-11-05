@@ -6,7 +6,7 @@ await describe("279 isolates load modules concurrently", async () => {
     await it("many workers compiling the same module agree", async () => {
         const out = channel<int>(32)
         for (let i = 1; i <= 24; i = i + 1) {
-            await spawnIsolate(workerParallel, [out.tx, i, 0])
+            await spawnIsolate(workerParallel, (out.tx, i, 0))
         }
         let sum = 0
         for (let i = 0; i < 24; i = i + 1) {

@@ -7,20 +7,20 @@ async function testIsolates() {
     // ---- 1 ----
     const in1 = channel<ValueMsg>(1)
     const out1 = channel<int>(1)
-    const h1 = await spawnIsolate(workerMain, [in1.rx, out1.tx])
+    const h1 = await spawnIsolate(workerMain, (in1.rx, out1.tx))
     await in1.tx.send({ value: 10 })
     expect(await out1.rx.receive()).toBe(20)
     await h1.join()
 
     // ---- 2 ----
     const out2 = channel<str>(1)
-    await spawnIsolate(workerArgs, [out2.tx, 42, "hello", [1, 2, 3], { x: "nested" }])
+    await spawnIsolate(workerArgs, (out2.tx, 42, "hello", [1, 2, 3], { x: "nested" }))
     expect(await out2.rx.receive()).toBe("args_ok")
 
     // ---- 3 ----
     const in3 = channel<Msg>(2)
     const out3 = channel<int>(2)
-    const h3 = await spawnIsolate(workerDialog, [in3.rx, out3.tx])
+    const h3 = await spawnIsolate(workerDialog, (in3.rx, out3.tx))
     await in3.tx.send(Msg.Val(1))
     expect(await out3.rx.receive()).toBe(2)
     await in3.tx.send(Msg.Val(100))
@@ -35,17 +35,18 @@ async function testIsolates() {
     const c1 = channel<int>(1)
     const c2 = channel<int>(1)
     const c3 = channel<int>(1)
-    await spawnIsolate(workerParallel, [c1.tx, 1, 2])
-    await spawnIsolate(workerParallel, [c2.tx, 2, 0])
-    await spawnIsolate(workerParallel, [c3.tx, 3, 1])
+    await spawnIsolate(workerParallel, (c1.tx, 1, 2))
+    await spawnIsolate(workerParallel, (c2.tx, 2, 0))
+    await spawnIsolate(workerParallel, (c3.tx, 3, 1))
     expect(await c2.rx.receive()).toBe(20)
     expect(await c3.rx.receive()).toBe(30)
     expect(await c1.rx.receive()).toBe(10)
 
     // ---- 5/6: errores de spawn (igual que antes) ----
+    const spare = channel<str>(1)
     let threwAnon = false
     try {
-        await spawnIsolate(anonymousWorkerRef(), [])
+        await spawnIsolate(anonymousWorkerRef(), (spare.tx,))
     } catch (e) {
         threwAnon = true
         expect(e.message.indexOf("must be a function reference") !== null).toBeTruthy()
@@ -54,7 +55,7 @@ async function testIsolates() {
 
     let threwUnexported = false
     try {
-        await spawnIsolate(unexportedWorkerRef(), [])
+        await spawnIsolate(unexportedWorkerRef(), (spare.tx,))
     } catch (e) {
         threwUnexported = true
         expect(e.message.indexOf("is not a top-level exported function") !== null).toBeTruthy()

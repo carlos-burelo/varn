@@ -11,7 +11,7 @@ export declare class IsolateHandle {
     join(): TaskHandle<void>;
 }
 
-export declare function spawnIsolate$(fn: dynamic, args: Array<dynamic>): TaskHandle<IsolateHandle>;
+export declare function spawnIsolate$(fn: dynamic, args: dynamic): TaskHandle<IsolateHandle>;
 
 export declare class ChannelClosed extends Error {}
 

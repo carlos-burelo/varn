@@ -1,0 +1,4 @@
+// expect: error[VN3001]
+import { spawnIsolate } from "std:task"
+export function worker(count: int): void {}
+spawnIsolate(worker, ("text",))

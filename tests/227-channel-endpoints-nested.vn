@@ -6,14 +6,14 @@ import { replyThroughBox, echoShape } from "./helpers/isolate-workers.vn";
 await describe("227 channel endpoints nested", async () => {
     await it("an endpoint inside an object crosses an isolate as an endpoint", async () => {
         const ch = channel<int>(1)
-        const handle = await spawnIsolate(replyThroughBox, [{ reply: ch.tx }])
+        const handle = await spawnIsolate(replyThroughBox, ({ reply: ch.tx },))
         expect(await ch.rx.receive()).toBe(7)
         await handle.join()
     });
 
     await it("a plain object shaped like the old marker stays a plain object", async () => {
         const ch = channel<str>(1)
-        const handle = await spawnIsolate(echoShape, [{ __chanEndpoint: "tx", __chanId: 3 }, ch.tx])
+        const handle = await spawnIsolate(echoShape, ({ __chanEndpoint: "tx", __chanId: 3 }, ch.tx))
         expect(await ch.rx.receive()).toBe("tx3")
         await handle.join()
     });

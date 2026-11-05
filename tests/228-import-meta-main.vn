@@ -11,7 +11,7 @@ await describe("228 import.meta.main", async () => {
 
     await it("a module loaded by an isolate is not the entry", async () => {
         const ch = channel<bool>(1)
-        const handle = await spawnIsolate(reportMain, [ch.tx])
+        const handle = await spawnIsolate(reportMain, (ch.tx,))
         expect(await ch.rx.receive()).toBe(false)
         await handle.join()
     });
