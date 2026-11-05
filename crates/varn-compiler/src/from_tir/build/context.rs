@@ -36,6 +36,8 @@ pub(crate) struct Builder<'m> {
     pub(super) locals_bt: Vec<BackendTy>,
     pub(super) return_bt: Option<BackendTy>,
     pub(super) inline_serial: u32,
+    pub(super) inline_scopes: Vec<varn_types::chunk::InlineScope>,
+    pub(super) inline_scope_stack: Vec<u32>,
 }
 
 pub(super) struct InlineFrame {
@@ -78,11 +80,36 @@ impl<'m> Builder<'m> {
             locals_bt: Vec::new(),
             return_bt: None,
             inline_serial: 0,
+            inline_scopes: Vec::new(),
+            inline_scope_stack: Vec::new(),
         };
         let entry = b.new_block();
         b.sealed[entry.0 as usize] = true;
         b.current = entry;
         b
+    }
+
+    pub(super) fn push_inline(&mut self, frame: InlineFrame) {
+        let function = self
+            .tir
+            .function(frame.func)
+            .map_or_else(String::new, |f| f.name.to_string());
+        self.inline_scopes.push(varn_types::chunk::InlineScope {
+            function,
+            parent: self.current_inline_scope(),
+            call_line: self.cur_line,
+        });
+        self.inline_scope_stack.push(self.inline_scopes.len() as u32);
+        self.inlining.push(frame);
+    }
+
+    pub(super) fn pop_inline(&mut self) -> Option<InlineFrame> {
+        self.inline_scope_stack.pop();
+        self.inlining.pop()
+    }
+
+    pub(super) fn current_inline_scope(&self) -> u32 {
+        self.inline_scope_stack.last().copied().unwrap_or(0)
     }
 
     pub(super) fn line_of(&self, offset: u32) -> u32 {

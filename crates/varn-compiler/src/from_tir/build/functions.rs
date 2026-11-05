@@ -149,6 +149,7 @@ fn build_inner(
         values: b.values,
         is_async: func.is_async,
         is_generator: func.is_generator,
+        inline_scopes: b.inline_scopes,
     })
 }
 

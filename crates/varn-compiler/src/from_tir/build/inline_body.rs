@@ -177,7 +177,8 @@ impl<'m> Builder<'m> {
             self.store_var(VarId::Local(LocalId(param_base + i as u32)), *v);
         }
         let exit = self.new_block();
-        self.inlining.push(InlineFrame {
+        let caller_line = self.cur_line;
+        self.push_inline(InlineFrame {
             func: f,
             params: argv,
             this,
@@ -196,7 +197,8 @@ impl<'m> Builder<'m> {
             self.leave_inlined(None);
         }
         self.return_bt = saved_return;
-        let frame = self.inlining.pop();
+        let frame = self.pop_inline();
+        self.cur_line = caller_line;
         lowered?;
 
         let Some(body) = frame.and_then(|f| f.body) else {

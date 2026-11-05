@@ -327,6 +327,7 @@ fn compact_cfg(func: &mut SsaFunc) -> bool {
                 insts: Vec::new(),
                 term: Terminator::Unreachable,
                 term_line: 0,
+                term_scope: 0,
                 preds: Vec::new(),
             },
         );

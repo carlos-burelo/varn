@@ -180,7 +180,7 @@ impl<'m> Builder<'m> {
             .tir
             .function(func)
             .ok_or(OptError::Unsupported("from_tir: constructor out of range"))?;
-        self.inlining.push(InlineFrame {
+        self.push_inline(InlineFrame {
             func,
             params,
             this: Some(this),
@@ -190,7 +190,7 @@ impl<'m> Builder<'m> {
             .body
             .iter()
             .try_for_each(|s| self.lower_inlined_ctor_stmt(s, ctor, args));
-        self.inlining.pop();
+        self.pop_inline();
         lowered
     }
 

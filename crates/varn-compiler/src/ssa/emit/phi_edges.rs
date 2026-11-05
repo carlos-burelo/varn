@@ -46,11 +46,13 @@ fn split_one(ssa: &mut SsaFunc, br: BlockId, is_then: bool) {
     };
     let pad = BlockId(ssa.blocks.len() as u32);
     let term_line = ssa.blocks[br.0 as usize].term_line;
+    let term_scope = ssa.blocks[br.0 as usize].term_scope;
     ssa.blocks.push(Block {
         params: Vec::new(),
         insts: Vec::new(),
         term: Terminator::Jump { target, args },
         term_line,
+        term_scope,
         preds: vec![br],
     });
     if let Terminator::Branch {

@@ -210,6 +210,7 @@ fn reorder_blocks_rpo(func: &mut SsaFunc) {
                 insts: Vec::new(),
                 term: Terminator::Unreachable,
                 term_line: 0,
+                term_scope: 0,
                 preds: Vec::new(),
             },
         ));

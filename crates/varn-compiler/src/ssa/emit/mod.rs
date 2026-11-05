@@ -71,6 +71,7 @@ pub(crate) fn emit_function_meta(
     let n = ssa.blocks.len();
     let mut chunk = Chunk::new();
     chunk.source_file = Arc::from(source_file.as_ref());
+    chunk.inline_scopes = std::mem::take(&mut ssa.inline_scopes);
     let mut block_offset = vec![usize::MAX; n];
 
     let mut inst_off: Vec<Vec<usize>> = ssa
@@ -100,6 +101,7 @@ pub(crate) fn emit_function_meta(
         let insts = std::mem::take(&mut ssa.blocks[b].insts);
         for (idx, inst) in insts.iter().enumerate() {
             inst_off[b][idx] = chunk.code.len();
+            chunk.scope_cursor = inst.scope;
             emit_inst(
                 &mut chunk,
                 inst,
@@ -124,6 +126,7 @@ pub(crate) fn emit_function_meta(
         } else {
             fn_line
         };
+        chunk.scope_cursor = ssa.blocks[b].term_scope;
         terminator::emit_terminator(
             &mut chunk,
             &ssa,
@@ -139,6 +142,7 @@ pub(crate) fn emit_function_meta(
         )?;
     }
 
+    chunk.scope_cursor = 0;
     chunk.write(Chunk::pack_op(OpCode::LoadNull, null_reg), fn_line);
     chunk.emit1(OpCode::Return, Chunk::pack(0, null_reg), fn_line);
 

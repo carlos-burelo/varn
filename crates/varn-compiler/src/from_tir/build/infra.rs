@@ -10,6 +10,7 @@ impl<'m> Builder<'m> {
             insts: Vec::new(),
             term: Terminator::Unreachable,
             term_line: 0,
+            term_scope: 0,
             preds: Vec::new(),
         });
         self.sealed.push(false);
@@ -56,9 +57,11 @@ impl<'m> Builder<'m> {
     pub(super) fn set_term(&mut self, term: Terminator) {
         self.terminated[self.current.0 as usize] = true;
         let line = self.cur_line;
+        let scope = self.current_inline_scope();
         let blk = self.block_mut(self.current);
         blk.term = term;
         blk.term_line = line;
+        blk.term_scope = scope;
     }
 
     pub(super) fn add_pred(&mut self, block: BlockId, pred: BlockId) {
@@ -68,20 +71,24 @@ impl<'m> Builder<'m> {
     pub(super) fn emit(&mut self, kind: InstKind, ty: BackendTy) -> Value {
         let dest = self.new_value(ty);
         let line = self.cur_line;
+        let scope = self.current_inline_scope();
         self.block_mut(self.current).insts.push(Inst {
             dest: Some(dest),
             kind,
             line,
+            scope,
         });
         dest
     }
 
     pub(super) fn emit_effect(&mut self, kind: InstKind) {
         let line = self.cur_line;
+        let scope = self.current_inline_scope();
         self.block_mut(self.current).insts.push(Inst {
             dest: None,
             kind,
             line,
+            scope,
         });
     }
 

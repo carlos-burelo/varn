@@ -5,7 +5,7 @@ use crate::OptError;
 use varn_tir::TirStmt;
 use varn_tir::{BackendTy, DynReason};
 
-fn stmt_offset(s: &TirStmt) -> Option<u32> {
+pub(super) fn stmt_offset(s: &TirStmt) -> Option<u32> {
     match s {
         TirStmt::Expr(e) => first_real_span(e),
         TirStmt::Let { init: Some(e), .. } => first_real_span(e),

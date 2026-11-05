@@ -16,6 +16,8 @@ pub struct SsaFunc {
     pub is_async: bool,
 
     pub is_generator: bool,
+
+    pub inline_scopes: Vec<varn_types::chunk::InlineScope>,
 }
 
 impl SsaFunc {
@@ -37,6 +39,7 @@ impl SsaFunc {
             insts: Vec::new(),
             term: Terminator::Unreachable,
             term_line: 0,
+            term_scope: 0,
             preds: Vec::new(),
         });
         id
@@ -84,6 +87,7 @@ pub struct Block {
     pub insts: Vec<Inst>,
     pub term: Terminator,
     pub term_line: u32,
+    pub term_scope: u32,
 
     pub preds: Vec<BlockId>,
 }
@@ -93,4 +97,5 @@ pub struct Inst {
     pub dest: Option<Value>,
     pub kind: InstKind,
     pub line: u32,
+    pub scope: u32,
 }
