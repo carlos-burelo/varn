@@ -249,38 +249,7 @@ fn infer_arrow_with_context(
         });
     }
 
-    let arrow_scope = find_arrow_scope(checker.current_scope, &params, bind);
-    let saved_scope = checker.current_scope;
-
-    if let Some(scope_id) = arrow_scope {
-        checker.current_scope = scope_id;
-        for (ap, ep) in params.iter().zip(expected_fn.params.iter()) {
-            let name = pattern_lead_name(&ap.pattern, &bind.interner);
-            if !name.is_empty() && name != varn_core::TokenKind::Placeholder.as_str() {
-                let scope = bind.scopes.get(scope_id);
-                if let Some(sym_id) = bind
-                    .interner
-                    .get(name)
-                    .and_then(|atom| scope.resolve(atom, &bind.scopes))
-                {
-                    let explicit_ty = ap
-                        .type_ann
-                        .as_ref()
-                        .map(|m| checker.resolve_type_node_cached(m, bind));
-
-                    let ty = explicit_ty.unwrap_or(Type::resolved(ep.ty));
-                    rec.symbol_types.insert(sym_id, ty);
-                }
-            }
-        }
-    }
-
-    let ret_ty =
-        crate::checker_expressions::infer::arrow_body_return_type(body, checker, rec, bind);
-
-    if arrow_scope.is_some() {
-        checker.current_scope = saved_scope;
-    }
+    let ret_ty = checker.infer_body_return_type(rec, &params, &actual_params, body, bind);
 
     Some(Type::fn_(
         FunctionType {
@@ -304,8 +273,9 @@ pub(crate) fn find_arrow_scope(
     }
     let param_names: Vec<&str> = params
         .iter()
-        .map(|p| pattern_lead_name(&p.pattern, &bind.interner))
-        .filter(|name| !name.is_empty() && *name != varn_core::TokenKind::Placeholder.as_str())
+        .flat_map(|p| p.pattern.bound_names())
+        .map(|atom| bind.interner.resolve(atom))
+        .filter(|name| *name != varn_core::TokenKind::Placeholder.as_str())
         .collect();
 
     if param_names.is_empty() {

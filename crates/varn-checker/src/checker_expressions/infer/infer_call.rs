@@ -120,7 +120,7 @@ impl<'r> Checker<'r> {
         }
     }
 
-    pub(super) fn infer_body_return_type(
+    pub(crate) fn infer_body_return_type(
         &mut self,
         rec: &mut Recorder,
         params: &[Param],
@@ -134,6 +134,12 @@ impl<'r> Checker<'r> {
         if let Some(scope_id) = body_scope {
             self.current_scope = scope_id;
             for (p, fp) in params.iter().zip(ps.iter()) {
+                if !matches!(p.pattern, varn_core::ast::Pattern::Identifier { .. }) {
+                    let env_rev = self.infer_env_rev;
+                    self.check_pattern(rec, &p.pattern, &Type::resolved(fp.ty), bind);
+                    self.infer_env_rev = env_rev;
+                    continue;
+                }
                 let name = varn_sem::infer::pattern_lead_name(&p.pattern, &bind.interner);
                 if name.is_empty() || name == varn_core::TokenKind::Placeholder.as_str() {
                     continue;
