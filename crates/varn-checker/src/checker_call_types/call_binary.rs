@@ -1,6 +1,7 @@
 use super::CallTypeCtx;
 use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::ExprId;
+use varn_sem::types::numeric_ops::numeric_binary_type;
 use varn_sem::types::Type;
 
 pub(super) fn infer_binary(
@@ -9,29 +10,33 @@ pub(super) fn infer_binary(
     right: ExprId,
     op: BinaryOp,
 ) -> Option<Type> {
-    let l = c.infer(left)?;
-    let r = c.infer(right)?;
+    let l = c.infer(left)?.apparent(c.table);
+    let r = c.infer(right)?.apparent(c.table);
 
     match op {
-        BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div => {
-            if l == Type::Float || r == Type::Float {
-                Some(Type::Float)
+        BinaryOp::Add => {
+            if l == Type::Str || r == Type::Str {
+                Some(Type::Str)
             } else {
-                Some(Type::Int)
+                numeric_binary_type(&l, &r, c.table)
             }
         }
-        BinaryOp::Lt | BinaryOp::Gt | BinaryOp::LtEq | BinaryOp::GtEq => Some(Type::Bool),
-        BinaryOp::Mod
-        | BinaryOp::Pow
+        BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod | BinaryOp::Pow => {
+            numeric_binary_type(&l, &r, c.table)
+        }
+        BinaryOp::Lt
+        | BinaryOp::Gt
+        | BinaryOp::LtEq
+        | BinaryOp::GtEq
         | BinaryOp::Eq
         | BinaryOp::NotEq
-        | BinaryOp::BitAnd
+        | BinaryOp::Instanceof
+        | BinaryOp::In => Some(Type::Bool),
+        BinaryOp::BitAnd
         | BinaryOp::BitOr
         | BinaryOp::BitXor
         | BinaryOp::Shl
         | BinaryOp::Shr
-        | BinaryOp::UShr
-        | BinaryOp::Instanceof
-        | BinaryOp::In => Some(Type::Dynamic),
+        | BinaryOp::UShr => (l.is_int() && r.is_int()).then_some(Type::Int),
     }
 }

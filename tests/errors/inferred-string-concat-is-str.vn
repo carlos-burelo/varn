@@ -1,0 +1,3 @@
+// expect: error[VN3001]
+function joined() { return "a" + "b" }
+const n: int = joined()
