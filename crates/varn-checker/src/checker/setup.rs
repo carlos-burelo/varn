@@ -27,6 +27,7 @@ impl<'r> Checker<'r> {
             infer_env_rev: 0,
             compat_cache: FxHashMap::default(),
             type_node_cache: FxHashMap::default(),
+            unknown_type_names: rustc_hash::FxHashSet::default(),
             symbol_type_params_cache: FxHashMap::default(),
             current_class: None,
             extension_self: None,

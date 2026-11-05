@@ -161,6 +161,7 @@ impl<'r> Checker<'r> {
         if varn_sem::resolve::qualified_type(&text, Some(&view), table).is_some() {
             return true;
         }
+        self.unknown_type_names.insert(name);
         self.emit(
             Diagnostic::error(ErrorCode::UnknownSymbol, format!("unknown type: {text}"))
                 .with_range(node.range),

@@ -29,6 +29,9 @@ impl<'r> Checker<'r> {
         inferred: &Type,
         bind: Option<&BindResult>,
     ) -> bool {
+        if self.mentions_unknown_type(declared) || self.mentions_unknown_type(inferred) {
+            return true;
+        }
         if bind.is_some_and(|b| self.unchecked_generic_conversion(*declared, *inferred, b)) {
             return false;
         }
@@ -47,6 +50,27 @@ impl<'r> Checker<'r> {
             &mut self.compat_cache,
             &self.ty_table,
         )
+    }
+
+    fn mentions_unknown_type(&self, ty: &Type) -> bool {
+        if self.unknown_type_names.is_empty() {
+            return false;
+        }
+        let mut pending = vec![*ty];
+        let mut visited = std::collections::BTreeSet::new();
+        while let Some(current) = pending.pop() {
+            if !visited.insert(current.0) {
+                continue;
+            }
+            if let varn_core::TypeKind::Named(name, _) | varn_core::TypeKind::Generic(name, _, _) =
+                self.ty_table.get(current.0)
+                && self.unknown_type_names.contains(&name)
+            {
+                return true;
+            }
+            pending.extend(current.components(&self.ty_table));
+        }
+        false
     }
 
     fn fits_open_parameter(

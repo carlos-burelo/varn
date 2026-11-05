@@ -61,6 +61,7 @@ pub struct Checker<'r> {
     pub(crate) infer_env_rev: u32,
     pub(crate) compat_cache: FxHashMap<(Type, Type, usize), bool>,
     pub(crate) type_node_cache: FxHashMap<(u32, usize), Type>,
+    pub(crate) unknown_type_names: rustc_hash::FxHashSet<varn_core::Atom>,
     pub(crate) symbol_type_params_cache: FxHashMap<(Arc<str>, u8), Vec<Arc<str>>>,
 
     pub(crate) current_class: Option<Arc<str>>,
