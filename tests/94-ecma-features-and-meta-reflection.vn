@@ -49,7 +49,6 @@ await describe("94 ecma features and meta reflection", async () => {
         const u = new SampleUser("Bob", 25, "User");
         expect(u::type).toBe("SampleUser");
         const cls = u::class;
-        expect(cls !== null).toBe(true);
         expect(cls::name).toBe("SampleUser");
         
 
@@ -109,7 +108,7 @@ await describe("94 ecma features and meta reflection", async () => {
         expect(k.length).toBe(2);
         expect(k[0]).toBe("a");
         expect(k[1]).toBe("b");
-        const v = Reflect.values(obj);
+        const v = obj::values();
         expect(v[0]).toBe(100);
         expect(v[1]).toBe("test");
         expect(Reflect.hasOwn(obj, "a")).toBe(true);

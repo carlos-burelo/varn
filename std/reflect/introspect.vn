@@ -1,31 +1,17 @@
 export class Reflect {
-    static keys(target: dynamic): str[] {
-        if (target === null) return [];
+    static keys<T>(target: T): str[] {
         return target::keys();
     }
 
-    static values(target: dynamic): dynamic[] {
-        if (target === null) return [];
-        return target::values();
-    }
-
-    static entries(target: dynamic): dynamic[] {
-        if (target === null) return [];
-        return target::entries();
-    }
-
-    static hasOwn(target: dynamic, key: str): bool {
-        if (target === null) return false;
+    static hasOwn<T>(target: T, key: str): bool {
         return target::hasOwn(key);
     }
 
-    static typeOf(target: dynamic): str {
-        if (target === null) return "null";
+    static typeOf<T>(target: T): str {
         return target::type;
     }
 
-    static classOf(target: dynamic): dynamic {
-        if (target === null) return null;
+    static classOf<T>(target: T): Class<T> {
         return target::class;
     }
 }

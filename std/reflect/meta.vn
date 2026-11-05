@@ -50,26 +50,22 @@ export function getMetadataKeys<T>(target: T): str[] {
     return [];
 }
 
-export class MetaKey<T> {
-    private values: Map<dynamic, T> = new Map<dynamic, T>();
+export class MetaKey<K, V> {
+    private values: Map<K, V> = new Map<K, V>();
 
-    static create<R>(): MetaKey<R> {
-        return new MetaKey<R>();
+    static create<A, B>(): MetaKey<A, B> {
+        return new MetaKey<A, B>();
     }
 
-    set(target: dynamic, value: T): void {
+    set(target: K, value: V): void {
         this.values.set(target, value);
     }
 
-    get(target: dynamic): T? {
+    get(target: K): V? {
         return this.values.get(target);
     }
 
-    has(target: dynamic): bool {
+    has(target: K): bool {
         return this.values.has(target);
-    }
-
-    keys(target: dynamic): dynamic[] {
-        return [];
     }
 }

@@ -7,8 +7,9 @@ await describe("example std:reflect", async () => {
         expect(keys.length).toBe(2);
         expect(Reflect.hasOwn({ x: 1 }, "x")).toBe(true);
         expect(Reflect.hasOwn({ x: 1 }, "missing")).toBe(false);
-        expect(Reflect.values({ a: 7 }).length).toBe(1);
-        expect(Reflect.entries({ a: 7 })[0][1]).toBe(7);
+        const seven = { a: 7 };
+        expect(seven::values().length).toBe(1);
+        expect(seven::entries()[0][1]).toBe(7);
     });
 
     await it("names runtime types", () => {
@@ -28,7 +29,7 @@ await describe("example std:reflect", async () => {
     });
 
     await it("scopes metadata with typed keys", () => {
-        let tag = MetaKey.create<str>();
+        let tag = MetaKey.create<{ id: int }, str>();
         let target = { id: 1 };
         tag.set(target, "v1");
         expect(tag.has(target)).toBe(true);

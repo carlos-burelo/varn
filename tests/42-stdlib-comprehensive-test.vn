@@ -121,7 +121,7 @@ async function runComprehensiveTest(): Task<void> {
     expect(getMetadata("my_key", list)).toBe("my_val");
     expect(hasMetadata("my_key", list)).toBeTruthy();
 
-    let mkey = MetaKey.create<str>();
+    let mkey = MetaKey.create<int[], str>();
     expect(getMetadata("my_key", list)).toBe("my_val");
     expect(hasMetadata("my_key", list)).toBeTruthy();
 
