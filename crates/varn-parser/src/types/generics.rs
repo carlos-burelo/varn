@@ -36,6 +36,7 @@ pub fn parse_type_params(s: &mut TokenStream) -> Result<Vec<varn_core::ast::Type
             name,
             constraint,
             default,
+            is_rest: false,
             range: full_range,
         });
         if !s.eat(TokenKind::Comma) {
@@ -53,7 +54,7 @@ pub(crate) fn parse_fn_type_params(
     while !s.check(TokenKind::RParen) && !s.is_eof() {
         let prange = s.range();
 
-        s.eat(TokenKind::DotDotDot);
+        let is_rest = s.eat(TokenKind::DotDotDot);
 
         let name = if s.kind() == TokenKind::Identifier && s.peek_kind(1) == TokenKind::Colon {
             let n = s.consume_lexeme();
@@ -69,6 +70,7 @@ pub(crate) fn parse_fn_type_params(
             name,
             constraint: Some(ty),
             default: None,
+            is_rest,
             range: full_range,
         });
         if !s.eat(TokenKind::Comma) {

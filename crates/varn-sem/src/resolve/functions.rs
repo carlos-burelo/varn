@@ -23,7 +23,7 @@ pub(super) fn resolve_fn_type(
                 name: Some(resolve_atom_name(p.name, ctx, interner)),
                 ty: ty.0,
                 optional: false,
-                is_rest: false,
+                is_rest: p.is_rest,
             }
         })
         .collect();

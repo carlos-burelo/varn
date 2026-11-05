@@ -119,6 +119,7 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String
                                 .intern(varn_core::TokenKind::Placeholder.as_str()),
                             constraint: Some(ty),
                             default: None,
+                            is_rest: false,
                             range: ty_range,
                         }
                     })
@@ -141,6 +142,7 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String
                             name: underscore,
                             constraint: Some(first),
                             default: None,
+                            is_rest: false,
                             range: first_range,
                         }],
                         Box::new(ret),

@@ -36,6 +36,7 @@ pub struct TypeParam {
     pub name: Atom,
     pub constraint: Option<TypeNode>,
     pub default: Option<TypeNode>,
+    pub is_rest: bool,
     pub range: SourceRange,
 }
 
