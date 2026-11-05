@@ -70,14 +70,17 @@ impl<'r> Checker<'r> {
         } else {
             Some(target_ty)
         };
+        let mark = self.diagnostics_mark();
         self.with_expected(target_expected, |c| c.check_expr(rec, value, bind));
+        let value_rejected = self.errors_since(mark);
 
         self.check_extension_assignment(rec, target, bind);
 
-        if !matches!(
+        let valid_target = matches!(
             &arena.expr(target).kind,
             varn_core::ast::ExprKind::Identifier { .. } | varn_core::ast::ExprKind::Member { .. }
-        ) {
+        );
+        if !valid_target {
             self.emit(
                 Diagnostic::error(
                     ErrorCode::NotAssignable,
@@ -87,9 +90,12 @@ impl<'r> Checker<'r> {
             );
         }
 
-        if let varn_core::ast::ExprKind::Identifier { name } = &arena.expr(target).kind {
-            self.check_reassignable(*name, range, bind);
-        }
+        let reassignable = match &arena.expr(target).kind {
+            varn_core::ast::ExprKind::Identifier { name } => {
+                self.check_reassignable(*name, range, bind)
+            }
+            _ => true,
+        };
 
         let value_ty = self.infer_type(rec, value, bind);
         let is_empty_array_val = value_ty.is_unresolved()
@@ -99,7 +105,7 @@ impl<'r> Checker<'r> {
         } else {
             self.value_fits(rec, &target_ty, &value_ty, Some(value), Some(bind))
         };
-        if !is_empty_array_val && !accepted {
+        if !is_empty_array_val && !accepted && valid_target && reassignable && !value_rejected {
             let value_ty_s = value_ty.display(&self.ty_table, &bind.interner);
             let target_ty_s = target_ty.display(&self.ty_table, &bind.interner);
             self.emit(
@@ -158,7 +164,7 @@ impl<'r> Checker<'r> {
         name: varn_core::Atom,
         range: varn_core::SourceRange,
         bind: &BindResult,
-    ) {
+    ) -> bool {
         let scope = bind.scopes.get(self.current_scope);
         if let Some(id) = scope.resolve(name, &bind.scopes) {
             let sym = bind.arena.get(id);
@@ -190,8 +196,10 @@ impl<'r> Checker<'r> {
                     )
                     .with_range(range),
                 );
+                return false;
             }
         }
+        true
     }
 
     pub(super) fn check_pure_assign_target(

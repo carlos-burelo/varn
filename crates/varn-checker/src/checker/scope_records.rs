@@ -16,6 +16,14 @@ impl<'r> Checker<'r> {
         self.diagnostics.push(diag);
     }
 
+    pub(crate) fn diagnostics_mark(&self) -> usize {
+        self.diagnostics.len()
+    }
+
+    pub(crate) fn errors_since(&self, mark: usize) -> bool {
+        self.diagnostics.all()[mark..].iter().any(|d| d.is_error())
+    }
+
     pub(crate) fn record_scope(&mut self, rec: &mut Recorder, offset: u32) {
         rec.record_scope(offset, self.current_scope);
     }

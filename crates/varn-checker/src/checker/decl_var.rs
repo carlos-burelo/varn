@@ -45,7 +45,9 @@ impl<'r> Checker<'r> {
             }
 
             if let Some(init_expr) = d.init {
+                let mark = self.diagnostics_mark();
                 self.with_expected(ann_ty_opt, |c| c.check_expr(rec, init_expr, bind));
+                let init_rejected = self.errors_since(mark);
 
                 if matches!(
                     &self.ast_arena.expr(init_expr).kind,
@@ -77,7 +79,7 @@ impl<'r> Checker<'r> {
                         && matches!(&self.ast_arena.expr(init_expr).kind, ExprKind::Array { elements } if elements.is_empty());
                     let is_compatible =
                         self.value_fits(rec, ann_ty, &init_ty, Some(init_expr), Some(bind));
-                    if !is_empty_array && !is_compatible {
+                    if !is_empty_array && !is_compatible && !init_rejected {
                         let ann_ty_s = ann_ty.display(&self.ty_table, &bind.interner);
                         let init_ty_s = init_ty.display(&self.ty_table, &bind.interner);
                         self.emit(
