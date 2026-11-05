@@ -1,14 +1,16 @@
+use crate::Failure;
 use varn_core::ast::{AstArena, Program};
 
 pub(crate) fn parse_module(
     source: &str,
     path: &str,
-) -> Result<(Program, AstArena, varn_core::AtomInterner), String> {
-    let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(source, path);
-    if let Some(first) = lex_errs.first() {
-        return Err(format!("{path}: {}", first.message));
+) -> Result<(Program, AstArena, varn_core::AtomInterner), Failure> {
+    let (tokens, _, lex_diagnostics) = crate::lex::scan_tolerant(source, path);
+    let (parsed, mut diagnostics) =
+        crate::parse::parse_tolerant(tokens.tokens, tokens.lexeme_buf, path);
+    diagnostics.extend(lex_diagnostics);
+    if !diagnostics.is_empty() {
+        return Err(Failure::diagnostics(path, source, diagnostics));
     }
-    varn_parser::parse(tokens, lexeme_buf, path, varn_core::AtomInterner::new())
-        .map(|(program, interner, arena)| (program, arena, interner))
-        .map_err(|errs| format!("{path}: {}", errs[0].message))
+    Ok((parsed.program, parsed.arena, parsed.interner))
 }

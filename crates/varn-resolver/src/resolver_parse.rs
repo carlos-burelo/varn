@@ -15,7 +15,21 @@ impl ModuleResolver {
     pub(super) fn parse_and_cache(&self, source: &str, key: &str) -> Option<ParsedModule> {
         let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(source, key);
         let (program, interner, arena) =
-            varn_parser::parse(tokens, lexeme_buf, key, varn_core::AtomInterner::new()).ok()?;
+            match varn_parser::parse(tokens, lexeme_buf, key, varn_core::AtomInterner::new()) {
+                Ok(parsed) => parsed,
+                Err(errors) => {
+                    let first = errors.iter().chain(lex_errs.iter()).next()?;
+                    let detail = format!(
+                        "{} ({}:{}:{})",
+                        first.message,
+                        varn_core::diagnostics::display_path(key),
+                        first.range.start.line,
+                        first.range.start.column
+                    );
+                    self.syntax_failures.lock().insert(key.to_owned(), detail);
+                    return None;
+                }
+            };
         let program = Arc::new(program);
         let arena = Arc::new(arena);
         self.store_program(key.to_owned(), Arc::clone(&program));

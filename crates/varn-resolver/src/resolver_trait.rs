@@ -15,6 +15,15 @@ impl ImportResolver for ModuleResolver {
         self.graph.lock().heavy_stats()
     }
 
+    fn module_syntax_failure(&self, abs_path: &str) -> Option<String> {
+        let canonical = varn_modules::canonical_or_original(Path::new(abs_path));
+        let failures = self.syntax_failures.lock();
+        failures
+            .get(abs_path)
+            .or_else(|| failures.get(&canonical))
+            .cloned()
+    }
+
     fn module_bind(&self, abs_path: &str) -> Option<Arc<BindResult>> {
         let _binding = self.bind_guard();
         if let Some(cached) = self.cached_bind(abs_path) {

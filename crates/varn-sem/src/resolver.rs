@@ -6,6 +6,8 @@ use std::sync::Arc;
 pub trait ImportResolver {
     fn module_bind(&self, abs_path: &str) -> Option<Arc<BindResult>>;
 
+    fn module_syntax_failure(&self, abs_path: &str) -> Option<String>;
+
     fn module_exports(&self, abs_path: &str, visiting: &mut Vec<String>) -> Arc<ExportMap>;
 
     fn stdlib_bind(&self, specifier: &str) -> Option<Arc<BindResult>>;

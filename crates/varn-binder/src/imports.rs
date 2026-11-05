@@ -55,6 +55,10 @@ impl<'r> super::Binder<'r> {
             None
         };
 
+        let syntax_failure = resolved_target
+            .as_deref()
+            .and_then(|abs| self.resolver.module_syntax_failure(abs));
+
         let stdlib_exports = if is_stdlib {
             Some(self.resolver.stdlib_exports(&source_str))
         } else {
@@ -70,7 +74,15 @@ impl<'r> super::Binder<'r> {
             self.deps.push(Arc::from(dep));
         }
 
-        if is_relative || is_package {
+        if let Some(detail) = &syntax_failure {
+            self.emit(
+                Diagnostic::error(
+                    ErrorCode::InvalidImportPath,
+                    format!("module '{source_str}' has syntax errors and cannot be imported: {detail}"),
+                )
+                .with_range(i.range),
+            );
+        } else if is_relative || is_package {
             if resolved_target.is_none() {
                 let message = match &package_failure {
                     Some(reason) => format!("cannot resolve module '{source_str}': {reason}"),
@@ -165,16 +177,18 @@ impl<'r> super::Binder<'r> {
                             s
                         }
                         None => {
-                            self.emit(
-                                Diagnostic::error(
-                                    ErrorCode::UnknownSymbol,
-                                    format!(
-                                        "module '{}' has no exported member named '{}'",
-                                        source_str, imported
-                                    ),
-                                )
-                                .with_range(range),
-                            );
+                            if syntax_failure.is_none() {
+                                self.emit(
+                                    Diagnostic::error(
+                                        ErrorCode::UnknownSymbol,
+                                        format!(
+                                            "module '{}' has no exported member named '{}'",
+                                            source_str, imported
+                                        ),
+                                    )
+                                    .with_range(range),
+                                );
+                            }
                             let mut s = Symbol::new(SymbolKind::Let, local, line);
                             s.original_name = Some(self.intern_local(&imported));
                             s.origin_module = module_path_atom;
