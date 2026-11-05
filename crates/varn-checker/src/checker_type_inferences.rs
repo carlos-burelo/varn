@@ -12,6 +12,23 @@ pub(crate) fn collect_type_inferences(
     interner: &varn_core::AtomInterner,
 ) {
     let expected_kind = table.get(expected.0);
+    let expects_type_param = matches!(expected_kind, TypeKind::Named(name, _)
+        if params.iter().any(|p| p.as_ref() == interner.resolve(name)));
+    if !expects_type_param
+        && let TypeKind::Union(members) = table.get(actual.0)
+    {
+        for member in table.get_list(members).to_vec() {
+            collect_type_inferences(
+                expected,
+                &Type::resolved(member),
+                params,
+                out,
+                table,
+                interner,
+            );
+        }
+        return;
+    }
     match expected_kind {
         TypeKind::Named(name, _origin)
             if params.iter().any(|p| p.as_ref() == interner.resolve(name)) =>
