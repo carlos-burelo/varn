@@ -119,7 +119,7 @@ impl RuntimeFailure {
             )?;
         }
         if let Some(cause) = &self.cause {
-            write!(f, "\n")?;
+            writeln!(f)?;
             cause.write_chain(f, "caused by")?;
         }
         Ok(())

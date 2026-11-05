@@ -90,12 +90,12 @@ impl<'r> Checker<'r> {
             );
         }
 
-        let reassignable = match &arena.expr(target).kind {
-            varn_core::ast::ExprKind::Identifier { name } => {
+        let reassignable =
+            if let varn_core::ast::ExprKind::Identifier { name } = &arena.expr(target).kind {
                 self.check_reassignable(*name, range, bind)
-            }
-            _ => true,
-        };
+            } else {
+                true
+            };
 
         let value_ty = self.infer_type(rec, value, bind);
         let is_empty_array_val = value_ty.is_unresolved()

@@ -266,40 +266,47 @@ impl TokenStream {
 
     pub fn describe_current(&self) -> String {
         let tok = self.token();
-        match tok.kind {
-            TokenKind::EOF => "end of file".to_owned(),
-            TokenKind::Identifier => {
-                format!("identifier `{}`", tok.get_lexeme(&self.lexeme_buf))
-            }
+        let kind = tok.kind;
+        if kind == TokenKind::EOF {
+            "end of file".to_owned()
+        } else if kind == TokenKind::Identifier {
+            format!("identifier `{}`", tok.get_lexeme(&self.lexeme_buf))
+        } else if matches!(
+            kind,
             TokenKind::IntegerLiteral
-            | TokenKind::FloatLiteral
-            | TokenKind::BigIntLiteral
-            | TokenKind::DecimalLiteral
-            | TokenKind::Str
-            | TokenKind::Char => format!("{} literal", tok.kind.as_str()),
-            _ => format!("`{}`", tok.get_lexeme(&self.lexeme_buf)),
+                | TokenKind::FloatLiteral
+                | TokenKind::BigIntLiteral
+                | TokenKind::DecimalLiteral
+                | TokenKind::Str
+                | TokenKind::Char
+        ) {
+            format!("{} literal", kind.as_str())
+        } else {
+            format!("`{}`", tok.get_lexeme(&self.lexeme_buf))
         }
     }
 
     fn mismatch(&self, kind: TokenKind) -> ParseError {
         let found = self.describe_current();
         if self.kind() == TokenKind::EOF {
-            let unterminated = match kind {
-                TokenKind::RParen => Some(ErrorCode::UnterminatedParen),
-                TokenKind::RBrace => Some(ErrorCode::UnterminatedBrace),
-                TokenKind::RBracket => Some(ErrorCode::UnterminatedBracket),
-                _ => None,
-            };
-            if let Some(code) = unterminated {
+            let unterminated = [
+                (TokenKind::RParen, ErrorCode::UnterminatedParen),
+                (TokenKind::RBrace, ErrorCode::UnterminatedBrace),
+                (TokenKind::RBracket, ErrorCode::UnterminatedBracket),
+            ]
+            .into_iter()
+            .find(|(closing, _)| *closing == kind);
+            if let Some((_, code)) = unterminated {
                 return ParseError::new(
                     code,
                     format!("expected `{}` before the end of the file", kind.as_str()),
                 );
             }
         }
-        let wanted = match kind {
-            TokenKind::Identifier => "an identifier".to_owned(),
-            _ => format!("`{}`", kind.as_str()),
+        let wanted = if kind == TokenKind::Identifier {
+            "an identifier".to_owned()
+        } else {
+            format!("`{}`", kind.as_str())
         };
         ParseError::expected(format!("expected {wanted}, found {found}"))
     }
