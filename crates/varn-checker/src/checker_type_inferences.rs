@@ -85,14 +85,18 @@ pub(crate) fn collect_type_inferences(
                     out.insert(Arc::from(interner.resolve(name)), tuple);
                 }
                 for (ep, ap) in e_ft.params.iter().take(paired).zip(a_ft.params.iter()) {
+                    let mut contravariant = FxHashMap::default();
                     collect_type_inferences(
                         &Type::resolved(ep.ty),
                         &Type::resolved(ap.ty),
                         params,
-                        out,
+                        &mut contravariant,
                         table,
                         interner,
                     );
+                    for (name, ty) in contravariant {
+                        out.entry(name).or_insert(ty);
+                    }
                 }
                 collect_type_inferences(
                     &Type::resolved(e_ft.return_type),
