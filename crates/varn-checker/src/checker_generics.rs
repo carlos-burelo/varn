@@ -53,6 +53,7 @@ pub(crate) fn check_call_type_arg_arity(
 }
 
 pub(crate) fn build_call_mapping(
+    call_index: u32,
     callee: ExprId,
     type_args: &[TypeNode],
     args: &[Arg],
@@ -80,6 +81,23 @@ pub(crate) fn build_call_mapping(
     } else if type_args.is_empty() {
         let mut mapping =
             infer_mapping_from_args(&fn_type_params, &ft.params, args, checker, rec, bind);
+        if let Some(expected) = checker
+            .expected_type
+            .filter(|_| checker.expected_owner == Some(call_index))
+        {
+            let mut from_return = FxHashMap::default();
+            collect_type_inferences(
+                &Type::resolved(ft.return_type),
+                &expected,
+                &fn_type_params,
+                &mut from_return,
+                &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
+                &bind.interner,
+            );
+            for (name, ty) in from_return {
+                mapping.entry(name).or_insert(ty);
+            }
+        }
         for tp in &fn_type_params {
             let declared_default = ft
                 .type_params

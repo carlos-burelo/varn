@@ -40,6 +40,8 @@ impl<'r> Checker<'r> {
             member_exists_cache: FxHashMap::default(),
             member_type_cache: FxHashMap::default(),
             expected_type: None,
+            expected_pending: false,
+            expected_owner: None,
             map_generics_cache: FxHashMap::default(),
             yielded_types: None,
             declared_yield: None,

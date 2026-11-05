@@ -71,9 +71,14 @@ impl<'r> Checker<'r> {
         f: impl FnOnce(&mut Self) -> R,
     ) -> R {
         let prev = self.expected_type.take();
+        let prev_pending = self.expected_pending;
+        let prev_owner = self.expected_owner;
         self.expected_type = ty;
+        self.expected_pending = ty.is_some();
         let result = f(self);
         self.expected_type = prev;
+        self.expected_pending = prev_pending;
+        self.expected_owner = prev_owner;
         result
     }
 

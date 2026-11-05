@@ -75,6 +75,8 @@ pub struct Checker<'r> {
     pub(crate) member_exists_cache: FxHashMap<(Type, Arc<str>), bool>,
     pub(crate) member_type_cache: FxHashMap<(Type, Arc<str>), MemberTypeCacheEntry>,
     pub(crate) expected_type: Option<Type>,
+    pub(crate) expected_pending: bool,
+    pub(crate) expected_owner: Option<u32>,
 
     pub(crate) map_generics_cache: FxHashMap<(Type, Vec<Type>), Type>,
     pub(crate) yielded_types: Option<Vec<Type>>,
