@@ -85,8 +85,10 @@ impl AtomInterner {
 
     #[track_caller]
     pub fn resolve(&self, atom: Atom) -> &str {
-        self.try_resolve(atom)
-            .unwrap_or_else(|| panic!("Atom {atom:?} is not present in this interner"))
+        match self.try_resolve(atom) {
+            Some(text) => text,
+            None => panic!("Atom {atom:?} is not present in this interner"),
+        }
     }
 
     pub fn try_resolve(&self, atom: Atom) -> Option<&str> {
