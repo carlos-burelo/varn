@@ -21,12 +21,24 @@ use literal::rc_str_serde;
 use std::sync::Arc;
 use varn_core::OpCode;
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct InlineScope {
+    pub function: String,
+    pub parent: u32,
+    pub call_line: u32,
+}
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[allow(clippy::mutable_key_type)]
 pub struct Chunk {
     pub code: Vec<u16>,
 
     pub lines: LineMapping,
+
+    pub inline_scopes: Vec<InlineScope>,
+
+    #[serde(skip)]
+    pub scope_cursor: u32,
 
     pub constants: Vec<PoolEntry>,
 
@@ -47,7 +59,10 @@ pub const MAX_CONSTANTS: usize = (u16::MAX - 1) as usize;
 
 impl PartialEq for Chunk {
     fn eq(&self, other: &Self) -> bool {
-        self.code == other.code && self.lines == other.lines && self.constants == other.constants
+        self.code == other.code
+            && self.lines == other.lines
+            && self.inline_scopes == other.inline_scopes
+            && self.constants == other.constants
     }
 }
 
@@ -57,6 +72,7 @@ impl std::hash::Hash for Chunk {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.code.hash(state);
         self.lines.hash(state);
+        self.inline_scopes.hash(state);
         self.constants.hash(state);
     }
 }
@@ -66,6 +82,8 @@ impl Default for Chunk {
         Self {
             code: Vec::new(),
             lines: LineMapping::default(),
+            inline_scopes: Vec::new(),
+            scope_cursor: 0,
             constants: Vec::new(),
             constants_map: rustc_hash::FxHashMap::default(),
             source_file: Arc::from(""),
@@ -82,7 +100,7 @@ impl Chunk {
 
     pub fn write(&mut self, word: u16, line: u32) {
         self.code.push(word);
-        self.lines.add(line);
+        self.lines.add(line, self.scope_cursor);
     }
 
     pub fn emit(&mut self, op: OpCode, line: u32) {
