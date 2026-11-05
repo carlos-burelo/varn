@@ -1,13 +1,13 @@
 
-  [34mclif[0m [2m───────────────────────────────────────────── <module>[0m
-  [1m<module>[0m[2m (native)[0m
+  clif ───────────────────────────────────────────── <module>
+  <module> (native)
   info ROUTE
-  [1mmakeAdder[0m[2m (framed)[0m
+  makeAdder (framed)
   info ROUTE
-  [1m<closure>[0m[2m (native)[0m
+  <closure> (native)
   info ROUTE
-  [1mmakeCounter[0m[2m (framed)[0m
+  makeCounter (framed)
   info ROUTE
-  [1m<closure>[0m[2m (native)[0m
+  <closure> (native)
   info ROUTE
-  [2m── end: clif ──[0m
+  ── end: clif ──

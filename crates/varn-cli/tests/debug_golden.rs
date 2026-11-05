@@ -68,6 +68,7 @@ fn normalize(raw: &str, fixtures: &Path) -> String {
 
 fn run_phase(vn: &str, fixture: &Path, phase: &str) -> String {
     let out = Command::new(vn)
+        .env("NO_COLOR", "1")
         .arg("debug")
         .arg(fixture)
         .arg("-p")

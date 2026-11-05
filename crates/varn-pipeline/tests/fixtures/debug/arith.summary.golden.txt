@@ -1,6 +1,6 @@
 
-  [1msummary[0m [2m────────────────────────────────────────── <module>[0m
-  [2mmétrica                 [0m │ [2m              valor[0m
+  summary ────────────────────────────────────────── <module>
+  métrica                  │               valor
   ─────────────────────────┼────────────────────
   funciones                │                   3
   bytecode (words)         │                  46
@@ -8,9 +8,9 @@
   exports                  │                   0
   fuera de clif por tamaño │ 0 (gate 8192 words)
 [top] 10 por tamaño
-  [2mfunción [0m │ [2m   words[0m │ [2mgate[0m
+  función  │    words │ gate
   ─────────┼──────────┼─────
   <module> │ 28 words │     
   scale    │ 11 words │     
   add      │  7 words │     
-  [2m── end: summary ──[0m
+  ── end: summary ──

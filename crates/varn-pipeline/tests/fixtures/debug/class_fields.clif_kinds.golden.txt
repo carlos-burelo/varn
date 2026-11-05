@@ -1,34 +1,34 @@
 
-  [34mclif[0m [2m───────────────────────────────────────────── <module>[0m
-  [1m<module>[0m[2m (native)[0m
-    [2mkinds (14 regs):[0m
-  [2mblock  [0m │ [2mkinds                                                                               [0m
+  clif ───────────────────────────────────────────── <module>
+  <module> (native)
+    kinds (15 regs):
+  block   │ kinds                                                                               
   ────────┼─────────────────────────────────────────────────────────────────────────────────────
   block@0 │ v0:Ref, v1:Ref, v2:Ref, v3:Ref, v4:Ref, v5:Ref, v6:Float, v7:Ref, v8:Float, v10:Bool
-  block@1 │ v11:Ref, v12:Str, v13:Dynamic, v14:Ref                                              
-  block@2 │ v15:Float, v16:Float, v17:Bool                                                      
-  block@3 │ v18:Ref, v19:Str, v20:Dynamic, v21:Ref                                              
-  block@4 │ v22:Float, v23:Dynamic, v24:Float, v25:Float, v26:Bool                              
-  block@5 │ v27:Ref, v28:Str, v29:Dynamic, v30:Ref                                              
-  block@6 │ v31:Ref, v32:Str, v33:Dynamic, v34:Dynamic                                          
-  [1mTemperature.constructor[0m[2m (native)[0m
-    [2mkinds (4 regs):[0m
-  [2mblock  [0m │ [2mkinds           [0m
+  block@1 │ v11:Ref, v12:Str, v13:Dynamic, v14:Dynamic, v15:Ref                                 
+  block@2 │ v16:Float, v17:Float, v18:Bool                                                      
+  block@3 │ v19:Ref, v20:Str, v21:Dynamic, v22:Dynamic, v23:Ref                                 
+  block@4 │ v24:Float, v25:Dynamic, v26:Float, v27:Float, v28:Bool                              
+  block@5 │ v29:Ref, v30:Str, v31:Dynamic, v32:Dynamic, v33:Ref                                 
+  block@6 │ v34:Ref, v35:Str, v36:Dynamic, v37:Dynamic                                          
+  Temperature.constructor (native)
+    kinds (4 regs):
+  block   │ kinds           
   ────────┼─────────────────
   block@0 │ v0:Float, v1:Ref
-  [1mTemperature.get celsius[0m[2m (native)[0m
-    [2mkinds (4 regs):[0m
-  [2mblock  [0m │ [2mkinds           [0m
+  Temperature.get celsius (native)
+    kinds (4 regs):
+  block   │ kinds           
   ────────┼─────────────────
   block@0 │ v0:Ref, v1:Float
-  [1mTemperature.set celsius[0m[2m (native)[0m
-    [2mkinds (4 regs):[0m
-  [2mblock  [0m │ [2mkinds           [0m
+  Temperature.set celsius (native)
+    kinds (4 regs):
+  block   │ kinds           
   ────────┼─────────────────
   block@0 │ v0:Float, v1:Ref
-  [1mTemperature.get fahrenheit[0m[2m (native)[0m
-    [2mkinds (6 regs):[0m
-  [2mblock  [0m │ [2mkinds                                                   [0m
+  Temperature.get fahrenheit (native)
+    kinds (6 regs):
+  block   │ kinds                                                   
   ────────┼─────────────────────────────────────────────────────────
   block@0 │ v0:Ref, v1:Float, v2:Float, v3:Float, v4:Float, v5:Float
-  [2m── end: clif ──[0m
+  ── end: clif ──

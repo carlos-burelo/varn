@@ -1,8 +1,9 @@
 
-  [35mtir check[0m [2m──────────────────────────────────────── <fixtures>/arith.vn[0m
-nodes 34   static 13   by name 0   static 100%
+  tir check ──────────────────────────────────────── <fixtures>/arith.vn
+nodes 36   static 13   by name 0   static 100%
   declared           dynamic     1   by name     0
   function type      dynamic     3   by name     0
+  class object       dynamic     2   by name     0
   info from_tir(ssa): OK (3 ssa fn(s))
   info from_tir(proto): OK
-  [2m── end: tir check ──[0m
+  ── end: tir check ──

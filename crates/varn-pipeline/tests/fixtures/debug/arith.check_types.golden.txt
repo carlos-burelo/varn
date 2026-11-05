@@ -15,7 +15,7 @@
 12 | 10:5 | int
 13 | 10:11 | int
 14 | 10:5 | bool
-15 | 10:24 | Error
+15 | 10:24 | Class<Error>
 16 | 10:30 | str
 17 | 10:20 | Error
 18 | 11:5 | (x: int) => int
@@ -23,7 +23,7 @@
 20 | 11:5 | int
 21 | 11:19 | int
 22 | 11:5 | bool
-23 | 11:33 | Error
+23 | 11:33 | Class<Error>
 24 | 11:39 | str
 25 | 11:29 | Error
 26 | 12:1 | (...args: dynamic[]) => void

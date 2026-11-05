@@ -1,9 +1,9 @@
 
-  [34mclif[0m [2m───────────────────────────────────────────── <module>[0m
-  [1m<module>[0m[2m (native)[0m
+  clif ───────────────────────────────────────────── <module>
+  <module> (native)
   info ROUTE
-  [1madd[0m[2m[0m
+  add
   info ROUTE
-  [1mscale[0m[2m[0m
+  scale
   info ROUTE
-  [2m── end: clif ──[0m
+  ── end: clif ──

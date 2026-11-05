@@ -1,37 +1,37 @@
 
-  [34mclif[0m [2m───────────────────────────────────────────── <module>[0m
-  [1m<module>[0m[2m (native)[0m
-    [2mkinds (15 regs):[0m
-  [2mblock  [0m │ [2mkinds                                                                                       [0m
+  clif ───────────────────────────────────────────── <module>
+  <module> (native)
+    kinds (16 regs):
+  block   │ kinds                                                                                       
   ────────┼─────────────────────────────────────────────────────────────────────────────────────────────
   block@0 │ v0:Ref, v1:Ref, v2:Ref, v3:Ref, v4:Ref, v5:Ref, v6:Int, v7:Ref, v8:Dynamic, v9:Int, v11:Bool
-  block@1 │ v12:Ref, v13:Str, v14:Dynamic, v15:Ref                                                      
-  block@2 │ v23:Ref, v25:Dynamic, v26:Dynamic, v29:Str, v30:Str, v31:Bool                               
-  block@3 │ v32:Ref, v33:Str, v34:Dynamic, v35:Ref                                                      
-  block@4 │ v36:Ref, v37:Str, v38:Dynamic, v39:Dynamic                                                  
-  [1midentity[0m[2m (native)[0m
-    [2mkinds (3 regs):[0m
-  [2mblock  [0m │ [2mkinds     [0m
+  block@1 │ v12:Ref, v13:Str, v14:Dynamic, v15:Dynamic, v16:Ref                                         
+  block@2 │ v25:Ref, v27:Dynamic, v28:Dynamic, v31:Str, v32:Str, v33:Bool                               
+  block@3 │ v34:Ref, v35:Str, v36:Dynamic, v37:Dynamic, v38:Ref                                         
+  block@4 │ v39:Ref, v40:Str, v41:Dynamic, v42:Dynamic                                                  
+  identity (native)
+    kinds (3 regs):
+  block   │ kinds     
   ────────┼───────────
   block@0 │ v0:Dynamic
-  [1mBox.constructor[0m[2m (native)[0m
-    [2mkinds (4 regs):[0m
-  [2mblock  [0m │ [2mkinds             [0m
+  Box.constructor (native)
+    kinds (4 regs):
+  block   │ kinds             
   ────────┼───────────────────
   block@0 │ v0:Dynamic, v1:Ref
-  [1mBox.get[0m[2m (native)[0m
-    [2mkinds (3 regs):[0m
-  [2mblock  [0m │ [2mkinds             [0m
+  Box.get (native)
+    kinds (3 regs):
+  block   │ kinds             
   ────────┼───────────────────
   block@0 │ v0:Ref, v1:Dynamic
-  [1mBox.map[0m[2m (native)[0m
-    [2mkinds (10 regs):[0m
-  [2mblock  [0m │ [2mkinds                                                     [0m
+  Box.map (native)
+    kinds (10 regs):
+  block   │ kinds                                                     
   ────────┼───────────────────────────────────────────────────────────
   block@0 │ v0:Dynamic, v1:Ref, v2:Ref, v3:Dynamic, v4:Dynamic, v5:Ref
-  [1m<closure>[0m[2m (native)[0m
-    [2mkinds (6 regs):[0m
-  [2mblock  [0m │ [2mkinds                                         [0m
+  <closure> (native)
+    kinds (6 regs):
+  block   │ kinds                                         
   ────────┼───────────────────────────────────────────────
   block@0 │ v0:Int, v1:Str, v2:Str, v3:Str, v4:Str, v5:Str
-  [2m── end: clif ──[0m
+  ── end: clif ──

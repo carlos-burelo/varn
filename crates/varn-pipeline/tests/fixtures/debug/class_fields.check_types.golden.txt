@@ -16,21 +16,21 @@
 17 | 17:16 | float
 18 | 17:38 | float
 19 | 17:16 | float
-20 | 21:15 | Temperature
+20 | 21:15 | Class<Temperature>
 21 | 21:27 | float
 22 | 21:11 | Temperature
 23 | 22:5 | Temperature
 25 | 22:5 | float
 26 | 22:19 | float
 27 | 22:5 | bool
-28 | 22:36 | Error
+28 | 22:36 | Class<Error>
 29 | 22:42 | str
 30 | 22:32 | Error
 31 | 23:5 | Temperature
 33 | 23:5 | float
 34 | 23:22 | float
 35 | 23:5 | bool
-36 | 23:39 | Error
+36 | 23:39 | Class<Error>
 37 | 23:45 | str
 38 | 23:35 | Error
 39 | 24:1 | Temperature
@@ -41,7 +41,7 @@
 46 | 25:5 | float
 47 | 25:22 | float
 48 | 25:5 | bool
-49 | 25:38 | Error
+49 | 25:38 | Class<Error>
 50 | 25:44 | str
 51 | 25:34 | Error
 52 | 26:1 | (...args: dynamic[]) => void

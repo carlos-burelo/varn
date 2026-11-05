@@ -1,19 +1,19 @@
 
-  [1msummary[0m [2m────────────────────────────────────────── <module>[0m
-  [2mmétrica                 [0m │ [2m              valor[0m
+  summary ────────────────────────────────────────── <module>
+  métrica                  │               valor
   ─────────────────────────┼────────────────────
   funciones                │                   6
-  bytecode (words)         │                 185
+  bytecode (words)         │                 191
   constantes               │                  16
   exports                  │                   0
   fuera de clif por tamaño │ 0 (gate 8192 words)
 [top] 10 por tamaño
-  [2mfunción        [0m │ [2m    words[0m │ [2mgate[0m
+  función         │     words │ gate
   ────────────────┼───────────┼─────
-  <module>        │ 117 words │     
+  <module>        │ 123 words │     
   Box.map         │  25 words │     
   <closure>       │  15 words │     
   Box.constructor │  12 words │     
   Box.get         │  11 words │     
   identity        │   5 words │     
-  [2m── end: summary ──[0m
+  ── end: summary ──

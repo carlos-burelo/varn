@@ -20,7 +20,7 @@
 17 | 14:5 | int
 18 | 14:17 | int
 19 | 14:5 | bool
-20 | 14:30 | Error
+20 | 14:30 | Class<Error>
 21 | 14:36 | str
 22 | 14:26 | Error
 23 | 15:17 | () => () => int
@@ -29,14 +29,14 @@
 26 | 16:5 | int
 27 | 16:19 | int
 28 | 16:5 | bool
-29 | 16:32 | Error
+29 | 16:32 | Class<Error>
 30 | 16:38 | str
 31 | 16:28 | Error
 32 | 17:5 | () => int
 33 | 17:5 | int
 34 | 17:19 | int
 35 | 17:5 | bool
-36 | 17:32 | Error
+36 | 17:32 | Class<Error>
 37 | 17:38 | str
 38 | 17:28 | Error
 39 | 18:1 | (...args: dynamic[]) => void

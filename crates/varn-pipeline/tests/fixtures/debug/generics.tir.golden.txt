@@ -1,29 +1,49 @@
 
-  [35mtir[0m [2m────────────────────────────────────────────── <fixtures>/generics.vn[0m
+  tir ────────────────────────────────────────────── <fixtures>/generics.vn
 TirModule {
     source_file: "<fixtures>/generics.vn",
     imports: [],
     exports: [],
     types: TyTable {
+        literal_strings: [],
         entries: [
             Never,
+            Class(
+                ClassId(
+                    1,
+                ),
+            ),
             Str,
+            Class(
+                ClassId(
+                    0,
+                ),
+            ),
             Dynamic(
                 Declared,
             ),
         ],
         dedup: {
-            Str: 1,
-            Never: 0,
             Dynamic(
                 Declared,
-            ): 2,
+            ): 4,
+            Str: 2,
+            Class(
+                ClassId(
+                    1,
+                ),
+            ): 1,
+            Class(
+                ClassId(
+                    0,
+                ),
+            ): 3,
+            Never: 0,
         },
         lists: [],
         shapes: [],
         shape_names: [],
         named_shapes: {},
-        open_shapes: 0,
         open_aliases: [],
     },
     classes: [
@@ -77,6 +97,7 @@ TirModule {
                         },
                     ],
                 },
+                is_value: false,
             },
             constructor: Some(
                 SigId(
@@ -104,6 +125,15 @@ TirModule {
                     ty: Str,
                     slot: 2,
                 },
+                FieldInfo {
+                    name: "cause",
+                    ty: Nullable(
+                        TyId(
+                            1,
+                        ),
+                    ),
+                    slot: 3,
+                },
             ],
             statics: [],
             vtable: [
@@ -115,7 +145,7 @@ TirModule {
                 },
             ],
             layout: ClassLayout {
-                payload_size: 48,
+                payload_size: 56,
                 alignment: 8,
                 fields: [
                     FieldLayout {
@@ -154,6 +184,18 @@ TirModule {
                             repr: Boxed,
                         },
                     },
+                    FieldLayout {
+                        name: "cause",
+                        kind: Some(
+                            Class,
+                        ),
+                        offset: 48,
+                        layout: TypeLayout {
+                            size: 8,
+                            align: 8,
+                            repr: Ref,
+                        },
+                    },
                 ],
                 gc: GcLayout {
                     slots: [
@@ -169,8 +211,13 @@ TirModule {
                             offset: 32,
                             repr: Boxed,
                         },
+                        GcSlot {
+                            offset: 48,
+                            repr: Ref,
+                        },
                     ],
                 },
+                is_value: false,
             },
             constructor: Some(
                 SigId(
@@ -200,6 +247,11 @@ TirModule {
         },
         Signature {
             params: [
+                Nullable(
+                    TyId(
+                        2,
+                    ),
+                ),
                 Nullable(
                     TyId(
                         1,
@@ -276,7 +328,7 @@ TirModule {
             params: [
                 Array(
                     TyId(
-                        2,
+                        4,
                     ),
                 ),
             ],
@@ -322,8 +374,8 @@ TirModule {
                                 0,
                             ),
                             span: Span {
-                                start: 258,
-                                end: 259,
+                                start: 275,
+                                end: 276,
                             },
                         },
                     ),
@@ -362,8 +414,8 @@ TirModule {
                                             ty: Str,
                                             res: None,
                                             span: Span {
-                                                start: 452,
-                                                end: 461,
+                                                start: 475,
+                                                end: 484,
                                             },
                                         },
                                         rhs: TirExpr {
@@ -376,24 +428,24 @@ TirModule {
                                                         0,
                                                     ),
                                                     span: Span {
-                                                        start: 461,
-                                                        end: 462,
+                                                        start: 484,
+                                                        end: 485,
                                                     },
                                                 },
                                             },
                                             ty: Str,
                                             res: None,
                                             span: Span {
-                                                start: 461,
-                                                end: 462,
+                                                start: 484,
+                                                end: 485,
                                             },
                                         },
                                     },
                                     ty: Str,
                                     res: None,
                                     span: Span {
-                                        start: 452,
-                                        end: 461,
+                                        start: 475,
+                                        end: 484,
                                     },
                                 },
                                 rhs: TirExpr {
@@ -403,16 +455,16 @@ TirModule {
                                     ty: Str,
                                     res: None,
                                     span: Span {
-                                        start: 452,
-                                        end: 461,
+                                        start: 475,
+                                        end: 484,
                                     },
                                 },
                             },
                             ty: Str,
                             res: None,
                             span: Span {
-                                start: 452,
-                                end: 461,
+                                start: 475,
+                                end: 484,
                             },
                         },
                     ),
@@ -452,8 +504,8 @@ TirModule {
                                         ),
                                         res: None,
                                         span: Span {
-                                            start: 61,
-                                            end: 65,
+                                            start: 65,
+                                            end: 69,
                                         },
                                     },
                                     name: "value",
@@ -465,8 +517,8 @@ TirModule {
                                     0,
                                 ),
                                 span: Span {
-                                    start: 61,
-                                    end: 71,
+                                    start: 65,
+                                    end: 75,
                                 },
                             },
                             value: TirExpr {
@@ -478,8 +530,8 @@ TirModule {
                                     0,
                                 ),
                                 span: Span {
-                                    start: 74,
-                                    end: 75,
+                                    start: 78,
+                                    end: 79,
                                 },
                             },
                         },
@@ -488,8 +540,8 @@ TirModule {
                         ),
                         res: None,
                         span: Span {
-                            start: 61,
-                            end: 75,
+                            start: 65,
+                            end: 79,
                         },
                     },
                 ),
@@ -529,8 +581,8 @@ TirModule {
                                     ),
                                     res: None,
                                     span: Span {
-                                        start: 113,
-                                        end: 117,
+                                        start: 121,
+                                        end: 125,
                                     },
                                 },
                                 name: "value",
@@ -542,8 +594,8 @@ TirModule {
                                 0,
                             ),
                             span: Span {
-                                start: 113,
-                                end: 123,
+                                start: 121,
+                                end: 131,
                             },
                         },
                     ),
@@ -597,8 +649,8 @@ TirModule {
                                                         0,
                                                     ),
                                                     span: Span {
-                                                        start: 191,
-                                                        end: 192,
+                                                        start: 203,
+                                                        end: 204,
                                                     },
                                                 },
                                                 args: [
@@ -614,8 +666,8 @@ TirModule {
                                                                     ),
                                                                     res: None,
                                                                     span: Span {
-                                                                        start: 193,
-                                                                        end: 197,
+                                                                        start: 205,
+                                                                        end: 209,
                                                                     },
                                                                 },
                                                                 name: "value",
@@ -627,8 +679,8 @@ TirModule {
                                                                 0,
                                                             ),
                                                             span: Span {
-                                                                start: 193,
-                                                                end: 203,
+                                                                start: 205,
+                                                                end: 215,
                                                             },
                                                         },
                                                     ),
@@ -639,8 +691,8 @@ TirModule {
                                             ),
                                             res: None,
                                             span: Span {
-                                                start: 191,
-                                                end: 204,
+                                                start: 203,
+                                                end: 216,
                                             },
                                         },
                                     ),
@@ -653,8 +705,8 @@ TirModule {
                             ),
                             res: None,
                             span: Span {
-                                start: 180,
-                                end: 205,
+                                start: 192,
+                                end: 217,
                             },
                         },
                     ),
@@ -806,8 +858,8 @@ TirModule {
                                             ty: Int,
                                             res: None,
                                             span: Span {
-                                                start: 291,
-                                                end: 293,
+                                                start: 311,
+                                                end: 313,
                                             },
                                         },
                                     ),
@@ -820,8 +872,8 @@ TirModule {
                             ),
                             res: None,
                             span: Span {
-                                start: 278,
-                                end: 294,
+                                start: 298,
+                                end: 314,
                             },
                         },
                     },
@@ -852,8 +904,8 @@ TirModule {
                                         ),
                                     ),
                                     span: Span {
-                                        start: 299,
-                                        end: 305,
+                                        start: 320,
+                                        end: 326,
                                     },
                                 },
                                 name: "get",
@@ -864,8 +916,8 @@ TirModule {
                                 0,
                             ),
                             span: Span {
-                                start: 299,
-                                end: 311,
+                                start: 320,
+                                end: 332,
                             },
                         },
                         rhs: TirExpr {
@@ -875,16 +927,16 @@ TirModule {
                             ty: Int,
                             res: None,
                             span: Span {
-                                start: 316,
-                                end: 318,
+                                start: 337,
+                                end: 339,
                             },
                         },
                     },
                     ty: Bool,
                     res: None,
                     span: Span {
-                        start: 299,
-                        end: 318,
+                        start: 320,
+                        end: 339,
                     },
                 },
                 then_body: [
@@ -893,17 +945,19 @@ TirModule {
                             kind: Call {
                                 callee: TirExpr {
                                     kind: Var,
-                                    ty: Class(
-                                        ClassId(
-                                            1,
+                                    ty: Dynamic(
+                                        ClassObject(
+                                            TyId(
+                                                1,
+                                            ),
                                         ),
                                     ),
                                     res: NativeGlobal(
                                         4,
                                     ),
                                     span: Span {
-                                        start: 330,
-                                        end: 335,
+                                        start: 351,
+                                        end: 356,
                                     },
                                 },
                                 args: [
@@ -917,11 +971,26 @@ TirModule {
                                                     ty: Str,
                                                     res: None,
                                                     span: Span {
-                                                        start: 336,
-                                                        end: 350,
+                                                        start: 357,
+                                                        end: 371,
                                                     },
                                                 },
                                             },
+                                            ty: Nullable(
+                                                TyId(
+                                                    2,
+                                                ),
+                                            ),
+                                            res: None,
+                                            span: Span {
+                                                start: 357,
+                                                end: 371,
+                                            },
+                                        },
+                                    ),
+                                    Expr(
+                                        TirExpr {
+                                            kind: NullLit,
                                             ty: Nullable(
                                                 TyId(
                                                     1,
@@ -929,8 +998,8 @@ TirModule {
                                             ),
                                             res: None,
                                             span: Span {
-                                                start: 336,
-                                                end: 350,
+                                                start: 0,
+                                                end: 0,
                                             },
                                         },
                                     ),
@@ -943,8 +1012,8 @@ TirModule {
                             ),
                             res: None,
                             span: Span {
-                                start: 326,
-                                end: 351,
+                                start: 347,
+                                end: 372,
                             },
                         },
                     ),
@@ -966,8 +1035,8 @@ TirModule {
                                         2,
                                     ),
                                     span: Span {
-                                        start: 356,
-                                        end: 364,
+                                        start: 378,
+                                        end: 386,
                                     },
                                 },
                                 args: [
@@ -979,8 +1048,8 @@ TirModule {
                                             ty: Int,
                                             res: None,
                                             span: Span {
-                                                start: 370,
-                                                end: 372,
+                                                start: 392,
+                                                end: 394,
                                             },
                                         },
                                     ),
@@ -993,8 +1062,8 @@ TirModule {
                                 ),
                             ),
                             span: Span {
-                                start: 356,
-                                end: 373,
+                                start: 378,
+                                end: 395,
                             },
                         },
                         rhs: TirExpr {
@@ -1004,16 +1073,16 @@ TirModule {
                             ty: Int,
                             res: None,
                             span: Span {
-                                start: 378,
-                                end: 380,
+                                start: 400,
+                                end: 402,
                             },
                         },
                     },
                     ty: Bool,
                     res: None,
                     span: Span {
-                        start: 356,
-                        end: 380,
+                        start: 378,
+                        end: 402,
                     },
                 },
                 then_body: [
@@ -1022,17 +1091,19 @@ TirModule {
                             kind: Call {
                                 callee: TirExpr {
                                     kind: Var,
-                                    ty: Class(
-                                        ClassId(
-                                            1,
+                                    ty: Dynamic(
+                                        ClassObject(
+                                            TyId(
+                                                1,
+                                            ),
                                         ),
                                     ),
                                     res: NativeGlobal(
                                         4,
                                     ),
                                     span: Span {
-                                        start: 392,
-                                        end: 397,
+                                        start: 414,
+                                        end: 419,
                                     },
                                 },
                                 args: [
@@ -1046,11 +1117,26 @@ TirModule {
                                                     ty: Str,
                                                     res: None,
                                                     span: Span {
-                                                        start: 398,
-                                                        end: 417,
+                                                        start: 420,
+                                                        end: 439,
                                                     },
                                                 },
                                             },
+                                            ty: Nullable(
+                                                TyId(
+                                                    2,
+                                                ),
+                                            ),
+                                            res: None,
+                                            span: Span {
+                                                start: 420,
+                                                end: 439,
+                                            },
+                                        },
+                                    ),
+                                    Expr(
+                                        TirExpr {
+                                            kind: NullLit,
                                             ty: Nullable(
                                                 TyId(
                                                     1,
@@ -1058,8 +1144,8 @@ TirModule {
                                             ),
                                             res: None,
                                             span: Span {
-                                                start: 398,
-                                                end: 417,
+                                                start: 0,
+                                                end: 0,
                                             },
                                         },
                                     ),
@@ -1072,8 +1158,8 @@ TirModule {
                             ),
                             res: None,
                             span: Span {
-                                start: 388,
-                                end: 418,
+                                start: 410,
+                                end: 440,
                             },
                         },
                     ),
@@ -1115,8 +1201,8 @@ TirModule {
                                         ),
                                     ),
                                     span: Span {
-                                        start: 434,
-                                        end: 440,
+                                        start: 457,
+                                        end: 463,
                                     },
                                 },
                                 name: "map",
@@ -1134,8 +1220,8 @@ TirModule {
                                             ),
                                             res: None,
                                             span: Span {
-                                                start: 445,
-                                                end: 464,
+                                                start: 468,
+                                                end: 487,
                                             },
                                         },
                                     ),
@@ -1150,8 +1236,8 @@ TirModule {
                                 1,
                             ),
                             span: Span {
-                                start: 434,
-                                end: 465,
+                                start: 457,
+                                end: 488,
                             },
                         },
                     },
@@ -1182,8 +1268,8 @@ TirModule {
                                         ),
                                     ),
                                     span: Span {
-                                        start: 470,
-                                        end: 476,
+                                        start: 494,
+                                        end: 500,
                                     },
                                 },
                                 name: "get",
@@ -1194,8 +1280,8 @@ TirModule {
                                 0,
                             ),
                             span: Span {
-                                start: 470,
-                                end: 482,
+                                start: 494,
+                                end: 506,
                             },
                         },
                         rhs: TirExpr {
@@ -1205,16 +1291,16 @@ TirModule {
                             ty: Str,
                             res: None,
                             span: Span {
-                                start: 487,
-                                end: 497,
+                                start: 511,
+                                end: 521,
                             },
                         },
                     },
                     ty: Bool,
                     res: None,
                     span: Span {
-                        start: 470,
-                        end: 497,
+                        start: 494,
+                        end: 521,
                     },
                 },
                 then_body: [
@@ -1223,17 +1309,19 @@ TirModule {
                             kind: Call {
                                 callee: TirExpr {
                                     kind: Var,
-                                    ty: Class(
-                                        ClassId(
-                                            1,
+                                    ty: Dynamic(
+                                        ClassObject(
+                                            TyId(
+                                                1,
+                                            ),
                                         ),
                                     ),
                                     res: NativeGlobal(
                                         4,
                                     ),
                                     span: Span {
-                                        start: 509,
-                                        end: 514,
+                                        start: 533,
+                                        end: 538,
                                     },
                                 },
                                 args: [
@@ -1247,11 +1335,26 @@ TirModule {
                                                     ty: Str,
                                                     res: None,
                                                     span: Span {
-                                                        start: 515,
-                                                        end: 529,
+                                                        start: 539,
+                                                        end: 553,
                                                     },
                                                 },
                                             },
+                                            ty: Nullable(
+                                                TyId(
+                                                    2,
+                                                ),
+                                            ),
+                                            res: None,
+                                            span: Span {
+                                                start: 539,
+                                                end: 553,
+                                            },
+                                        },
+                                    ),
+                                    Expr(
+                                        TirExpr {
+                                            kind: NullLit,
                                             ty: Nullable(
                                                 TyId(
                                                     1,
@@ -1259,8 +1362,8 @@ TirModule {
                                             ),
                                             res: None,
                                             span: Span {
-                                                start: 515,
-                                                end: 529,
+                                                start: 0,
+                                                end: 0,
                                             },
                                         },
                                     ),
@@ -1273,8 +1376,8 @@ TirModule {
                             ),
                             res: None,
                             span: Span {
-                                start: 505,
-                                end: 530,
+                                start: 529,
+                                end: 554,
                             },
                         },
                     ),
@@ -1293,8 +1396,8 @@ TirModule {
                                 0,
                             ),
                             span: Span {
-                                start: 531,
-                                end: 536,
+                                start: 556,
+                                end: 561,
                             },
                         },
                         args: [
@@ -1308,8 +1411,8 @@ TirModule {
                                             ty: Str,
                                             res: None,
                                             span: Span {
-                                                start: 537,
-                                                end: 550,
+                                                start: 562,
+                                                end: 575,
                                             },
                                         },
                                     },
@@ -1318,8 +1421,8 @@ TirModule {
                                     ),
                                     res: None,
                                     span: Span {
-                                        start: 537,
-                                        end: 550,
+                                        start: 562,
+                                        end: 575,
                                     },
                                 },
                             ),
@@ -1330,8 +1433,8 @@ TirModule {
                         0,
                     ),
                     span: Span {
-                        start: 531,
-                        end: 551,
+                        start: 556,
+                        end: 576,
                     },
                 },
             ),
@@ -1344,4 +1447,4 @@ TirModule {
         force_inline: false,
     },
 }
-  [2m── end: tir ──[0m
+  ── end: tir ──

@@ -42,7 +42,7 @@
 40 | 23:5 | int
 41 | 23:19 | int
 42 | 23:5 | bool
-43 | 23:33 | Error
+43 | 23:33 | Class<Error>
 44 | 23:39 | str
 45 | 23:29 | Error
 46 | 24:5 | (arr: int[], threshold: int) => int
@@ -51,7 +51,7 @@
 49 | 24:5 | int
 50 | 24:29 | int
 51 | 24:5 | bool
-52 | 24:42 | Error
+52 | 24:42 | Class<Error>
 53 | 24:48 | str
 54 | 24:38 | Error
 55 | 25:1 | (...args: dynamic[]) => void

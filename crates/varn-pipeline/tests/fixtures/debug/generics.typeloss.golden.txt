@@ -1,4 +1,4 @@
 
-  [34mtypeloss[0m [2m───────────────────────────────────────── <module>[0m
+  typeloss ───────────────────────────────────────── <module>
   info cada opcode tipado que el emisor pudo elegir, lo eligió
-  [2m── end: typeloss ──[0m
+  ── end: typeloss ──
