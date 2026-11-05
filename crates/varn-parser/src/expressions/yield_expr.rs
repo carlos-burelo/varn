@@ -1,5 +1,5 @@
-use crate::error::{PResult, ParseError};
 use super::parse_assign_expr;
+use crate::error::{PResult, ParseError};
 use crate::stream::TokenStream;
 use varn_core::ast::{ExprKind, Pattern, StmtId, StmtKind, VarKind};
 use varn_core::TokenKind;

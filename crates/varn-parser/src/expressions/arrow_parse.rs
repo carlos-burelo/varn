@@ -1,5 +1,5 @@
-use crate::error::PResult;
 use super::parse_assign_expr;
+use crate::error::PResult;
 use crate::stream::TokenStream;
 use crate::types::parse_type;
 use varn_core::ast::expr::ArrowBody;

@@ -355,7 +355,9 @@ fn parse_match_fields(s: &mut TokenStream) -> PResult<(Vec<MatchField>, bool)> {
             rest = true;
             s.eat(TokenKind::Comma);
             if !s.check(TokenKind::RBrace) {
-                return Err(ParseError::invalid("`...` must be the last entry of a record pattern".to_owned()));
+                return Err(ParseError::invalid(
+                    "`...` must be the last entry of a record pattern".to_owned(),
+                ));
             }
             break;
         }

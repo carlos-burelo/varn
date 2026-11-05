@@ -18,12 +18,12 @@ impl<'r> Checker<'r> {
         if callee_ty.is_unresolved() {
             return Type::Dynamic;
         }
-        let callee_ty = if callee_ty.builtin_of(&self.ty_table) == Some(varn_core::BuiltinType::Class)
-        {
-            callee_ty.builtin_arg(0, &self.ty_table)
-        } else {
-            callee_ty
-        };
+        let callee_ty =
+            if callee_ty.builtin_of(&self.ty_table) == Some(varn_core::BuiltinType::Class) {
+                callee_ty.builtin_arg(0, &self.ty_table)
+            } else {
+                callee_ty
+            };
         let callee_kind = self.ty_table.get(callee_ty.0);
         match callee_kind {
             TypeKind::Named(name, origin) => {

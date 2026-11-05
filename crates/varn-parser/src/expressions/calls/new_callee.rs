@@ -1,7 +1,7 @@
-use crate::error::PResult;
 use super::super::parse_expr;
 use super::super::primary::parse_primary_expr;
 use super::property_name::parse_property_name;
+use crate::error::PResult;
 use crate::stream::TokenStream;
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::TokenKind;

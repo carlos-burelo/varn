@@ -50,7 +50,9 @@ pub(crate) fn parse_array_type(s: &mut TokenStream) -> PResult<TypeNode> {
     let start = s.range();
     let mut ty = super::primary::parse_primary_type(s)?;
     if matches!(ty.kind, TypeKind::Literal(_)) && s.check(TokenKind::LBracket) {
-        return Err(ParseError::invalid("literal types cannot be used as array element types or indexed".to_owned()));
+        return Err(ParseError::invalid(
+            "literal types cannot be used as array element types or indexed".to_owned(),
+        ));
     }
 
     loop {

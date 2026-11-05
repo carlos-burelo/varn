@@ -165,7 +165,8 @@ impl<'r> Checker<'r> {
         let effective_callee_ty = if let TypeKind::Fn(fid) = callee_kind {
             let ft = self.ty_table.get_function(fid).clone();
             check_call_type_arg_arity(callee, type_args, &ft, self, range, bind);
-            let mapping = build_call_mapping(call_id, callee, type_args, args, &ft, self, rec, bind);
+            let mapping =
+                build_call_mapping(call_id, callee, type_args, args, &ft, self, rec, bind);
             let type_params = fn_type_param_names(callee, &ft, self, bind);
             if self.returns_caller_chosen_type(&ft, &type_params, &mapping) {
                 let result = map_generics_cached(self, &Type::resolved(ft.return_type), &mapping);

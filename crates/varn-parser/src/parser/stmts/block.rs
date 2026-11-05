@@ -1,5 +1,5 @@
-use crate::error::PResult;
 use super::dispatch::parse_stmt_or_decl_inner;
+use crate::error::PResult;
 use crate::stream::TokenStream;
 #[cfg(feature = "profiling")]
 use std::time::Instant;

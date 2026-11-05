@@ -5,7 +5,9 @@ use crate::term::chalk::{chalk, Chalk};
 const TAB_WIDTH: usize = 4;
 
 pub fn display_path(path: &str) -> String {
-    path.strip_prefix(r"\\?\").unwrap_or(path).replace('\\', "/")
+    path.strip_prefix(r"\\?\")
+        .unwrap_or(path)
+        .replace('\\', "/")
 }
 
 struct Place<'a> {
@@ -91,15 +93,18 @@ pub fn format_diagnostic(diagnostic: &Diagnostic, source: &str) -> String {
             related_start.column,
         ));
         if *related.file == *diagnostic.file {
-            render_snippet(&mut out, source, related.range, DiagnosticKind::Hint, margin);
+            render_snippet(
+                &mut out,
+                source,
+                related.range,
+                DiagnosticKind::Hint,
+                margin,
+            );
         }
     }
 
     for suggestion in &diagnostic.suggestions {
-        out.push_str(&format!(
-            "\n{gutter} {}: {suggestion}",
-            chalk("help").dim()
-        ));
+        out.push_str(&format!("\n{gutter} {}: {suggestion}", chalk("help").dim()));
     }
 
     out

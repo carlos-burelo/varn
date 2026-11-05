@@ -1,5 +1,5 @@
-use crate::error::PResult;
 use super::class_key::member_key_name;
+use crate::error::PResult;
 use crate::stream::TokenStream;
 use crate::types::{parse_type, parse_type_params};
 use varn_core::ast::decl::Decl;
@@ -152,10 +152,7 @@ pub fn parse_type_alias_decl(s: &mut TokenStream) -> PResult<Decl> {
     }))
 }
 
-pub fn parse_namespace_decl(
-    s: &mut TokenStream,
-    is_declare: bool,
-) -> PResult<NamespaceDecl> {
+pub fn parse_namespace_decl(s: &mut TokenStream, is_declare: bool) -> PResult<NamespaceDecl> {
     let range = s.range();
     s.advance();
     let id = s.expect_id()?;

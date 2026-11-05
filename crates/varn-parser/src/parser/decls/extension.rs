@@ -77,7 +77,9 @@ fn parse_extension_member(s: &mut TokenStream) -> PResult<ExtensionMember> {
 
     if is_get {
         if is_async || is_generator {
-            return Err(ParseError::invalid("extension getters cannot be async or generators".to_owned()));
+            return Err(ParseError::invalid(
+                "extension getters cannot be async or generators".to_owned(),
+            ));
         }
         s.advance();
         let key = s.expect_id()?;
@@ -101,7 +103,9 @@ fn parse_extension_member(s: &mut TokenStream) -> PResult<ExtensionMember> {
 
     if is_set {
         if is_async || is_generator {
-            return Err(ParseError::invalid("extension setters cannot be async or generators".to_owned()));
+            return Err(ParseError::invalid(
+                "extension setters cannot be async or generators".to_owned(),
+            ));
         }
         s.advance();
         let key = s.expect_id()?;

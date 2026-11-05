@@ -318,8 +318,8 @@ impl<'r> Checker<'r> {
         let ty = if let Some(arg) = argument {
             self.with_expected(declared, |c| c.check_expr(rec, arg, bind));
             let given = self.infer_type(rec, arg, bind);
-            let yields_null =
-                given == Type::Null || (!given.is_unresolved() && given.is_nullable(&self.ty_table));
+            let yields_null = given == Type::Null
+                || (!given.is_unresolved() && given.is_nullable(&self.ty_table));
             if let Some(declared) = declared
                 && !yields_null
                 && !self.value_fits(rec, &declared, &given, Some(arg), Some(bind))

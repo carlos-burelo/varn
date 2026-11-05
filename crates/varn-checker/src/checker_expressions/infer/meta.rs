@@ -18,8 +18,10 @@ impl<'r> Checker<'r> {
         let field_tys: Vec<Type> = members
             .iter()
             .filter(|m| {
-                matches!(m.kind, varn_sem::semantic_info::ResolvedMemberKind::Property)
-                    && !m.is_static
+                matches!(
+                    m.kind,
+                    varn_sem::semantic_info::ResolvedMemberKind::Property
+                ) && !m.is_static
             })
             .map(|m| m.ty)
             .collect();
@@ -71,10 +73,7 @@ impl<'r> Checker<'r> {
             }
             Some(varn_core::MemberKey::Values) => {
                 let value_ty = self.field_value_type(target_ty, bind);
-                let ret = Type::array(
-                    value_ty,
-                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                );
+                let ret = Type::array(value_ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                 Type::fn_(
                     varn_sem::types::FunctionType {
                         params: vec![],

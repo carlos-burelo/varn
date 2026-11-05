@@ -120,13 +120,17 @@ fn check_fixture(path: &Path, cache: &Path) -> Result<(), String> {
                 .iter()
                 .find(|s| !text.contains(&format!("help: {s}")))
             {
-                return Err(format!("falta la sugerencia {missing:?}, salida:
-{text}"));
+                return Err(format!(
+                    "falta la sugerencia {missing:?}, salida:
+{text}"
+                ));
             }
             let invalid = invalid_locations(&text);
             if !invalid.is_empty() {
-                return Err(format!("posiciones inválidas {invalid:?}, salida:
-{text}"));
+                return Err(format!(
+                    "posiciones inválidas {invalid:?}, salida:
+{text}"
+                ));
             }
             if declared.iter().any(|t| t.starts_with("error")) && out.status.success() {
                 return Err("hay errores declarados pero `vn check` salió con 0".to_owned());

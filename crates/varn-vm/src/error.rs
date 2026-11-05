@@ -89,7 +89,11 @@ impl fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}: {}", self.class, self.message)?;
         for frame in &self.frames {
-            write!(f, "\n    at {} ({}:{})", frame.fn_name, frame.file, frame.line)?;
+            write!(
+                f,
+                "\n    at {} ({}:{})",
+                frame.fn_name, frame.file, frame.line
+            )?;
         }
         Ok(())
     }

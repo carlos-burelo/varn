@@ -39,10 +39,11 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> PResult<ExprId> {
             let raw_text = s.interner.resolve(raw);
             let value: i64 = match pre_parsed {
                 Some(ParsedNumber::Int(v)) => v,
-                Some(ParsedNumber::Float(_)) | None => parse_int_radix(raw_text)
-                    .ok_or_else(|| {
+                Some(ParsedNumber::Float(_)) | None => {
+                    parse_int_radix(raw_text).ok_or_else(|| {
                         ParseError::invalid(format!("integer literal `{}` overflows i64", raw_text))
-                    })?,
+                    })?
+                }
             };
             Ok(s.expr(range, ExprKind::IntLiteral { value, raw }))
         }
@@ -52,9 +53,9 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> PResult<ExprId> {
             let raw_text = s.interner.resolve(raw);
             let value: f64 = match pre_parsed {
                 Some(ParsedNumber::Float(v)) => v,
-                Some(ParsedNumber::Int(_)) | None => raw_text
-                    .parse()
-                    .map_err(|_| ParseError::invalid(format!("invalid float literal: {}", raw_text)))?,
+                Some(ParsedNumber::Int(_)) | None => raw_text.parse().map_err(|_| {
+                    ParseError::invalid(format!("invalid float literal: {}", raw_text))
+                })?,
             };
             Ok(s.expr(range, ExprKind::FloatLiteral { value, raw }))
         }

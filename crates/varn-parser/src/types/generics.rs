@@ -48,9 +48,7 @@ pub fn parse_type_params(s: &mut TokenStream) -> PResult<Vec<varn_core::ast::Typ
     Ok(params)
 }
 
-pub(crate) fn parse_fn_type_params(
-    s: &mut TokenStream,
-) -> PResult<Vec<varn_core::ast::TypeParam>> {
+pub(crate) fn parse_fn_type_params(s: &mut TokenStream) -> PResult<Vec<varn_core::ast::TypeParam>> {
     let mut params = vec![];
     while !s.check(TokenKind::RParen) && !s.is_eof() {
         let prange = s.range();

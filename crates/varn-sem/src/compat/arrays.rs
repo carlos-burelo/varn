@@ -15,7 +15,9 @@ pub(super) fn array_arms(
     table: &CheckerTyTable,
 ) -> Option<bool> {
     match (d, i) {
-        (TypeKind::Array(_), TypeKind::Array(inf_elem)) if t(inf_elem).is_unresolved() => Some(true),
+        (TypeKind::Array(_), TypeKind::Array(inf_elem)) if t(inf_elem).is_unresolved() => {
+            Some(true)
+        }
         (TypeKind::Array(decl_elem), TypeKind::Array(inf_elem)) => Some(same_element(
             &t(decl_elem),
             &t(inf_elem),

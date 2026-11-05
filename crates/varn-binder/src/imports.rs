@@ -78,7 +78,9 @@ impl<'r> super::Binder<'r> {
             self.emit(
                 Diagnostic::error(
                     ErrorCode::InvalidImportPath,
-                    format!("module '{source_str}' has syntax errors and cannot be imported: {detail}"),
+                    format!(
+                        "module '{source_str}' has syntax errors and cannot be imported: {detail}"
+                    ),
                 )
                 .with_range(i.range),
             );

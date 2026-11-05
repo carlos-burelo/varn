@@ -29,8 +29,8 @@ impl<'r> super::super::Binder<'r> {
             } else {
                 ty
             };
-            let needs_enrich =
-                !has_explicit_ann && (ty.is_none() || ty.as_ref().is_some_and(|t| t.is_unresolved()));
+            let needs_enrich = !has_explicit_ann
+                && (ty.is_none() || ty.as_ref().is_some_and(|t| t.is_unresolved()));
             self.bind_pattern(&d.id, sym_kind, line, v.doc.clone(), ty, has_explicit_ann);
 
             if let Pattern::Identifier { name, .. } = &d.id

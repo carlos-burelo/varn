@@ -74,9 +74,7 @@ pub fn relative_path(file: &str) -> String {
         .ok()
         .and_then(|cwd| {
             let root = varn_core::diagnostics::display_path(&cwd.to_string_lossy());
-            cleaned
-                .strip_prefix(&format!("{root}/"))
-                .map(str::to_owned)
+            cleaned.strip_prefix(&format!("{root}/")).map(str::to_owned)
         })
         .unwrap_or(cleaned)
 }
@@ -104,7 +102,11 @@ impl RuntimeFailure {
         for (at, frame) in self.frames.iter().enumerate() {
             if omitted > 0 && at >= FRAMES_SHOWN_FIRST && at < FRAMES_SHOWN_FIRST + omitted {
                 if at == FRAMES_SHOWN_FIRST {
-                    write!(f, "\n    {}", chalk(format!("... {omitted} more frames")).dim())?;
+                    write!(
+                        f,
+                        "\n    {}",
+                        chalk(format!("... {omitted} more frames")).dim()
+                    )?;
                 }
                 continue;
             }

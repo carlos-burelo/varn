@@ -1,5 +1,5 @@
-use crate::error::PResult;
 use super::patterns::parse_pattern;
+use crate::error::PResult;
 use crate::expressions::parse_expr;
 use crate::stream::TokenStream;
 use crate::types::parse_type;

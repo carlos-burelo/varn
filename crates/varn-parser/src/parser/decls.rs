@@ -205,7 +205,9 @@ pub(super) fn parse_var_decl_with_declare(
         | TokenKind::Spawn
         | TokenKind::Parallel
         | TokenKind::Start
-        | TokenKind::RawStr => return Err(ParseError::invalid("Expected `let` or `const`".to_owned())),
+        | TokenKind::RawStr => {
+            return Err(ParseError::invalid("Expected `let` or `const`".to_owned()))
+        }
     };
 
     let dec_range = s.range();
@@ -258,14 +260,17 @@ fn parse_var_declarator_suffix(
     };
     let init = if s.eat(TokenKind::Eq) {
         if is_declare {
-            return Err(ParseError::invalid("declare variables cannot have initializers".to_owned()));
+            return Err(ParseError::invalid(
+                "declare variables cannot have initializers".to_owned(),
+            ));
         }
         Some(parse_expr(s)?)
     } else {
         None
     };
     if let (Pattern::Identifier { name, .. }, None, Some(init)) = (&id, &type_ann, init)
-        && let varn_core::ast::ExprKind::ClassExpr { declaration } = &mut s.arena.expr_mut(init).kind
+        && let varn_core::ast::ExprKind::ClassExpr { declaration } =
+            &mut s.arena.expr_mut(init).kind
         && declaration.id.is_none()
     {
         declaration.id = Some(*name);
@@ -305,7 +310,9 @@ pub(super) fn parse_function_decl(
     };
     let body = if is_declare {
         if s.check(TokenKind::LBrace) {
-            return Err(ParseError::invalid("declare function cannot have a body".to_owned()));
+            return Err(ParseError::invalid(
+                "declare function cannot have a body".to_owned(),
+            ));
         }
         s.eat_semicolon();
         s.stmt(s.range(), varn_core::ast::StmtKind::Empty)

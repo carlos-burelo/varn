@@ -39,7 +39,8 @@ impl LineMapping {
     }
 
     pub fn get_scope(&self, instruction_idx: usize) -> u32 {
-        self.entry_at(instruction_idx).map_or(0, |entry| entry.scope)
+        self.entry_at(instruction_idx)
+            .map_or(0, |entry| entry.scope)
     }
 
     fn entry_at(&self, instruction_idx: usize) -> Option<&LineEntry> {

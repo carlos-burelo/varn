@@ -30,9 +30,7 @@ impl Type {
                 P::Bool => Type::Bool,
                 P::Char => Type::Char,
                 P::Error => Type::Error,
-                P::Null | P::Float | P::BigInt | P::Decimal | P::Void | P::Never => {
-                    Type::Dynamic
-                }
+                P::Null | P::Float | P::BigInt | P::Decimal | P::Void | P::Never => Type::Dynamic,
                 P::Dynamic => Type::Dynamic,
             }
         }

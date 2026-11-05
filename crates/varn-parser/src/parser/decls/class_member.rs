@@ -1,5 +1,5 @@
-use crate::error::{PResult, ParseError};
 use super::class_key::member_key_name;
+use crate::error::{PResult, ParseError};
 use crate::expressions::parse_expr;
 use crate::stream::TokenStream;
 use crate::types::{parse_type, parse_type_params};
@@ -27,7 +27,9 @@ pub fn parse_class_member(
 
     if mods.is_static && s.check(TokenKind::LBrace) {
         if !decorators.is_empty() {
-            return Err(ParseError::invalid("decorators are not supported on static blocks".to_owned()));
+            return Err(ParseError::invalid(
+                "decorators are not supported on static blocks".to_owned(),
+            ));
         }
         let body = super::super::stmts::parse_block(s)?;
         let full_range = s.span_from(range);
@@ -56,7 +58,9 @@ pub fn parse_class_member(
         let params = super::super::params::parse_params(s)?;
         let body = if class_is_declare {
             if s.check(TokenKind::LBrace) {
-                return Err(ParseError::invalid("declare constructor cannot have a body".to_owned()));
+                return Err(ParseError::invalid(
+                    "declare constructor cannot have a body".to_owned(),
+                ));
             }
             s.eat_semicolon();
             s.stmt(s.range(), varn_core::ast::StmtKind::Empty)
@@ -75,11 +79,15 @@ pub fn parse_class_member(
     if s.check(TokenKind::Destructor) {
         s.advance();
         if !decorators.is_empty() {
-            return Err(ParseError::invalid("decorators are not supported on destructors".to_owned()));
+            return Err(ParseError::invalid(
+                "decorators are not supported on destructors".to_owned(),
+            ));
         }
         let body = if class_is_declare {
             if s.check(TokenKind::LBrace) {
-                return Err(ParseError::invalid("declare destructor cannot have a body".to_owned()));
+                return Err(ParseError::invalid(
+                    "declare destructor cannot have a body".to_owned(),
+                ));
             }
             s.eat_semicolon();
             s.stmt(s.range(), varn_core::ast::StmtKind::Empty)
@@ -120,7 +128,9 @@ pub fn parse_class_member(
         };
         let body = if s.check(TokenKind::LBrace) {
             if class_is_declare {
-                return Err(ParseError::invalid("declare getter cannot have a body".to_owned()));
+                return Err(ParseError::invalid(
+                    "declare getter cannot have a body".to_owned(),
+                ));
             }
             Some(s.in_function_body(mods.is_async, super::super::stmts::parse_block)?)
         } else {
@@ -146,7 +156,9 @@ pub fn parse_class_member(
         s.expect(TokenKind::RParen)?;
         let body = if s.check(TokenKind::LBrace) {
             if class_is_declare {
-                return Err(ParseError::invalid("declare setter cannot have a body".to_owned()));
+                return Err(ParseError::invalid(
+                    "declare setter cannot have a body".to_owned(),
+                ));
             }
             Some(super::super::stmts::parse_block(s)?)
         } else {
@@ -181,7 +193,9 @@ pub fn parse_class_member(
         };
         let body = if s.check(TokenKind::LBrace) {
             if class_is_declare {
-                return Err(ParseError::invalid("declare method cannot have a body".to_owned()));
+                return Err(ParseError::invalid(
+                    "declare method cannot have a body".to_owned(),
+                ));
             }
             Some(super::super::stmts::parse_block(s)?)
         } else {
@@ -209,7 +223,9 @@ pub fn parse_class_member(
     };
     let init = if s.eat(TokenKind::Eq) {
         if class_is_declare {
-            return Err(ParseError::invalid("declare property cannot have initializer".to_owned()));
+            return Err(ParseError::invalid(
+                "declare property cannot have initializer".to_owned(),
+            ));
         }
         Some(parse_expr(s)?)
     } else {

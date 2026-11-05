@@ -1,5 +1,5 @@
-use crate::error::{PResult, ParseError};
 use super::TokenStream;
+use crate::error::{PResult, ParseError};
 use varn_core::TokenKind;
 
 impl TokenStream {

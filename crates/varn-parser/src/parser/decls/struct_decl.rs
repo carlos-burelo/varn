@@ -1,15 +1,12 @@
-use crate::error::{PResult, ParseError};
 use super::class_member::{member_doc, parse_class_member};
+use crate::error::{PResult, ParseError};
 use crate::stream::TokenStream;
 use crate::types::{parse_type, parse_type_params};
 use varn_core::ast::operators::Modifiers;
 use varn_core::ast::{ClassDecl, ClassMember, Decorator, Param, Pattern, StmtKind};
 use varn_core::TokenKind;
 
-pub fn parse_struct_decl(
-    s: &mut TokenStream,
-    decorators: Vec<Decorator>,
-) -> PResult<ClassDecl> {
+pub fn parse_struct_decl(s: &mut TokenStream, decorators: Vec<Decorator>) -> PResult<ClassDecl> {
     let range = s.range();
     s.expect(TokenKind::Struct)?;
 
@@ -56,7 +53,9 @@ pub fn parse_struct_decl(
                 ..
             } if !modifiers.is_static => {
                 if !decorators.is_empty() {
-                    return Err(ParseError::invalid("decorators are not supported on struct fields".to_owned()));
+                    return Err(ParseError::invalid(
+                        "decorators are not supported on struct fields".to_owned(),
+                    ));
                 }
                 if fields
                     .iter()
@@ -96,10 +95,14 @@ pub fn parse_struct_decl(
                 ));
             }
             ClassMember::Destructor { .. } => {
-                return Err(ParseError::invalid("a struct has no destructor: it owns no resources".to_owned()));
+                return Err(ParseError::invalid(
+                    "a struct has no destructor: it owns no resources".to_owned(),
+                ));
             }
             ClassMember::Setter { .. } => {
-                return Err(ParseError::invalid("a struct is immutable: it cannot declare a setter".to_owned()));
+                return Err(ParseError::invalid(
+                    "a struct is immutable: it cannot declare a setter".to_owned(),
+                ));
             }
             member @ (ClassMember::Property { .. }
             | ClassMember::Method { .. }

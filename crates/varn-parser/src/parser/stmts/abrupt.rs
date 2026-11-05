@@ -1,5 +1,5 @@
-use crate::error::{PResult, ParseError};
 use super::block::parse_block;
+use crate::error::{PResult, ParseError};
 use crate::stream::TokenStream;
 use varn_core::ast::{CatchClause, StmtId, StmtKind, VarDeclarator};
 use varn_core::TokenKind;
@@ -140,7 +140,9 @@ pub(super) fn parse_try_stmt(s: &mut TokenStream) -> PResult<StmtId> {
     };
 
     if catches.is_empty() && finally.is_none() {
-        return Err(ParseError::invalid("expected `catch` or `finally` after `try` block".to_owned()));
+        return Err(ParseError::invalid(
+            "expected `catch` or `finally` after `try` block".to_owned(),
+        ));
     }
 
     let range = s.span_from(start_range);

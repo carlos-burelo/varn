@@ -1,5 +1,5 @@
-use crate::error::PResult;
 use super::trailer::parse_call_expr;
+use crate::error::PResult;
 use crate::stream::TokenStream;
 use varn_core::ast::operators::UpdateOp;
 use varn_core::ast::{ExprId, ExprKind};

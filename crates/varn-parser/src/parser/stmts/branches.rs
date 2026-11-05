@@ -1,5 +1,5 @@
-use crate::error::{PResult, ParseError};
 use super::dispatch::parse_stmt_or_decl_inner;
+use crate::error::{PResult, ParseError};
 use crate::stream::TokenStream;
 use varn_core::ast::operators::VarKind;
 use varn_core::ast::{ForInit, StmtId, StmtKind, SwitchCase};
@@ -248,7 +248,11 @@ pub(super) fn parse_for_stmt(s: &mut TokenStream) -> PResult<StmtId> {
             | TokenKind::Spawn
             | TokenKind::Parallel
             | TokenKind::Start
-            | TokenKind::RawStr => return Err(ParseError::invalid(String::from("Expected `let` or `const`"))),
+            | TokenKind::RawStr => {
+                return Err(ParseError::invalid(String::from(
+                    "Expected `let` or `const`",
+                )))
+            }
         };
         let decl_range = s.range();
         s.advance();

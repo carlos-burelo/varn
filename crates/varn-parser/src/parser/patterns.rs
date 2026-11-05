@@ -369,7 +369,9 @@ fn parse_decorator_expr(s: &mut TokenStream) -> PResult<ExprId> {
     }
 
     if s.check(TokenKind::LAngle) {
-        return Err(ParseError::invalid("decorators do not support generic type arguments".to_owned()));
+        return Err(ParseError::invalid(
+            "decorators do not support generic type arguments".to_owned(),
+        ));
     }
     if s.check(TokenKind::LParen) {
         let (type_args, args, call_range) = parse_call_args_pub(s)?;

@@ -77,7 +77,9 @@ impl<'r> Checker<'r> {
                         );
                     }
                     let default_ty = match &prop.value {
-                        Pattern::Assignment { right, .. } => Some(self.infer_type(rec, *right, bind)),
+                        Pattern::Assignment { right, .. } => {
+                            Some(self.infer_type(rec, *right, bind))
+                        }
                         Pattern::Identifier { .. }
                         | Pattern::Array { .. }
                         | Pattern::Tuple { .. }

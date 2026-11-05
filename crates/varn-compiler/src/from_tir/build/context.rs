@@ -99,7 +99,8 @@ impl<'m> Builder<'m> {
             parent: self.current_inline_scope(),
             call_line: self.cur_line,
         });
-        self.inline_scope_stack.push(self.inline_scopes.len() as u32);
+        self.inline_scope_stack
+            .push(self.inline_scopes.len() as u32);
         self.inlining.push(frame);
     }
 

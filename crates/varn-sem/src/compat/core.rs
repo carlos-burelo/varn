@@ -118,10 +118,7 @@ pub(super) fn types_compatible_impl(
         return result;
     }
     let result = match (d, i) {
-        (
-            TypeKind::Primitive(varn_core::LangPrimitive::Error),
-            _,
-        )
+        (TypeKind::Primitive(varn_core::LangPrimitive::Error), _)
         | (_, TypeKind::Primitive(varn_core::LangPrimitive::Error))
         | (TypeKind::Primitive(varn_core::LangPrimitive::Dynamic), _) => true,
 

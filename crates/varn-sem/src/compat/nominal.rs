@@ -50,44 +50,42 @@ pub(super) fn class_value_arm(
             | TypeKind::EnumVariant { .. }
             | TypeKind::TypePredicate { .. } => Vec::new(),
         };
-        return Some(
-            match table.get(instance.0) {
-                TypeKind::Named(inst, origin_i) | TypeKind::Generic(inst, _, origin_i) => {
-                    match (resolve_atom(bind, dn), resolve_atom(bind, inst)) {
-                        (Some(declared_name), Some(instance_name)) => class_value_satisfies(
-                            &declared_name,
-                            origin_d.and_then(|o| resolve_atom(bind, o)).as_deref(),
-                            &declared_args,
-                            &instance_name,
-                            origin_i.and_then(|o| resolve_atom(bind, o)).as_deref(),
-                            bind,
-                            cache,
-                            in_progress,
-                            table,
-                        ),
-                        _ => false,
-                    }
+        return Some(match table.get(instance.0) {
+            TypeKind::Named(inst, origin_i) | TypeKind::Generic(inst, _, origin_i) => {
+                match (resolve_atom(bind, dn), resolve_atom(bind, inst)) {
+                    (Some(declared_name), Some(instance_name)) => class_value_satisfies(
+                        &declared_name,
+                        origin_d.and_then(|o| resolve_atom(bind, o)).as_deref(),
+                        &declared_args,
+                        &instance_name,
+                        origin_i.and_then(|o| resolve_atom(bind, o)).as_deref(),
+                        bind,
+                        cache,
+                        in_progress,
+                        table,
+                    ),
+                    _ => false,
                 }
-                TypeKind::Primitive(_)
-                | TypeKind::Literal(_)
-                | TypeKind::This
-                | TypeKind::Array(_)
-                | TypeKind::Union(_)
-                | TypeKind::Intersection(_)
-                | TypeKind::Tuple(_)
-                | TypeKind::TemplateLiteral(_)
-                | TypeKind::Fn(_)
-                | TypeKind::Object(_)
-                | TypeKind::Typeof(_)
-                | TypeKind::KeyOf(_)
-                | TypeKind::IndexedAccess { .. }
-                | TypeKind::Mapped { .. }
-                | TypeKind::Conditional { .. }
-                | TypeKind::Infer(_)
-                | TypeKind::EnumVariant { .. }
-                | TypeKind::TypePredicate { .. } => false,
-            },
-        );
+            }
+            TypeKind::Primitive(_)
+            | TypeKind::Literal(_)
+            | TypeKind::This
+            | TypeKind::Array(_)
+            | TypeKind::Union(_)
+            | TypeKind::Intersection(_)
+            | TypeKind::Tuple(_)
+            | TypeKind::TemplateLiteral(_)
+            | TypeKind::Fn(_)
+            | TypeKind::Object(_)
+            | TypeKind::Typeof(_)
+            | TypeKind::KeyOf(_)
+            | TypeKind::IndexedAccess { .. }
+            | TypeKind::Mapped { .. }
+            | TypeKind::Conditional { .. }
+            | TypeKind::Infer(_)
+            | TypeKind::EnumVariant { .. }
+            | TypeKind::TypePredicate { .. } => false,
+        });
     }
     None
 }
@@ -158,16 +156,18 @@ pub(super) fn nominal_arms(
                     table,
                 ));
             }
-            Some(named_members(bind, &dn_s, origin_d_s.as_deref()).is_some_and(|members| {
-                !members.is_empty()
-                    && members.iter().all(|m| {
-                        m.is_optional
-                            || (m.name.as_ref() == MemberKey::Name.as_str()
-                                && m.ty == Type::Str)
-                            || (m.name.as_ref() == MemberKey::Length.as_str()
-                                && m.ty == Type::Int)
-                    })
-            }))
+            Some(
+                named_members(bind, &dn_s, origin_d_s.as_deref()).is_some_and(|members| {
+                    !members.is_empty()
+                        && members.iter().all(|m| {
+                            m.is_optional
+                                || (m.name.as_ref() == MemberKey::Name.as_str()
+                                    && m.ty == Type::Str)
+                                || (m.name.as_ref() == MemberKey::Length.as_str()
+                                    && m.ty == Type::Int)
+                        })
+                }),
+            )
         }
         (TypeKind::Generic(..), TypeKind::Object(_)) => Some(false),
         (TypeKind::Named(dn, origin_d), TypeKind::Object(inf_fields)) => Some(

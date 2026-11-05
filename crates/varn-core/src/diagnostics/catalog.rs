@@ -88,7 +88,6 @@ pub enum ErrorCode {
     IncompatibleOverride = 4116,
     InterfaceNotSatisfied = 4117,
 
-
     CapabilityViolation = 4302,
 
     InvalidDecoratorSignature = 4401,
@@ -171,7 +170,6 @@ impl ErrorCode {
             ErrorCode::DuplicateMemberName => "duplicate-member-name",
             ErrorCode::SuperOutsideMethod => "super-outside-method",
             ErrorCode::ThisOutsideInstance => "this-outside-instance",
-
 
             ErrorCode::CapabilityViolation => "capability-violation",
 

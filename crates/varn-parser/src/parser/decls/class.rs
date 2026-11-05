@@ -1,5 +1,5 @@
-use crate::error::PResult;
 use super::class_member::parse_class_member;
+use crate::error::PResult;
 use crate::expressions::parse_new_callee_expr;
 use crate::stream::TokenStream;
 use crate::types::{parse_type, parse_type_args, parse_type_params};

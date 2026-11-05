@@ -1,5 +1,5 @@
-use crate::error::PResult;
 use super::super::{parse_call_args, parse_new_callee_expr};
+use crate::error::PResult;
 use crate::stream::TokenStream;
 use crate::types::parse_type_args;
 use varn_core::ast::{ExprId, ExprKind};

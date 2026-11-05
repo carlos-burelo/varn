@@ -1,4 +1,3 @@
-use crate::error::{PResult, ParseError};
 use super::abrupt::{
     parse_break_stmt, parse_continue_stmt, parse_return_stmt, parse_throw_stmt, parse_try_stmt,
     parse_using_stmt,
@@ -7,6 +6,7 @@ use super::block::parse_block;
 use super::branches::{
     parse_do_while_stmt, parse_for_stmt, parse_if_stmt, parse_switch_stmt, parse_while_stmt,
 };
+use crate::error::{PResult, ParseError};
 use crate::stream::TokenStream;
 use varn_core::ast::{StmtId, StmtKind};
 use varn_core::TokenKind;
@@ -33,7 +33,9 @@ pub fn parse_stmt_or_decl_inner(s: &mut TokenStream) -> PResult<StmtId> {
         return decl_stmt;
     }
     if has_decorators {
-        return Err(ParseError::invalid("expected a declaration after decorators".to_owned()));
+        return Err(ParseError::invalid(
+            "expected a declaration after decorators".to_owned(),
+        ));
     }
 
     let _ = s.current_doc();

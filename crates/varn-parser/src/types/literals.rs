@@ -17,11 +17,9 @@ pub(crate) fn parse_literal_type(
             operand,
             ..
         } => match &s.arena.expr(*operand).kind {
-            ExprKind::IntLiteral { value, .. } => TypeLiteral::Int(
-                value
-                    .checked_neg()
-                    .ok_or_else(|| literal_type_error())?,
-            ),
+            ExprKind::IntLiteral { value, .. } => {
+                TypeLiteral::Int(value.checked_neg().ok_or_else(|| literal_type_error())?)
+            }
             ExprKind::FloatLiteral { .. }
             | ExprKind::BigIntLiteral { .. }
             | ExprKind::DecimalLiteral { .. }

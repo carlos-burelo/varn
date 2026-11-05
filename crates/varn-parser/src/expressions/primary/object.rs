@@ -83,10 +83,14 @@ pub(crate) fn parse_object_body(s: &mut TokenStream) -> PResult<Vec<ObjectProp>>
         }
 
         if is_generator {
-            return Err(ParseError::invalid(String::from("unexpected `*` before property")));
+            return Err(ParseError::invalid(String::from(
+                "unexpected `*` before property",
+            )));
         }
         if is_async {
-            return Err(ParseError::invalid(String::from("unexpected `async` before property")));
+            return Err(ParseError::invalid(String::from(
+                "unexpected `async` before property",
+            )));
         }
 
         let shorthand = !s.check(TokenKind::Colon);
@@ -96,7 +100,9 @@ pub(crate) fn parse_object_body(s: &mut TokenStream) -> PResult<Vec<ObjectProp>>
             let name = match &key {
                 PropKey::Identifier(n) => s.interner.intern(n),
                 PropKey::Str(_) | PropKey::Int(_) | PropKey::Computed(_) => {
-                    return Err(ParseError::invalid(String::from("shorthand property must be an identifier")))
+                    return Err(ParseError::invalid(String::from(
+                        "shorthand property must be an identifier",
+                    )))
                 }
             };
             s.expr(prop_range, varn_core::ast::ExprKind::Identifier { name })
@@ -126,12 +132,14 @@ fn parse_prop_key(s: &mut TokenStream) -> PResult<PropKey> {
         TokenKind::Str => {
             let range = s.range();
             let raw = s.consume_str();
-            Ok(PropKey::Str(super::super::literal_text::unescape_reporting(
-                s,
-                &raw,
-                range,
-                range.start.offset + 1,
-            )))
+            Ok(PropKey::Str(
+                super::super::literal_text::unescape_reporting(
+                    s,
+                    &raw,
+                    range,
+                    range.start.offset + 1,
+                ),
+            ))
         }
         TokenKind::IntegerLiteral => {
             let pre_parsed = s.parsed_num();
