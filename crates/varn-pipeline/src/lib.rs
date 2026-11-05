@@ -28,7 +28,7 @@ pub use varn_resolver::ModuleResolver;
 pub use analysis::Analysis;
 pub use compilation::{CacheStatus, Compilation, Stage};
 pub use core::core_protos_owned;
-pub use error::{DiagnosticReport, Failure, RuntimeFailure};
+pub use error::{relative_path, DiagnosticReport, Failure, RuntimeFailure};
 pub use executable::Executable;
 pub use execute::{boot_machine, drive_entry, enter_main, execute, execute_unit, Unit};
 pub use lex::Tokens;

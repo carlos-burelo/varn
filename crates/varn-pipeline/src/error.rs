@@ -30,33 +30,47 @@ impl Failure {
         Failure::Internal(message.into())
     }
 
-    pub fn diagnostics(file: &str, source: &str, diagnostics: DiagnosticBag) -> Self {
+    pub fn diagnostics(file: &str, source: &str, mut diagnostics: DiagnosticBag) -> Self {
+        diagnostics.normalize();
+        let items = diagnostics.take();
+        for mut diagnostic in items {
+            diagnostic.file = Arc::from(relative_path(&diagnostic.file));
+            for related in &mut diagnostic.related {
+                related.file = Arc::from(relative_path(&related.file));
+            }
+            diagnostics.push(diagnostic);
+        }
         Failure::Diagnostics(DiagnosticReport {
-            file: Arc::from(file),
+            file: Arc::from(relative_path(file)),
             source: Arc::from(source),
             diagnostics,
         })
     }
 }
 
+pub fn relative_path(file: &str) -> String {
+    let cleaned = varn_core::diagnostics::display_path(file);
+    std::env::current_dir()
+        .ok()
+        .and_then(|cwd| {
+            let root = varn_core::diagnostics::display_path(&cwd.to_string_lossy());
+            cleaned
+                .strip_prefix(&format!("{root}/"))
+                .map(str::to_owned)
+        })
+        .unwrap_or(cleaned)
+}
+
 impl fmt::Display for RuntimeFailure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.message)?;
-        let cwd = std::env::current_dir().ok();
         for frame in &self.frames {
-            let mut file = frame.file.as_str();
-            if let Some(stripped) = file.strip_prefix(r"\\?\") {
-                file = stripped;
-            }
-            let relative = cwd
-                .as_deref()
-                .and_then(|root| std::path::Path::new(file).strip_prefix(root).ok())
-                .map(|p| p.to_string_lossy().replace('\\', "/"))
-                .unwrap_or_else(|| file.replace('\\', "/"));
             write!(
                 f,
                 "\n    at {} ({}:{})",
-                frame.fn_name, relative, frame.line
+                frame.fn_name,
+                relative_path(&frame.file),
+                frame.line
             )?;
         }
         Ok(())
