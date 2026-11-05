@@ -160,7 +160,7 @@ impl<'r> Checker<'r> {
         ret_ty
     }
 
-    pub(super) fn infer_arrow_type(
+    pub(crate) fn infer_arrow_type(
         &mut self,
         rec: &mut Recorder,
         _expr: ExprId,

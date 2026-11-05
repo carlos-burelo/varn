@@ -7,7 +7,6 @@ use std::sync::Arc;
 use varn_core::ast::{Arg, ExprId, ExprKind, Param, TypeNode};
 use varn_core::TypeKind;
 use varn_sem::bind::BindResult;
-use varn_sem::infer::pattern_lead_name;
 use varn_sem::symbol::SymbolKind;
 use varn_sem::types::{FunctionParam, FunctionType, Type};
 
@@ -228,39 +227,22 @@ fn infer_arrow_with_context(
     rec: &mut Recorder,
     bind: &BindResult,
 ) -> Option<Type> {
-    let ExprKind::Arrow { params, body, .. } = &checker.ast_arena.expr(expr).kind else {
+    let ExprKind::Arrow {
+        params,
+        return_type,
+        body,
+        is_async,
+    } = checker.ast_arena.expr(expr).kind.clone()
+    else {
         return None;
     };
-    let params = params.clone();
-    let body = (**body).clone();
-
-    let mut actual_params = Vec::new();
-    for (ap, ep) in params.iter().zip(expected_fn.params.iter()) {
-        let explicit_ty = ap
-            .type_ann
-            .as_ref()
-            .map(|m| checker.resolve_type_node_cached(m, bind));
-
-        actual_params.push(FunctionParam {
-            name: Some(Arc::from(pattern_lead_name(&ap.pattern, &bind.interner))),
-            ty: explicit_ty.map(|t| t.0).unwrap_or(ep.ty),
-            optional: ap.is_optional,
-            is_rest: ap.is_rest,
-        });
-    }
-
-    let ret_ty = checker.infer_body_return_type(rec, &params, &actual_params, body, bind);
-
-    Some(Type::fn_(
-        FunctionType {
-            params: actual_params,
-            return_type: ret_ty.0,
-            is_arrow: true,
-            type_params: Vec::new(),
-            type_param_defaults: Vec::new(),
-        },
+    let expected = Type::fn_(
+        expected_fn.clone(),
         &mut *std::sync::Arc::make_mut(&mut checker.ty_table),
-    ))
+    );
+    Some(checker.with_expected(Some(expected), |c| {
+        c.infer_arrow_type(rec, expr, &params, &return_type, *body, is_async, bind)
+    }))
 }
 
 pub(crate) fn find_arrow_scope(
