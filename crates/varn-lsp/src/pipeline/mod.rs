@@ -3,11 +3,32 @@ mod params;
 use rustc_hash::FxHashMap;
 use varn_pipeline::{Session, Source};
 
-use crate::constants::{SEVERITY_ERROR, SEVERITY_HINT, SEVERITY_WARNING};
 use crate::document::{uri_to_path, DocumentAnalysis, LspDiag, RelatedLocation, TokenRecord};
 use varn_core::ast::{AstArena, Decl, StmtId, StmtKind};
 use varn_core::{DiagnosticKind, TokenKind};
 use varn_sem::symbol::SymbolKind;
+
+fn position_of(source: &str, line_starts: &[usize], offset: u32) -> (u32, u32) {
+    let mut at = (offset as usize).min(source.len());
+    while !source.is_char_boundary(at) {
+        at -= 1;
+    }
+    let line = line_starts
+        .partition_point(|&start| start <= at)
+        .saturating_sub(1);
+    let start = line_starts.get(line).copied().unwrap_or(0);
+    (line as u32, source[start..at].encode_utf16().count() as u32)
+}
+
+fn span_of(
+    source: &str,
+    line_starts: &[usize],
+    range: varn_core::SourceRange,
+) -> (u32, u32, u32, u32) {
+    let (line, col) = position_of(source, line_starts, range.start.offset);
+    let (end_line, end_col) = position_of(source, line_starts, range.end.offset);
+    (line, col, end_line, end_col)
+}
 
 pub fn run_pipeline(source: String, uri: String, session: &Session) -> DocumentAnalysis {
     varn_builtins::register_provider();
@@ -22,26 +43,27 @@ pub fn run_pipeline(source: String, uri: String, session: &Session) -> DocumentA
     let result = analysis.checked;
     let mut syntax = analysis.syntax;
 
-    let mut diagnostics: Vec<LspDiag> = Vec::new();
-    for e in syntax.take() {
-        diagnostics.push(LspDiag {
-            message: e.message,
-            line: e.range.start.line.saturating_sub(1),
-            col: e.range.start.column,
-            end_line: e.range.end.line.saturating_sub(1),
-            end_col: e.range.end.column,
-            severity: SEVERITY_ERROR,
-            code: Some(e.code),
-            related: Vec::new(),
-            suggestions: Vec::new(),
-        });
-    }
-
     let mut line_starts: Vec<usize> = vec![0];
     for (i, b) in source.bytes().enumerate() {
         if b == b'\n' {
             line_starts.push(i + 1);
         }
+    }
+
+    let mut diagnostics: Vec<LspDiag> = Vec::new();
+    for e in syntax.take() {
+        let (line, col, end_line, end_col) = span_of(&source, &line_starts, e.range);
+        diagnostics.push(LspDiag {
+            message: e.message,
+            line,
+            col,
+            end_line,
+            end_col,
+            kind: e.kind,
+            code: Some(e.code),
+            related: Vec::new(),
+            suggestions: Vec::new(),
+        });
     }
     let tokens: Vec<TokenRecord> = raw_tokens
         .iter()
@@ -74,20 +96,15 @@ pub fn run_pipeline(source: String, uri: String, session: &Session) -> DocumentA
         .collect();
 
     for d in &result.diagnostics {
-        let severity = match d.kind {
-            DiagnosticKind::Error => SEVERITY_ERROR,
-            DiagnosticKind::Warning => SEVERITY_WARNING,
-            DiagnosticKind::Hint => SEVERITY_HINT,
-        };
-
         let related = build_related_locations(d, &uri);
+        let (line, col, end_line, end_col) = span_of(&source, &line_starts, d.range);
         diagnostics.push(LspDiag {
             message: d.message.clone(),
-            line: d.range.start.line.saturating_sub(1),
-            col: d.range.start.column,
-            end_line: d.range.end.line.saturating_sub(1),
-            end_col: d.range.end.column,
-            severity,
+            line,
+            col,
+            end_line,
+            end_col,
+            kind: d.kind,
             code: Some(d.code),
             related,
             suggestions: d.suggestions.clone(),
@@ -112,7 +129,7 @@ pub fn run_pipeline(source: String, uri: String, session: &Session) -> DocumentA
                 col: 0,
                 end_line: 0,
                 end_col: 0,
-                severity: SEVERITY_ERROR,
+                kind: DiagnosticKind::Error,
                 code: Some(varn_core::ErrorCode::InvalidImportPath),
                 related: Vec::new(),
                 suggestions: Vec::new(),

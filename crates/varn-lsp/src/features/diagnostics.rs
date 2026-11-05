@@ -1,6 +1,5 @@
-use crate::constants::{SEVERITY_ERROR, SEVERITY_HINT, SEVERITY_WARNING};
 use crate::document::DocumentState;
-use crate::util::converters::range_on_line;
+use crate::util::converters::pos;
 use tower_lsp_f::lsp_types::{
     Diagnostic as LspDiagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag,
     Location, Position, Range, Uri,
@@ -11,11 +10,10 @@ pub fn convert_diagnostics(state: &DocumentState) -> Vec<LspDiagnostic> {
         .diagnostics
         .iter()
         .map(|d| {
-            let severity = match d.severity {
-                s if s == SEVERITY_ERROR => DiagnosticSeverity::Error,
-                s if s == SEVERITY_WARNING => DiagnosticSeverity::Warning,
-                s if s == SEVERITY_HINT => DiagnosticSeverity::Hint,
-                _ => DiagnosticSeverity::Information,
+            let severity = match d.kind {
+                varn_core::DiagnosticKind::Error => DiagnosticSeverity::Error,
+                varn_core::DiagnosticKind::Warning => DiagnosticSeverity::Warning,
+                varn_core::DiagnosticKind::Hint => DiagnosticSeverity::Hint,
             };
 
             let related_information = if d.related.is_empty() {
@@ -91,7 +89,10 @@ pub fn convert_diagnostics(state: &DocumentState) -> Vec<LspDiagnostic> {
                 .map(|c| tower_lsp_f::lsp_types::Code::String(c.to_string()));
 
             LspDiagnostic {
-                range: range_on_line(d.line, d.col, d.end_col),
+                range: Range {
+                    start: pos(d.line, d.col),
+                    end: pos(d.end_line, d.end_col),
+                },
                 severity: Some(severity),
                 code,
                 code_description: None,
