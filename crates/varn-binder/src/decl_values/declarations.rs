@@ -12,6 +12,13 @@ impl<'r> super::super::Binder<'r> {
             VarKind::Let => SymbolKind::Let,
         };
         for d in &v.declarators {
+            if let (Pattern::Identifier { name, .. }, Some(init)) = (&d.id, d.init)
+                && let ExprKind::ClassExpr { declaration } = &self.ast_arena.expr(init).kind
+                && declaration.id == Some(*name)
+            {
+                self.bind_expr(init);
+                continue;
+            }
             let line = d.range.start.line;
             let has_explicit_ann = d.type_ann.is_some();
             let ty = d

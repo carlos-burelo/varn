@@ -26,6 +26,13 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) {
         for d in &v.declarators {
+            if let (varn_core::ast::Pattern::Identifier { name, .. }, Some(init)) = (&d.id, d.init)
+                && let ExprKind::ClassExpr { declaration } = &self.ast_arena.expr(init).kind
+                && declaration.id == Some(*name)
+            {
+                self.check_expr(rec, init, bind);
+                continue;
+            }
             let ann = d
                 .type_ann
                 .as_ref()
