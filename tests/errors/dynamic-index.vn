@@ -1,0 +1,3 @@
+// expect: error[VN3033]
+const d: dynamic = [1]
+const v = d[0]

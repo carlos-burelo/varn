@@ -6,6 +6,7 @@ mod const_int;
 mod contextual;
 mod control;
 mod destructure_assign;
+mod dynamic_use;
 mod exhaustiveness;
 mod match_arm;
 pub(crate) mod member_index;
@@ -26,11 +27,11 @@ use varn_sem::bind::BindResult;
 
 impl<'r> Checker<'r> {
     pub(crate) fn check_expr(&mut self, rec: &mut Recorder, expr: ExprId, bind: &BindResult) {
-        let arena = self.ast_arena;
         if self.expected_pending {
             self.expected_pending = false;
             self.expected_owner = Some(expr.index());
         }
+        let arena = self.ast_arena;
         self.check_expr_no_record(rec, expr, bind);
         self.require_namespace_member_use(rec, expr, bind);
         let range = arena.expr(expr).range;

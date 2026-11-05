@@ -1,0 +1,2 @@
+// expect: error[VN3001]
+function give(d: dynamic): int { return d }

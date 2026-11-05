@@ -49,6 +49,13 @@ impl<'r> Checker<'r> {
     ) {
         let l_ty = self.infer_type(rec, left, bind);
         let r_ty = self.infer_type(rec, right, bind);
+        if !matches!(op, BinaryOp::Eq | BinaryOp::NotEq | BinaryOp::Instanceof) {
+            let left_rejected = self.reject_dynamic_operand(&l_ty, "operate on", range);
+            let right_rejected = self.reject_dynamic_operand(&r_ty, "operate on", range);
+            if left_rejected || right_rejected {
+                return;
+            }
+        }
         if matches!(op, BinaryOp::Eq | BinaryOp::NotEq) {
             let is_null = |e: ExprId| {
                 matches!(

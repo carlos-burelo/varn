@@ -42,6 +42,10 @@ impl<'r> Checker<'r> {
         self.namespace_bases.remove(&object);
         if computed {
             let indexed_ty = self.infer_type(rec, object, bind);
+            if self.reject_dynamic_operand(&indexed_ty, "index", *range) {
+                self.check_expr(rec, property, bind);
+                return;
+            }
             if !optional && indexed_ty.is_nullable(&self.ty_table) {
                 self.emit(
                     Diagnostic::error(
@@ -69,6 +73,9 @@ impl<'r> Checker<'r> {
         let prop_name = bind.interner.resolve(*prop_name);
 
         let obj_ty = self.infer_type(rec, object, bind);
+        if self.reject_dynamic_operand(&obj_ty, "access a member of", *range) {
+            return;
+        }
         if optional {
             self.require_nullable(rec, object, "'?.'", bind);
         }

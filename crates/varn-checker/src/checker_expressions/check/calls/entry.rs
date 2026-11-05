@@ -54,6 +54,13 @@ impl<'r> Checker<'r> {
         let callee_ty =
             callee_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
         let callee_kind = self.ty_table.get(callee_ty.0);
+        if self.reject_dynamic_operand(&callee_ty, "call", *range) {
+            for arg in args {
+                let (Arg::Positional(e) | Arg::Spread(e) | Arg::Named { value: e, .. }) = arg;
+                self.check_expr(rec, *e, bind);
+            }
+            return;
+        }
 
         let callee_sid: Option<usize> = match &arena.expr(callee).kind {
             ExprKind::Identifier { name } => bind

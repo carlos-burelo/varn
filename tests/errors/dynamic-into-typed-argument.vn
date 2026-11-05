@@ -1,0 +1,4 @@
+// expect: error[VN3001]
+function take(n: int): void {}
+const d: dynamic = 5
+take(d)
