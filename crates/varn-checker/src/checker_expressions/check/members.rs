@@ -41,6 +41,22 @@ impl<'r> Checker<'r> {
         self.check_expr(rec, object, bind);
         self.namespace_bases.remove(&object);
         if computed {
+            let indexed_ty = self.infer_type(rec, object, bind);
+            if !optional && indexed_ty.is_nullable(&self.ty_table) {
+                self.emit(
+                    Diagnostic::error(
+                        ErrorCode::PossibleNullDereference,
+                        format!(
+                            "object is possibly null: cannot index nullable type '{}'",
+                            indexed_ty.display(&self.ty_table, &bind.interner)
+                        ),
+                    )
+                    .with_suggestion(Suggestion::new(
+                        "use optional chaining '?.[' to safely index a nullable object",
+                    ))
+                    .with_range(*range),
+                );
+            }
             self.check_member_index(rec, object, property, property_range, bind);
             return;
         }

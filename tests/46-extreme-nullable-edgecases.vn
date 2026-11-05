@@ -35,7 +35,7 @@ await describe("46 extreme nullable edgecases", async () => {
         expect(arr1[1]).toBe(null)
         expect(arr2).toBe(null)
         expect(arr3).toBe(null)
-        expect(arr4 !== null && arr4[0][1] === null).toBeTruthy()
+        expect(arr4 !== null && arr4[0]?.[1] === null).toBeTruthy()
         
         const p1: ExtremeProfile = { score: null }
         const p2: ExtremeProfile = { nickname: "nick", score: 42 }

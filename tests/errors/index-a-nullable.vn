@@ -1,0 +1,3 @@
+// expect: error[VN3301]
+const xs: int[]? = [1]
+const first = xs[0]
