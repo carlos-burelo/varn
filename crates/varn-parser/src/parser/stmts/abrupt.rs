@@ -1,9 +1,10 @@
+use crate::error::{PResult, ParseError};
 use super::block::parse_block;
 use crate::stream::TokenStream;
 use varn_core::ast::{CatchClause, StmtId, StmtKind, VarDeclarator};
 use varn_core::TokenKind;
 
-pub(super) fn parse_using_stmt(s: &mut TokenStream, is_await: bool) -> Result<StmtId, String> {
+pub(super) fn parse_using_stmt(s: &mut TokenStream, is_await: bool) -> PResult<StmtId> {
     let start_range = s.range();
     if is_await {
         s.expect(TokenKind::Await)?;
@@ -46,7 +47,7 @@ pub(super) fn parse_using_stmt(s: &mut TokenStream, is_await: bool) -> Result<St
     ))
 }
 
-pub(super) fn parse_return_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
+pub(super) fn parse_return_stmt(s: &mut TokenStream) -> PResult<StmtId> {
     let start_range = s.range();
     s.advance();
     let argument = if !s.check(TokenKind::Semicolon) && !s.check(TokenKind::RBrace) && !s.is_eof() {
@@ -59,7 +60,7 @@ pub(super) fn parse_return_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     Ok(s.stmt(range, StmtKind::Return { argument }))
 }
 
-pub(super) fn parse_break_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
+pub(super) fn parse_break_stmt(s: &mut TokenStream) -> PResult<StmtId> {
     let start_range = s.range();
     s.advance();
 
@@ -76,7 +77,7 @@ pub(super) fn parse_break_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     Ok(s.stmt(range, StmtKind::Break { label }))
 }
 
-pub(super) fn parse_continue_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
+pub(super) fn parse_continue_stmt(s: &mut TokenStream) -> PResult<StmtId> {
     let start_range = s.range();
     s.advance();
 
@@ -93,7 +94,7 @@ pub(super) fn parse_continue_stmt(s: &mut TokenStream) -> Result<StmtId, String>
     Ok(s.stmt(range, StmtKind::Continue { label }))
 }
 
-pub(super) fn parse_throw_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
+pub(super) fn parse_throw_stmt(s: &mut TokenStream) -> PResult<StmtId> {
     let start_range = s.range();
     s.advance();
     let argument = crate::expressions::parse_expr(s)?;
@@ -102,7 +103,7 @@ pub(super) fn parse_throw_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     Ok(s.stmt(range, StmtKind::Throw { argument }))
 }
 
-pub(super) fn parse_try_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
+pub(super) fn parse_try_stmt(s: &mut TokenStream) -> PResult<StmtId> {
     let start_range = s.range();
     s.advance();
     let block = parse_block(s)?;
@@ -139,7 +140,7 @@ pub(super) fn parse_try_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     };
 
     if catches.is_empty() && finally.is_none() {
-        return Err("expected `catch` or `finally` after `try` block".to_owned());
+        return Err(ParseError::invalid("expected `catch` or `finally` after `try` block".to_owned()));
     }
 
     let range = s.span_from(start_range);

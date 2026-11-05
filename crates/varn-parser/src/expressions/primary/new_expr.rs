@@ -1,3 +1,4 @@
+use crate::error::PResult;
 use super::super::{parse_call_args, parse_new_callee_expr};
 use crate::stream::TokenStream;
 use crate::types::parse_type_args;
@@ -7,7 +8,7 @@ use varn_core::TokenKind;
 pub(super) fn parse_new_expr(
     s: &mut TokenStream,
     range: varn_core::SourceRange,
-) -> Result<ExprId, String> {
+) -> PResult<ExprId> {
     s.advance();
     let callee = parse_new_callee_expr(s)?;
     let mut type_args = vec![];

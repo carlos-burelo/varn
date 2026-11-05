@@ -1,12 +1,20 @@
+use crate::error::{PResult, ParseError};
 use crate::stream::TokenStream;
 use varn_core::TokenKind;
 
-pub(super) fn member_key_name(s: &mut TokenStream) -> Result<String, String> {
+pub(super) fn member_key_name(s: &mut TokenStream) -> PResult<String> {
     match s.kind() {
         TokenKind::Identifier => Ok(s.consume_str()),
-        TokenKind::Str => Ok(crate::expressions::literal_text::unescape_string(
-            &s.consume_str(),
-        )),
+        TokenKind::Str => {
+            let range = s.range();
+            let raw = s.consume_str();
+            Ok(crate::expressions::literal_text::unescape_reporting(
+                s,
+                &raw,
+                range,
+                range.start.offset + 1,
+            ))
+        }
         TokenKind::IntegerLiteral => Ok(s.consume_str()),
         TokenKind::Hash => {
             s.advance();
@@ -169,6 +177,9 @@ pub(super) fn member_key_name(s: &mut TokenStream) -> Result<String, String> {
         | TokenKind::Spawn
         | TokenKind::Parallel
         | TokenKind::Start
-        | TokenKind::RawStr => Err(format!("Expected class member name, got {:?}", s.kind())),
+        | TokenKind::RawStr => Err(ParseError::expected(format!(
+            "expected a class member name, found {}",
+            s.describe_current()
+        ))),
     }
 }

@@ -1,10 +1,11 @@
+use crate::error::{PResult, ParseError};
 use crate::stream::TokenStream;
 use crate::types::parse_type;
 use varn_core::ast::expr::PropKey;
 use varn_core::ast::{ExprId, ObjectProp};
 use varn_core::TokenKind;
 
-pub(super) fn parse_object_expr(s: &mut TokenStream) -> Result<ExprId, String> {
+pub(super) fn parse_object_expr(s: &mut TokenStream) -> PResult<ExprId> {
     let range = s.range();
     s.advance();
     let properties = parse_object_body(s)?;
@@ -13,7 +14,7 @@ pub(super) fn parse_object_expr(s: &mut TokenStream) -> Result<ExprId, String> {
     Ok(s.expr(full_range, varn_core::ast::ExprKind::Object { properties }))
 }
 
-pub(crate) fn parse_object_body(s: &mut TokenStream) -> Result<Vec<ObjectProp>, String> {
+pub(crate) fn parse_object_body(s: &mut TokenStream) -> PResult<Vec<ObjectProp>> {
     let mut properties = vec![];
 
     while !s.check(TokenKind::RBrace) && !s.is_eof() {
@@ -43,9 +44,9 @@ pub(crate) fn parse_object_body(s: &mut TokenStream) -> Result<Vec<ObjectProp>, 
             && s.peek_kind(1) != TokenKind::RBrace;
 
         if is_getter || is_setter {
-            return Err(String::from(
+            return Err(ParseError::invalid(String::from(
                 "getters and setters are not supported in object literals: declare a class",
-            ));
+            )));
         }
 
         let is_async = s.check(TokenKind::Async)
@@ -82,10 +83,10 @@ pub(crate) fn parse_object_body(s: &mut TokenStream) -> Result<Vec<ObjectProp>, 
         }
 
         if is_generator {
-            return Err(String::from("unexpected `*` before property"));
+            return Err(ParseError::invalid(String::from("unexpected `*` before property")));
         }
         if is_async {
-            return Err(String::from("unexpected `async` before property"));
+            return Err(ParseError::invalid(String::from("unexpected `async` before property")));
         }
 
         let shorthand = !s.check(TokenKind::Colon);
@@ -95,7 +96,7 @@ pub(crate) fn parse_object_body(s: &mut TokenStream) -> Result<Vec<ObjectProp>, 
             let name = match &key {
                 PropKey::Identifier(n) => s.interner.intern(n),
                 PropKey::Str(_) | PropKey::Int(_) | PropKey::Computed(_) => {
-                    return Err(String::from("shorthand property must be an identifier"))
+                    return Err(ParseError::invalid(String::from("shorthand property must be an identifier")))
                 }
             };
             s.expr(prop_range, varn_core::ast::ExprKind::Identifier { name })
@@ -116,16 +117,20 @@ pub(crate) fn parse_object_body(s: &mut TokenStream) -> Result<Vec<ObjectProp>, 
     Ok(properties)
 }
 
-fn parse_prop_key(s: &mut TokenStream) -> Result<PropKey, String> {
+fn parse_prop_key(s: &mut TokenStream) -> PResult<PropKey> {
     match s.kind() {
         TokenKind::Identifier => {
             let atom = s.consume_lexeme();
             Ok(PropKey::Identifier(s.interner.resolve(atom).to_string()))
         }
         TokenKind::Str => {
+            let range = s.range();
             let raw = s.consume_str();
-            Ok(PropKey::Str(super::super::literal_text::unescape_string(
+            Ok(PropKey::Str(super::super::literal_text::unescape_reporting(
+                s,
                 &raw,
+                range,
+                range.start.offset + 1,
             )))
         }
         TokenKind::IntegerLiteral => {
@@ -306,6 +311,9 @@ fn parse_prop_key(s: &mut TokenStream) -> Result<PropKey, String> {
         | TokenKind::Spawn
         | TokenKind::Parallel
         | TokenKind::Start
-        | TokenKind::RawStr => Err(format!("Expected property key, got {:?}", s.kind())),
+        | TokenKind::RawStr => Err(ParseError::expected(format!(
+            "expected a property key, found {}",
+            s.describe_current()
+        ))),
     }
 }

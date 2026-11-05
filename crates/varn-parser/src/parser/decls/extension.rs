@@ -1,3 +1,4 @@
+use crate::error::{PResult, ParseError};
 use crate::stream::TokenStream;
 use crate::types::parse_type;
 use varn_core::ast::decl::ExtensionMember;
@@ -6,15 +7,14 @@ use varn_core::ast::ExtensionDecl;
 use varn_core::ast::FunctionDecl;
 use varn_core::TokenKind;
 
-pub fn parse_extension_decl(s: &mut TokenStream) -> Result<ExtensionDecl, String> {
+pub fn parse_extension_decl(s: &mut TokenStream) -> PResult<ExtensionDecl> {
     let range = s.range();
     s.expect(TokenKind::Extension)?;
 
     if s.check(TokenKind::For) {
-        return Err(
-            "extension syntax changed; use `extension [Name] on Type { method() { ... } }`"
-                .to_owned(),
-        );
+        return Err(ParseError::invalid(
+            "extension syntax changed; use `extension [Name] on Type { method() { ... } }`",
+        ));
     }
 
     let id = if s.check(TokenKind::On) {
@@ -37,10 +37,9 @@ pub fn parse_extension_decl(s: &mut TokenStream) -> Result<ExtensionDecl, String
         if s.check(TokenKind::Function)
             || (s.check(TokenKind::Async) && s.peek_kind(1) == TokenKind::Function)
         {
-            return Err(
-                "extension members use ECMAScript-style method syntax; remove the `function` keyword"
-                    .to_owned(),
-            );
+            return Err(ParseError::invalid(
+                "extension members use ECMAScript-style method syntax; remove the `function` keyword",
+            ));
         }
         members.push(parse_extension_member(s)?);
     }
@@ -56,7 +55,7 @@ pub fn parse_extension_decl(s: &mut TokenStream) -> Result<ExtensionDecl, String
     })
 }
 
-fn parse_extension_member(s: &mut TokenStream) -> Result<ExtensionMember, String> {
+fn parse_extension_member(s: &mut TokenStream) -> PResult<ExtensionMember> {
     let range = s.range();
     let is_async = s.eat(TokenKind::Async);
     let is_generator = s.eat(TokenKind::Star);
@@ -78,7 +77,7 @@ fn parse_extension_member(s: &mut TokenStream) -> Result<ExtensionMember, String
 
     if is_get {
         if is_async || is_generator {
-            return Err("extension getters cannot be async or generators".to_owned());
+            return Err(ParseError::invalid("extension getters cannot be async or generators".to_owned()));
         }
         s.advance();
         let key = s.expect_id()?;
@@ -102,7 +101,7 @@ fn parse_extension_member(s: &mut TokenStream) -> Result<ExtensionMember, String
 
     if is_set {
         if is_async || is_generator {
-            return Err("extension setters cannot be async or generators".to_owned());
+            return Err(ParseError::invalid("extension setters cannot be async or generators".to_owned()));
         }
         s.advance();
         let key = s.expect_id()?;

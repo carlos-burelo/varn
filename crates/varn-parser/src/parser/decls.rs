@@ -1,3 +1,4 @@
+use crate::error::{PResult, ParseError};
 mod class;
 mod class_key;
 mod class_member;
@@ -27,7 +28,7 @@ use varn_core::TokenKind;
 pub(super) fn parse_var_decl_with_declare(
     s: &mut TokenStream,
     is_declare: bool,
-) -> Result<VariableDecl, String> {
+) -> PResult<VariableDecl> {
     let range = s.range();
     let kind = match s.kind() {
         TokenKind::Let => {
@@ -204,7 +205,7 @@ pub(super) fn parse_var_decl_with_declare(
         | TokenKind::Spawn
         | TokenKind::Parallel
         | TokenKind::Start
-        | TokenKind::RawStr => return Err("Expected `let` or `const`".to_owned()),
+        | TokenKind::RawStr => return Err(ParseError::invalid("Expected `let` or `const`".to_owned())),
     };
 
     let dec_range = s.range();
@@ -219,7 +220,7 @@ pub(super) fn parse_var_decl_after_head(
     first_range: varn_core::SourceRange,
     first_id: Pattern,
     is_declare: bool,
-) -> Result<VariableDecl, String> {
+) -> PResult<VariableDecl> {
     let mut declarators = vec![parse_var_declarator_suffix(
         s,
         first_range,
@@ -249,7 +250,7 @@ fn parse_var_declarator_suffix(
     range: varn_core::SourceRange,
     id: Pattern,
     is_declare: bool,
-) -> Result<VarDeclarator, String> {
+) -> PResult<VarDeclarator> {
     let type_ann = if s.eat(TokenKind::Colon) {
         Some(parse_type(s)?)
     } else {
@@ -257,7 +258,7 @@ fn parse_var_declarator_suffix(
     };
     let init = if s.eat(TokenKind::Eq) {
         if is_declare {
-            return Err("declare variables cannot have initializers".to_owned());
+            return Err(ParseError::invalid("declare variables cannot have initializers".to_owned()));
         }
         Some(parse_expr(s)?)
     } else {
@@ -284,7 +285,7 @@ pub(super) fn parse_function_decl(
     decorators: Vec<Decorator>,
     is_async_pre: bool,
     is_declare: bool,
-) -> Result<FunctionDecl, String> {
+) -> PResult<FunctionDecl> {
     let range = s.range();
     s.expect(TokenKind::Function)?;
     let is_generator = s.eat(TokenKind::Star);
@@ -304,7 +305,7 @@ pub(super) fn parse_function_decl(
     };
     let body = if is_declare {
         if s.check(TokenKind::LBrace) {
-            return Err("declare function cannot have a body".to_owned());
+            return Err(ParseError::invalid("declare function cannot have a body".to_owned()));
         }
         s.eat_semicolon();
         s.stmt(s.range(), varn_core::ast::StmtKind::Empty)

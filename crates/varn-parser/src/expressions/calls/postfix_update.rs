@@ -1,10 +1,11 @@
+use crate::error::PResult;
 use super::trailer::parse_call_expr;
 use crate::stream::TokenStream;
 use varn_core::ast::operators::UpdateOp;
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::TokenKind;
 
-pub(super) fn parse_postfix_expr(s: &mut TokenStream) -> Result<ExprId, String> {
+pub(super) fn parse_postfix_expr(s: &mut TokenStream) -> PResult<ExprId> {
     let mut expr = parse_call_expr(s)?;
 
     loop {

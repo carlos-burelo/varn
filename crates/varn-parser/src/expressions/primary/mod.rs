@@ -1,3 +1,4 @@
+use crate::error::{PResult, ParseError};
 mod array_expr;
 mod class_expr;
 mod function_expr;
@@ -8,7 +9,7 @@ mod object;
 mod regex_literal;
 mod template;
 
-use super::literal_text::{parse_int_radix, unescape_string};
+use super::literal_text::{parse_int_radix, unescape_reporting};
 use super::{parse_expr, try_parse_arrow};
 use crate::stream::TokenStream;
 use array_expr::parse_array_expr;
@@ -25,7 +26,7 @@ pub(crate) use self::object::parse_object_body;
 use self::object::parse_object_expr;
 pub(crate) use self::template::parse_template;
 
-pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
+pub fn parse_primary_expr(s: &mut TokenStream) -> PResult<ExprId> {
     let range = s.range();
 
     match s.kind() {
@@ -39,7 +40,9 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
             let value: i64 = match pre_parsed {
                 Some(ParsedNumber::Int(v)) => v,
                 Some(ParsedNumber::Float(_)) | None => parse_int_radix(raw_text)
-                    .ok_or_else(|| format!("integer literal `{}` overflows i64", raw_text))?,
+                    .ok_or_else(|| {
+                        ParseError::invalid(format!("integer literal `{}` overflows i64", raw_text))
+                    })?,
             };
             Ok(s.expr(range, ExprKind::IntLiteral { value, raw }))
         }
@@ -51,7 +54,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
                 Some(ParsedNumber::Float(v)) => v,
                 Some(ParsedNumber::Int(_)) | None => raw_text
                     .parse()
-                    .map_err(|_| format!("invalid float literal: {}", raw_text))?,
+                    .map_err(|_| ParseError::invalid(format!("invalid float literal: {}", raw_text)))?,
             };
             Ok(s.expr(range, ExprKind::FloatLiteral { value, raw }))
         }
@@ -69,12 +72,17 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
             Ok(s.expr(range, ExprKind::StrLiteral { value }))
         }
         TokenKind::Str => {
-            let value = unescape_string(s.lexeme());
+            let raw = s.lexeme().to_owned();
+            let value = unescape_reporting(s, &raw, range, range.start.offset + 1);
             s.advance();
             Ok(s.expr(range, ExprKind::StrLiteral { value }))
         }
         TokenKind::Char => {
-            let ch = unescape_string(s.lexeme()).chars().next().unwrap_or('\0');
+            let raw = s.lexeme().to_owned();
+            let ch = unescape_reporting(s, &raw, range, range.start.offset + 1)
+                .chars()
+                .next()
+                .unwrap_or('\0');
             s.advance();
             Ok(s.expr(range, ExprKind::CharLiteral { value: ch }))
         }
@@ -162,7 +170,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
         TokenKind::Class => parse_class_expr(s),
         TokenKind::Match => parse_match_expr(s),
 
-        TokenKind::Hash => Err(format!("Unexpected `#` at {}:{}", s.line(), s.column())),
+        TokenKind::Hash => Err(ParseError::unexpected("unexpected `#` in an expression")),
 
         TokenKind::EOF
         | TokenKind::Dynamic
@@ -300,13 +308,10 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
                 let name = s.consume_lexeme();
                 Ok(s.expr(range, ExprKind::Identifier { name }))
             } else {
-                Err(format!(
-                    "Unexpected token {:?} ({:?}) in expression at {}:{}",
-                    s.kind(),
-                    s.lexeme(),
-                    s.line(),
-                    s.column()
-                ))
+                Err(ParseError::unexpected(format!(
+                    "unexpected {} in an expression",
+                    s.describe_current()
+                )))
             }
         }
     }

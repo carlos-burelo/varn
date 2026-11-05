@@ -1,3 +1,4 @@
+use crate::error::{PResult, ParseError};
 use super::abrupt::{
     parse_break_stmt, parse_continue_stmt, parse_return_stmt, parse_throw_stmt, parse_try_stmt,
     parse_using_stmt,
@@ -10,7 +11,7 @@ use crate::stream::TokenStream;
 use varn_core::ast::{StmtId, StmtKind};
 use varn_core::TokenKind;
 
-pub fn parse_stmt_or_decl_inner(s: &mut TokenStream) -> Result<StmtId, String> {
+pub fn parse_stmt_or_decl_inner(s: &mut TokenStream) -> PResult<StmtId> {
     while s.check(TokenKind::DocComment) {
         let lexeme: std::sync::Arc<str> = std::sync::Arc::from(s.lexeme());
         s.advance();
@@ -32,7 +33,7 @@ pub fn parse_stmt_or_decl_inner(s: &mut TokenStream) -> Result<StmtId, String> {
         return decl_stmt;
     }
     if has_decorators {
-        return Err("expected a declaration after decorators".to_owned());
+        return Err(ParseError::invalid("expected a declaration after decorators".to_owned()));
     }
 
     let _ = s.current_doc();
@@ -56,9 +57,9 @@ pub fn parse_stmt_or_decl_inner(s: &mut TokenStream) -> Result<StmtId, String> {
         TokenKind::Try if s.peek_kind(1) == TokenKind::LBrace => parse_try_stmt(s),
         TokenKind::Using => parse_using_stmt(s, false),
         TokenKind::Await if next_kind == TokenKind::Using => parse_using_stmt(s, true),
-        TokenKind::With => Err(String::from(
+        TokenKind::With => Err(ParseError::invalid(String::from(
             "`with` is not supported; use explicit variable bindings",
-        )),
+        ))),
 
         TokenKind::Identifier if next_kind == TokenKind::Colon => {
             let start_range = s.range();

@@ -1,8 +1,9 @@
+use crate::error::PResult;
 use crate::stream::TokenStream;
 use varn_core::ast::TypeNode;
 use varn_core::TokenKind;
 
-pub fn parse_type_args(s: &mut TokenStream) -> Result<Vec<TypeNode>, String> {
+pub fn parse_type_args(s: &mut TokenStream) -> PResult<Vec<TypeNode>> {
     s.expect(TokenKind::LAngle)?;
     let mut args = vec![];
     while !s.check(TokenKind::RAngle) && !s.is_eof() {
@@ -15,7 +16,7 @@ pub fn parse_type_args(s: &mut TokenStream) -> Result<Vec<TypeNode>, String> {
     Ok(args)
 }
 
-pub fn parse_type_params(s: &mut TokenStream) -> Result<Vec<varn_core::ast::TypeParam>, String> {
+pub fn parse_type_params(s: &mut TokenStream) -> PResult<Vec<varn_core::ast::TypeParam>> {
     s.expect(TokenKind::LAngle)?;
     let mut params = vec![];
     while !s.check(TokenKind::RAngle) && !s.is_eof() {
@@ -49,7 +50,7 @@ pub fn parse_type_params(s: &mut TokenStream) -> Result<Vec<varn_core::ast::Type
 
 pub(crate) fn parse_fn_type_params(
     s: &mut TokenStream,
-) -> Result<Vec<varn_core::ast::TypeParam>, String> {
+) -> PResult<Vec<varn_core::ast::TypeParam>> {
     let mut params = vec![];
     while !s.check(TokenKind::RParen) && !s.is_eof() {
         let prange = s.range();

@@ -1,9 +1,10 @@
+use crate::error::PResult;
 use crate::stream::TokenStream;
 use varn_core::ast::ImportDecl;
 use varn_core::ast::ImportSpecifier;
 use varn_core::TokenKind;
 
-pub fn parse_import_decl(s: &mut TokenStream) -> Result<ImportDecl, String> {
+pub fn parse_import_decl(s: &mut TokenStream) -> PResult<ImportDecl> {
     let range = s.range();
     s.expect(TokenKind::Import)?;
 

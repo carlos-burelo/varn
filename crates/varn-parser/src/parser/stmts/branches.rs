@@ -1,10 +1,11 @@
+use crate::error::{PResult, ParseError};
 use super::dispatch::parse_stmt_or_decl_inner;
 use crate::stream::TokenStream;
 use varn_core::ast::operators::VarKind;
 use varn_core::ast::{ForInit, StmtId, StmtKind, SwitchCase};
 use varn_core::TokenKind;
 
-pub(super) fn parse_if_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
+pub(super) fn parse_if_stmt(s: &mut TokenStream) -> PResult<StmtId> {
     let start_range = s.range();
     s.advance();
     s.expect(TokenKind::LParen)?;
@@ -28,7 +29,7 @@ pub(super) fn parse_if_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
             ));
         }
         (None, Some(test)) => test,
-        (None, None) => return Err(String::from("`if` needs a condition")),
+        (None, None) => return Err(ParseError::invalid(String::from("`if` needs a condition"))),
     };
     Ok(s.stmt(
         range,
@@ -40,7 +41,7 @@ pub(super) fn parse_if_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     ))
 }
 
-pub(super) fn parse_while_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
+pub(super) fn parse_while_stmt(s: &mut TokenStream) -> PResult<StmtId> {
     let start_range = s.range();
     s.advance();
     s.expect(TokenKind::LParen)?;
@@ -57,7 +58,7 @@ pub(super) fn parse_while_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     Ok(s.stmt(range, StmtKind::While { test, body }))
 }
 
-pub(super) fn parse_do_while_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
+pub(super) fn parse_do_while_stmt(s: &mut TokenStream) -> PResult<StmtId> {
     let start_range = s.range();
     s.advance();
     let body = parse_stmt_or_decl_inner(s)?;
@@ -70,7 +71,7 @@ pub(super) fn parse_do_while_stmt(s: &mut TokenStream) -> Result<StmtId, String>
     Ok(s.stmt(range, StmtKind::DoWhile { body, test }))
 }
 
-pub(super) fn parse_for_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
+pub(super) fn parse_for_stmt(s: &mut TokenStream) -> PResult<StmtId> {
     let start_range = s.range();
     s.advance();
     let is_await = s.eat(TokenKind::Await);
@@ -247,7 +248,7 @@ pub(super) fn parse_for_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
             | TokenKind::Spawn
             | TokenKind::Parallel
             | TokenKind::Start
-            | TokenKind::RawStr => return Err(String::from("Expected `let` or `const`")),
+            | TokenKind::RawStr => return Err(ParseError::invalid(String::from("Expected `let` or `const`"))),
         };
         let decl_range = s.range();
         s.advance();
@@ -327,7 +328,7 @@ pub(super) fn parse_for_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     ))
 }
 
-pub(super) fn parse_switch_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
+pub(super) fn parse_switch_stmt(s: &mut TokenStream) -> PResult<StmtId> {
     let start_range = s.range();
     s.advance();
     s.expect(TokenKind::LParen)?;

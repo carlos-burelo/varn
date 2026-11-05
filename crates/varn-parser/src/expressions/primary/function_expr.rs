@@ -1,8 +1,9 @@
+use crate::error::PResult;
 use crate::stream::TokenStream;
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::TokenKind;
 
-pub(super) fn parse_function_expr(s: &mut TokenStream) -> Result<ExprId, String> {
+pub(super) fn parse_function_expr(s: &mut TokenStream) -> PResult<ExprId> {
     let start_range = s.range();
     s.advance();
     parse_function_expr_inner_with_start(s, false, start_range)
@@ -12,7 +13,7 @@ pub(super) fn parse_function_expr_inner_with_start(
     s: &mut TokenStream,
     is_async: bool,
     start_range: varn_core::SourceRange,
-) -> Result<ExprId, String> {
+) -> PResult<ExprId> {
     let is_generator = s.eat(TokenKind::Star);
     let id = if s.check(TokenKind::Identifier) {
         Some(s.consume_lexeme())

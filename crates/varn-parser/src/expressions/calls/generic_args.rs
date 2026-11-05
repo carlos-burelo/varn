@@ -1,3 +1,4 @@
+use crate::error::{PResult, ParseError};
 use super::super::parse_assign_expr;
 use crate::stream::TokenStream;
 use crate::types::parse_type_args;
@@ -10,10 +11,10 @@ pub(super) fn try_parse_generic_call(
     s: &mut TokenStream,
     callee: ExprId,
     expr_range: SourceRange,
-) -> Result<ExprId, String> {
+) -> PResult<ExprId> {
     let type_args = parse_type_args(s)?;
     if !s.check(TokenKind::LParen) {
-        return Err("not a generic call".to_owned());
+        return Err(ParseError::invalid("not a generic call".to_owned()));
     }
     let (_, args, call_range) = parse_call_args(s)?;
     Ok(s.expr(
@@ -29,7 +30,7 @@ pub(super) fn try_parse_generic_call(
 
 pub fn parse_call_args(
     s: &mut TokenStream,
-) -> Result<(Vec<varn_core::ast::TypeNode>, Vec<Arg>, SourceRange), String> {
+) -> PResult<(Vec<varn_core::ast::TypeNode>, Vec<Arg>, SourceRange)> {
     s.expect(TokenKind::LParen)?;
     let mut args = vec![];
     while !s.check(TokenKind::RParen) && !s.is_eof() {
@@ -57,6 +58,6 @@ pub fn parse_call_args(
 
 pub fn parse_call_args_pub(
     s: &mut TokenStream,
-) -> Result<(Vec<varn_core::ast::TypeNode>, Vec<Arg>, SourceRange), String> {
+) -> PResult<(Vec<varn_core::ast::TypeNode>, Vec<Arg>, SourceRange)> {
     parse_call_args(s)
 }

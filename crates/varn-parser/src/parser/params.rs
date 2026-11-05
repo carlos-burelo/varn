@@ -1,3 +1,4 @@
+use crate::error::PResult;
 use super::patterns::parse_pattern;
 use crate::expressions::parse_expr;
 use crate::stream::TokenStream;
@@ -6,7 +7,7 @@ use varn_core::ast::operators::{Modifiers, Visibility};
 use varn_core::ast::Param;
 use varn_core::TokenKind;
 
-pub fn parse_params(s: &mut TokenStream) -> Result<Vec<Param>, String> {
+pub fn parse_params(s: &mut TokenStream) -> PResult<Vec<Param>> {
     s.expect(TokenKind::LParen)?;
     let mut params = vec![];
     while !s.check(TokenKind::RParen) && !s.is_eof() {
@@ -19,11 +20,11 @@ pub fn parse_params(s: &mut TokenStream) -> Result<Vec<Param>, String> {
     Ok(params)
 }
 
-pub fn parse_single_param(s: &mut TokenStream) -> Result<Param, String> {
+pub fn parse_single_param(s: &mut TokenStream) -> PResult<Param> {
     parse_param(s)
 }
 
-fn parse_param(s: &mut TokenStream) -> Result<Param, String> {
+fn parse_param(s: &mut TokenStream) -> PResult<Param> {
     let range = s.range();
     let mut mods = Modifiers::default();
 

@@ -1,3 +1,4 @@
+use crate::error::{PResult, ParseError};
 mod angle;
 mod regex_literals;
 
@@ -263,46 +264,71 @@ impl TokenStream {
         }
     }
 
-    pub fn expect(&mut self, kind: TokenKind) -> Result<(), String> {
+    pub fn describe_current(&self) -> String {
+        let tok = self.token();
+        match tok.kind {
+            TokenKind::EOF => "end of file".to_owned(),
+            TokenKind::Identifier => {
+                format!("identifier `{}`", tok.get_lexeme(&self.lexeme_buf))
+            }
+            TokenKind::IntegerLiteral
+            | TokenKind::FloatLiteral
+            | TokenKind::BigIntLiteral
+            | TokenKind::DecimalLiteral
+            | TokenKind::Str
+            | TokenKind::Char => format!("{} literal", tok.kind.as_str()),
+            _ => format!("`{}`", tok.get_lexeme(&self.lexeme_buf)),
+        }
+    }
+
+    fn mismatch(&self, kind: TokenKind) -> ParseError {
+        let found = self.describe_current();
+        if self.kind() == TokenKind::EOF {
+            let unterminated = match kind {
+                TokenKind::RParen => Some(ErrorCode::UnterminatedParen),
+                TokenKind::RBrace => Some(ErrorCode::UnterminatedBrace),
+                TokenKind::RBracket => Some(ErrorCode::UnterminatedBracket),
+                _ => None,
+            };
+            if let Some(code) = unterminated {
+                return ParseError::new(
+                    code,
+                    format!("expected `{}` before the end of the file", kind.as_str()),
+                );
+            }
+        }
+        let wanted = match kind {
+            TokenKind::Identifier => "an identifier".to_owned(),
+            _ => format!("`{}`", kind.as_str()),
+        };
+        ParseError::expected(format!("expected {wanted}, found {found}"))
+    }
+
+    pub fn expect(&mut self, kind: TokenKind) -> PResult<()> {
         if self.check(kind) {
             self.advance();
             Ok(())
         } else {
-            let tok = self.token();
-            let lex = tok.get_lexeme(&self.lexeme_buf);
-            Err(format!(
-                "Expected {:?}, got {:?} ({:?}) at {}:{}",
-                kind, tok.kind, lex, tok.range.start.line, tok.range.start.column
-            ))
+            Err(self.mismatch(kind))
         }
     }
 
-    pub fn expect_token(&mut self, kind: TokenKind) -> Result<Token, String> {
+    pub fn expect_token(&mut self, kind: TokenKind) -> PResult<Token> {
         if self.check(kind) {
             let tok = self.token().clone();
             self.advance();
             Ok(tok)
         } else {
-            let tok = self.token();
-            let lex = tok.get_lexeme(&self.lexeme_buf);
-            Err(format!(
-                "Expected {:?}, got {:?} ({:?}) at {}:{}",
-                kind, tok.kind, lex, tok.range.start.line, tok.range.start.column
-            ))
+            Err(self.mismatch(kind))
         }
     }
 
-    pub fn expect_id(&mut self) -> Result<varn_core::Atom, String> {
+    pub fn expect_id(&mut self) -> PResult<varn_core::Atom> {
         if self.kind().can_be_identifier() {
             let id = self.consume_lexeme();
             Ok(id)
         } else {
-            let tok = self.token();
-            let lex = tok.get_lexeme(&self.lexeme_buf);
-            Err(format!(
-                "Expected identifier, got {:?} ({:?}) at {}:{}",
-                tok.kind, lex, tok.range.start.line, tok.range.start.column
-            ))
+            Err(self.mismatch(TokenKind::Identifier))
         }
     }
 
@@ -335,7 +361,7 @@ impl TokenStream {
         while self.eat(TokenKind::Semicolon) {}
     }
 
-    pub fn expect_semicolon(&mut self) -> Result<(), String> {
+    pub fn expect_semicolon(&mut self) -> PResult<()> {
         if self.eat(TokenKind::Semicolon) {
             while self.eat(TokenKind::Semicolon) {}
             return Ok(());
@@ -354,11 +380,10 @@ impl TokenStream {
         {
             return Ok(());
         }
-        let lex = tok.get_lexeme(&self.lexeme_buf);
-        Err(format!(
-            "Expected ';', got {:?} ({:?}) at {}:{}",
-            tok.kind, lex, tok.range.start.line, tok.range.start.column
-        ))
+        Err(ParseError::expected(format!(
+            "expected `;`, found {}",
+            self.describe_current()
+        )))
     }
 
     pub fn store_pending_doc(&mut self, doc: Arc<str>) {

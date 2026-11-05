@@ -1,3 +1,4 @@
+use crate::error::{PResult, ParseError};
 use super::TokenStream;
 use varn_core::TokenKind;
 
@@ -192,16 +193,14 @@ impl TokenStream {
         }
     }
 
-    pub fn expect_rangle(&mut self) -> Result<(), String> {
+    pub fn expect_rangle(&mut self) -> PResult<()> {
         if self.eat_rangle() {
             Ok(())
         } else {
-            let tok = self.token();
-            let lex = tok.get_lexeme(&self.lexeme_buf);
-            Err(format!(
-                "Expected RAngle, got {:?} ({:?}) at {}:{}",
-                tok.kind, lex, tok.range.start.line, tok.range.start.column
-            ))
+            Err(ParseError::expected(format!(
+                "expected `>`, found {}",
+                self.describe_current()
+            )))
         }
     }
 

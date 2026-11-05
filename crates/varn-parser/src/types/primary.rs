@@ -1,8 +1,9 @@
+use crate::error::{PResult, ParseError};
 use crate::stream::TokenStream;
 use varn_core::ast::{TypeNode, TypeParam};
 use varn_core::{ContextualKeyword, TokenKind, TypeKind};
 
-pub(crate) fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
+pub(crate) fn parse_primary_type(s: &mut TokenStream) -> PResult<TypeNode> {
     let range = s.range();
 
     match s.kind() {
@@ -371,11 +372,9 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String
         | TokenKind::DecimalLiteral
         | TokenKind::Spawn
         | TokenKind::Parallel
-        | TokenKind::Start => Err(format!(
-            "Unexpected token in type position: {:?} at {}:{}",
-            s.kind(),
-            s.range().start.line,
-            s.range().start.column
-        )),
+        | TokenKind::Start => Err(ParseError::unexpected(format!(
+            "unexpected {} in a type",
+            s.describe_current()
+        ))),
     }
 }

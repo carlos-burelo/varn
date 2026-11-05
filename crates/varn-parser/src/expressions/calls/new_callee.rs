@@ -1,3 +1,4 @@
+use crate::error::PResult;
 use super::super::parse_expr;
 use super::super::primary::parse_primary_expr;
 use super::property_name::parse_property_name;
@@ -5,7 +6,7 @@ use crate::stream::TokenStream;
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::TokenKind;
 
-pub fn parse_new_callee_expr(s: &mut TokenStream) -> Result<ExprId, String> {
+pub fn parse_new_callee_expr(s: &mut TokenStream) -> PResult<ExprId> {
     let mut expr = parse_primary_expr(s)?;
     loop {
         match s.kind() {

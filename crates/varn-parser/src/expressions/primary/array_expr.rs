@@ -1,9 +1,10 @@
+use crate::error::PResult;
 use super::super::parse_assign_expr;
 use crate::stream::TokenStream;
 use varn_core::ast::{ArrayEl, ExprId, ExprKind};
 use varn_core::TokenKind;
 
-pub(super) fn parse_array_expr(s: &mut TokenStream) -> Result<ExprId, String> {
+pub(super) fn parse_array_expr(s: &mut TokenStream) -> PResult<ExprId> {
     let start_range = s.range();
     s.advance();
     let mut elements = vec![];

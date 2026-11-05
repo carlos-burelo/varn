@@ -1,3 +1,4 @@
+use crate::error::PResult;
 use crate::stream::TokenStream;
 use varn_core::ast::operators::{BinaryOp, VarKind};
 use varn_core::ast::{
@@ -12,7 +13,7 @@ pub(super) struct Binding {
     range: SourceRange,
 }
 
-pub(super) fn parse_binding(s: &mut TokenStream) -> Result<Option<Binding>, String> {
+pub(super) fn parse_binding(s: &mut TokenStream) -> PResult<Option<Binding>> {
     let kind = if s.check(TokenKind::Let) {
         VarKind::Let
     } else if s.check(TokenKind::Const) {

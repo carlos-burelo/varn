@@ -1,8 +1,9 @@
+use crate::error::PResult;
 use crate::stream::TokenStream;
 use varn_core::ast::{operators::UnaryOp, ExprId, ExprKind};
-use varn_core::{SourceRange, TokenKind};
+use varn_core::{ErrorCode, SourceRange, TokenKind};
 
-pub(crate) fn parse_literal_atom(s: &mut TokenStream) -> Result<ExprId, String> {
+pub(crate) fn parse_literal_atom(s: &mut TokenStream) -> PResult<ExprId> {
     let start = s.range();
     if !s.eat(TokenKind::Minus) {
         return super::primary::parse_primary_expr(s);
@@ -61,65 +62,124 @@ pub(super) fn parse_int_radix(raw: &str) -> Option<i64> {
     }
 }
 
-pub(crate) fn unescape_string(raw: &str) -> String {
+pub(crate) struct EscapeIssue {
+    pub code: ErrorCode,
+    pub message: String,
+    pub at: usize,
+    pub len: usize,
+}
+
+pub(crate) fn unescape_string(raw: &str) -> (String, Vec<EscapeIssue>) {
     let mut result = String::with_capacity(raw.len());
-    let mut chars = raw.chars().peekable();
-    while let Some(c) = chars.next() {
-        if c == '\\' {
-            match chars.next() {
-                Some('n') => result.push('\n'),
-                Some('t') => result.push('\t'),
-                Some('r') => result.push('\r'),
-                Some('\\') => result.push('\\'),
-                Some('\'') => result.push('\''),
-                Some('"') => result.push('"'),
-                Some('0') => result.push('\0'),
-                Some('u') => {
-                    if chars.peek() == Some(&'{') {
-                        chars.next();
-                        let hex: String = chars.by_ref().take_while(|&c| c != '}').collect();
-                        if let Ok(n) = u32::from_str_radix(&hex, 16)
-                            && let Some(ch) = char::from_u32(n)
-                        {
-                            result.push(ch);
-                            continue;
-                        }
-                        result.push_str("\\u{");
-                        result.push_str(&hex);
-                        result.push('}');
-                    } else {
-                        let hex: String = chars.by_ref().take(4).collect();
-                        if hex.len() == 4
-                            && let Ok(n) = u32::from_str_radix(&hex, 16)
-                            && let Some(ch) = char::from_u32(n)
-                        {
-                            result.push(ch);
-                            continue;
-                        }
-                        result.push_str("\\u");
-                        result.push_str(&hex);
-                    }
-                }
-                Some('x') => {
-                    let hex: String = chars.by_ref().take(2).collect();
-                    if hex.len() == 2
-                        && let Ok(n) = u8::from_str_radix(&hex, 16)
-                    {
-                        result.push(n as char);
-                        continue;
-                    }
-                    result.push_str("\\x");
-                    result.push_str(&hex);
-                }
-                Some(other) => {
-                    result.push('\\');
-                    result.push(other);
-                }
-                None => {}
-            }
-        } else {
+    let mut issues = Vec::new();
+    let mut chars = raw.char_indices().peekable();
+    while let Some((at, c)) = chars.next() {
+        if c != '\\' {
             result.push(c);
+            continue;
+        }
+        let Some((_, escape)) = chars.next() else {
+            issues.push(EscapeIssue {
+                code: ErrorCode::InvalidEscapeSequence,
+                message: "a backslash must be followed by the character it escapes".to_owned(),
+                at,
+                len: 1,
+            });
+            continue;
+        };
+        match escape {
+            'n' => result.push('\n'),
+            't' => result.push('\t'),
+            'r' => result.push('\r'),
+            '\\' => result.push('\\'),
+            '\'' => result.push('\''),
+            '"' => result.push('"'),
+            '0' => result.push('\0'),
+            'u' => {
+                let braced = chars.peek().is_some_and(|(_, next)| *next == '{');
+                let (digits, consumed) = if braced {
+                    chars.next();
+                    let mut digits = String::new();
+                    let mut closed = false;
+                    for (_, next) in chars.by_ref() {
+                        if next == '}' {
+                            closed = true;
+                            break;
+                        }
+                        digits.push(next);
+                    }
+                    (digits, 2 + usize::from(closed) + 1)
+                } else {
+                    let digits: String = chars.by_ref().take(4).map(|(_, d)| d).collect();
+                    (digits, 2)
+                };
+                let decoded = if braced || digits.len() == 4 {
+                    u32::from_str_radix(&digits, 16)
+                        .ok()
+                        .and_then(char::from_u32)
+                } else {
+                    None
+                };
+                match decoded {
+                    Some(ch) => result.push(ch),
+                    None => {
+                        let written = if braced {
+                            format!("{{{digits}}}")
+                        } else {
+                            digits.clone()
+                        };
+                        issues.push(EscapeIssue {
+                            code: ErrorCode::InvalidUnicodeEscape,
+                            message: format!(
+                                "`\\u{written}` is not a valid unicode escape: write `\\u{{XXXX}}` with a Unicode scalar value"
+                            ),
+                            at,
+                            len: consumed + digits.len(),
+                        });
+                    }
+                }
+            }
+            'x' => {
+                let digits: String = chars.by_ref().take(2).map(|(_, d)| d).collect();
+                match u8::from_str_radix(&digits, 16) {
+                    Ok(n) if digits.len() == 2 => result.push(n as char),
+                    Ok(_) | Err(_) => issues.push(EscapeIssue {
+                        code: ErrorCode::InvalidEscapeSequence,
+                        message: format!(
+                            "`\\x{digits}` is not a valid escape: write `\\xHH` with two hex digits"
+                        ),
+                        at,
+                        len: 2 + digits.len(),
+                    }),
+                }
+            }
+            other => issues.push(EscapeIssue {
+                code: ErrorCode::InvalidEscapeSequence,
+                message: format!("unknown escape sequence `\\{other}`"),
+                at,
+                len: 1 + other.len_utf8(),
+            }),
         }
     }
-    result
+    (result, issues)
+}
+
+pub(crate) fn unescape_reporting(
+    s: &mut TokenStream,
+    raw: &str,
+    token: SourceRange,
+    base_offset: u32,
+) -> String {
+    let (value, issues) = unescape_string(raw);
+    for issue in issues {
+        let delta = base_offset.saturating_sub(token.start.offset) + issue.at as u32;
+        let mut start = token.start;
+        start.offset = token.start.offset + delta;
+        start.column = token.start.column + delta;
+        let mut end = start;
+        end.offset += issue.len as u32;
+        end.column += issue.len as u32;
+        s.push_diagnostic(issue.code, issue.message, SourceRange { start, end });
+    }
+    value
 }

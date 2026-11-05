@@ -1,8 +1,9 @@
-use crate::expressions::literal_text::unescape_string;
+use crate::error::PResult;
+use crate::expressions::literal_text::unescape_reporting;
 use crate::stream::TokenStream;
 use varn_core::ast::{ExprId, TemplatePart};
 
-pub(crate) fn parse_template(s: &mut TokenStream) -> Result<ExprId, String> {
+pub(crate) fn parse_template(s: &mut TokenStream) -> PResult<ExprId> {
     let range = s.range();
     let mut parts = vec![];
 
@@ -14,7 +15,9 @@ pub(crate) fn parse_template(s: &mut TokenStream) -> Result<ExprId, String> {
     } else {
         (literal_text.trim_end_matches('`'), false)
     };
-    parts.push(TemplatePart::Literal(unescape_string(literal_text)));
+    let head_text = literal_text.to_owned();
+    let head_value = unescape_reporting(s, &head_text, range, range.start.offset + 1);
+    parts.push(TemplatePart::Literal(head_value));
 
     if !is_head {
         return Ok(s.expr(range, varn_core::ast::ExprKind::Template { parts }));
@@ -32,7 +35,11 @@ pub(crate) fn parse_template(s: &mut TokenStream) -> Result<ExprId, String> {
             let after_close = raw_cont_text.strip_prefix('}').unwrap_or(&raw_cont_text);
             (after_close.trim_end_matches("${"), false)
         };
-        parts.push(TemplatePart::Literal(unescape_string(content)));
+        let content_text = content.to_owned();
+        let cont_range = s.range();
+        let content_value =
+            unescape_reporting(s, &content_text, cont_range, cont_range.start.offset);
+        parts.push(TemplatePart::Literal(content_value));
 
         if is_tail {
             break;

@@ -14,7 +14,7 @@ pub(super) fn parse_regex_literal(s: &mut TokenStream) -> ExprId {
                 .map(|_| (pattern.to_owned(), flags.to_owned()))
                 .map_err(|e| e.to_string())
         }
-        None => Err("unterminated regular expression".to_owned()),
+        None => return s.expr(range, ExprKind::Missing),
     };
     match outcome {
         Ok((pattern, flags)) => {

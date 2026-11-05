@@ -1,3 +1,4 @@
+use crate::error::PResult;
 use super::super::parse_expr;
 use super::super::primary::{parse_object_body, parse_primary_expr, parse_template};
 use super::generic_args::{parse_call_args, try_parse_generic_call};
@@ -6,7 +7,7 @@ use crate::stream::TokenStream;
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::TokenKind;
 
-pub(super) fn parse_call_expr(s: &mut TokenStream) -> Result<ExprId, String> {
+pub(super) fn parse_call_expr(s: &mut TokenStream) -> PResult<ExprId> {
     let mut expr = parse_primary_expr(s)?;
 
     loop {

@@ -1,8 +1,9 @@
+use crate::error::{PResult, ParseError};
 use crate::stream::TokenStream;
 use varn_core::ast::TypeNode;
 use varn_core::{TokenKind, TypeKind};
 
-pub(crate) fn parse_template_literal_type(s: &mut TokenStream) -> Result<TypeNode, String> {
+pub(crate) fn parse_template_literal_type(s: &mut TokenStream) -> PResult<TypeNode> {
     let start = s.range();
     let raw = s.consume_lexeme();
     let has_interp = s.interner.resolve(raw).ends_with("${");
@@ -13,11 +14,11 @@ pub(crate) fn parse_template_literal_type(s: &mut TokenStream) -> Result<TypeNod
                 s.kind(),
                 TokenKind::TemplateMiddle | TokenKind::TemplateTail
             ) {
-                return Err(format!(
+                return Err(ParseError::invalid(format!(
                     "expected template continuation in type position at {}:{}",
                     s.range().start.line,
                     s.range().start.column
-                ));
+                )));
             }
             let raw_cont = s.consume_lexeme();
             if s.interner.resolve(raw_cont).ends_with('`') {

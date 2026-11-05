@@ -1,17 +1,18 @@
+use crate::error::{PResult, ParseError};
 use super::postfix_update::parse_postfix_expr;
 use crate::stream::TokenStream;
 use varn_core::ast::operators::{UnaryOp, UpdateOp};
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::TokenKind;
 
-fn reject_unary_power(s: &TokenStream) -> Result<(), String> {
+fn reject_unary_power(s: &TokenStream) -> PResult<()> {
     if s.kind() == TokenKind::StarStar {
-        return Err("a sign before `**` is ambiguous: write `(-a) ** b` or `-(a ** b)`".to_owned());
+        return Err(ParseError::invalid("a sign before `**` is ambiguous: write `(-a) ** b` or `-(a ** b)`".to_owned()));
     }
     Ok(())
 }
 
-pub fn parse_unary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
+pub fn parse_unary_expr(s: &mut TokenStream) -> PResult<ExprId> {
     let start_range = s.range();
 
     macro_rules! prefix_unary {
@@ -66,8 +67,8 @@ pub fn parse_unary_expr(s: &mut TokenStream) -> Result<ExprId, String> {
             ))
         }
         TokenKind::Typeof => prefix_unary!(UnaryOp::Typeof),
-        TokenKind::Void => Err("`void` is not supported; use `_` to discard values".to_owned()),
-        TokenKind::Delete => Err("`delete` is not supported".to_owned()),
+        TokenKind::Void => Err(ParseError::invalid("`void` is not supported; use `_` to discard values".to_owned())),
+        TokenKind::Delete => Err(ParseError::invalid("`delete` is not supported".to_owned())),
         TokenKind::Await => {
             s.advance();
             let argument = parse_unary_expr(s)?;

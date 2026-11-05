@@ -1,3 +1,4 @@
+use crate::error::PResult;
 pub mod decls;
 mod params;
 mod patterns;
@@ -14,7 +15,7 @@ use std::sync::Arc;
 #[cfg(feature = "profiling")]
 use std::time::Instant;
 use varn_core::ast::Program;
-use varn_core::{ErrorCode, TokenKind};
+use varn_core::TokenKind;
 
 pub struct Parser {
     pub stream: TokenStream,
@@ -87,7 +88,7 @@ impl Parser {
                 Ok(stmt) => body.push(stmt),
                 Err(msg) => {
                     self.diagnostics.push(
-                        varn_core::Diagnostic::error(ErrorCode::InvalidStatement, msg)
+                        varn_core::Diagnostic::error(msg.code, msg.message)
                             .with_range(self.stream.range())
                             .with_file(self.stream.filename.clone()),
                     );
@@ -330,7 +331,7 @@ impl Parser {
         self.stream.span_from(start)
     }
 
-    fn parse_stmt_or_decl(&mut self) -> Result<varn_core::ast::StmtId, String> {
+    fn parse_stmt_or_decl(&mut self) -> PResult<varn_core::ast::StmtId> {
         #[cfg(feature = "profiling")]
         let started = Instant::now();
         let s = &mut self.stream;

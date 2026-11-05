@@ -1,3 +1,4 @@
+use crate::error::{PResult, ParseError};
 use crate::stream::TokenStream;
 use varn_core::ast::TypeNode;
 use varn_core::TypeKind;
@@ -5,7 +6,7 @@ use varn_core::TypeKind;
 pub(crate) fn parse_literal_type(
     s: &mut TokenStream,
     range: varn_core::SourceRange,
-) -> Result<TypeNode, String> {
+) -> PResult<TypeNode> {
     use varn_core::ast::{operators::UnaryOp, ExprKind};
     use varn_core::TypeLiteral;
     let expr = crate::expressions::parse_literal_atom(s)?;
@@ -19,7 +20,7 @@ pub(crate) fn parse_literal_type(
             ExprKind::IntLiteral { value, .. } => TypeLiteral::Int(
                 value
                     .checked_neg()
-                    .ok_or_else(|| literal_type_error(range))?,
+                    .ok_or_else(|| literal_type_error())?,
             ),
             ExprKind::FloatLiteral { .. }
             | ExprKind::BigIntLiteral { .. }
@@ -65,7 +66,7 @@ pub(crate) fn parse_literal_type(
             | ExprKind::Match { .. }
             | ExprKind::Is { .. }
             | ExprKind::With { .. }
-            | ExprKind::MetaAccess { .. } => return Err(literal_type_error(range)),
+            | ExprKind::MetaAccess { .. } => return Err(literal_type_error()),
         },
         ExprKind::StrLiteral { value } => {
             let value = value.clone();
@@ -114,15 +115,12 @@ pub(crate) fn parse_literal_type(
         | ExprKind::Match { .. }
         | ExprKind::Is { .. }
         | ExprKind::With { .. }
-        | ExprKind::MetaAccess { .. } => return Err(literal_type_error(range)),
+        | ExprKind::MetaAccess { .. } => return Err(literal_type_error()),
     };
     let full_range = s.span_from(range);
     Ok(s.type_node(full_range, TypeKind::Literal(literal)))
 }
 
-pub(crate) fn literal_type_error(range: varn_core::SourceRange) -> String {
-    format!(
-        "only int, str, bool and char literals can be types at {}:{}",
-        range.start.line, range.start.column
-    )
+pub(crate) fn literal_type_error() -> ParseError {
+    ParseError::invalid("only int, str, bool and char literals can be types")
 }

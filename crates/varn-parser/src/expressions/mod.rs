@@ -1,3 +1,4 @@
+use crate::error::{PResult, ParseError};
 mod arrow_lookahead;
 mod arrow_parse;
 mod assign_ops;
@@ -24,11 +25,11 @@ use arrow_parse::try_parse_arrow;
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::{ContextualKeyword, TokenKind};
 
-pub fn parse_expr(s: &mut TokenStream) -> Result<ExprId, String> {
+pub fn parse_expr(s: &mut TokenStream) -> PResult<ExprId> {
     parse_assign_expr(s)
 }
 
-pub fn parse_seq_expr(s: &mut TokenStream) -> Result<ExprId, String> {
+pub fn parse_seq_expr(s: &mut TokenStream) -> PResult<ExprId> {
     let start = s.range();
     let first = parse_assign_expr(s)?;
     if !s.check(TokenKind::Comma) {
@@ -46,11 +47,11 @@ pub fn parse_seq_expr(s: &mut TokenStream) -> Result<ExprId, String> {
     Ok(s.expr(range, ExprKind::Sequence { expressions: exprs }))
 }
 
-pub(super) fn parse_assign_expr(s: &mut TokenStream) -> Result<ExprId, String> {
+pub(super) fn parse_assign_expr(s: &mut TokenStream) -> PResult<ExprId> {
     if s.check(TokenKind::Yield) {
-        return Err(String::from(
+        return Err(ParseError::invalid_expression(String::from(
             "`yield` produces no value, so it is a statement of its own and cannot be used inside an expression",
-        ));
+        )));
     }
 
     if could_be_arrow(s)
@@ -78,7 +79,7 @@ pub(super) fn parse_assign_expr(s: &mut TokenStream) -> Result<ExprId, String> {
     Ok(left)
 }
 
-fn parse_conditional_expr(s: &mut TokenStream) -> Result<ExprId, String> {
+fn parse_conditional_expr(s: &mut TokenStream) -> PResult<ExprId> {
     let expr = parse_binary_expr(s, Prec::None)?;
 
     if s.eat(TokenKind::Question) {
@@ -99,7 +100,7 @@ fn parse_conditional_expr(s: &mut TokenStream) -> Result<ExprId, String> {
     Ok(expr)
 }
 
-pub(super) fn parse_binary_expr(s: &mut TokenStream, min_prec: Prec) -> Result<ExprId, String> {
+pub(super) fn parse_binary_expr(s: &mut TokenStream, min_prec: Prec) -> PResult<ExprId> {
     let mut left = parse_unary_expr(s)?;
 
     loop {

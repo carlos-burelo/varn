@@ -1,3 +1,4 @@
+use crate::error::PResult;
 use super::dispatch::parse_stmt_or_decl_inner;
 use crate::stream::TokenStream;
 #[cfg(feature = "profiling")]
@@ -5,7 +6,7 @@ use std::time::Instant;
 use varn_core::ast::{StmtId, StmtKind};
 use varn_core::TokenKind;
 
-pub fn parse_block(s: &mut TokenStream) -> Result<StmtId, String> {
+pub fn parse_block(s: &mut TokenStream) -> PResult<StmtId> {
     #[cfg(feature = "profiling")]
     let started = Instant::now();
     let start_range = s.range();
@@ -20,7 +21,7 @@ pub fn parse_block(s: &mut TokenStream) -> Result<StmtId, String> {
             Ok(stmt) => stmts.push(stmt),
             Err(msg) => {
                 let err_range = s.range();
-                s.push_error(msg, err_range);
+                s.push_diagnostic(msg.code, msg.message, err_range);
                 loop {
                     match s.kind() {
                         TokenKind::EOF | TokenKind::RBrace => break,

@@ -1,9 +1,10 @@
+use crate::error::{PResult, ParseError};
 use crate::expressions::{parse_call_args_pub, parse_expr};
 use crate::stream::TokenStream;
 use varn_core::ast::{ArrayPatternEl, Decorator, ExprId, ExprKind, ObjPatternProp, Pattern};
 use varn_core::TokenKind;
 
-pub fn parse_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
+pub fn parse_pattern(s: &mut TokenStream) -> PResult<Pattern> {
     let range = s.range();
     match s.kind() {
         TokenKind::LBracket => parse_sequence_pattern(s, Sequence::Array),
@@ -216,7 +217,7 @@ impl Sequence {
     }
 }
 
-fn parse_sequence_pattern(s: &mut TokenStream, kind: Sequence) -> Result<Pattern, String> {
+fn parse_sequence_pattern(s: &mut TokenStream, kind: Sequence) -> PResult<Pattern> {
     let range = s.range();
     s.advance();
     let mut elements: Vec<Option<ArrayPatternEl>> = vec![];
@@ -224,12 +225,12 @@ fn parse_sequence_pattern(s: &mut TokenStream, kind: Sequence) -> Result<Pattern
 
     while !s.check(kind.closing()) && !s.is_eof() {
         if s.check(TokenKind::Comma) {
-            return Err(format!(
+            return Err(ParseError::invalid(format!(
                 "{} destructuring holes are not allowed at {}:{}; use `_` to discard a position",
                 kind.noun(),
                 s.range().start.line,
                 s.range().start.column
-            ));
+            )));
         }
         if s.check(TokenKind::DotDotDot) {
             s.advance();
@@ -266,7 +267,7 @@ fn parse_sequence_pattern(s: &mut TokenStream, kind: Sequence) -> Result<Pattern
     })
 }
 
-fn parse_object_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
+fn parse_object_pattern(s: &mut TokenStream) -> PResult<Pattern> {
     let range = s.range();
     s.advance();
     let mut properties = vec![];
@@ -331,7 +332,7 @@ fn parse_object_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
     })
 }
 
-pub fn parse_decorator_list(s: &mut TokenStream) -> Result<Vec<Decorator>, String> {
+pub fn parse_decorator_list(s: &mut TokenStream) -> PResult<Vec<Decorator>> {
     let mut decorators = vec![];
     while s.check(TokenKind::At) {
         let range = s.range();
@@ -346,7 +347,7 @@ pub fn parse_decorator_list(s: &mut TokenStream) -> Result<Vec<Decorator>, Strin
     Ok(decorators)
 }
 
-fn parse_decorator_expr(s: &mut TokenStream) -> Result<ExprId, String> {
+fn parse_decorator_expr(s: &mut TokenStream) -> PResult<ExprId> {
     let range = s.range();
     let name = s.expect_id()?;
     let mut expr = s.expr(range, ExprKind::Identifier { name });
@@ -368,7 +369,7 @@ fn parse_decorator_expr(s: &mut TokenStream) -> Result<ExprId, String> {
     }
 
     if s.check(TokenKind::LAngle) {
-        return Err("decorators do not support generic type arguments".to_owned());
+        return Err(ParseError::invalid("decorators do not support generic type arguments".to_owned()));
     }
     if s.check(TokenKind::LParen) {
         let (type_args, args, call_range) = parse_call_args_pub(s)?;

@@ -1,3 +1,4 @@
+use crate::error::PResult;
 use super::parse_assign_expr;
 use crate::stream::TokenStream;
 use crate::types::parse_type;
@@ -5,7 +6,7 @@ use varn_core::ast::expr::ArrowBody;
 use varn_core::ast::{ExprId, ExprKind, Param, Pattern};
 use varn_core::TokenKind;
 
-pub(super) fn try_parse_arrow(s: &mut TokenStream) -> Result<Option<ExprId>, String> {
+pub(super) fn try_parse_arrow(s: &mut TokenStream) -> PResult<Option<ExprId>> {
     let save = s.save();
     match parse_arrow_attempt(s) {
         Ok(expr) => Ok(Some(expr)),
@@ -16,7 +17,7 @@ pub(super) fn try_parse_arrow(s: &mut TokenStream) -> Result<Option<ExprId>, Str
     }
 }
 
-fn parse_arrow_attempt(s: &mut TokenStream) -> Result<ExprId, String> {
+fn parse_arrow_attempt(s: &mut TokenStream) -> PResult<ExprId> {
     let start_range = s.range();
     let is_async = s.eat(TokenKind::Async);
 

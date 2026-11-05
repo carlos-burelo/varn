@@ -1,3 +1,4 @@
+use crate::error::PResult;
 use super::class_key::member_key_name;
 use crate::stream::TokenStream;
 use crate::types::{parse_type, parse_type_params};
@@ -5,7 +6,7 @@ use varn_core::ast::decl::Decl;
 use varn_core::ast::{InterfaceDecl, InterfaceMember, NamespaceDecl, StmtKind, TypeAliasDecl};
 use varn_core::TokenKind;
 
-pub fn parse_interface_decl(s: &mut TokenStream) -> Result<InterfaceDecl, String> {
+pub fn parse_interface_decl(s: &mut TokenStream) -> PResult<InterfaceDecl> {
     let range = s.range();
     s.expect(TokenKind::Interface)?;
     let id = s.expect_id()?;
@@ -47,7 +48,7 @@ pub fn parse_interface_decl(s: &mut TokenStream) -> Result<InterfaceDecl, String
     })
 }
 
-pub fn parse_interface_member(s: &mut TokenStream) -> Result<InterfaceMember, String> {
+pub fn parse_interface_member(s: &mut TokenStream) -> PResult<InterfaceMember> {
     let mem_range = s.range();
     let readonly = s.eat(TokenKind::Readonly);
     let is_async = s.check(TokenKind::Async)
@@ -125,7 +126,7 @@ pub fn parse_interface_member(s: &mut TokenStream) -> Result<InterfaceMember, St
     })
 }
 
-pub fn parse_type_alias_decl(s: &mut TokenStream) -> Result<Decl, String> {
+pub fn parse_type_alias_decl(s: &mut TokenStream) -> PResult<Decl> {
     let range = s.range();
     s.expect(TokenKind::Type)?;
     let id = s.expect_id()?;
@@ -154,7 +155,7 @@ pub fn parse_type_alias_decl(s: &mut TokenStream) -> Result<Decl, String> {
 pub fn parse_namespace_decl(
     s: &mut TokenStream,
     is_declare: bool,
-) -> Result<NamespaceDecl, String> {
+) -> PResult<NamespaceDecl> {
     let range = s.range();
     s.advance();
     let id = s.expect_id()?;

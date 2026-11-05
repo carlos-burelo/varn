@@ -1,9 +1,10 @@
+use crate::error::{PResult, ParseError};
 use super::parse_assign_expr;
 use crate::stream::TokenStream;
 use varn_core::ast::{ExprKind, Pattern, StmtId, StmtKind, VarKind};
 use varn_core::TokenKind;
 
-pub(crate) fn parse_yield_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
+pub(crate) fn parse_yield_stmt(s: &mut TokenStream) -> PResult<StmtId> {
     let start_range = s.range();
     s.advance();
     let delegate = s.eat(TokenKind::Star);
@@ -16,7 +17,9 @@ pub(crate) fn parse_yield_stmt(s: &mut TokenStream) -> Result<StmtId, String> {
     let range = s.span_from(start_range);
     let Some(source) = argument.filter(|_| delegate) else {
         if delegate {
-            return Err(String::from("`yield*` needs the iterable it delegates to"));
+            return Err(ParseError::invalid_expression(String::from(
+                "`yield*` needs the iterable it delegates to",
+            )));
         }
         let yielded = s.expr(range, ExprKind::Yield { argument });
         return Ok(s.stmt(

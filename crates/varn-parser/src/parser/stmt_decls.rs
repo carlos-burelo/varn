@@ -1,3 +1,4 @@
+use crate::error::{PResult, ParseError};
 use crate::stream::TokenStream;
 use varn_core::ast::{Decl, StmtId, StmtKind};
 use varn_core::TokenKind;
@@ -7,7 +8,7 @@ pub(super) fn try_parse_decl_stmt(
     kind: TokenKind,
     next_kind: TokenKind,
     decorators: Vec<varn_core::ast::Decorator>,
-) -> Option<Result<StmtId, String>> {
+) -> Option<PResult<StmtId>> {
     if kind == TokenKind::Declare {
         s.advance();
         return try_parse_decl_stmt_mode(s, s.kind(), s.peek_kind(1), decorators, true);
@@ -22,7 +23,7 @@ pub(super) fn try_parse_decl_stmt_mode(
     next_kind: TokenKind,
     decorators: Vec<varn_core::ast::Decorator>,
     is_declare: bool,
-) -> Option<Result<StmtId, String>> {
+) -> Option<PResult<StmtId>> {
     let result = match kind {
         TokenKind::Function => {
             let doc = s.current_doc();
@@ -59,7 +60,7 @@ pub(super) fn try_parse_decl_stmt_mode(
         }
         TokenKind::Interface => {
             if !decorators.is_empty() {
-                return Some(Err("decorators are not supported on interfaces".to_owned()));
+                return Some(Err(ParseError::invalid("decorators are not supported on interfaces".to_owned())));
             }
             let doc = s.current_doc();
             let mut decl = match super::decls::parse_interface_decl(s) {
@@ -72,9 +73,7 @@ pub(super) fn try_parse_decl_stmt_mode(
         }
         TokenKind::Type => {
             if !decorators.is_empty() {
-                return Some(Err(
-                    "decorators are not supported on type aliases".to_owned()
-                ));
+                return Some(Err(ParseError::invalid("decorators are not supported on type aliases".to_owned())));
             }
             let doc = s.current_doc();
             let mut decl = match super::decls::parse_type_alias_decl(s) {
@@ -89,7 +88,7 @@ pub(super) fn try_parse_decl_stmt_mode(
         }
         TokenKind::Enum => {
             if !decorators.is_empty() {
-                return Some(Err("decorators are not supported on enums".to_owned()));
+                return Some(Err(ParseError::invalid("decorators are not supported on enums".to_owned())));
             }
             let doc = s.current_doc();
             let mut decl = match super::decls::parse_enum_decl(s) {
@@ -103,7 +102,7 @@ pub(super) fn try_parse_decl_stmt_mode(
         }
         TokenKind::Namespace | TokenKind::Module => {
             if !decorators.is_empty() {
-                return Some(Err("decorators are not supported on namespaces".to_owned()));
+                return Some(Err(ParseError::invalid("decorators are not supported on namespaces".to_owned())));
             }
             let doc = s.current_doc();
             let mut decl = match super::decls::parse_namespace_decl(s, is_declare) {
@@ -126,7 +125,7 @@ pub(super) fn try_parse_decl_stmt_mode(
         }
         TokenKind::Extension => {
             if !decorators.is_empty() {
-                return Some(Err("decorators are not supported on extensions".to_owned()));
+                return Some(Err(ParseError::invalid("decorators are not supported on extensions".to_owned())));
             }
             let decl = match super::decls::parse_extension_decl(s) {
                 Ok(decl) => decl,
@@ -137,9 +136,7 @@ pub(super) fn try_parse_decl_stmt_mode(
         }
         TokenKind::Let | TokenKind::Const | TokenKind::Var => {
             if !decorators.is_empty() {
-                return Some(Err(
-                    "decorators are not supported on variable declarations".to_owned()
-                ));
+                return Some(Err(ParseError::invalid("decorators are not supported on variable declarations".to_owned())));
             }
             let doc = s.current_doc();
             let mut decl = match super::decls::parse_var_decl_with_declare(s, is_declare) {
@@ -154,7 +151,7 @@ pub(super) fn try_parse_decl_stmt_mode(
         TokenKind::Import if next_kind == TokenKind::Dot => return None,
         TokenKind::Import => {
             if !decorators.is_empty() {
-                return Some(Err("decorators are not supported on imports".to_owned()));
+                return Some(Err(ParseError::invalid("decorators are not supported on imports".to_owned())));
             }
             let decl = match super::decls::parse_import_decl(s) {
                 Ok(decl) => decl,

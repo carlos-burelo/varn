@@ -1,10 +1,11 @@
+use crate::error::PResult;
 use crate::expressions::parse_expr;
 use crate::stream::TokenStream;
 use crate::types::{parse_type, parse_type_params};
 use varn_core::ast::{EnumDecl, EnumField, EnumMember};
 use varn_core::TokenKind;
 
-pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
+pub fn parse_enum_decl(s: &mut TokenStream) -> PResult<EnumDecl> {
     let range = s.range();
     s.expect(TokenKind::Enum)?;
     let id = s.expect_id()?;

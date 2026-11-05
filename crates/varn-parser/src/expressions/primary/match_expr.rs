@@ -1,9 +1,10 @@
+use crate::error::{PResult, ParseError};
 use crate::stream::TokenStream;
 use varn_core::ast::expr::MatchCase;
 use varn_core::ast::{ExprId, MatchBody, MatchField, MatchPattern, SequenceRest, VariantPayload};
 use varn_core::TokenKind;
 
-pub(super) fn parse_match_expr(s: &mut TokenStream) -> Result<ExprId, String> {
+pub(super) fn parse_match_expr(s: &mut TokenStream) -> PResult<ExprId> {
     let range = s.range();
     s.advance();
 
@@ -28,7 +29,7 @@ pub(super) fn parse_match_expr(s: &mut TokenStream) -> Result<ExprId, String> {
     ))
 }
 
-fn parse_match_case(s: &mut TokenStream) -> Result<Vec<MatchCase>, String> {
+fn parse_match_case(s: &mut TokenStream) -> PResult<Vec<MatchCase>> {
     let range = s.range();
 
     let mut patterns = vec![parse_match_pattern(s)?];
@@ -62,7 +63,7 @@ fn parse_match_case(s: &mut TokenStream) -> Result<Vec<MatchCase>, String> {
     Ok(cases)
 }
 
-fn parse_match_pattern(s: &mut TokenStream) -> Result<MatchPattern, String> {
+fn parse_match_pattern(s: &mut TokenStream) -> PResult<MatchPattern> {
     match s.kind() {
         TokenKind::Placeholder => {
             s.advance();
@@ -237,7 +238,7 @@ fn parse_match_pattern(s: &mut TokenStream) -> Result<MatchPattern, String> {
     }
 }
 
-fn parse_identifier_match_pattern(s: &mut TokenStream) -> Result<MatchPattern, String> {
+fn parse_identifier_match_pattern(s: &mut TokenStream) -> PResult<MatchPattern> {
     let id_range = s.range();
     let name = s.consume_lexeme();
     if s.check(TokenKind::LParen) {
@@ -285,7 +286,7 @@ fn parse_match_list(
     s: &mut TokenStream,
     open: TokenKind,
     close: TokenKind,
-) -> Result<Vec<MatchPattern>, String> {
+) -> PResult<Vec<MatchPattern>> {
     s.expect(open)?;
     let mut items = Vec::new();
     while !s.check(close) && !s.is_eof() {
@@ -298,7 +299,7 @@ fn parse_match_list(
     Ok(items)
 }
 
-fn parse_tuple_match_pattern(s: &mut TokenStream) -> Result<MatchPattern, String> {
+fn parse_tuple_match_pattern(s: &mut TokenStream) -> PResult<MatchPattern> {
     s.expect(TokenKind::LParen)?;
     let mut items = Vec::new();
     let mut trailing_comma = false;
@@ -316,7 +317,7 @@ fn parse_tuple_match_pattern(s: &mut TokenStream) -> Result<MatchPattern, String
     Ok(MatchPattern::Tuple(items))
 }
 
-fn parse_array_match_pattern(s: &mut TokenStream) -> Result<MatchPattern, String> {
+fn parse_array_match_pattern(s: &mut TokenStream) -> PResult<MatchPattern> {
     s.expect(TokenKind::LBracket)?;
     let mut elements = Vec::new();
     let mut rest = SequenceRest::Closed;
@@ -330,9 +331,9 @@ fn parse_array_match_pattern(s: &mut TokenStream) -> Result<MatchPattern, String
             };
             s.eat(TokenKind::Comma);
             if !s.check(TokenKind::RBracket) {
-                return Err(
-                    "a rest pattern must be the last element of an array pattern".to_owned(),
-                );
+                return Err(ParseError::invalid(
+                    "a rest pattern must be the last element of an array pattern",
+                ));
             }
             break;
         }
@@ -345,7 +346,7 @@ fn parse_array_match_pattern(s: &mut TokenStream) -> Result<MatchPattern, String
     Ok(MatchPattern::Array { elements, rest })
 }
 
-fn parse_match_fields(s: &mut TokenStream) -> Result<(Vec<MatchField>, bool), String> {
+fn parse_match_fields(s: &mut TokenStream) -> PResult<(Vec<MatchField>, bool)> {
     s.expect(TokenKind::LBrace)?;
     let mut fields: Vec<MatchField> = Vec::new();
     let mut rest = false;
@@ -354,17 +355,17 @@ fn parse_match_fields(s: &mut TokenStream) -> Result<(Vec<MatchField>, bool), St
             rest = true;
             s.eat(TokenKind::Comma);
             if !s.check(TokenKind::RBrace) {
-                return Err("`...` must be the last entry of a record pattern".to_owned());
+                return Err(ParseError::invalid("`...` must be the last entry of a record pattern".to_owned()));
             }
             break;
         }
         let range = s.range();
         let name = s.expect_id()?;
         if fields.iter().any(|f| f.name == name) {
-            return Err(format!(
+            return Err(ParseError::invalid(format!(
                 "the pattern already names the field '{}'",
                 s.interner.resolve(name)
-            ));
+            )));
         }
         let pattern = if s.eat(TokenKind::Colon) {
             Some(parse_match_pattern(s)?)

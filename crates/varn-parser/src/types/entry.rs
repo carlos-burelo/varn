@@ -1,8 +1,9 @@
+use crate::error::PResult;
 use crate::stream::TokenStream;
 use varn_core::ast::TypeNode;
 use varn_core::{TokenKind, TypeKind};
 
-pub fn parse_type(s: &mut TokenStream) -> Result<TypeNode, String> {
+pub fn parse_type(s: &mut TokenStream) -> PResult<TypeNode> {
     let start = s.range();
 
     if s.check(TokenKind::Identifier) && s.peek_kind(1) == TokenKind::Is {

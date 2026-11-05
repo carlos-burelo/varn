@@ -1,3 +1,4 @@
+use crate::error::PResult;
 use super::class_member::parse_class_member;
 use crate::expressions::parse_new_callee_expr;
 use crate::stream::TokenStream;
@@ -10,7 +11,7 @@ pub fn parse_class_decl(
     s: &mut TokenStream,
     decorators: Vec<Decorator>,
     is_declare: bool,
-) -> Result<ClassDecl, String> {
+) -> PResult<ClassDecl> {
     let range = s.range();
     let is_abstract = s.eat(TokenKind::Abstract);
     s.expect(TokenKind::Class)?;

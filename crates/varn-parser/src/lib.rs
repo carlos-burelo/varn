@@ -1,3 +1,4 @@
+mod error;
 mod expressions;
 mod parser;
 mod profile;
@@ -8,6 +9,7 @@ use std::sync::Arc;
 #[cfg(test)]
 use varn_lexer as _;
 
+pub use error::{PResult, ParseError};
 pub use parser::Parser;
 pub use profile::ParseProfile;
 pub use stream::TokenStream;

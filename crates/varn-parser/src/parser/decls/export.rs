@@ -1,3 +1,4 @@
+use crate::error::{PResult, ParseError};
 use super::class::parse_class_decl;
 use super::parse_function_decl;
 use crate::expressions::parse_expr;
@@ -9,14 +10,14 @@ use varn_core::TokenKind;
 pub fn parse_export_decl(
     s: &mut TokenStream,
     decorators: Vec<Decorator>,
-) -> Result<ExportDecl, String> {
+) -> PResult<ExportDecl> {
     let range = s.range();
     s.expect(TokenKind::Export)?;
     let is_declare = s.eat(TokenKind::Declare);
 
     if s.check(TokenKind::Type) && s.peek_kind(1) == TokenKind::LBrace {
         if !decorators.is_empty() {
-            return Err("decorators are not supported on type exports".to_owned());
+            return Err(ParseError::invalid("decorators are not supported on type exports".to_owned()));
         }
         s.advance();
         s.advance();
@@ -217,9 +218,7 @@ pub fn parse_export_decl(
             | TokenKind::Start
             | TokenKind::RawStr => {
                 if !decorators.is_empty() {
-                    return Err(
-                        "decorators are not supported on default export expressions".to_owned()
-                    );
+                    return Err(ParseError::invalid("decorators are not supported on default export expressions".to_owned()));
                 }
                 let expr = parse_expr(s)?;
                 s.eat_semicolon();
@@ -236,7 +235,7 @@ pub fn parse_export_decl(
 
     if s.eat(TokenKind::Star) {
         if !decorators.is_empty() {
-            return Err("decorators are not supported on export all".to_owned());
+            return Err(ParseError::invalid("decorators are not supported on export all".to_owned()));
         }
         let alias = if s.eat(TokenKind::As) {
             Some(s.consume_lexeme())
@@ -257,7 +256,7 @@ pub fn parse_export_decl(
 
     if s.check(TokenKind::LBrace) {
         if !decorators.is_empty() {
-            return Err("decorators are not supported on named exports".to_owned());
+            return Err(ParseError::invalid("decorators are not supported on named exports".to_owned()));
         }
         s.advance();
         let mut specifiers = vec![];
@@ -306,7 +305,7 @@ pub fn parse_export_decl(
         ) {
             Some(Ok(stmt)) => stmt,
             Some(Err(e)) => return Err(e),
-            None => return Err("Expected declaration after `export declare`".to_owned()),
+            None => return Err(ParseError::invalid("Expected declaration after `export declare`".to_owned())),
         }
     } else {
         match super::super::stmt_decls::try_parse_decl_stmt_mode(
@@ -320,7 +319,7 @@ pub fn parse_export_decl(
             Some(Err(e)) => return Err(e),
             None => {
                 if has_outer_decorators {
-                    return Err("expected a declaration after decorators".to_owned());
+                    return Err(ParseError::invalid("expected a declaration after decorators".to_owned()));
                 }
                 super::super::stmts::parse_stmt_or_decl_inner(s)?
             }
@@ -335,5 +334,5 @@ pub fn parse_export_decl(
         });
     }
 
-    Err("Expected declaration after `export`".to_owned())
+    Err(ParseError::invalid("Expected declaration after `export`".to_owned()))
 }
