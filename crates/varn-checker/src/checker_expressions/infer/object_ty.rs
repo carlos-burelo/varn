@@ -87,21 +87,29 @@ impl Checker<'_> {
                     params,
                     return_type,
                     is_async,
+                    body,
                     ..
                 } => {
                     let Some(name) = prop_key_name(key) else {
                         continue;
                     };
-                    let ret = return_type
-                        .as_ref()
-                        .map(|rt| self.resolve_type_node_cached(rt, bind))
-                        .unwrap_or(Type::Dynamic);
+                    let signature = self.signature_params(params, bind);
+                    let ret = match return_type {
+                        Some(rt) => self.resolve_type_node_cached(rt, bind),
+                        None => self.infer_body_return_type(
+                            rec,
+                            params,
+                            &signature,
+                            varn_core::ast::ArrowBody::Block(*body),
+                            bind,
+                        ),
+                    };
                     let ret = varn_sem::types::async_fn_return(
                         ret,
                         *is_async,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     );
-                    let params = self.signature_params(params, bind);
+                    let params = signature;
                     put_member(
                         &mut members,
                         ObjectTypeMember::Method {

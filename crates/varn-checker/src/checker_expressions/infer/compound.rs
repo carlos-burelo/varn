@@ -164,15 +164,26 @@ impl<'r> Checker<'r> {
 
     pub(crate) fn infer_function_expr_type(
         &mut self,
+        rec: &mut Recorder,
         params: &[varn_core::ast::Param],
         return_type: &Option<varn_core::ast::TypeNode>,
+        body: varn_core::ast::StmtId,
         is_async: bool,
         is_generator: bool,
         bind: &BindResult,
     ) -> Type {
-        let declared = return_type
-            .as_ref()
-            .map(|rt| self.resolve_type_node_cached(rt, bind));
+        let signature = self.signature_params(params, bind);
+        let declared = match return_type {
+            Some(rt) => Some(self.resolve_type_node_cached(rt, bind)),
+            None if is_generator => None,
+            None => Some(self.infer_body_return_type(
+                rec,
+                params,
+                &signature,
+                varn_core::ast::ArrowBody::Block(body),
+                bind,
+            )),
+        };
         let ret = if is_generator {
             varn_sem::types::declared_generator(
                 declared.unwrap_or(Type::Dynamic),
@@ -186,10 +197,9 @@ impl<'r> Checker<'r> {
                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
             )
         };
-        let params = self.signature_params(params, bind);
         Type::fn_(
             varn_sem::types::FunctionType {
-                params,
+                params: signature,
                 return_type: ret.0,
                 is_arrow: false,
                 type_params: Vec::new(),

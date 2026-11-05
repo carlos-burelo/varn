@@ -139,8 +139,17 @@ impl<'r> Checker<'r> {
                 return_type,
                 is_async,
                 is_generator,
+                body,
                 ..
-            } => self.infer_function_expr_type(params, return_type, *is_async, *is_generator, bind),
+            } => self.infer_function_expr_type(
+                rec,
+                params,
+                return_type,
+                *body,
+                *is_async,
+                *is_generator,
+                bind,
+            ),
             ExprKind::Object { properties } => {
                 let properties = properties.clone();
                 self.infer_object_type(rec, &properties, bind, expr)

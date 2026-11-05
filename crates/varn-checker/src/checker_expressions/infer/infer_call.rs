@@ -120,6 +120,40 @@ impl<'r> Checker<'r> {
         }
     }
 
+    pub(super) fn infer_body_return_type(
+        &mut self,
+        rec: &mut Recorder,
+        params: &[Param],
+        ps: &[FunctionParam],
+        body: varn_core::ast::ArrowBody,
+        bind: &BindResult,
+    ) -> Type {
+        let body_scope =
+            crate::checker_generics::find_arrow_scope(self.current_scope, params, bind);
+        let saved_scope = self.current_scope;
+        if let Some(scope_id) = body_scope {
+            self.current_scope = scope_id;
+            for (p, fp) in params.iter().zip(ps.iter()) {
+                let name = varn_sem::infer::pattern_lead_name(&p.pattern, &bind.interner);
+                if name.is_empty() || name == varn_core::TokenKind::Placeholder.as_str() {
+                    continue;
+                }
+                if let Some(sym_id) = bind
+                    .interner
+                    .get(name)
+                    .and_then(|atom| bind.scopes.get(scope_id).resolve(atom, &bind.scopes))
+                {
+                    rec.symbol_types.insert(sym_id, Type::resolved(fp.ty));
+                }
+            }
+        }
+        let ret_ty = super::arrow_body_return_type(body, self, rec, bind);
+        if body_scope.is_some() {
+            self.current_scope = saved_scope;
+        }
+        ret_ty
+    }
+
     pub(super) fn infer_arrow_type(
         &mut self,
         rec: &mut Recorder,
@@ -188,34 +222,10 @@ impl<'r> Checker<'r> {
             })
             .collect();
 
-        let arrow_scope =
-            crate::checker_generics::find_arrow_scope(self.current_scope, params, bind);
-        let saved_scope = self.current_scope;
-        if let Some(scope_id) = arrow_scope {
-            self.current_scope = scope_id;
-            for (p, fp) in params.iter().zip(ps.iter()) {
-                let name = varn_sem::infer::pattern_lead_name(&p.pattern, &bind.interner);
-                if name.is_empty() || name == varn_core::TokenKind::Placeholder.as_str() {
-                    continue;
-                }
-                if let Some(sym_id) = bind
-                    .interner
-                    .get(name)
-                    .and_then(|atom| bind.scopes.get(scope_id).resolve(atom, &bind.scopes))
-                {
-                    rec.symbol_types.insert(sym_id, Type::resolved(fp.ty));
-                }
-            }
-        }
-
         let ret_ty = match return_type {
             Some(rt) => self.resolve_type_node_cached(rt, bind),
-            None => super::arrow_body_return_type(body, self, rec, bind),
+            None => self.infer_body_return_type(rec, params, &ps, body, bind),
         };
-
-        if arrow_scope.is_some() {
-            self.current_scope = saved_scope;
-        }
 
         let ret_ty = varn_sem::types::async_fn_return(
             ret_ty,
