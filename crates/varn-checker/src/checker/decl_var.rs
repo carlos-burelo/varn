@@ -18,6 +18,15 @@ impl<'r> Checker<'r> {
         }
     }
 
+    pub(crate) fn is_rejected_regex_literal(
+        v: &varn_core::ast::VariableDecl,
+        bind: &BindResult,
+    ) -> bool {
+        bind.diagnostics
+            .iter()
+            .any(|d| d.code == ErrorCode::InvalidRegex && d.range == v.range)
+    }
+
     pub(super) fn check_variable(
         &mut self,
         rec: &mut Recorder,
@@ -25,6 +34,9 @@ impl<'r> Checker<'r> {
         decl_range: &varn_core::SourceRange,
         bind: &BindResult,
     ) {
+        if Self::is_rejected_regex_literal(v, bind) {
+            return;
+        }
         for d in &v.declarators {
             if let (varn_core::ast::Pattern::Identifier { name, .. }, Some(init)) = (&d.id, d.init)
                 && let ExprKind::ClassExpr { declaration } = &self.ast_arena.expr(init).kind

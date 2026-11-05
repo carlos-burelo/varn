@@ -111,6 +111,9 @@ impl<'r> Checker<'r> {
     fn da_read(&mut self, name: Atom, at: ExprId, flow: &mut Flow, bind: &BindResult) {
         let range = self.ast_arena.expr(at).range;
         let text = bind.interner.resolve(name);
+        if varn_core::intrinsics::is_regex_literal_binding(text) {
+            return;
+        }
         if flow.undeclared.remove(&name) {
             flow.assigned.insert(name);
             self.emit(
@@ -294,7 +297,9 @@ impl<'r> Checker<'r> {
 
             StmtKind::Decl(decl) => {
                 let decl = decl.clone();
-                if let Decl::Variable(v) = decl.as_ref() {
+                if let Decl::Variable(v) = decl.as_ref()
+                    && !Self::is_rejected_regex_literal(v, bind)
+                {
                     for d in &v.declarators {
                         if let Some(init) = d.init {
                             self.da_expr(init, flow, bind);
