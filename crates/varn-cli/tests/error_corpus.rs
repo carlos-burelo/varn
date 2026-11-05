@@ -4,8 +4,13 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 enum Expect {
-    Diagnostic { token: String, is_error: bool },
-    Failure { text: String },
+    Diagnostics {
+        tokens: Vec<String>,
+        suggestions: Vec<String>,
+    },
+    Failure {
+        text: String,
+    },
 }
 
 fn repo_root() -> PathBuf {
@@ -15,20 +20,56 @@ fn repo_root() -> PathBuf {
         .expect("repo root")
 }
 
-fn parse_expect(first_line: &str) -> Option<Expect> {
-    let rest = first_line.trim().strip_prefix("// expect: ")?;
-    let (level, inner) = rest.split_once('[')?;
-    let inner = inner.strip_suffix(']')?;
-    match (level, inner.starts_with("VN")) {
-        ("error" | "warning", true) => Some(Expect::Diagnostic {
-            token: format!("{level}[{inner}]"),
-            is_error: level == "error",
-        }),
-        ("error", false) => Some(Expect::Failure {
-            text: inner.to_owned(),
-        }),
-        _ => None,
+fn parse_expect(source: &str) -> Option<Expect> {
+    let mut tokens = Vec::new();
+    let mut suggestions = Vec::new();
+    for line in source
+        .lines()
+        .map_while(|line| line.trim().strip_prefix("// expect: "))
+    {
+        if let Some(text) = line.strip_prefix("suggestion: ") {
+            suggestions.push(text.to_owned());
+            continue;
+        }
+        let (level, inner) = line.split_once('[')?;
+        let inner = inner.strip_suffix(']')?;
+        match (level, inner.starts_with("VN")) {
+            ("error" | "warning", true) => tokens.push(format!("{level}[{inner}]")),
+            ("error", false) if tokens.is_empty() => {
+                return Some(Expect::Failure {
+                    text: inner.to_owned(),
+                });
+            }
+            _ => return None,
+        }
     }
+    (!tokens.is_empty()).then_some(Expect::Diagnostics {
+        tokens,
+        suggestions,
+    })
+}
+
+fn emitted_tokens(text: &str) -> Vec<String> {
+    let mut found: Vec<String> = text
+        .lines()
+        .filter(|line| line.starts_with("error[VN") || line.starts_with("warning[VN"))
+        .filter_map(|line| line.find(']').map(|end| line[..=end].to_owned()))
+        .collect();
+    found.sort();
+    found
+}
+
+fn invalid_locations(text: &str) -> Vec<String> {
+    text.lines()
+        .filter_map(|line| line.trim_start().strip_prefix("┌─ "))
+        .filter(|location| {
+            let mut parts = location.rsplit(':');
+            let column = parts.next().and_then(|c| c.parse::<u32>().ok());
+            let line = parts.next().and_then(|l| l.parse::<u32>().ok());
+            column.is_none_or(|c| c == 0) || line.is_none_or(|l| l == 0)
+        })
+        .map(str::to_owned)
+        .collect()
 }
 
 fn vn(sub: &str, file: &Path, cache: &Path) -> Output {
@@ -51,17 +92,41 @@ fn combined(out: &Output) -> String {
 
 fn check_fixture(path: &Path, cache: &Path) -> Result<(), String> {
     let src = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-    let first = src.lines().next().unwrap_or_default();
-    let expect = parse_expect(first).ok_or_else(|| format!("cabecera inválida: {first:?}"))?;
+    let expect = parse_expect(&src).ok_or_else(|| {
+        format!(
+            "cabecera inválida: {:?}",
+            src.lines().next().unwrap_or_default()
+        )
+    })?;
     match expect {
-        Expect::Diagnostic { token, is_error } => {
+        Expect::Diagnostics {
+            tokens: mut declared,
+            suggestions,
+        } => {
+            declared.sort();
             let out = vn("check", path, cache);
             let text = combined(&out);
-            if !text.contains(&token) {
-                return Err(format!("esperaba {token}, salida:\n{text}"));
+            let emitted = emitted_tokens(&text);
+            if emitted != declared {
+                return Err(format!(
+                    "declarados {declared:?}, emitidos {emitted:?}, salida:
+{text}"
+                ));
             }
-            if is_error && out.status.success() {
-                return Err(format!("{token} pero `vn check` salió con 0"));
+            if let Some(missing) = suggestions
+                .iter()
+                .find(|s| !text.contains(&format!("help: {s}")))
+            {
+                return Err(format!("falta la sugerencia {missing:?}, salida:
+{text}"));
+            }
+            let invalid = invalid_locations(&text);
+            if !invalid.is_empty() {
+                return Err(format!("posiciones inválidas {invalid:?}, salida:
+{text}"));
+            }
+            if declared.iter().any(|t| t.starts_with("error")) && out.status.success() {
+                return Err("hay errores declarados pero `vn check` salió con 0".to_owned());
             }
             Ok(())
         }

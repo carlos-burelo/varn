@@ -1,4 +1,5 @@
 // expect: error[VN3001]
+// expect: error[VN3001]
 let a = 0
 let s = ""
 ;(a, s) = ("x", 1)
