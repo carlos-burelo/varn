@@ -3,6 +3,7 @@ pub enum ExitCode {
     Fatal = 1,
     Usage = 2,
     Diagnostics = 3,
+    Uncaught = 4,
 }
 
 impl ExitCode {

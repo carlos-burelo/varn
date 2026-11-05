@@ -1,5 +1,6 @@
 use std::fmt;
 use std::sync::Arc;
+use varn_core::term::chalk::chalk;
 use varn_core::DiagnosticBag;
 
 pub struct DiagnosticReport {
@@ -9,8 +10,21 @@ pub struct DiagnosticReport {
 }
 
 pub struct RuntimeFailure {
+    pub class: String,
     pub message: String,
     pub frames: Vec<varn_vm::FrameInfo>,
+    pub cause: Option<Box<RuntimeFailure>>,
+}
+
+impl RuntimeFailure {
+    pub fn of(error: varn_vm::RuntimeError) -> Self {
+        Self {
+            class: error.class,
+            message: error.message,
+            frames: error.frames,
+            cause: error.cause.map(|inner| Box::new(Self::of(*inner))),
+        }
+    }
 }
 
 pub enum Failure {
@@ -61,19 +75,52 @@ pub fn relative_path(file: &str) -> String {
         .unwrap_or(cleaned)
 }
 
-impl fmt::Display for RuntimeFailure {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.message)?;
-        for frame in &self.frames {
+const FRAMES_SHOWN_FIRST: usize = 12;
+const FRAMES_SHOWN_LAST: usize = 6;
+
+impl RuntimeFailure {
+    fn write_chain(&self, f: &mut fmt::Formatter<'_>, label: &str) -> fmt::Result {
+        let class = if self.class == varn_core::RuntimeErrorKind::Error.class_name() {
+            String::new()
+        } else {
+            format!("{}: ", self.class)
+        };
+        write!(
+            f,
+            "{}{}",
+            chalk(label).red().bold(),
+            chalk(format!(": {class}{}", self.message)).bold()
+        )?;
+        let omitted = self
+            .frames
+            .len()
+            .saturating_sub(FRAMES_SHOWN_FIRST + FRAMES_SHOWN_LAST);
+        for (at, frame) in self.frames.iter().enumerate() {
+            if omitted > 0 && at >= FRAMES_SHOWN_FIRST && at < FRAMES_SHOWN_FIRST + omitted {
+                if at == FRAMES_SHOWN_FIRST {
+                    write!(f, "\n    {}", chalk(format!("... {omitted} more frames")).dim())?;
+                }
+                continue;
+            }
             write!(
                 f,
-                "\n    at {} ({}:{})",
+                "\n    {} {} {}",
+                chalk("at").dim(),
                 frame.fn_name,
-                relative_path(&frame.file),
-                frame.line
+                chalk(format!("({}:{})", relative_path(&frame.file), frame.line)).dim()
             )?;
         }
+        if let Some(cause) = &self.cause {
+            write!(f, "\n")?;
+            cause.write_chain(f, "caused by")?;
+        }
         Ok(())
+    }
+}
+
+impl fmt::Display for RuntimeFailure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.write_chain(f, "error")
     }
 }
 

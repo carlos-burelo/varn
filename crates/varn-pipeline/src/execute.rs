@@ -50,10 +50,7 @@ pub fn execute_unit(
         && let Err(e) = machine.call_main_global(test.global)
     {
         machine.abandon_heap_at_exit();
-        return Err(Failure::Runtime(RuntimeFailure {
-            message: e.message,
-            frames: e.frames,
-        }));
+        return Err(Failure::Runtime(RuntimeFailure::of(e)));
     }
     if policy.gc {
         eprintln!("{}", machine.gc_report());
@@ -66,10 +63,7 @@ pub fn drive_entry(machine: &mut Vm, main_proto: &Rc<FunctionProto>) -> Result<(
     let mut resume = |_: &mut Vm| varn_vm::debug::BreakAction::Resume;
     match varn_vm::debug::drive_main(machine, main_proto, &mut resume) {
         varn_vm::debug::DriveResult::Done(_) | varn_vm::debug::DriveResult::Stopped => Ok(()),
-        varn_vm::debug::DriveResult::Failed(e) => Err(Failure::Runtime(RuntimeFailure {
-            message: e.message,
-            frames: e.frames,
-        })),
+        varn_vm::debug::DriveResult::Failed(e) => Err(Failure::Runtime(RuntimeFailure::of(e))),
     }
 }
 

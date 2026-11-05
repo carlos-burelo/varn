@@ -178,7 +178,7 @@ pub fn error(msg: impl Display) {
         .bold()
         .for_stderr()
         .to_string();
-    write_line(format!("  {tag} {msg}"));
+    write_line(format!("{tag}: {msg}"));
 }
 
 pub fn info(msg: impl Display) {

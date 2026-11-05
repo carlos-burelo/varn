@@ -91,7 +91,7 @@ fn run_cli() {
 
     if let Err(e) = result {
         match e.exit_code() {
-            exit::ExitCode::Diagnostics => eprintln!("{e}"),
+            exit::ExitCode::Diagnostics | exit::ExitCode::Uncaught => eprintln!("{e}"),
             exit::ExitCode::Fatal | exit::ExitCode::Usage => terminal::error(&e),
         }
         process::exit(e.exit_code().code());

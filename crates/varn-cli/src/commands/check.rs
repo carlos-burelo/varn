@@ -20,7 +20,7 @@ pub fn execute(session: &pipeline::Session, args: CheckArgs) -> Result<(), CliEr
                     eprintln!("{error}");
                     diagnostics += 1;
                 }
-                ExitCode::Fatal | ExitCode::Usage => {
+                ExitCode::Fatal | ExitCode::Usage | ExitCode::Uncaught => {
                     terminal::error(&error);
                     fatal += 1;
                 }

@@ -22,9 +22,8 @@ impl CliError {
     pub fn exit_code(&self) -> ExitCode {
         match self {
             CliError::Failure(Failure::Diagnostics(_)) => ExitCode::Diagnostics,
-            CliError::Failure(
-                Failure::Runtime(_) | Failure::Io(_) | Failure::Internal(_) | Failure::Project(_),
-            )
+            CliError::Failure(Failure::Runtime(_)) => ExitCode::Uncaught,
+            CliError::Failure(Failure::Io(_) | Failure::Internal(_) | Failure::Project(_))
             | CliError::Fatal(_) => ExitCode::Fatal,
             CliError::Usage(_) => ExitCode::Usage,
             CliError::Summary { exit, .. } => *exit,
