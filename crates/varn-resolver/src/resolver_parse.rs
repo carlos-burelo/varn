@@ -60,7 +60,7 @@ impl ModuleResolver {
             None => varn_binder::Binder::bind(program, ast_arena, interner.clone(), self),
         };
         for e in lex_errs {
-            bind.diagnostics.emit(e);
+            bind.diagnostics.push(e);
         }
         let provisional = Arc::new(bind);
         self.store_bind(key.to_owned(), Arc::clone(&provisional));

@@ -16,10 +16,6 @@ impl DiagnosticBag {
         self.items.push(diagnostic);
     }
 
-    pub fn emit(&mut self, diagnostic: Diagnostic) {
-        self.items.push(diagnostic);
-    }
-
     pub fn error(&mut self, code: ErrorCode, message: impl Into<String>, range: SourceRange) {
         self.items
             .push(Diagnostic::error(code, message).with_range(range));
@@ -63,6 +59,21 @@ impl DiagnosticBag {
 
     pub fn take(&mut self) -> Vec<Diagnostic> {
         std::mem::take(&mut self.items)
+    }
+
+    pub fn normalize(&mut self) {
+        let mut seen = std::collections::BTreeSet::new();
+        self.items.retain(|d| {
+            seen.insert((
+                d.file.clone(),
+                d.range.start.offset,
+                d.range.end.offset,
+                d.code.code_number(),
+                d.message.clone(),
+            ))
+        });
+        self.items
+            .sort_by(|a, b| (&a.file, a.range.start.offset).cmp(&(&b.file, b.range.start.offset)));
     }
 
     pub fn clear(&mut self) {

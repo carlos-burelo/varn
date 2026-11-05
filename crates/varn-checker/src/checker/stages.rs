@@ -146,7 +146,7 @@ pub(super) fn assemble(
     let mut final_diagnostics = std::mem::take(&mut bind.diagnostics);
     final_diagnostics.extend(checker.diagnostics);
     for (kept, rejected) in bind.interner.collisions() {
-        final_diagnostics.emit(varn_core::Diagnostic::error(
+        final_diagnostics.push(varn_core::Diagnostic::error(
             varn_core::ErrorCode::CompilationInternalError,
             format!("name hash collision: '{kept}' and '{rejected}' share an Atom"),
         ));
@@ -177,8 +177,9 @@ pub(super) fn assemble(
         if let Some(node) = ast_arena.exprs().nth(id as usize) {
             diag = diag.with_range(node.range);
         }
-        final_diagnostics.emit(diag);
+        final_diagnostics.push(diag);
     }
+    final_diagnostics.normalize();
     profile.collect_annotations = std::time::Duration::ZERO;
     let flattened = std::mem::take(&mut bind.type_members.flattened);
 
