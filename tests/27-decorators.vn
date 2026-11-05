@@ -37,7 +37,7 @@ function logMethod(fn: FunctionRef, ctx: MethodContext): FunctionRef {
     const isStatic = ctx.isStatic;
     return (...args: int[]) => {
         method_log.push(`${name}:static=${isStatic}`);
-        return fn(...args);
+        return (fn as (...args: int[]) => int)(...args);
     };
 }
 class DecoratedCalc {
