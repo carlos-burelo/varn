@@ -132,7 +132,7 @@ pub(super) fn infer_binary_type(
             let l = l_raw.apparent(&checker.ty_table);
             let r = r_raw.apparent(&checker.ty_table);
             if l_raw.is_error() || r_raw.is_error() {
-                return Type::Dynamic;
+                return Type::Error;
             }
             if l.is_unresolved() || r.is_unresolved() {
                 return Type::Dynamic;
