@@ -208,6 +208,9 @@ impl Summary<'_> {
         let mut table = Table::pairs();
         table.row(["p50".to_owned(), fmt_dur(reference)]);
         table.row(["throughput".to_owned(), format!("{per_second:.1}/s")]);
+        if let Some(peak) = crate::peak_memory::bytes() {
+            table.row(["peak memory".to_owned(), fmt_bytes(peak)]);
+        }
         if let Some(precompile) = self.precompile {
             table.row(["precompile".to_owned(), fmt_dur(precompile)]);
         }

@@ -81,6 +81,7 @@ pub struct Record {
     pub phases: Vec<PhaseRecord>,
     pub e2e: Option<PhaseRecord>,
     pub jit: JitRecord,
+    pub peak_memory_bytes: Option<u64>,
     pub profile: Option<ProfileRecord>,
     #[serde(default)]
     pub comparison: Vec<Change>,
@@ -95,6 +96,7 @@ impl Record {
             phases: Vec::new(),
             e2e: None,
             jit,
+            peak_memory_bytes: crate::peak_memory::bytes(),
             profile: None,
             comparison: Vec::new(),
         }
