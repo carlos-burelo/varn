@@ -188,6 +188,10 @@ fn merge_blocks(func: &mut SsaFunc) -> bool {
                     &mut func.blocks[b_id.0 as usize].term,
                     Terminator::Unreachable,
                 );
+                let (b_term_line, b_term_scope) = {
+                    let b_block = &func.blocks[b_id.0 as usize];
+                    (b_block.term_line, b_block.term_scope)
+                };
 
                 let handlers: Vec<BlockId> = b_insts
                     .iter()
@@ -300,6 +304,8 @@ fn merge_blocks(func: &mut SsaFunc) -> bool {
                 func.blocks[b_id.0 as usize].preds.clear();
 
                 func.blocks[a_id.0 as usize].term = b_term;
+                func.blocks[a_id.0 as usize].term_line = b_term_line;
+                func.blocks[a_id.0 as usize].term_scope = b_term_scope;
                 changed = true;
             }
         }

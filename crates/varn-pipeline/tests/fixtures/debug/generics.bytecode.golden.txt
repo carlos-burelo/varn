@@ -37,7 +37,7 @@ fn <module> (arity: 1, regs: 16, upvalues: 0)
   0039 │   9 │ GetFixedField       [0m │ r4 = r2, field0, +0, :dynamic
   0043 │  22 │ Move                [0m │ r5 = r4
   0045 │  22 │ [32mNeqInt              [0m │ r6 = r5 != r3
-  0047 │   9 │ [33mJumpIfFalse         [0m │ r6, → 0067
+  0047 │  22 │ [33mJumpIfFalse         [0m │ r6, → 0067
   0050 │  22 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@4
   0052 │  22 │ [36mLoadConst           [0m │ r7 = #9  [2m;[0m [32m"generics get"[0m
   0054 │  22 │ Move                [0m │ r4 = r7
@@ -55,7 +55,7 @@ fn <module> (arity: 1, regs: 16, upvalues: 0)
   0079 │  25 │ Move                [0m │ r7 = r8
   0081 │  25 │ [36mLoadConst           [0m │ r10 = #11  [2m;[0m [32m"value=10"[0m
   0083 │  25 │ [32mNeqStr              [0m │ r6 = r7 != r10
-  0085 │  13 │ [33mJumpIfFalse         [0m │ r6, → 0105
+  0085 │  25 │ [33mJumpIfFalse         [0m │ r6, → 0105
   0088 │  25 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@4
   0090 │  25 │ [36mLoadConst           [0m │ r7 = #12  [2m;[0m [32m"generics map"[0m
   0092 │  25 │ Move                [0m │ r4 = r7

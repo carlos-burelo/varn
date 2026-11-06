@@ -68,7 +68,7 @@ fn <module> (arity: 1, regs: 20, upvalues: 0)
   0114 │  12 │ Move                [0m │ r2 = r4
   0116 │  24 │ [36mLoadInt             [0m │ r3 = 4
   0118 │  24 │ [32mNeqInt              [0m │ r6 = r2 != r3
-  0120 │  19 │ [33mJumpIfFalse         [0m │ r6, → 0140
+  0120 │  24 │ [33mJumpIfFalse         [0m │ r6, → 0140
   0123 │  24 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@4
   0125 │  24 │ [36mLoadConst           [0m │ r8 = #3  [2m;[0m [32m"loop firstAbove"[0m
   0127 │  24 │ Move                [0m │ r9 = r8

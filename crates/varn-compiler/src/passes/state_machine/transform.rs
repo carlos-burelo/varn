@@ -23,17 +23,19 @@ fn split_at_suspend_point(func: &mut SsaFunc, _k: usize, pt: &SuspendPoint) {
 
     let cont_bid = func.alloc_block();
 
-    let (suffix_insts, original_term) = {
+    let (suffix_insts, original_term, term_line, term_scope) = {
         let block = func.block_mut(target_bid);
         let suffix = block.insts.split_off(inst_idx + 1);
         let term = std::mem::replace(&mut block.term, Terminator::Unreachable);
-        (suffix, term)
+        (suffix, term, block.term_line, block.term_scope)
     };
 
     {
         let cont_block = func.block_mut(cont_bid);
         cont_block.insts = suffix_insts;
         cont_block.term = original_term;
+        cont_block.term_line = term_line;
+        cont_block.term_scope = term_scope;
     }
 
     func.block_mut(target_bid).term = Terminator::Jump {

@@ -18,8 +18,8 @@ fn <module> (arity: 1, regs: 6, upvalues: 0)
   0016 │  12 │ LoadNull            [0m │ r1 = null
   0017 │  12 │ Move                [0m │ r2 = r5
   0019 │  12 │ [35mCall                [0m │ r5 = r3, (r1..r2)
-  0022 │  10 │ LoadNull            [0m │ r1 = null
-  0023 │  10 │ [33mReturn              [0m │ r1
+  0022 │  12 │ LoadNull            [0m │ r1 = null
+  0023 │  12 │ [33mReturn              [0m │ r1
   0025 │   1 │ LoadNull            [0m │ r1 = null
   0026 │   1 │ [33mReturn              [0m │ r1
 

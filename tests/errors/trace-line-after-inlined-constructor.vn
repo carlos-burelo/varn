@@ -1,0 +1,15 @@
+// expect: error[late]
+// expect: error[at check (tests/errors/trace-line-after-inlined-constructor.vn:8)]
+// expect: error[at build (tests/errors/trace-line-after-inlined-constructor.vn:13)]
+// expect: error[at <module> (tests/errors/trace-line-after-inlined-constructor.vn:15)]
+class Item { size: int = 1 }
+function check(item: Item): int {
+    if (item.size == 1) {
+        throw new Error("late")
+    }
+    return item.size
+}
+function build(): int {
+    return check(new Item())
+}
+print(build())
