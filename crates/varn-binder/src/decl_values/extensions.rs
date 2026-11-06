@@ -105,10 +105,19 @@ impl<'r> super::super::Binder<'r> {
                 } => {
                     let key_str = self.interner.resolve(*key).to_string();
                     let mangled = format!("__extget_{type_name}_{}", key_str);
-                    let ret_ty = return_type
-                        .as_ref()
-                        .map(|rt| self.resolve_type(rt))
-                        .unwrap_or(Type::Dynamic);
+                    let ret_ty = match return_type {
+                        Some(rt) => self.resolve_type(rt),
+                        None => {
+                            self.emit(
+                                varn_core::Diagnostic::error(
+                                    varn_core::ErrorCode::TypeAnnotationRequired,
+                                    format!("extension getter '{key_str}' needs a return type annotation"),
+                                )
+                                .with_range(*range),
+                            );
+                            Type::Error
+                        }
+                    };
                     let fn_type = Type::fn_(
                         varn_sem::types::FunctionType {
                             params: vec![varn_sem::types::FunctionParam {

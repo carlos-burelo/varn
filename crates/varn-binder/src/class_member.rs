@@ -255,7 +255,7 @@ impl<'r> Binder<'r> {
                 let ty = return_type
                     .as_ref()
                     .map(|ann| self.resolve_type(ann))
-                    .unwrap_or(Type::Dynamic);
+                    .unwrap_or(Type::Error);
 
                 let mut sym =
                     Symbol::new(SymbolKind::Property, *key, range.start.line).with_type(ty);

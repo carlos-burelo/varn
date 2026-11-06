@@ -67,7 +67,7 @@ impl<'r> super::super::Binder<'r> {
                     let ret_ty = ret_ann
                         .as_ref()
                         .map(|ann| self.resolve_type(ann))
-                        .unwrap_or(Type::Dynamic);
+                        .unwrap_or(Type::Error);
 
                     let fn_params: Vec<_> = params
                         .iter()

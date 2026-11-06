@@ -1,0 +1,3 @@
+// expect: error[VN3011]
+class Box {}
+extension on Box { get size() { return 3 } }

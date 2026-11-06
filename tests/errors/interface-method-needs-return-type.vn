@@ -1,0 +1,2 @@
+// expect: error[VN3011]
+interface Named { label() }

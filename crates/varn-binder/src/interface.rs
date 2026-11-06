@@ -113,10 +113,22 @@ impl<'r> super::Binder<'r> {
                 is_async,
                 range,
             } => {
-                let declared = return_type
-                    .as_ref()
-                    .map(|m| self.resolve_type(m))
-                    .unwrap_or(Type::Dynamic);
+                let declared = match return_type {
+                    Some(node) => self.resolve_type(node),
+                    None => {
+                        self.emit(
+                            varn_core::Diagnostic::error(
+                                varn_core::ErrorCode::TypeAnnotationRequired,
+                                format!(
+                                    "interface method '{}' needs a return type annotation",
+                                    self.interner.resolve(*key)
+                                ),
+                            )
+                            .with_range(*range),
+                        );
+                        Type::Error
+                    }
+                };
                 let ret = varn_sem::types::async_fn_return(
                     declared,
                     *is_async,
