@@ -6,6 +6,25 @@ impl ObjectTypeMember {
         mapping: &FxHashMap<varn_core::Atom, Type>,
         table: &mut CheckerTyTable,
     ) -> Self {
+        self.map_types(table, &mut |ty, table| ty.map_generics(mapping, table))
+    }
+
+    pub fn map_types(
+        &self,
+        table: &mut CheckerTyTable,
+        f: &mut dyn FnMut(Type, &mut CheckerTyTable) -> Type,
+    ) -> Self {
+        let mut params_of = |params: &[FunctionParam], table: &mut CheckerTyTable| {
+            params
+                .iter()
+                .map(|p| FunctionParam {
+                    name: p.name.clone(),
+                    ty: f(Type::resolved(p.ty), table).0,
+                    optional: p.optional,
+                    is_rest: p.is_rest,
+                })
+                .collect::<Vec<_>>()
+        };
         match self {
             ObjectTypeMember::Property {
                 name,
@@ -14,7 +33,7 @@ impl ObjectTypeMember {
                 readonly,
             } => ObjectTypeMember::Property {
                 name: name.clone(),
-                ty: Type::resolved(*ty).map_generics(mapping, table).0,
+                ty: f(Type::resolved(*ty), table).0,
                 optional: *optional,
                 readonly: *readonly,
             },
@@ -25,48 +44,38 @@ impl ObjectTypeMember {
                 optional,
                 is_arrow,
                 type_params,
-            } => ObjectTypeMember::Method {
-                name: name.clone(),
-                params: params
-                    .iter()
-                    .map(|p| FunctionParam {
-                        name: p.name.clone(),
-                        ty: Type::resolved(p.ty).map_generics(mapping, table).0,
-                        optional: p.optional,
-                        is_rest: p.is_rest,
-                    })
-                    .collect(),
-                return_type: Type::resolved(*return_type).map_generics(mapping, table).0,
-                optional: *optional,
-                is_arrow: *is_arrow,
-                type_params: type_params.clone(),
-            },
+            } => {
+                let params = params_of(params, table);
+                ObjectTypeMember::Method {
+                    name: name.clone(),
+                    params,
+                    return_type: f(Type::resolved(*return_type), table).0,
+                    optional: *optional,
+                    is_arrow: *is_arrow,
+                    type_params: type_params.clone(),
+                }
+            }
             ObjectTypeMember::Index {
                 param_name,
                 key_ty,
                 value_ty,
             } => ObjectTypeMember::Index {
                 param_name: param_name.clone(),
-                key_ty: Type::resolved(*key_ty).map_generics(mapping, table).0,
-                value_ty: Type::resolved(*value_ty).map_generics(mapping, table).0,
+                key_ty: f(Type::resolved(*key_ty), table).0,
+                value_ty: f(Type::resolved(*value_ty), table).0,
             },
             ObjectTypeMember::Callable {
                 params,
                 return_type,
                 is_arrow,
-            } => ObjectTypeMember::Callable {
-                params: params
-                    .iter()
-                    .map(|p| FunctionParam {
-                        name: p.name.clone(),
-                        ty: Type::resolved(p.ty).map_generics(mapping, table).0,
-                        optional: p.optional,
-                        is_rest: p.is_rest,
-                    })
-                    .collect(),
-                return_type: Type::resolved(*return_type).map_generics(mapping, table).0,
-                is_arrow: *is_arrow,
-            },
+            } => {
+                let params = params_of(params, table);
+                ObjectTypeMember::Callable {
+                    params,
+                    return_type: f(Type::resolved(*return_type), table).0,
+                    is_arrow: *is_arrow,
+                }
+            }
         }
     }
 }

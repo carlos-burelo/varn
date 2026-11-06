@@ -14,20 +14,17 @@ pub fn rehome_ty_with_origin(
     to: &mut CheckerTyTable,
 ) -> Type {
     let ty = rehome_ty(ty, &from.ty_table, to);
-    if let varn_core::TypeKind::Named(name, None) | varn_core::TypeKind::Generic(name, _, None) =
-        to.get(ty.0)
-    {
-        let nominal = from
-            .ty_table
-            .names()
-            .try_resolve(name)
-            .is_some_and(|name| from.classify_decl(name).is_some());
-        if nominal {
-            let origin = to.intern_name(from.source_file.as_ref());
-            return ty.with_origin(origin, to);
-        }
-    }
-    ty
+    let origin = to.intern_name(from.source_file.as_ref());
+    ty.qualify_nominals(
+        origin,
+        &|name| {
+            from.ty_table
+                .names()
+                .try_resolve(name)
+                .is_some_and(|name| from.classify_decl(name).is_some())
+        },
+        to,
+    )
 }
 
 pub fn rehome_symbol(sym: &Symbol, from: &CheckerTyTable, to: &mut CheckerTyTable) -> Symbol {

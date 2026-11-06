@@ -321,6 +321,112 @@ impl Type {
         }
     }
 
+    pub fn qualify_nominals(
+        self,
+        origin: varn_core::Atom,
+        is_nominal: &dyn Fn(varn_core::Atom) -> bool,
+        table: &mut CheckerTyTable,
+    ) -> Self {
+        match table.get(self.0) {
+            TypeKind::Named(n, None) if is_nominal(n) => {
+                Type(table.intern(TypeKind::Named(n, Some(origin))))
+            }
+            TypeKind::Generic(n, args, current) => {
+                let ids = table.get_list(args).to_vec();
+                let new_args: Vec<CheckerTyId> = ids
+                    .into_iter()
+                    .map(|a| {
+                        Type::resolved(a)
+                            .qualify_nominals(origin, is_nominal, table)
+                            .0
+                    })
+                    .collect();
+                let list = table.intern_list(&new_args);
+                let origin = current.or_else(|| is_nominal(n).then_some(origin));
+                Type(table.intern(TypeKind::Generic(n, list, origin)))
+            }
+            TypeKind::Array(inner) => {
+                let inner = Type::resolved(inner).qualify_nominals(origin, is_nominal, table);
+                Type::array(inner, table)
+            }
+            TypeKind::Union(list) => {
+                let ids = table.get_list(list).to_vec();
+                let members: Vec<Type> = ids
+                    .into_iter()
+                    .map(|id| Type::resolved(id).qualify_nominals(origin, is_nominal, table))
+                    .collect();
+                Type::union(members, table)
+            }
+            TypeKind::Tuple(els) => {
+                let ids = table.get_list(els).to_vec();
+                let new_els: Vec<CheckerTyId> = ids
+                    .into_iter()
+                    .map(|id| {
+                        Type::resolved(id)
+                            .qualify_nominals(origin, is_nominal, table)
+                            .0
+                    })
+                    .collect();
+                let list = table.intern_list(&new_els);
+                Type(table.intern(TypeKind::Tuple(list)))
+            }
+            TypeKind::Fn(fid) => {
+                let ft = table.get_function(fid).clone();
+                let params = ft
+                    .params
+                    .iter()
+                    .map(|p| FunctionParam {
+                        name: p.name.clone(),
+                        ty: Type::resolved(p.ty)
+                            .qualify_nominals(origin, is_nominal, table)
+                            .0,
+                        optional: p.optional,
+                        is_rest: p.is_rest,
+                    })
+                    .collect();
+                let return_type = Type::resolved(ft.return_type)
+                    .qualify_nominals(origin, is_nominal, table)
+                    .0;
+                Type::fn_(
+                    FunctionType {
+                        params,
+                        return_type,
+                        is_arrow: ft.is_arrow,
+                        type_params: ft.type_params.clone(),
+                        type_param_defaults: ft.type_param_defaults.clone(),
+                    },
+                    table,
+                )
+            }
+            TypeKind::Object(mid) => {
+                let members = table.get_object_members(mid).to_vec();
+                let members: Vec<ObjectTypeMember> = members
+                    .into_iter()
+                    .map(|m| {
+                        m.map_types(table, &mut |ty, table| {
+                            ty.qualify_nominals(origin, is_nominal, table)
+                        })
+                    })
+                    .collect();
+                Type::object(members, table)
+            }
+            TypeKind::Named(..)
+            | TypeKind::Primitive(_)
+            | TypeKind::Literal(_)
+            | TypeKind::This
+            | TypeKind::Intersection(_)
+            | TypeKind::TemplateLiteral(_)
+            | TypeKind::Typeof(_)
+            | TypeKind::KeyOf(_)
+            | TypeKind::IndexedAccess { .. }
+            | TypeKind::Mapped { .. }
+            | TypeKind::Conditional { .. }
+            | TypeKind::Infer(_)
+            | TypeKind::EnumVariant { .. }
+            | TypeKind::TypePredicate { .. } => self,
+        }
+    }
+
     pub fn with_origin(self, origin: varn_core::Atom, table: &mut CheckerTyTable) -> Self {
         match table.get(self.0) {
             TypeKind::Named(n, None) => Type(table.intern(TypeKind::Named(n, Some(origin)))),
