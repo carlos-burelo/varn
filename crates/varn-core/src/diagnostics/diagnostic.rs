@@ -30,6 +30,11 @@ pub struct Diagnostic {
 
 impl Diagnostic {
     pub fn error(code: ErrorCode, message: impl Into<String>) -> Self {
+        debug_assert_eq!(
+            code.severity(),
+            DiagnosticKind::Error,
+            "{code} is not an error"
+        );
         Self {
             code,
             kind: DiagnosticKind::Error,
@@ -42,21 +47,14 @@ impl Diagnostic {
     }
 
     pub fn warning(code: ErrorCode, message: impl Into<String>) -> Self {
+        debug_assert_eq!(
+            code.severity(),
+            DiagnosticKind::Warning,
+            "{code} is not a warning"
+        );
         Self {
             code,
             kind: DiagnosticKind::Warning,
-            message: message.into(),
-            range: SourceRange::default(),
-            file: Arc::from(""),
-            suggestions: Vec::new(),
-            related: Vec::new(),
-        }
-    }
-
-    pub fn hint(code: ErrorCode, message: impl Into<String>) -> Self {
-        Self {
-            code,
-            kind: DiagnosticKind::Hint,
             message: message.into(),
             range: SourceRange::default(),
             file: Arc::from(""),

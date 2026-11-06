@@ -38,7 +38,10 @@ fn anchor_of(cmd: &Commands) -> Option<Anchor<'_>> {
         | Commands::Lsp(_)
         | Commands::Dap
         | Commands::StdBundle(_) => Some(Anchor::Cwd),
-        Commands::Init(_) | Commands::Cache(_) | Commands::Completions(_) => None,
+        Commands::Init(_)
+        | Commands::Cache(_)
+        | Commands::Completions(_)
+        | Commands::Explain(_) => None,
     }
 }
 
@@ -66,6 +69,7 @@ pub fn run(cmd: Commands, session: &Arc<Session>) -> Result<(), CliError> {
         Commands::Lsp(args) => commands::lsp::execute(args),
         Commands::Init(args) => commands::init::execute(args),
         Commands::Completions(args) => commands::completions::execute(args),
+        Commands::Explain(args) => commands::explain::execute(args),
         Commands::Dap => commands::dap::execute(),
         Commands::Pkg(sub) => {
             let project = varn_project::Project::owning(varn_project::Anchor::Cwd)?;

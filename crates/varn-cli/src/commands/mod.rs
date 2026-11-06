@@ -9,6 +9,7 @@ pub mod dap;
 pub mod debug;
 pub mod doctor;
 pub mod eval;
+pub mod explain;
 pub mod fmt;
 pub mod init;
 

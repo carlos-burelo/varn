@@ -26,11 +26,6 @@ impl DiagnosticBag {
             .push(Diagnostic::warning(code, message).with_range(range));
     }
 
-    pub fn hint(&mut self, code: ErrorCode, message: impl Into<String>, range: SourceRange) {
-        self.items
-            .push(Diagnostic::hint(code, message).with_range(range));
-    }
-
     pub fn has_errors(&self) -> bool {
         self.items.iter().any(|d| d.kind == DiagnosticKind::Error)
     }

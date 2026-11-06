@@ -64,6 +64,8 @@ pub enum Commands {
 
     Completions(CompletionsArgs),
 
+    Explain(ExplainArgs),
+
     Dap,
 
     StdBundle(StdBundleArgs),
@@ -202,6 +204,11 @@ pub struct InitArgs {
 
     #[arg(long)]
     pub name: Option<String>,
+}
+
+#[derive(Args)]
+pub struct ExplainArgs {
+    pub code: String,
 }
 
 #[derive(Args)]

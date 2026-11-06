@@ -1,5 +1,6 @@
 mod bag;
 mod catalog;
+mod describe;
 mod diagnostic;
 mod report;
 mod suggestion;
