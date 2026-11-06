@@ -175,7 +175,7 @@ fn stamp_stack(heap: &mut Heap, val: VmValue, frames: &[FrameInfo]) {
     if !unset {
         return;
     }
-    let text = heap.alloc_str_dynamic(&format_stack(frames));
+    let text = heap.alloc_str_dynamic(format_stack(frames));
     if let Some(inst) = heap.instance(val.as_heap()) {
         let _ = inst.write_field(field, text);
     }
@@ -230,7 +230,7 @@ pub(crate) fn thrown_value_for(err: &RuntimeError, heap: &mut Heap) -> VmValue {
         return msg;
     };
     let name = heap.alloc_str_dynamic(class_name);
-    let stack = heap.alloc_str_dynamic(&format_stack(&err.frames));
+    let stack = heap.alloc_str_dynamic(format_stack(&err.frames));
     let (shape, n) = cls.instance_shape();
     let err_obj = heap.alloc_object_cell(shape, n, &[]);
     if let Some(HeapObj::Object(oref)) = heap.get(err_obj.as_heap()) {
