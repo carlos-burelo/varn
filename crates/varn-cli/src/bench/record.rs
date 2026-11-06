@@ -70,6 +70,9 @@ pub struct ProfileRecord {
     pub hz: u32,
     pub samples: u64,
     pub compiled_samples: u64,
+    pub collecting_samples: u64,
+    pub compiling_samples: u64,
+    pub waiting_samples: u64,
     pub functions: Vec<FunctionRecord>,
 }
 

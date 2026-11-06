@@ -9,6 +9,7 @@ type Handle = isize;
 
 const THREAD_SUSPEND_RESUME: u32 = 0x0002;
 const THREAD_GET_CONTEXT: u32 = 0x0008;
+const THREAD_QUERY_LIMITED_INFORMATION: u32 = 0x0800;
 const CONTEXT_CONTROL: u32 = 0x0010_0001;
 const CONTEXT_FLAGS_OFFSET: usize = 0x30;
 const CONTEXT_RIP_OFFSET: usize = 0xF8;
@@ -33,6 +34,7 @@ unsafe extern "system" {
     fn ResumeThread(thread: Handle) -> u32;
     fn GetThreadContext(thread: Handle, context: *mut Context) -> i32;
     fn CloseHandle(handle: Handle) -> i32;
+    fn QueryThreadCycleTime(thread: Handle, cycles: *mut u64) -> i32;
 }
 
 struct Target(Handle);
@@ -57,7 +59,7 @@ impl Sampler {
                 GetCurrentThread(),
                 GetCurrentProcess(),
                 &mut target,
-                THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT,
+                THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_LIMITED_INFORMATION,
                 0,
                 0,
             )
@@ -113,7 +115,9 @@ fn run(target: &Target, shared: &Shared, period: Duration, stop: &AtomicBool) {
         if unsafe { GetThreadContext(target.0, &mut context) } != 0 {
             let mut rip = [0u8; 8];
             rip.copy_from_slice(&context.0[CONTEXT_RIP_OFFSET..CONTEXT_RIP_OFFSET + 8]);
-            unsafe { shared.capture(u64::from_le_bytes(rip) as usize) };
+            let mut cycles = 0u64;
+            unsafe { QueryThreadCycleTime(target.0, &mut cycles) };
+            unsafe { shared.capture(u64::from_le_bytes(rip) as usize, cycles) };
         }
         unsafe { ResumeThread(target.0) };
     }

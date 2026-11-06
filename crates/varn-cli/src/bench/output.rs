@@ -35,7 +35,7 @@ pub fn emit(
             summary.fill(&mut report);
             details(&mut report)?;
             if let Some(profile) = profile {
-                cpu::print(&mut report, profile);
+                cpu::print(&mut report, profile, timed_run(summary));
             }
             changes_table(&mut report, &changes);
             report.print();
@@ -43,6 +43,14 @@ pub fn emit(
     }
     summary.warn();
     gate(opts, &changes)
+}
+
+fn timed_run(summary: &Summary<'_>) -> Option<std::time::Duration> {
+    summary
+        .phases
+        .iter()
+        .find(|p| p.name == GATED_PHASE)
+        .map(|p| p.p50)
 }
 
 fn gate(opts: &BenchOpts, changes: &[Change]) -> Result<(), CliError> {
@@ -94,6 +102,9 @@ fn profile_record(profile: &CpuProfile) -> ProfileRecord {
         hz: profile.hz,
         samples: profile.samples,
         compiled_samples: profile.compiled_samples,
+        collecting_samples: profile.collecting_samples,
+        compiling_samples: profile.compiling_samples,
+        waiting_samples: profile.waiting_samples,
         functions: cpu::rank_functions(profile)
             .into_iter()
             .take(RECORDED_FUNCTIONS)

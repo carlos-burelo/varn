@@ -27,6 +27,7 @@ impl ExecCtx {
     }
 
     pub fn run_minor_gc(&mut self) {
+        let _collecting = crate::cpu_profile::Activity::collecting();
         let start = std::time::Instant::now();
         let roots = self.gc_roots();
         self.heap.minor_gc(&roots);
@@ -34,6 +35,7 @@ impl ExecCtx {
     }
 
     pub(crate) fn trigger_gc(&mut self) -> usize {
+        let _collecting = crate::cpu_profile::Activity::collecting();
         let start = std::time::Instant::now();
         let roots = self.gc_roots();
         let freed = self.heap.collect(&roots);

@@ -57,6 +57,7 @@ pub(crate) fn compile(
     linker: &dyn varn_jit::clif::lower::ClifLinker,
     osr: Option<varn_types::ssa::OsrRequest>,
 ) -> Result<varn_jit::Compiled, String> {
+    let _compiling = crate::cpu_profile::Activity::compiling();
     let store = match (STORE.get(), mode()) {
         (Some(store), Mode::On | Mode::Verify) => *store,
         (None, _) | (_, Mode::Off) => {

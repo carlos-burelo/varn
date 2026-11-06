@@ -16,7 +16,10 @@ pub(super) struct Entry {
 pub(super) struct Slot {
     pub depth: u32,
     pub truncated: bool,
+    pub activity: u8,
     pub pc: usize,
+    pub cpu: u64,
+    pub at_ns: u64,
     pub frames: [Entry; MAX_DEPTH],
 }
 
@@ -25,6 +28,7 @@ pub(crate) struct Shared {
     capacity: usize,
     taken: AtomicUsize,
     frames: *const FrameStack,
+    start: std::time::Instant,
 }
 
 unsafe impl Send for Shared {}
@@ -39,6 +43,7 @@ impl Shared {
             capacity,
             taken: AtomicUsize::new(0),
             frames,
+            start: std::time::Instant::now(),
         }
     }
 
@@ -57,7 +62,7 @@ impl Shared {
         unsafe { &*self.slots.add(index) }
     }
 
-    pub(crate) unsafe fn capture(&self, pc: usize) {
+    pub(crate) unsafe fn capture(&self, pc: usize, cpu: u64) {
         let index = self.taken.fetch_add(1, Ordering::AcqRel);
         if index >= self.capacity {
             return;
@@ -67,6 +72,9 @@ impl Shared {
         let skipped = stack.len().saturating_sub(MAX_DEPTH);
         slot.truncated = skipped > 0;
         slot.pc = pc;
+        slot.cpu = cpu;
+        slot.at_ns = self.start.elapsed().as_nanos() as u64;
+        slot.activity = super::activity::snapshot();
         let mut depth = 0;
         for frame in &stack[skipped..] {
             slot.frames[depth] = Entry {

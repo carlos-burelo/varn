@@ -10,8 +10,14 @@ static ACTIVE: AtomicPtr<Shared> = AtomicPtr::new(std::ptr::null_mut());
 extern "C" fn on_signal(_: libc::c_int, _: *mut libc::siginfo_t, context: *mut libc::c_void) {
     let shared = ACTIVE.load(Ordering::Acquire);
     if !shared.is_null() {
-        unsafe { (*shared).capture(program_counter(context)) };
+        unsafe { (*shared).capture(program_counter(context), thread_cpu_nanos()) };
     }
+}
+
+fn thread_cpu_nanos() -> u64 {
+    let mut now: libc::timespec = unsafe { std::mem::zeroed() };
+    unsafe { libc::clock_gettime(libc::CLOCK_THREAD_CPUTIME_ID, &mut now) };
+    now.tv_sec as u64 * 1_000_000_000 + now.tv_nsec as u64
 }
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]

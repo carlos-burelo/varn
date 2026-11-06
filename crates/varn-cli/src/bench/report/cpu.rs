@@ -23,9 +23,10 @@ pub struct Counts {
     pub total: u64,
 }
 
-pub fn print(report: &mut Report, profile: &CpuProfile) {
+pub fn print(report: &mut Report, profile: &CpuProfile, timed_run: Option<Duration>) {
     report.title("cpu profile");
     let mut table = Table::pairs();
+    table.row(["runs".to_owned(), profile.runs.to_string()]);
     table.row(["samples".to_owned(), profile.samples.to_string()]);
     table.row(["rate".to_owned(), format!("{} Hz", profile.hz)]);
     table.row(["wall".to_owned(), fmt_dur(profile.wall)]);
@@ -35,10 +36,24 @@ pub fn print(report: &mut Report, profile: &CpuProfile) {
             profile.samples as f64 / f64::from(profile.hz),
         )),
     ]);
-    table.row([
-        "in compiled code".to_owned(),
-        format!("{}%", share(profile.compiled_samples, profile.samples)),
-    ]);
+    for (name, count) in [
+        ("in compiled code", profile.compiled_samples),
+        ("in gc", profile.collecting_samples),
+        ("in jit compile", profile.compiling_samples),
+        ("waiting, off cpu", profile.waiting_samples),
+    ] {
+        table.row([
+            name.to_owned(),
+            format!("{}%", share(count, profile.samples)),
+        ]);
+    }
+    if let Some(timed) = timed_run.filter(|t| !t.is_zero() && profile.runs > 0) {
+        let per_run = profile.wall.as_secs_f64() / profile.runs as f64;
+        table.row([
+            "sampling slowdown".to_owned(),
+            format!("{:+.1}%", (per_run / timed.as_secs_f64() - 1.0) * 100.0),
+        ]);
+    }
     table.row(["dropped".to_owned(), profile.dropped.to_string()]);
     table.row(["truncated stacks".to_owned(), profile.truncated.to_string()]);
     report.table(&table);

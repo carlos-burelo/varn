@@ -1,5 +1,8 @@
+mod activity;
 mod capture;
 mod sampler;
+
+pub(crate) use activity::Activity;
 
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
@@ -11,6 +14,7 @@ use capture::Shared;
 use sampler::Sampler;
 
 const SLOTS_PER_RUN: usize = 16_384;
+const BUSY_FRACTION_DENOMINATOR: u64 = 10;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ProfileFrame {
@@ -24,6 +28,10 @@ pub struct CpuProfile {
     pub dropped: u64,
     pub truncated: u64,
     pub compiled_samples: u64,
+    pub collecting_samples: u64,
+    pub compiling_samples: u64,
+    pub waiting_samples: u64,
+    pub runs: u64,
     pub wall: Duration,
     pub frames: Vec<ProfileFrame>,
     pub stacks: BTreeMap<Vec<u32>, u64>,
@@ -39,6 +47,10 @@ impl CpuProfile {
             dropped: 0,
             truncated: 0,
             compiled_samples: 0,
+            collecting_samples: 0,
+            compiling_samples: 0,
+            waiting_samples: 0,
+            runs: 0,
             wall: Duration::ZERO,
             frames: Vec::new(),
             stacks: BTreeMap::new(),
@@ -82,13 +94,28 @@ impl CpuProfiler {
         })
     }
 
+    fn waiting_flags(shared: &Shared) -> Vec<bool> {
+        let mut flags = vec![false];
+        flags.extend((1..shared.recorded()).map(|index| {
+            let (now, before) = (shared.slot(index), shared.slot(index - 1));
+            let spent = now.cpu.saturating_sub(before.cpu);
+            let elapsed = now.at_ns.saturating_sub(before.at_ns);
+            spent < elapsed / BUSY_FRACTION_DENOMINATOR
+        }));
+        flags
+    }
+
     pub fn finish(self, into: &mut CpuProfile, _vm: &Vm) {
         let wall = self.started.elapsed();
-        self.sampler.stop();
+        let waiting = {
+            self.sampler.stop();
+            Self::waiting_flags(&self.shared)
+        };
         into.wall += wall;
+        into.runs += 1;
         into.dropped += self.shared.dropped() as u64;
         let mut resolved: FxHashMap<(usize, usize), Vec<(u32, u32)>> = FxHashMap::default();
-        for index in 0..self.shared.recorded() {
+        for (index, idle_flag) in waiting.iter().enumerate() {
             let slot = self.shared.slot(index);
             let mut entries: Vec<capture::Entry> = slot.frames[..slot.depth as usize].to_vec();
             let compiled = varn_jit::stack_roots::locate(slot.pc);
@@ -104,6 +131,12 @@ impl CpuProfiler {
                 }
             }
             into.compiled_samples += u64::from(compiled.is_some());
+            let collecting = slot.activity & activity::COLLECTING_BIT != 0;
+            let compiling = slot.activity & activity::COMPILING_BIT != 0;
+            let idle = *idle_flag && !collecting && !compiling;
+            into.collecting_samples += u64::from(collecting);
+            into.compiling_samples += u64::from(compiling && !collecting);
+            into.waiting_samples += u64::from(idle);
             let mut stack: Vec<u32> = Vec::new();
             let mut leaf: Option<(u32, u32)> = None;
             for entry in &entries {
@@ -129,9 +162,26 @@ impl CpuProfiler {
                 stack.extend(chain.iter().map(|(id, _)| *id));
                 leaf = chain.last().copied();
             }
-            let (Some(leaf), false) = (leaf, stack.is_empty()) else {
+            let (Some(mut leaf), false) = (leaf, stack.is_empty()) else {
                 continue;
             };
+            let pseudo = if collecting {
+                Some("<gc>")
+            } else if compiling {
+                Some("<jit compile>")
+            } else if idle {
+                Some("<waiting>")
+            } else {
+                None
+            };
+            if let Some(name) = pseudo {
+                let id = into.intern(ProfileFrame {
+                    function: name.to_owned(),
+                    file: String::new(),
+                });
+                stack.push(id);
+                leaf = (id, 0);
+            }
             *into.lines.entry(leaf).or_insert(0) += 1;
             into.samples += 1;
             into.truncated += u64::from(slot.truncated);
