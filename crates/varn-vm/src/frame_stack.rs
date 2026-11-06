@@ -7,6 +7,8 @@ use std::sync::Arc;
 pub struct FrameStack {
     frames: Vec<CallFrame>,
 
+    pending_ip: usize,
+
     counters: Option<Arc<ProfileCounters>>,
 }
 
@@ -15,9 +17,24 @@ impl FrameStack {
         std::mem::offset_of!(FrameStack, frames)
     }
 
+    pub(crate) fn pending_field_offset() -> usize {
+        std::mem::offset_of!(FrameStack, pending_ip)
+    }
+
+    #[inline(always)]
+    pub(crate) fn settle(&mut self) {
+        let pending = std::mem::take(&mut self.pending_ip);
+        if pending != 0
+            && let Some(top) = self.frames.last_mut()
+        {
+            top.ip = pending;
+        }
+    }
+
     pub(crate) fn with_capacity(cap: usize) -> Self {
         Self {
             frames: Vec::with_capacity(cap),
+            pending_ip: 0,
             counters: None,
         }
     }
@@ -28,6 +45,7 @@ impl FrameStack {
 
     #[inline(always)]
     pub fn push(&mut self, frame: CallFrame) {
+        self.settle();
         if let Some(ref c) = self.counters {
             c.frame_pushes.fetch_add(1, Ordering::Relaxed);
         }
@@ -36,6 +54,7 @@ impl FrameStack {
 
     #[inline(always)]
     pub fn pop(&mut self) -> Option<CallFrame> {
+        self.pending_ip = 0;
         let popped = self.frames.pop();
         if popped.is_some()
             && let Some(ref c) = self.counters

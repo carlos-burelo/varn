@@ -202,6 +202,17 @@ fn push_frame(
     let base = b.ins().load(types::I64, m, ectx, lay.frames_ptr_off as i32);
     let off = b.ins().imul_imm_u(len, lay.frame_size as i64);
     let slot = b.ins().iadd(base, off);
+    let caller = b.ins().iadd_imm_s(slot, -(lay.frame_size as i64));
+    let pending = b
+        .ins()
+        .load(types::I64, m, ectx, ctx.helpers.jit_site_ip_offset as i32);
+    let known = b.ins().load(types::I64, m, caller, lay.frame_ip_off as i32);
+    let noted = b.ins().icmp_imm_u(IntCC::NotEqual, pending, 0);
+    let settled = b.ins().select(noted, pending, known);
+    b.ins().store(m, settled, caller, lay.frame_ip_off as i32);
+    let none = b.ins().iconst(types::I64, 0);
+    b.ins()
+        .store(m, none, ectx, ctx.helpers.jit_site_ip_offset as i32);
     let control = b.ins().iadd_imm_s(closure, -(lay.rc_value_off as i64));
     let strong = b
         .ins()
@@ -231,6 +242,9 @@ fn push_frame(
 fn pop_frame(b: &mut FunctionBuilder, ctx: &Ctx<'_>, ectx: Value) {
     let lay = &ctx.helpers.call_layout;
     let m = MemFlagsData::trusted();
+    let none = b.ins().iconst(types::I64, 0);
+    b.ins()
+        .store(m, none, ectx, ctx.helpers.jit_site_ip_offset as i32);
     let len = b.ins().load(types::I64, m, ectx, lay.frames_len_off as i32);
     let len = b.ins().iadd_imm_s(len, -1);
     b.ins().store(m, len, ectx, lay.frames_len_off as i32);

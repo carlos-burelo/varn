@@ -14,7 +14,7 @@ pub(crate) struct FieldIo<'a> {
     pub exec_ctx: Value,
     pub landing: Option<Block>,
     pub err_ret: Option<Block>,
-    pub site: Option<emit::SiteStore<'a>>,
+    pub site: Option<emit::SiteStore>,
 }
 
 fn call_checked_void(b: &mut FunctionBuilder, io: &FieldIo, helper: usize, args: &[Value]) {

@@ -116,6 +116,7 @@ pub(crate) extern "C" fn jit_call_depth_overflow(
 pub(crate) extern "C" fn jit_stamp_throw(ctx: *mut ExecCtx, tag: u64, payload: u64) {
     unsafe {
         let ctx_ref = &mut *ctx;
+        ctx_ref.frames.settle();
         let thrown = VmValue::from_raw_parts(tag, payload);
         crate::exec::exceptions::stamp_thrown(&mut ctx_ref.heap, thrown, &ctx_ref.frames);
     }

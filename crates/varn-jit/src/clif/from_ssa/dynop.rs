@@ -30,7 +30,7 @@ pub(super) fn emit_bin(
     dest: Option<SlotKind>,
 ) -> Result<Out, String> {
     let h = ctx.helpers;
-    super::exceptions::record_site(b, ctx);
+    super::exceptions::note_site(b, ctx);
     let a = boxed_parts(b, ctx, values, lhs)?;
     let c = boxed_parts(b, ctx, values, rhs)?;
     let ectx = ctx.exec_ctx;
@@ -79,7 +79,7 @@ pub(super) fn emit_un(
     dest: Option<SlotKind>,
 ) -> Result<Out, String> {
     let h = ctx.helpers;
-    super::exceptions::record_site(b, ctx);
+    super::exceptions::note_site(b, ctx);
     let (tag, payload) = boxed_parts(b, ctx, values, operand)?;
     let ectx = ctx.exec_ctx;
     let result_off = h.jit_native_result_offset as i32;

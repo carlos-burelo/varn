@@ -16,6 +16,8 @@ macro_rules! fill_tail {
             young_threshold: 0,
             jit_native_result_offset: std::mem::offset_of!(ctx::ExecCtx, jit_native_result),
             jit_error_flag_offset: std::mem::offset_of!(ctx::ExecCtx, jit_error_flag),
+            jit_site_ip_offset: std::mem::offset_of!(ctx::ExecCtx, frames)
+                + crate::frame_stack::FrameStack::pending_field_offset(),
             jit_exit_offset: std::mem::offset_of!(ctx::ExecCtx, jit_exit),
             jit_stack_floor_offset: std::mem::offset_of!(ctx::ExecCtx, jit_stack_floor),
             globals_offset: std::mem::offset_of!(ctx::ExecCtx, globals),

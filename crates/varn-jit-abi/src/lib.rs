@@ -265,6 +265,7 @@ pub struct JitHelpers {
     pub young_threshold: usize,
     pub jit_native_result_offset: usize,
     pub jit_error_flag_offset: usize,
+    pub jit_site_ip_offset: usize,
     pub jit_exit_offset: usize,
     pub jit_stack_floor_offset: usize,
     pub globals_offset: usize,
