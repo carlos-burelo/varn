@@ -2,7 +2,7 @@
   tiers ──────────────────────────────────────────── <module> · 5/5 ruteadas
   función                    │ words │ tier │ razón                 
   ───────────────────────────┼───────┼──────┼───────────────────────
-  <module>                   │   138 │ clif │  (native: alloc+boxed)
+  <module>                   │   147 │ clif │  (native: alloc+boxed)
   Temperature.constructor    │    12 │ clif │  (native: this+boxed) 
   Temperature.get celsius    │    11 │ clif │  (native: this)       
   Temperature.set celsius    │    12 │ clif │  (native: this+boxed) 

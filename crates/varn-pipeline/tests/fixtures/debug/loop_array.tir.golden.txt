@@ -8,13 +8,13 @@ TirModule {
         literal_strings: [],
         entries: [
             Never,
-            Str,
-            Int,
             Class(
                 ClassId(
                     0,
                 ),
             ),
+            Str,
+            Int,
             Dynamic(
                 Declared,
             ),
@@ -23,13 +23,13 @@ TirModule {
             Dynamic(
                 Declared,
             ): 4,
-            Str: 1,
-            Int: 2,
+            Str: 2,
+            Int: 3,
             Class(
                 ClassId(
                     0,
                 ),
-            ): 3,
+            ): 1,
             Never: 0,
         },
         lists: [],
@@ -58,6 +58,15 @@ TirModule {
                     ty: Str,
                     slot: 2,
                 },
+                FieldInfo {
+                    name: "cause",
+                    ty: Nullable(
+                        TyId(
+                            1,
+                        ),
+                    ),
+                    slot: 3,
+                },
             ],
             statics: [],
             vtable: [
@@ -69,7 +78,7 @@ TirModule {
                 },
             ],
             layout: ClassLayout {
-                payload_size: 48,
+                payload_size: 56,
                 alignment: 8,
                 fields: [
                     FieldLayout {
@@ -108,6 +117,18 @@ TirModule {
                             repr: Boxed,
                         },
                     },
+                    FieldLayout {
+                        name: "cause",
+                        kind: Some(
+                            Class,
+                        ),
+                        offset: 48,
+                        layout: TypeLayout {
+                            size: 8,
+                            align: 8,
+                            repr: Ref,
+                        },
+                    },
                 ],
                 gc: GcLayout {
                     slots: [
@@ -122,6 +143,10 @@ TirModule {
                         GcSlot {
                             offset: 32,
                             repr: Boxed,
+                        },
+                        GcSlot {
+                            offset: 48,
+                            repr: Ref,
                         },
                     ],
                 },
@@ -156,6 +181,11 @@ TirModule {
             params: [
                 Nullable(
                     TyId(
+                        2,
+                    ),
+                ),
+                Nullable(
+                    TyId(
                         1,
                     ),
                 ),
@@ -167,7 +197,7 @@ TirModule {
             params: [
                 Array(
                     TyId(
-                        2,
+                        3,
                     ),
                 ),
             ],
@@ -178,7 +208,7 @@ TirModule {
             params: [
                 Array(
                     TyId(
-                        2,
+                        3,
                     ),
                 ),
                 Int,
@@ -190,7 +220,7 @@ TirModule {
             params: [
                 Array(
                     TyId(
-                        2,
+                        3,
                     ),
                 ),
             ],
@@ -201,7 +231,7 @@ TirModule {
             params: [
                 Array(
                     TyId(
-                        2,
+                        3,
                     ),
                 ),
                 Int,
@@ -230,7 +260,7 @@ TirModule {
             params: [
                 Array(
                     TyId(
-                        2,
+                        3,
                     ),
                 ),
             ],
@@ -239,7 +269,7 @@ TirModule {
                 Int,
                 Array(
                     TyId(
-                        2,
+                        3,
                     ),
                 ),
                 Int,
@@ -271,7 +301,7 @@ TirModule {
                     ),
                     ty: Array(
                         TyId(
-                            2,
+                            3,
                         ),
                     ),
                     init: Some(
@@ -279,7 +309,7 @@ TirModule {
                             kind: Var,
                             ty: Array(
                                 TyId(
-                                    2,
+                                    3,
                                 ),
                             ),
                             res: Param(
@@ -407,7 +437,7 @@ TirModule {
                                                 kind: Var,
                                                 ty: Array(
                                                     TyId(
-                                                        2,
+                                                        3,
                                                     ),
                                                 ),
                                                 res: Local(
@@ -453,7 +483,7 @@ TirModule {
                                             kind: Var,
                                             ty: Array(
                                                 TyId(
-                                                    2,
+                                                    3,
                                                 ),
                                             ),
                                             res: Local(
@@ -586,7 +616,7 @@ TirModule {
             params: [
                 Array(
                     TyId(
-                        2,
+                        3,
                     ),
                 ),
                 Int,
@@ -669,7 +699,7 @@ TirModule {
                                         kind: Var,
                                         ty: Array(
                                             TyId(
-                                                2,
+                                                3,
                                             ),
                                         ),
                                         res: Param(
@@ -707,7 +737,7 @@ TirModule {
                                                 kind: Var,
                                                 ty: Array(
                                                     TyId(
-                                                        2,
+                                                        3,
                                                     ),
                                                 ),
                                                 res: Param(
@@ -781,7 +811,7 @@ TirModule {
                                                         kind: Var,
                                                         ty: Array(
                                                             TyId(
-                                                                2,
+                                                                3,
                                                             ),
                                                         ),
                                                         res: Param(
@@ -924,7 +954,7 @@ TirModule {
         ),
         Array(
             TyId(
-                2,
+                3,
             ),
         ),
     ],
@@ -945,7 +975,7 @@ TirModule {
         locals: [
             Array(
                 TyId(
-                    2,
+                    3,
                 ),
             ),
         ],
@@ -957,7 +987,7 @@ TirModule {
                             kind: Var,
                             ty: Array(
                                 TyId(
-                                    2,
+                                    3,
                                 ),
                             ),
                             res: Local(
@@ -1042,7 +1072,7 @@ TirModule {
                             ),
                             ty: Array(
                                 TyId(
-                                    2,
+                                    3,
                                 ),
                             ),
                             res: None,
@@ -1085,7 +1115,7 @@ TirModule {
                                             kind: Var,
                                             ty: Array(
                                                 TyId(
-                                                    2,
+                                                    3,
                                                 ),
                                             ),
                                             res: Local(
@@ -1140,7 +1170,7 @@ TirModule {
                                     ty: Dynamic(
                                         ClassObject(
                                             TyId(
-                                                3,
+                                                1,
                                             ),
                                         ),
                                     ),
@@ -1170,13 +1200,28 @@ TirModule {
                                             },
                                             ty: Nullable(
                                                 TyId(
-                                                    1,
+                                                    2,
                                                 ),
                                             ),
                                             res: None,
                                             span: Span {
                                                 start: 473,
                                                 end: 483,
+                                            },
+                                        },
+                                    ),
+                                    Expr(
+                                        TirExpr {
+                                            kind: NullLit,
+                                            ty: Nullable(
+                                                TyId(
+                                                    1,
+                                                ),
+                                            ),
+                                            res: None,
+                                            span: Span {
+                                                start: 0,
+                                                end: 0,
                                             },
                                         },
                                     ),
@@ -1222,7 +1267,7 @@ TirModule {
                                             kind: Var,
                                             ty: Array(
                                                 TyId(
-                                                    2,
+                                                    3,
                                                 ),
                                             ),
                                             res: Local(
@@ -1290,7 +1335,7 @@ TirModule {
                                     ty: Dynamic(
                                         ClassObject(
                                             TyId(
-                                                3,
+                                                1,
                                             ),
                                         ),
                                     ),
@@ -1320,13 +1365,28 @@ TirModule {
                                             },
                                             ty: Nullable(
                                                 TyId(
-                                                    1,
+                                                    2,
                                                 ),
                                             ),
                                             res: None,
                                             span: Span {
                                                 start: 533,
                                                 end: 550,
+                                            },
+                                        },
+                                    ),
+                                    Expr(
+                                        TirExpr {
+                                            kind: NullLit,
+                                            ty: Nullable(
+                                                TyId(
+                                                    1,
+                                                ),
+                                            ),
+                                            res: None,
+                                            span: Span {
+                                                start: 0,
+                                                end: 0,
                                             },
                                         },
                                     ),

@@ -1,6 +1,6 @@
 
   tir check ──────────────────────────────────────── <fixtures>/generics.vn
-nodes 56   static 22   by name 0   static 100%
+nodes 59   static 22   by name 0   static 100%
   declared           dynamic     1   by name     0
   function type      dynamic     4   by name     0
   type parameter     dynamic     7   by name     0

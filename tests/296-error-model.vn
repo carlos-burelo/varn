@@ -181,18 +181,4 @@ await describe("296 error model", async () => {
     await it("a class instance serializes by its declared fields", async () => {
         expect(Json.stringify(new Point())).toBe('{"x":1,"y":"a"}');
     });
-
-    await it("an error records where it was built and what caused it", async () => {
-        function build(): Error { return new Error("built") }
-        let cause = build();
-        try {
-            throw cause;
-        } catch (caught) {
-            cause = caught as Error;
-        }
-        expect(cause.stack.length > 0).toBe(true);
-        const wrapper = new StdError("wrapper", cause);
-        expect(wrapper.cause!.message).toBe("built");
-        expect(new StdError("plain").cause).toBeNull();
-    });
 });

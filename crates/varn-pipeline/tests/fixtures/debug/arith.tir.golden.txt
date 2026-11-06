@@ -8,12 +8,12 @@ TirModule {
         literal_strings: [],
         entries: [
             Never,
-            Str,
             Class(
                 ClassId(
                     0,
                 ),
             ),
+            Str,
             Dynamic(
                 Declared,
             ),
@@ -22,12 +22,12 @@ TirModule {
             Dynamic(
                 Declared,
             ): 3,
-            Str: 1,
+            Str: 2,
             Class(
                 ClassId(
                     0,
                 ),
-            ): 2,
+            ): 1,
             Never: 0,
         },
         lists: [],
@@ -56,6 +56,15 @@ TirModule {
                     ty: Str,
                     slot: 2,
                 },
+                FieldInfo {
+                    name: "cause",
+                    ty: Nullable(
+                        TyId(
+                            1,
+                        ),
+                    ),
+                    slot: 3,
+                },
             ],
             statics: [],
             vtable: [
@@ -67,7 +76,7 @@ TirModule {
                 },
             ],
             layout: ClassLayout {
-                payload_size: 48,
+                payload_size: 56,
                 alignment: 8,
                 fields: [
                     FieldLayout {
@@ -106,6 +115,18 @@ TirModule {
                             repr: Boxed,
                         },
                     },
+                    FieldLayout {
+                        name: "cause",
+                        kind: Some(
+                            Class,
+                        ),
+                        offset: 48,
+                        layout: TypeLayout {
+                            size: 8,
+                            align: 8,
+                            repr: Ref,
+                        },
+                    },
                 ],
                 gc: GcLayout {
                     slots: [
@@ -120,6 +141,10 @@ TirModule {
                         GcSlot {
                             offset: 32,
                             repr: Boxed,
+                        },
+                        GcSlot {
+                            offset: 48,
+                            repr: Ref,
                         },
                     ],
                 },
@@ -152,6 +177,11 @@ TirModule {
         },
         Signature {
             params: [
+                Nullable(
+                    TyId(
+                        2,
+                    ),
+                ),
                 Nullable(
                     TyId(
                         1,
@@ -493,7 +523,7 @@ TirModule {
                                     ty: Dynamic(
                                         ClassObject(
                                             TyId(
-                                                2,
+                                                1,
                                             ),
                                         ),
                                     ),
@@ -523,13 +553,28 @@ TirModule {
                                             },
                                             ty: Nullable(
                                                 TyId(
-                                                    1,
+                                                    2,
                                                 ),
                                             ),
                                             res: None,
                                             span: Span {
                                                 start: 168,
                                                 end: 179,
+                                            },
+                                        },
+                                    ),
+                                    Expr(
+                                        TirExpr {
+                                            kind: NullLit,
+                                            ty: Nullable(
+                                                TyId(
+                                                    1,
+                                                ),
+                                            ),
+                                            res: None,
+                                            span: Span {
+                                                start: 0,
+                                                end: 0,
                                             },
                                         },
                                     ),
@@ -624,7 +669,7 @@ TirModule {
                                     ty: Dynamic(
                                         ClassObject(
                                             TyId(
-                                                2,
+                                                1,
                                             ),
                                         ),
                                     ),
@@ -654,13 +699,28 @@ TirModule {
                                             },
                                             ty: Nullable(
                                                 TyId(
-                                                    1,
+                                                    2,
                                                 ),
                                             ),
                                             res: None,
                                             span: Span {
                                                 start: 220,
                                                 end: 233,
+                                            },
+                                        },
+                                    ),
+                                    Expr(
+                                        TirExpr {
+                                            kind: NullLit,
+                                            ty: Nullable(
+                                                TyId(
+                                                    1,
+                                                ),
+                                            ),
+                                            res: None,
+                                            span: Span {
+                                                start: 0,
+                                                end: 0,
                                             },
                                         },
                                     ),

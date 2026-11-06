@@ -2,26 +2,27 @@ export declare class Error {
     message: str;
     name: str;
     stack: str;
-    constructor(message?: str);
+    cause: Error?;
+    constructor(message?: str, cause?: Error);
     toString(): str;
 }
 
 export declare class TypeError extends Error {
-    constructor(message?: str);
+    constructor(message?: str, cause?: Error);
 }
 
 export declare class RangeError extends Error {
-    constructor(message?: str);
+    constructor(message?: str, cause?: Error);
 }
 
 export declare class IntegerOverflow extends Error {
-    constructor(message?: str);
+    constructor(message?: str, cause?: Error);
 }
 
 export declare class DivisionByZero extends Error {
-    constructor(message?: str);
+    constructor(message?: str, cause?: Error);
 }
 
 export declare class MatchError extends Error {
-    constructor(message?: str);
+    constructor(message?: str, cause?: Error);
 }

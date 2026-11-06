@@ -21,6 +21,12 @@ await describe("297 deep class hierarchy across modules", async () => {
         expect(asError.message).toBe("deep");
     });
 
+    await it("an inherited class-typed field reads through an imported subclass", async () => {
+        const wrapped = new LeafError("outer", new LeafError("inner"));
+        expect(wrapped.cause!.message).toBe("inner");
+        expect(wrapped.cause!.cause).toBeNull();
+    });
+
     await it("a typed catch selects through several levels", async () => {
         let seen = "";
         try {

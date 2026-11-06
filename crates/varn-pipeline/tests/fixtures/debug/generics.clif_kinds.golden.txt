@@ -1,14 +1,14 @@
 
   clif ───────────────────────────────────────────── <module>
   <module> (native)
-    kinds (15 regs):
+    kinds (16 regs):
   block   │ kinds                                                                                       
   ────────┼─────────────────────────────────────────────────────────────────────────────────────────────
   block@0 │ v0:Ref, v1:Ref, v2:Ref, v3:Ref, v4:Ref, v5:Ref, v6:Int, v7:Ref, v8:Dynamic, v9:Int, v11:Bool
-  block@1 │ v12:Ref, v13:Str, v14:Dynamic, v15:Ref                                                      
-  block@2 │ v23:Ref, v25:Dynamic, v26:Dynamic, v29:Str, v30:Str, v31:Bool                               
-  block@3 │ v32:Ref, v33:Str, v34:Dynamic, v35:Ref                                                      
-  block@4 │ v36:Ref, v37:Str, v38:Dynamic, v39:Dynamic                                                  
+  block@1 │ v12:Ref, v13:Str, v14:Dynamic, v15:Dynamic, v16:Ref                                         
+  block@2 │ v25:Ref, v27:Dynamic, v28:Dynamic, v31:Str, v32:Str, v33:Bool                               
+  block@3 │ v34:Ref, v35:Str, v36:Dynamic, v37:Dynamic, v38:Ref                                         
+  block@4 │ v39:Ref, v40:Str, v41:Dynamic, v42:Dynamic                                                  
   identity (native)
     kinds (3 regs):
   block   │ kinds     

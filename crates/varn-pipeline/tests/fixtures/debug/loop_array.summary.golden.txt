@@ -3,14 +3,14 @@
   métrica                  │               valor
   ─────────────────────────┼────────────────────
   funciones                │                   3
-  bytecode (words)         │                 222
+  bytecode (words)         │                 228
   constantes               │                   5
   exports                  │                   0
   fuera de clif por tamaño │ 0 (gate 8192 words)
 [top] 10 por tamaño
   función    │     words │ gate
   ───────────┼───────────┼─────
-  <module>   │ 152 words │     
+  <module>   │ 158 words │     
   firstAbove │  37 words │     
   sum        │  33 words │     
   ── end: summary ──
