@@ -41,3 +41,34 @@ pub fn instrumented_run(
     }
     Ok(())
 }
+
+const PROFILE_TARGET_SAMPLES: u64 = 4_000;
+const PROFILE_MAX_RUNS: usize = 2_000;
+const PROFILE_MAX_WALL: std::time::Duration = std::time::Duration::from_secs(10);
+
+pub fn cpu_profile(
+    report: &mut Report,
+    factory: &VmFactory,
+    opts: &super::ProfileOpts,
+) -> Result<(), CliError> {
+    let mut profile = varn_vm::CpuProfile::new(opts.hz);
+    let started = std::time::Instant::now();
+    for _ in 0..PROFILE_MAX_RUNS {
+        varn_builtins::reset_testing_counters();
+        let mut machine = factory.build_silent();
+        let profiler =
+            varn_vm::CpuProfiler::start(&mut machine, opts.hz).map_err(CliError::fatal)?;
+        let outcome = run_vm_to_completion(&mut machine, factory.entry_proto());
+        profiler.finish(&mut profile, &machine);
+        outcome.map_err(|e| CliError::fatal(format!("profile run failed: {e}")))?;
+        if profile.samples >= PROFILE_TARGET_SAMPLES || started.elapsed() >= PROFILE_MAX_WALL {
+            break;
+        }
+    }
+    super::report::cpu::print(report, &profile);
+    if let Some(path) = &opts.out {
+        std::fs::write(path, super::report::cpu::folded(&profile))
+            .map_err(|e| CliError::fatal(format!("could not write {path}: {e}")))?;
+    }
+    Ok(())
+}

@@ -191,6 +191,15 @@ pub struct BenchArgs {
     #[arg(short, long)]
     pub verbose: bool,
 
+    #[arg(long)]
+    pub profile: bool,
+
+    #[arg(long, default_value = "1000", value_name = "HZ")]
+    pub profile_hz: u32,
+
+    #[arg(long, value_name = "FILE")]
+    pub profile_out: Option<String>,
+
     #[arg(long, value_name = "PCT")]
     pub min_clif_coverage: Option<f64>,
 }

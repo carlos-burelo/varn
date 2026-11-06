@@ -7,10 +7,16 @@ pub mod stats;
 
 use crate::error::CliError;
 
+pub struct ProfileOpts {
+    pub hz: u32,
+    pub out: Option<String>,
+}
+
 pub struct BenchOpts {
     pub runs: usize,
     pub show_output: bool,
     pub verbose: bool,
+    pub profile: Option<ProfileOpts>,
     pub min_clif_coverage: Option<f64>,
     pub capabilities: varn_pipeline::CapabilitySet,
 }

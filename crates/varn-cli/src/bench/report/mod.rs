@@ -1,3 +1,4 @@
+pub mod cpu;
 pub mod fmt;
 pub mod hotspots;
 pub mod jit;

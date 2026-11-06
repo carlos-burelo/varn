@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use super::detail::instrumented_run;
+use super::detail::{cpu_profile, instrumented_run};
 use super::harness::{run_vm_to_completion, time_n, time_n_freq_setup, VmFactory};
 use super::report::jit::top_blocker;
 use super::report::plain::Report;
@@ -139,6 +139,9 @@ pub fn run(
             phase_p50("check"),
         );
         instrumented_run(&mut report, &factory, &jit, &records, "program")?;
+    }
+    if let Some(profile) = &opts.profile {
+        cpu_profile(&mut report, &factory, profile)?;
     }
     report.print();
     summary.warn();
