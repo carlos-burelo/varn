@@ -1,12 +1,9 @@
 use std::time::Duration;
 
-pub const CV_NOISY: f64 = 0.05;
-
 pub const CV_UNRELIABLE: f64 = 0.10;
 
 pub struct PhaseStats {
     pub name: &'static str,
-    pub color_fn: fn(varn_core::term::chalk::Chalk) -> varn_core::term::chalk::Chalk,
     pub min: Duration,
     pub p50: Duration,
     pub max: Duration,
@@ -16,11 +13,7 @@ pub struct PhaseStats {
 }
 
 impl PhaseStats {
-    pub fn from_samples(
-        name: &'static str,
-        color_fn: fn(varn_core::term::chalk::Chalk) -> varn_core::term::chalk::Chalk,
-        samples: &[Duration],
-    ) -> Self {
+    pub fn from_samples(name: &'static str, samples: &[Duration]) -> Self {
         let min = *samples.iter().min().expect("samples must not be empty");
         let max = *samples.iter().max().expect("samples must not be empty");
         let total: Duration = samples.iter().sum();
@@ -42,7 +35,6 @@ impl PhaseStats {
 
         PhaseStats {
             name,
-            color_fn,
             min,
             p50,
             max,
@@ -61,12 +53,5 @@ impl PhaseStats {
             return 0.0;
         }
         self.stddev.as_nanos() as f64 / self.p50.as_nanos() as f64
-    }
-
-    pub fn spread(&self) -> f64 {
-        if self.min.as_nanos() == 0 {
-            return 0.0;
-        }
-        (self.max.as_nanos() - self.min.as_nanos()) as f64 / self.min.as_nanos() as f64
     }
 }

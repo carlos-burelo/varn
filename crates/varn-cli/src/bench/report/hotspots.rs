@@ -1,171 +1,93 @@
-use varn_core::term::chalk::chalk;
-use varn_core::term::terminal;
 use varn_vm::HotspotCounters;
 
-use super::fmt::{fmt_num, fmt_pct, row, row_note, short_global, LABEL_WIDTH};
+use super::fmt::{share, short_global};
+use super::plain::{
+    Align::{Left, Right},
+    Report, Table,
+};
 
-const TOP_N: usize = 12;
+const TOP_N: usize = 20;
 
-fn section(title: &str) {
-    terminal::blank();
-    terminal::log(format!("  {}", chalk(title).yellow().bold()));
-}
-
-pub fn print_hotspots(h: &HotspotCounters) {
-    terminal::blank();
-    terminal::log(chalk("Runtime Hotspots").cyan().bold());
-
-    let mut interp_only: Vec<_> = h
-        .fn_calls
-        .iter()
-        .filter(|(_, e)| e.interp_calls > 0)
-        .collect();
-    if !interp_only.is_empty() {
-        interp_only.sort_by_key(|b| std::cmp::Reverse(b.1.interp_calls));
-        let total_interp: u64 = interp_only.iter().map(|(_, e)| e.interp_calls).sum();
-        section("Frames interpretados");
-        for (name, entry) in interp_only.iter().take(TOP_N) {
-            let interp_share = entry.interp_calls as f64 / entry.calls.max(1) as f64;
-            let note = chalk(format!(
-                "{} de {}  ({})",
-                fmt_num(entry.interp_calls),
-                fmt_num(entry.calls),
-                fmt_pct(interp_share),
-            ))
-            .red()
-            .to_string();
-            terminal::log(format!(
-                "{}  {note}",
-                row(name, fmt_num(entry.interp_calls))
-            ));
-        }
-        if interp_only.len() > TOP_N {
-            terminal::log(format!(
-                "  {}",
-                chalk(format!(
-                    "… y {} fns más interpretadas",
-                    interp_only.len() - TOP_N
-                ))
-                .dim()
-            ));
-        }
-        terminal::log(row_note(
-            "total frames interpretados",
-            fmt_num(total_interp),
-            "solo fns con nombre",
-        ));
-    }
-
+pub fn hotspots(report: &mut Report, h: &HotspotCounters) {
     if !h.fn_calls.is_empty() {
-        section("Funciones");
         let mut entries: Vec<_> = h.fn_calls.iter().collect();
-        entries.sort_by_key(|b| std::cmp::Reverse(b.1.calls));
-        let counted: u64 = entries.iter().map(|(_, e)| e.calls).sum();
-        for (name, entry) in entries.iter().take(TOP_N) {
-            let jit_share = if entry.calls > 0 {
-                entry.jit_calls as f64 / entry.calls as f64
-            } else {
-                0.0
-            };
-            let note = if entry.interp_calls > 0 {
-                chalk(format!(
-                    "clif {}  interp {}",
-                    fmt_pct(jit_share),
-                    fmt_num(entry.interp_calls)
-                ))
-                .red()
-                .to_string()
-            } else {
-                chalk(format!("clif {}", fmt_pct(jit_share)))
-                    .dim()
-                    .to_string()
-            };
-            terminal::log(format!("{}  {note}", row(name, fmt_num(entry.calls))));
+        entries.sort_by_key(|(name, e)| (std::cmp::Reverse(e.calls), name.to_string()));
+        report.title("functions by calls");
+        let mut table = Table::new(
+            ["function", "calls", "clif%", "interp"],
+            [Left, Right, Right, Right],
+        );
+        for (name, entry) in entries.into_iter().take(TOP_N) {
+            table.row([
+                name.to_string(),
+                entry.calls.to_string(),
+                share(entry.jit_calls, entry.calls),
+                entry.interp_calls.to_string(),
+            ]);
         }
-        terminal::log(row_note(
-            "total contabilizado",
-            fmt_num(counted),
-            "solo llamadas con nombre",
-        ));
+        report.table(&table);
     }
 
     if !h.method_calls.is_empty() {
-        section("Métodos");
         let mut entries: Vec<_> = h.method_calls.iter().collect();
-        entries.sort_by_key(|b| std::cmp::Reverse(b.1.calls));
-        for (name, entry) in entries.iter().take(TOP_N) {
-            let jit_share = if entry.calls > 0 {
-                entry.jit_calls as f64 / entry.calls as f64
-            } else {
-                0.0
-            };
-            terminal::log(row_note(
-                name,
-                fmt_num(entry.calls),
-                format!("clif {}", fmt_pct(jit_share)),
-            ));
+        entries.sort_by_key(|(name, e)| (std::cmp::Reverse(e.calls), name.to_string()));
+        report.title("methods by calls");
+        let mut table = Table::new(["method", "calls", "clif%"], [Left, Right, Right]);
+        for (name, entry) in entries.into_iter().take(TOP_N) {
+            table.row([
+                name.to_string(),
+                entry.calls.to_string(),
+                share(entry.jit_calls, entry.calls),
+            ]);
         }
+        report.table(&table);
     }
 
     if !h.native_calls.is_empty() {
-        section("Llamadas nativas");
-
         let mut entries: Vec<_> = h.native_calls.iter().collect();
         entries.sort_by_key(|(name, count)| {
-            std::cmp::Reverse(h.native_ns.get(*name).copied().unwrap_or(0).max(**count))
+            (
+                std::cmp::Reverse(h.native_ns.get(*name).copied().unwrap_or(0).max(**count)),
+                name.to_string(),
+            )
         });
-        for (name, count) in entries.iter().take(TOP_N) {
-            let ns = h.native_ns.get(*name).copied().unwrap_or(0);
-            let note = if ns > 0 {
-                let avg_ns = ns / (**count).max(1);
-                format!(
-                    "{:.3} ms total, {} ns/llamada",
-                    ns as f64 / 1_000_000.0,
-                    avg_ns
-                )
-            } else {
-                "sin tiempo medido".to_string()
-            };
-            terminal::log(row_note(name, fmt_num(**count), note));
+        report.title("native calls");
+        let mut table = Table::new(
+            ["native", "calls", "total[ms]", "ns/call"],
+            [Left, Right, Right, Right],
+        );
+        for (name, count) in entries.into_iter().take(TOP_N) {
+            let ns = h.native_ns.get(name).copied().unwrap_or(0);
+            table.row([
+                name.to_string(),
+                count.to_string(),
+                format!("{:.3}", ns as f64 / 1_000_000.0),
+                (ns / (*count).max(1)).to_string(),
+            ]);
         }
-        let total_ns: u64 = h.native_ns.values().sum();
-        if total_ns > 0 {
-            terminal::log(row(
-                "tiempo nativo total",
-                format!("{:.3} ms", total_ns as f64 / 1_000_000.0),
-            ));
-        }
+        report.table(&table);
     }
 
     if !h.global_accesses.is_empty() {
-        section("Accesos a globals");
         let mut entries: Vec<_> = h.global_accesses.iter().collect();
-        entries.sort_by(|a, b| b.1.cmp(a.1));
-        for (name, count) in entries.iter().take(TOP_N) {
-            terminal::log(row(&short_global(name), fmt_num(**count)));
+        entries.sort_by_key(|(name, count)| (std::cmp::Reverse(**count), name.to_string()));
+        report.title("global accesses");
+        let mut table = Table::new(["global", "count"], [Left, Right]);
+        for (name, count) in entries.into_iter().take(TOP_N) {
+            table.row([short_global(name), count.to_string()]);
         }
+        report.table(&table);
     }
 
     if !h.alloc_types.is_empty() {
-        section("Tipos alocados");
         let mut entries: Vec<_> = h.alloc_types.iter().collect();
-        entries.sort_by(|a, b| b.1.cmp(a.1));
-        let counted: u64 = entries.iter().map(|(_, c)| **c).sum();
-        for (type_name, count) in entries.iter().take(TOP_N) {
-            terminal::log(row(type_name, fmt_num(**count)));
+        entries.sort_by_key(|(name, count)| (std::cmp::Reverse(**count), name.to_string()));
+        let total: u64 = entries.iter().map(|(_, count)| **count).sum();
+        report.title("allocations by type");
+        let mut table = Table::new(["type", "count", "share%"], [Left, Right, Right]);
+        for (name, count) in entries.into_iter().take(TOP_N) {
+            table.row([name.to_string(), count.to_string(), share(*count, total)]);
         }
-        if entries.len() > TOP_N {
-            let shown: u64 = entries.iter().take(TOP_N).map(|(_, c)| **c).sum();
-            terminal::log(row(
-                &format!("… {} tipos más", entries.len() - TOP_N),
-                fmt_num(counted - shown),
-            ));
-        }
-        terminal::log(format!("  {}", chalk("─".repeat(LABEL_WIDTH + 11)).dim()));
-        terminal::log(row_note(
-            "total por tipo",
-            fmt_num(counted),
-            "compárese con heap allocs arriba",
-        ));
+        report.table(&table);
     }
 }

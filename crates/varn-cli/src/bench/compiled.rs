@@ -1,15 +1,10 @@
 use std::rc::Rc;
-use std::time::Duration;
 
-use varn_core::term::chalk::chalk;
-use varn_core::term::terminal;
-
+use super::detail::instrumented_run;
 use super::harness::{run_vm_to_completion, time_n, time_n_freq_setup, VmFactory};
-use super::report::coverage::{print_coverage, top_blocker};
-use super::report::headline::{ExecSplit, Headline};
-use super::report::hotspots::print_hotspots;
-use super::report::profile::{print_opcode_hotspots, print_vm_profile};
-use super::report::table::{print_table, TableOpts};
+use super::report::jit::top_blocker;
+use super::report::plain::Report;
+use super::report::summary::{ExecSplit, Summary};
 use super::stats::PhaseStats;
 use super::BenchOpts;
 use crate::error::CliError;
@@ -24,7 +19,7 @@ pub fn run(session: &varn_pipeline::Session, path: &str, opts: &BenchOpts) -> Re
     let load_samples = time_n(runs, || {
         crate::pipeline::portable::read_portable(path)
             .map(|_| ())
-            .map_err(|e| e.to_string().clone())
+            .map_err(|e| e.to_string())
     })?;
 
     let factory = VmFactory::new(
@@ -42,90 +37,43 @@ pub fn run(session: &varn_pipeline::Session, path: &str, opts: &BenchOpts) -> Re
             factory.build()
         },
         |machine| run_vm_to_completion(machine, factory.entry_proto()),
-        |_, _| {},
     )?;
 
     let phases = vec![
-        PhaseStats::from_samples("load", |c| c.white(), &load_samples),
-        PhaseStats::from_samples("execute (warm)", |c| c.blue(), &exec_samples),
+        PhaseStats::from_samples("load", &load_samples),
+        PhaseStats::from_samples("execute (warm)", &exec_samples),
     ];
-    let total_p50: Duration = phases.iter().map(|p| p.p50).sum();
     let execute = phases.iter().find(|p| p.name == "execute (warm)");
 
-    let (exec_jit, records) = {
-        varn_jit::JIT_STATS.reset();
-        varn_jit::stats::start_recording();
-        let _ = factory.run_once_silent();
-        (
-            varn_jit::JIT_STATS.snapshot(),
-            varn_jit::stats::take_records(),
-        )
-    };
+    varn_jit::JIT_STATS.reset();
+    varn_jit::stats::start_recording();
+    let _ = factory.run_once_silent();
+    let jit = varn_jit::JIT_STATS.snapshot();
+    let records = varn_jit::stats::take_records();
 
-    Headline {
+    let mut report = Report::new();
+    let summary = Summary {
         path,
         runs,
-        source_lines: 0,
-        source_bytes: file_size,
-        tokens: 0,
+        bytes: file_size,
+        source: None,
+        phases: &phases,
         e2e: None,
-        execute,
-        total_p50,
-        split: execute.and_then(|e| ExecSplit::from_single_run(e.p50, &exec_jit)),
-        jit: Some(&exec_jit),
+        precompile: None,
+        split: execute.and_then(|e| ExecSplit::from_single_run(e.p50, &jit)),
+        jit: &jit,
         top_blocker: top_blocker(&records),
         tiered_during_window,
         cpu: cpu_freq,
-        phases: Some(&phases),
-    }
-    .print();
-
-    if !opts.show_output {
-        terminal::log(
-            chalk("  Ejecución medida con stdout silenciado (--show-output para verlo)").dim(),
-        );
-    }
+        silenced_output: !opts.show_output,
+    };
+    summary.fill(&mut report);
 
     if opts.verbose {
-        terminal::blank();
-        print_table(
-            &phases,
-            None,
-            &TableOpts {
-                all_rows: opts.all_rows,
-            },
-        );
-        varn_builtins::reset_testing_counters();
-
-        let mut profile_vm = factory.build_silent();
-        profile_vm.enable_opcode_profiling();
-        profile_vm.enable_profiling();
-        profile_vm.enable_hotspot_profiling();
-        run_vm_to_completion(&mut profile_vm, factory.entry_proto())
-            .map_err(|e| CliError::fatal(format!("profile run failed: {e}")))?;
-        profile_vm.collect_gc();
-        let opcode_counts = profile_vm.take_opcode_counts();
-        let mut vm_profile = profile_vm.take_profile();
-        let hotspots = profile_vm.take_hotspots();
-
-        print_coverage(&exec_jit, &records, "bundle .vnc");
-
-        let interp_share = (exec_jit.total_frames() > 0).then(|| exec_jit.never_compiled_ratio());
-        print_opcode_hotspots(&opcode_counts, interp_share);
-        if let Some(ref mut profile) = vm_profile {
-            let move_count = opcode_counts
-                .iter()
-                .find(|(op, _)| matches!(op, varn_core::OpCode::Move))
-                .map(|(_, n)| *n)
-                .unwrap_or(0);
-            profile.move_opcodes = move_count;
-            print_vm_profile(profile, interp_share);
-        }
-        if let Some(ref hs) = hotspots {
-            print_hotspots(hs);
-        }
-        terminal::blank();
+        instrumented_run(&mut report, &factory, &jit, &records, "bundle")?;
     }
+    report.print();
+    summary.warn();
 
-    super::enforce_coverage_floor(&exec_jit, opts.min_clif_coverage)
+    super::enforce_coverage_floor(&jit, opts.min_clif_coverage)
 }

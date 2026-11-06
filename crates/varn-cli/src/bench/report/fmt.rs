@@ -1,13 +1,9 @@
 use std::time::Duration;
 
-pub const LABEL_WIDTH: usize = 26;
-
-pub const VALUE_WIDTH: usize = 10;
-
 #[derive(Clone, Copy)]
 pub struct DurScale {
     divisor: f64,
-    suffix: &'static str,
+    unit: &'static str,
     decimals: usize,
 }
 
@@ -23,77 +19,72 @@ impl DurScale {
         if max_ns < 1_000.0 {
             Self {
                 divisor: 1.0,
-                suffix: "ns",
+                unit: "ns",
                 decimals: 0,
             }
         } else if max_ns < 1_000_000.0 {
             Self {
                 divisor: 1_000.0,
-                suffix: "µs",
-                decimals: 1,
+                unit: "us",
+                decimals: 2,
             }
         } else if max_ns < 1_000_000_000.0 {
             Self {
                 divisor: 1_000_000.0,
-                suffix: "ms",
-                decimals: 2,
+                unit: "ms",
+                decimals: 3,
             }
         } else {
             Self {
                 divisor: 1_000_000_000.0,
-                suffix: "s",
-                decimals: 3,
+                unit: "s",
+                decimals: 4,
             }
         }
     }
 
-    pub fn fmt(&self, d: Duration) -> String {
-        let v = d.as_nanos() as f64 / self.divisor;
+    pub fn unit(&self) -> &'static str {
+        self.unit
+    }
+
+    pub fn num(&self, d: Duration) -> String {
         format!(
-            "{v:.prec$} {suffix}",
-            prec = self.decimals,
-            suffix = self.suffix
+            "{:.prec$}",
+            d.as_nanos() as f64 / self.divisor,
+            prec = self.decimals
         )
+    }
+
+    pub fn header(&self, name: &str) -> String {
+        format!("{name}[{}]", self.unit)
     }
 }
 
 pub fn fmt_dur(d: Duration) -> String {
-    let ns = d.as_nanos();
-    if ns < 1_000 {
-        format!("{ns} ns")
-    } else if ns < 1_000_000 {
-        format!("{:.1} µs", ns as f64 / 1_000.0)
-    } else if ns < 1_000_000_000 {
-        format!("{:.2} ms", ns as f64 / 1_000_000.0)
-    } else {
-        format!("{:.3} s", ns as f64 / 1_000_000_000.0)
-    }
-}
-
-pub fn fmt_num(n: u64) -> String {
-    let s = n.to_string();
-    let mut out = String::new();
-    for (i, c) in s.chars().rev().enumerate() {
-        if i > 0 && i % 3 == 0 {
-            out.push(' ');
-        }
-        out.push(c);
-    }
-    out.chars().rev().collect()
+    let scale = DurScale::for_column([d]);
+    format!("{} {}", scale.num(d), scale.unit())
 }
 
 pub fn fmt_bytes(n: u64) -> String {
     if n < 1_024 {
         format!("{n} B")
     } else if n < 1_048_576 {
-        format!("{:.1} KB", n as f64 / 1_024.0)
+        format!("{:.1} KiB", n as f64 / 1_024.0)
     } else {
-        format!("{:.2} MB", n as f64 / 1_048_576.0)
+        format!("{:.2} MiB", n as f64 / 1_048_576.0)
     }
 }
 
-pub fn fmt_pct(ratio: f64) -> String {
-    format!("{:.1}%", ratio * 100.0)
+pub fn percent(ratio: f64) -> String {
+    format!("{:.1}", ratio * 100.0)
+}
+
+pub fn share(part: u64, whole: u64) -> String {
+    if whole == 0 {
+        "-".to_owned()
+    } else {
+        percent(part as f64 / whole as f64)
+    }
 }
 
 pub fn short_path(path: &str) -> String {
@@ -103,14 +94,14 @@ pub fn short_path(path: &str) -> String {
         .unwrap_or_else(|| path.strip_prefix(r"\\?\").unwrap_or(path).to_owned());
 
     let Ok(cwd) = std::env::current_dir() else {
-        return stripped;
+        return stripped.replace('\\', "/");
     };
     let cwd = cwd.to_string_lossy();
     let cwd = cwd.strip_prefix(r"\\?\").unwrap_or(&cwd);
 
     match stripped.strip_prefix(cwd) {
-        Some(rest) => rest.trim_start_matches(['/', '\\']).to_owned(),
-        None => stripped,
+        Some(rest) => rest.trim_start_matches(['/', '\\']).replace('\\', "/"),
+        None => stripped.replace('\\', "/"),
     }
 }
 
@@ -140,17 +131,4 @@ pub fn truncate_middle(s: &str, width: usize) -> String {
     let head_str: String = s.chars().take(head).collect();
     let tail_str: String = s.chars().skip(count - tail).collect();
     format!("{head_str}…{tail_str}")
-}
-
-pub fn row(label: &str, value: impl AsRef<str>) -> String {
-    format!(
-        "  {:<LABEL_WIDTH$} {:>VALUE_WIDTH$}",
-        truncate_middle(label, LABEL_WIDTH),
-        value.as_ref()
-    )
-}
-
-pub fn row_note(label: &str, value: impl AsRef<str>, note: impl AsRef<str>) -> String {
-    use varn_core::term::chalk::chalk;
-    format!("{}  {}", row(label, value), chalk(note.as_ref()).dim())
 }

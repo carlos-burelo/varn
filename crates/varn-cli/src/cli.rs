@@ -191,9 +191,6 @@ pub struct BenchArgs {
     #[arg(short, long)]
     pub verbose: bool,
 
-    #[arg(long)]
-    pub all_rows: bool,
-
     #[arg(long, value_name = "PCT")]
     pub min_clif_coverage: Option<f64>,
 }

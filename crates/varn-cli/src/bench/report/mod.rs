@@ -1,6 +1,6 @@
-pub mod coverage;
 pub mod fmt;
-pub mod headline;
 pub mod hotspots;
-pub mod profile;
-pub mod table;
+pub mod jit;
+pub mod plain;
+pub mod summary;
+pub mod vm;

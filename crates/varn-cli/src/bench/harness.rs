@@ -96,16 +96,14 @@ pub fn time_n<F: Fn() -> Result<(), String>>(runs: usize, f: F) -> Result<Vec<Du
     Ok(samples)
 }
 
-pub fn time_n_freq_setup<T, S, F, P>(
+pub fn time_n_freq_setup<T, S, F>(
     runs: usize,
     setup: S,
     f: F,
-    progress: P,
 ) -> Result<(Vec<Duration>, Option<crate::cpu_freq::CpuFreq>, u64), CliError>
 where
     S: Fn() -> T,
     F: Fn(&mut T) -> Result<(), String>,
-    P: Fn(usize, &[Duration]),
 {
     varn_jit::stats::start_recording();
     let mut warm = setup();
@@ -115,13 +113,12 @@ where
 
     let mut samples = Vec::with_capacity(runs);
     let mut peak = None;
-    for i in 0..runs {
+    for _ in 0..runs {
         let mut state = setup();
         let start = Instant::now();
         f(&mut state).map_err(|e| CliError::fatal(format!("bench run failed: {e}")))?;
         samples.push(start.elapsed());
         peak = crate::cpu_freq::keep_peak(peak, crate::cpu_freq::sample());
-        progress(i + 1, &samples);
     }
     let tiered = compiled_keys().difference(&warmed).count() as u64;
     Ok((samples, peak, tiered))

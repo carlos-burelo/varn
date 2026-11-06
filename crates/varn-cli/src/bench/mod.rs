@@ -1,4 +1,5 @@
 pub mod compiled;
+pub mod detail;
 pub mod harness;
 pub mod report;
 pub mod source;
@@ -10,8 +11,6 @@ pub struct BenchOpts {
     pub runs: usize,
     pub show_output: bool,
     pub verbose: bool,
-    pub all_rows: bool,
-
     pub min_clif_coverage: Option<f64>,
     pub capabilities: varn_pipeline::CapabilitySet,
 }
