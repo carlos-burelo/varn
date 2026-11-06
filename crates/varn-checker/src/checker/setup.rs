@@ -43,6 +43,7 @@ impl<'r> Checker<'r> {
             expected_type: None,
             expected_pending: false,
             expected_owner: None,
+            expected_forwarded: Vec::new(),
             map_generics_cache: FxHashMap::default(),
             yielded_types: None,
             declared_yield: None,

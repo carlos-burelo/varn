@@ -9,6 +9,7 @@ impl<'r> Checker<'r> {
     pub(super) fn infer_new_type(
         &mut self,
         rec: &mut Recorder,
+        expr: ExprId,
         callee: ExprId,
         type_args: &[varn_core::ast::TypeNode],
         ctor_args: &[varn_core::ast::Arg],
@@ -43,7 +44,7 @@ impl<'r> Checker<'r> {
                         origin_str,
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                     )
-                } else if let Some(contextual) = self.expected_instantiation(name) {
+                } else if let Some(contextual) = self.expected_instantiation(expr, name) {
                     contextual
                 } else if let Some(args) = self.instantiation_from_args(
                     rec,
@@ -123,7 +124,7 @@ impl<'r> Checker<'r> {
                             origin,
                             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                         )
-                    } else if let Some(contextual) = self.expected_instantiation(*name) {
+                    } else if let Some(contextual) = self.expected_instantiation(expr, *name) {
                         contextual
                     } else if let Some(args) = self.instantiation_from_args(
                         rec,
@@ -213,9 +214,9 @@ impl<'r> Checker<'r> {
             .unwrap_or_default()
     }
 
-    fn expected_instantiation(&mut self, name: varn_core::Atom) -> Option<Type> {
+    fn expected_instantiation(&mut self, expr: ExprId, name: varn_core::Atom) -> Option<Type> {
         let expected = self
-            .expected_type?
+            .expected_for(expr)?
             .non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
         match self.ty_table.get(expected.0) {
             TypeKind::Generic(expected_name, _, _) if expected_name == name => Some(expected),

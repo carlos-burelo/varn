@@ -30,6 +30,7 @@ impl<'r> Checker<'r> {
         if self.expected_pending {
             self.expected_pending = false;
             self.expected_owner = Some(expr.index());
+            self.expected_forwarded = self.forwarded_operands(expr);
         }
         let arena = self.ast_arena;
         self.check_expr_no_record(rec, expr, bind);
@@ -208,7 +209,7 @@ impl<'r> Checker<'r> {
 
             ExprKind::Array { elements } => {
                 let elements = elements.clone();
-                self.check_array_with_context(rec, &elements, bind)
+                self.check_array_with_context(rec, expr, &elements, bind)
             }
 
             ExprKind::Tuple { elements } => {
@@ -219,7 +220,7 @@ impl<'r> Checker<'r> {
 
             ExprKind::Object { properties } => {
                 let properties = properties.clone();
-                self.check_object_with_context(rec, &properties, bind)
+                self.check_object_with_context(rec, expr, &properties, bind)
             }
 
             ExprKind::Template { parts } => {

@@ -44,7 +44,11 @@ await describe("05 Arrays", async () => {
         expect(sorted[0]).toBe("apple");
         const rev = [1, 2, 3].reverse();
         expect(rev[0]).toBe(3);
-        const flat = [[1, 2], [3, 4]].flat();
+        const labels: str[] = [1, 2].map((n) => "n");
+        expect(labels.length).toBe(2);
+        const fallback: int[] = labels.length > 5 ? [1] : [];
+        expect(fallback.length).toBe(0);
+        const flat = [[1, 2], [3, 4]].flatMap((a) => a);
         expect(flat.length).toBe(4);
         expect(flat[2]).toBe(3);
         const fm = [[1, 2], [3]].flatMap((a) => a);

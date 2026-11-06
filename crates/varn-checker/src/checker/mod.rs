@@ -78,6 +78,7 @@ pub struct Checker<'r> {
     pub(crate) expected_type: Option<Type>,
     pub(crate) expected_pending: bool,
     pub(crate) expected_owner: Option<u32>,
+    pub(crate) expected_forwarded: Vec<u32>,
 
     pub(crate) map_generics_cache: FxHashMap<(Type, Vec<Type>), Type>,
     pub(crate) yielded_types: Option<Vec<Type>>,

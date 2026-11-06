@@ -1,6 +1,6 @@
 use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
-use varn_core::ast::{ArrayEl, ObjectProp, Param, PropKey};
+use varn_core::ast::{ArrayEl, ExprId, ObjectProp, Param, PropKey};
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 use varn_sem::bind::BindResult;
 use varn_sem::infer::pattern_lead_name;
@@ -38,14 +38,52 @@ impl<'r> Checker<'r> {
         }
     }
 
+    pub(crate) fn expected_for(&self, expr: ExprId) -> Option<Type> {
+        self.expected_type.filter(|_| {
+            self.expected_owner == Some(expr.index())
+                || self.expected_forwarded.contains(&expr.index())
+        })
+    }
+
+    pub(super) fn forwarded_operands(&self, expr: ExprId) -> Vec<u32> {
+        use varn_core::ast::ExprKind;
+        let mut forwarded = Vec::new();
+        let mut pending = vec![expr];
+        while let Some(current) = pending.pop() {
+            let kind = &self.ast_arena.expr(current).kind;
+            let operands: Vec<ExprId> = if let ExprKind::Paren { expression } = kind {
+                vec![*expression]
+            } else if let ExprKind::Logical { left, right, .. } = kind {
+                vec![*left, *right]
+            } else if let ExprKind::Conditional {
+                consequent,
+                alternate,
+                ..
+            } = kind
+            {
+                vec![*consequent, *alternate]
+            } else if let ExprKind::Sequence { expressions } = kind {
+                expressions.last().copied().into_iter().collect()
+            } else {
+                Vec::new()
+            };
+            for operand in operands {
+                forwarded.push(operand.index());
+                pending.push(operand);
+            }
+        }
+        forwarded
+    }
+
     pub(super) fn check_array_with_context(
         &mut self,
         rec: &mut Recorder,
+        expr: ExprId,
         elements: &[ArrayEl],
         bind: &BindResult,
     ) {
         let elem_expected = self
-            .expected_type
+            .expected_for(expr)
             .and_then(|t| match self.ty_table.get(t.0) {
                 TypeKind::Array(inner) => Some(Type::resolved(inner)),
                 TypeKind::Primitive(_)
@@ -114,10 +152,11 @@ impl<'r> Checker<'r> {
     pub(super) fn check_object_with_context(
         &mut self,
         rec: &mut Recorder,
+        expr: ExprId,
         properties: &[ObjectProp],
         bind: &BindResult,
     ) {
-        let expected_members: Vec<ObjectTypeMember> = if let Some(t) = self.expected_type {
+        let expected_members: Vec<ObjectTypeMember> = if let Some(t) = self.expected_for(expr) {
             let ty = t.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
             if let Some(cached) = self.expected_object_members_cache.get(&ty) {
                 cached.clone()

@@ -8,6 +8,7 @@ impl<'r> Checker<'r> {
     pub(super) fn infer_array(
         &mut self,
         rec: &mut Recorder,
+        expr: varn_core::ast::ExprId,
         elements: &[varn_core::ast::ArrayEl],
         bind: &BindResult,
     ) -> Type {
@@ -70,7 +71,7 @@ impl<'r> Checker<'r> {
             );
         }
         if elem_tys.is_empty() {
-            if let Some(expected) = self.expected_type {
+            if let Some(expected) = self.expected_for(expr) {
                 let non_null =
                     expected.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
                 if let varn_core::TypeKind::Array(inner) = self.ty_table.get(non_null.0) {

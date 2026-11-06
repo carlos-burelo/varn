@@ -68,7 +68,7 @@ impl<'r> Checker<'r> {
                 type_args,
                 args,
                 ..
-            } => self.infer_new_type(rec, *callee, type_args, args, bind),
+            } => self.infer_new_type(rec, expr, *callee, type_args, args, bind),
             ExprKind::Call { .. } => self.infer_call_type(rec, expr, bind),
             ExprKind::TaggedTemplate { tag, .. } => {
                 let tag_ty = self.infer_type(rec, *tag, bind);
@@ -223,7 +223,7 @@ impl<'r> Checker<'r> {
             }
             ExprKind::Update { operand, .. } => self.infer_type(rec, *operand, bind),
             ExprKind::Assign { value, .. } => self.infer_type(rec, *value, bind),
-            ExprKind::Array { elements } => self.infer_array(rec, elements, bind),
+            ExprKind::Array { elements } => self.infer_array(rec, expr, elements, bind),
             ExprKind::Template { .. } => Type::Str,
             ExprKind::Paren { expression } => self.infer_type(rec, *expression, bind),
             ExprKind::IntLiteral { .. } => Type::Int,

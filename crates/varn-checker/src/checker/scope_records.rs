@@ -81,12 +81,14 @@ impl<'r> Checker<'r> {
         let prev = self.expected_type.take();
         let prev_pending = self.expected_pending;
         let prev_owner = self.expected_owner;
+        let prev_forwarded = std::mem::take(&mut self.expected_forwarded);
         self.expected_type = ty;
         self.expected_pending = ty.is_some();
         let result = f(self);
         self.expected_type = prev;
         self.expected_pending = prev_pending;
         self.expected_owner = prev_owner;
+        self.expected_forwarded = prev_forwarded;
         result
     }
 

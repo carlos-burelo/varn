@@ -12,12 +12,12 @@ impl Checker<'_> {
         rec: &mut Recorder,
         properties: &[varn_core::ast::ObjectProp],
         bind: &BindResult,
-        _expr: ExprId,
+        expr: ExprId,
     ) -> Type {
         let has_methods = properties
             .iter()
             .any(|p| matches!(p, varn_core::ast::ObjectProp::Method { .. }));
-        if !has_methods && let Some(expected) = self.expected_type {
+        if !has_methods && let Some(expected) = self.expected_for(expr) {
             let exp = expected.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
             let exp_kind = self.ty_table.get(exp.0);
             let is_index_signature = match exp_kind {
