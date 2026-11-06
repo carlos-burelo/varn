@@ -39,8 +39,8 @@ function* nested_inner(n: int) {
 function* nested_outer() {
     yield 1;
     const inner = nested_inner(5);
-    yield inner.next().value + 100;
-    yield inner.next().value + 100;
+    yield inner.next()! + 100;
+    yield inner.next()! + 100;
 }
 
 function make_counter(step: int): () => Generator<int> {
@@ -107,7 +107,7 @@ t0 = now();
 const counter = make_counter(3);
 const c1 = counter();
 const c2 = counter();
-let cap_sum = c1.next().value + c1.next().value + c2.next().value;
+let cap_sum = c1.next()! + c1.next()! + c2.next()!;
 t1 = now();
 print(`upvalue checksum=${cap_sum} ms=${(t1 - t0)}`);
 
@@ -115,8 +115,8 @@ t0 = now();
 let try_sum = 0;
 try {
     const gg = guarded();
-    try_sum = try_sum + gg.next().value;
-    try_sum = try_sum + gg.next().value;
+    try_sum = try_sum + gg.next()!;
+    try_sum = try_sum + gg.next()!;
 } catch (e) {
     try_sum = -1;
 }
