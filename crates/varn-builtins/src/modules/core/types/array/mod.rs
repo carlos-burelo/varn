@@ -25,18 +25,6 @@ fn room_for(ctx: &mut dyn NativeCtx, array: &VnArray, extra: usize) -> Result<()
     Ok(())
 }
 
-fn flatten(ctx: &mut dyn NativeCtx, arr: VmValue, depth: i64, out: &mut Vec<VmValue>) {
-    let len = ctx.array_len(arr);
-    for i in 0..len {
-        let v = ctx.array_get(arr, i).unwrap_or(VmValue::null());
-        if depth > 0 && ctx.is_array(v) {
-            flatten(ctx, v, depth - 1, out);
-        } else {
-            out.push(v);
-        }
-    }
-}
-
 varn_contract! {
     module: "globals",
     class: "Array",
@@ -224,12 +212,6 @@ varn_contract! {
                 this.set(ctx, i, value);
             }
             this.raw()
-        }
-        fn flat(ctx: &mut dyn NativeCtx, this: VnArray, depth: Option<i64>) -> Vec<VmValue> {
-            let d = depth.unwrap_or(1);
-            let mut out = Vec::new();
-            flatten(ctx, this.raw(), d, &mut out);
-            out
         }
         fn reverse(ctx: &mut dyn NativeCtx, this: VnArray) -> VmValue {
             let mut items = this.to_vec(ctx);

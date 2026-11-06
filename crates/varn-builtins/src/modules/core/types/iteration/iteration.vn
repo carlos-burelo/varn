@@ -43,7 +43,7 @@ export interface AsyncIterator<T> {
 /**
  * Handle to a spawned task: poll it, await it or cancel it.
  */
-export interface TaskHandle<T = dynamic> {
+export interface TaskHandle<T> {
     isCompleted(): bool;
     await(): T;
     cancel(): void;

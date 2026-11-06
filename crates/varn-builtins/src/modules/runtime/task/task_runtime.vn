@@ -15,21 +15,21 @@ export declare function spawnIsolate$(fn: dynamic, args: dynamic): TaskHandle<Is
 
 export declare class ChannelClosed extends Error {}
 
-export declare class Sender<T = dynamic> {
+export declare class Sender<T> {
     send(msg: T): TaskHandle<void>;
     close(): void;
     dispose(): void;
 }
 
-export declare class Receiver<T = dynamic> {
+export declare class Receiver<T> {
     receive(): TaskHandle<T>;
     @throws(Error) next(): TaskHandle<T?>;
     dispose(): void;
 }
 
-export declare class Channel<T = dynamic> {
+export declare class Channel<T> {
     tx: Sender<T>;
     rx: Receiver<T>;
 }
 
-export declare function channel$<T = dynamic>(capacity: int): Channel<T>;
+export declare function channel$<T>(capacity: int): Channel<T>;
