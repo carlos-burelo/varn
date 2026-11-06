@@ -3,13 +3,22 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use crate::frame::CallFrame;
 use crate::frame_stack::FrameStack;
 
-pub(super) const MAX_DEPTH: usize = 192;
+pub(super) const MAX_DEPTH: usize = 128;
+pub(super) const NAME_BYTES: usize = 31;
 
 #[derive(Clone, Copy)]
 #[repr(C)]
 pub(super) struct Entry {
     pub proto: usize,
     pub ip: usize,
+    pub name_len: u8,
+    pub name: [u8; NAME_BYTES],
+}
+
+impl Entry {
+    pub(super) fn named(&self) -> &str {
+        std::str::from_utf8(&self.name[..self.name_len as usize]).unwrap_or("")
+    }
 }
 
 #[repr(C)]
@@ -77,10 +86,17 @@ impl Shared {
         slot.activity = super::activity::snapshot();
         let mut depth = 0;
         for frame in &stack[skipped..] {
-            slot.frames[depth] = Entry {
-                proto: unsafe { std::rc::Rc::as_ptr(&(*frame.closure_ptr).proto) } as usize,
-                ip: frame.ip,
-            };
+            let proto = unsafe { &*std::rc::Rc::as_ptr(&(*frame.closure_ptr).proto) };
+            let entry = &mut slot.frames[depth];
+            entry.proto = proto as *const _ as usize;
+            entry.ip = frame.ip;
+            let name = proto.name.as_deref().unwrap_or("").as_bytes();
+            let mut length = name.len().min(NAME_BYTES);
+            while length > 0 && !std::str::from_utf8(&name[..length]).is_ok() {
+                length -= 1;
+            }
+            entry.name_len = length as u8;
+            entry.name[..length].copy_from_slice(&name[..length]);
             depth += 1;
         }
         slot.depth = depth as u32;

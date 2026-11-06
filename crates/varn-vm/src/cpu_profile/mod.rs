@@ -15,9 +15,8 @@ use crate::vm::Vm;
 use capture::Shared;
 use sampler::Sampler;
 
-const SLOTS_PER_RUN: usize = 16_384;
+const SLOTS_PER_RUN: usize = 8_192;
 const BUSY_FRACTION_DENOMINATOR: u64 = 10;
-const NATIVE_FRAME: &str = "<native>";
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ProfileFrame {
@@ -90,10 +89,11 @@ impl CpuProfile {
         }
     }
 
-    fn describe(&mut self, key: usize, ip: usize) -> Vec<(u32, u32)> {
+    fn describe(&mut self, entry: &capture::Entry) -> Vec<(u32, u32)> {
+        let (key, ip) = (entry.proto, entry.ip);
         let Some(proto) = self.protos.get(&key).map(Rc::clone) else {
             let id = self.intern(ProfileFrame {
-                function: NATIVE_FRAME.to_owned(),
+                function: format!("<native {}>", entry.named()),
                 file: String::new(),
             });
             return vec![(id, 0)];
@@ -121,7 +121,11 @@ pub struct CpuProfiler {
 }
 
 impl CpuProfiler {
-    pub fn start(vm: &mut Vm, into: &mut CpuProfile) -> Result<Self, String> {
+    pub fn start(
+        vm: &mut Vm,
+        into: &mut CpuProfile,
+        entry: &Rc<FunctionProto>,
+    ) -> Result<Self, String> {
         if into.hz == 0 {
             return Err("the sampling rate must be at least 1 Hz".to_owned());
         }
@@ -130,6 +134,7 @@ impl CpuProfiler {
             .precompiled
             .values()
             .cloned()
+            .chain(std::iter::once(Rc::clone(entry)))
             .chain(vm.ctx.frames.iter().map(|f| Rc::clone(&f.closure().proto)))
             .collect();
         for root in &roots {
@@ -173,13 +178,14 @@ impl CpuProfiler {
             let mut entries: Vec<capture::Entry> = slot.frames[..slot.depth as usize].to_vec();
             let compiled = varn_jit::stack_roots::locate(slot.pc);
             if let Some(site) = &compiled {
-                let exact = capture::Entry {
-                    proto: site.owner,
-                    ip: site.ip as usize,
-                };
                 match entries.last_mut() {
-                    Some(top) if top.proto == site.owner => *top = exact,
-                    Some(_) | None => entries.push(exact),
+                    Some(top) if top.proto == site.owner => top.ip = site.ip as usize,
+                    Some(_) | None => entries.push(capture::Entry {
+                        proto: site.owner,
+                        ip: site.ip as usize,
+                        name_len: 0,
+                        name: [0; capture::NAME_BYTES],
+                    }),
                 }
             }
             into.compiled_samples += u64::from(compiled.is_some());
@@ -195,7 +201,7 @@ impl CpuProfiler {
                 let chain = match resolved.get(&(entry.proto, entry.ip)) {
                     Some(chain) => chain.clone(),
                     None => {
-                        let chain = into.describe(entry.proto, entry.ip);
+                        let chain = into.describe(entry);
                         resolved.insert((entry.proto, entry.ip), chain.clone());
                         chain
                     }

@@ -55,9 +55,10 @@ pub fn cpu_profile(
     for _ in 0..PROFILE_MAX_RUNS {
         varn_builtins::reset_testing_counters();
         let mut machine = factory.build_silent();
-        let profiler =
-            varn_vm::CpuProfiler::start(&mut machine, &mut profile).map_err(CliError::fatal)?;
-        let outcome = run_vm_to_completion(&mut machine, factory.entry_proto());
+        let entry = factory.entry_proto();
+        let profiler = varn_vm::CpuProfiler::start(&mut machine, &mut profile, &entry)
+            .map_err(CliError::fatal)?;
+        let outcome = run_vm_to_completion(&mut machine, entry);
         profiler.finish(&mut profile);
         outcome.map_err(|e| CliError::fatal(format!("profile run failed: {e}")))?;
         if profile.samples >= PROFILE_TARGET_SAMPLES || started.elapsed() >= PROFILE_MAX_WALL {
