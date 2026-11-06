@@ -38,6 +38,15 @@ impl<'r> Checker<'r> {
             return;
         }
         for d in &v.declarators {
+            if v.kind == varn_core::ast::VarKind::Const && !v.is_declare && d.init.is_none() {
+                self.emit(
+                    Diagnostic::error(
+                        ErrorCode::ConstWithoutInitializer,
+                        "a `const` must be initialized where it is declared",
+                    )
+                    .with_range(d.range),
+                );
+            }
             if let (varn_core::ast::Pattern::Identifier { name, .. }, Some(init)) = (&d.id, d.init)
                 && let ExprKind::ClassExpr { declaration } = &self.ast_arena.expr(init).kind
                 && declaration.id == Some(*name)
