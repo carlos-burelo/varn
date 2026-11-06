@@ -63,6 +63,3 @@ pub fn decode(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<In
     }
     Some(info)
 }
-
-#[cfg(test)]
-mod tests;

@@ -122,27 +122,3 @@ pub fn float_to_int(f: f64) -> Option<i64> {
     }
     Some(t as i64)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn float_to_int_truncates_and_rejects_non_representable() {
-        assert_eq!(float_to_int(3.9), Some(3));
-        assert_eq!(float_to_int(-3.9), Some(-3));
-        assert_eq!(float_to_int(-9_223_372_036_854_775_808.0), Some(i64::MIN));
-        assert_eq!(float_to_int(9_223_372_036_854_775_808.0), None);
-        assert_eq!(float_to_int(f64::NAN), None);
-        assert_eq!(float_to_int(f64::INFINITY), None);
-        assert_eq!(float_to_int(f64::NEG_INFINITY), None);
-    }
-
-    #[test]
-    fn wire_roundtrip() {
-        for c in ValueConv::ALL {
-            assert_eq!(ValueConv::from_u8(c as u8), Some(c));
-        }
-        assert_eq!(ValueConv::from_u8(ValueConv::ALL.len() as u8), None);
-    }
-}

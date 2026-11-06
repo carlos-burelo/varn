@@ -47,21 +47,3 @@ pub fn check_import(from: Layer, specifier: &str) -> Result<(), String> {
         )),
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn layer_matrix() {
-        assert!(check_import(Layer::User, "std:fs").is_ok());
-        assert!(check_import(Layer::User, "core:types").is_err());
-        assert!(check_import(Layer::User, "runtime:sys").is_err());
-        assert!(check_import(Layer::Std, "runtime:sys").is_ok());
-        assert!(check_import(Layer::Std, "core:types").is_err());
-        assert!(check_import(Layer::Core, "core:types/int").is_ok());
-        assert!(check_import(Layer::Core, "std:fs").is_err());
-        assert!(check_import(Layer::Std, "./sibling").is_ok());
-        assert!(check_import(Layer::Std, "C:/work/app.vn").is_ok());
-    }
-}

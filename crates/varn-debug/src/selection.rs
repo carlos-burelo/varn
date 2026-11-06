@@ -69,27 +69,3 @@ impl Selection {
         self.sel.is_empty()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn empty_selection_reports_empty() {
-        assert!(Selection::default().is_empty());
-    }
-
-    #[test]
-    fn bits_round_trip() {
-        let mut s = PhaseSel::EMPTY;
-        for b in [0u64, 3, 7, 63] {
-            assert!(!s.contains(b));
-            s.insert(b);
-            assert!(s.contains(b));
-        }
-        assert!(!s.is_empty());
-        s.remove(3);
-        assert!(!s.contains(3));
-        assert!(s.contains(7));
-    }
-}

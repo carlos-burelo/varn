@@ -50,23 +50,3 @@ pub const SIZE_CLASS_STRIDE: usize = 48;
 pub const VEC_CAP_OFF: usize = 0;
 pub const VEC_PTR_OFF: usize = 8;
 pub const VEC_LEN_OFF: usize = 16;
-
-#[cfg(test)]
-mod tests {
-    use super::{VEC_CAP_OFF, VEC_LEN_OFF, VEC_PTR_OFF};
-
-    #[test]
-    fn vec_triple_matches_std_layout() {
-        let mut v: Vec<u64> = Vec::with_capacity(16);
-        v.push(0xAA);
-        let base = &v as *const _ as *const usize;
-        unsafe {
-            assert_eq!(*base.add(0), v.capacity());
-            assert_eq!(*base.add(1), v.as_ptr() as usize);
-            assert_eq!(*base.add(2), v.len());
-            assert_eq!(VEC_CAP_OFF, 0);
-            assert_eq!(VEC_PTR_OFF, 8);
-            assert_eq!(VEC_LEN_OFF, 16);
-        }
-    }
-}

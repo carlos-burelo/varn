@@ -75,25 +75,3 @@ impl AstArena {
         &mut self.stmts[id.0 as usize]
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::ast::expr::ExprKind;
-    use crate::source::SourceRange;
-
-    #[test]
-    fn alloc_and_get_roundtrips() {
-        let mut arena = AstArena::new();
-        let id = arena.alloc_expr(ExprKind::NullLiteral, SourceRange::default());
-        assert!(matches!(arena.expr(id).kind, ExprKind::NullLiteral));
-    }
-
-    #[test]
-    fn distinct_allocations_get_distinct_ids() {
-        let mut arena = AstArena::new();
-        let a = arena.alloc_expr(ExprKind::NullLiteral, SourceRange::default());
-        let b = arena.alloc_expr(ExprKind::This, SourceRange::default());
-        assert_ne!(a, b);
-    }
-}

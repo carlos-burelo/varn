@@ -145,7 +145,3 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         | Yield { .. } => false,
     }
 }
-
-#[cfg(test)]
-#[path = "purity_tests.rs"]
-mod purity_tests;

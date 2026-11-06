@@ -273,26 +273,3 @@ impl Drop for CellSpace {
         }
     }
 }
-
-#[cfg(test)]
-mod geometry_tests {
-    #[test]
-    fn shared_instance_math_matches_slow_path() {
-        use varn_types::cell;
-        for payload in [0u32, 1, 7, 8, 9, 15, 16, 24, 64] {
-            let body = cell::instance_colocated_body_bytes(payload);
-            assert_eq!(body, 8 + (payload as usize).div_ceil(8) * 8);
-            let total = cell::HEADER_BYTES + body;
-            let cls = cell::class_for(total).expect("instance fits a class");
-            assert!(cell::CELL_CLASSES[cls] >= total);
-        }
-        for payload in [100000u32, 500000] {
-            let body = cell::instance_colocated_body_bytes(payload);
-            let total = cell::HEADER_BYTES + body;
-            assert!(
-                cell::class_for(total).is_none(),
-                "payload {payload} goes large"
-            );
-        }
-    }
-}

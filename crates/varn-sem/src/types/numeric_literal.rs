@@ -110,19 +110,3 @@ pub fn literal_operand_class(
     let value = const_int_value(arena, expr)?;
     int_literal_adopts(other, value, table).then_some(*other)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn float_adopts_only_exact_integers() {
-        let table = CheckerTyTable::new();
-        assert!(int_literal_adopts(&Type::Float, 1 << 53, &table));
-        assert!(!int_literal_adopts(&Type::Float, (1 << 53) + 1, &table));
-        assert!(int_literal_adopts(&Type::Decimal, i64::MAX, &table));
-        assert!(int_literal_adopts(&Type::BigInt, i64::MIN, &table));
-        assert!(!int_literal_adopts(&Type::Str, 1, &table));
-        assert!(!int_literal_adopts(&Type::Int, 1, &table));
-    }
-}

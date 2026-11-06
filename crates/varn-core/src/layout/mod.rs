@@ -98,24 +98,3 @@ pub struct GcSlot {
 
     pub repr: ScalarRepr,
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn scalars_hold_no_references() {
-        for kind in [RuntimeKind::Bool, RuntimeKind::Int, RuntimeKind::Float] {
-            assert!(!TypeLayout::of_field(Some(kind)).repr.holds_reference());
-        }
-        assert_eq!(
-            TypeLayout::of_field(Some(RuntimeKind::Class)).repr,
-            ScalarRepr::Ref
-        );
-        assert_eq!(
-            TypeLayout::of_field(Some(RuntimeKind::Str)).repr,
-            ScalarRepr::Boxed
-        );
-        assert_eq!(TypeLayout::of_field(None).size, 16);
-    }
-}

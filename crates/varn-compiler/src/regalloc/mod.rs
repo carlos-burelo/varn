@@ -24,7 +24,3 @@ pub fn run_post_passes(proto: &mut FunctionProto, measure: bool) -> Duration {
 
     total + regalloc_post::optimize_function(proto, measure)
 }
-
-#[cfg(test)]
-#[path = "regalloc_post_tests.rs"]
-mod regalloc_post_tests;

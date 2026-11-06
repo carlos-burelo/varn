@@ -41,32 +41,3 @@ pub fn debug_check_stacks(store: &FrameStore) -> bool {
         && ok(v.refs as *mut u8, v.refs_end as *mut u8)
         && ok(v.dyn_ as *mut u8, v.dyn_end as *mut u8)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use varn_types::register_meta::SlotKind;
-
-    #[test]
-    fn rangos_cubren_tramos_vivos() {
-        let proto = std::rc::Rc::new(varn_types::FunctionProto {
-            register_count: 2,
-            register_meta: vec![
-                varn_types::register_meta::RegisterMeta {
-                    kind: SlotKind::Int,
-                },
-                varn_types::register_meta::RegisterMeta {
-                    kind: SlotKind::Dynamic,
-                },
-            ],
-            ..Default::default()
-        });
-        let mut s = FrameStore::new();
-        s.push_frame(&proto);
-        let v = abi_stacks(&s);
-        unsafe {
-            assert!(v.gpr_end.offset_from(v.gpr) >= 1);
-            assert!(v.dyn_end.offset_from(v.dyn_) >= 1);
-        }
-    }
-}

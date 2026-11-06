@@ -22,8 +22,5 @@ num-bigint   = { workspace = true }
 rustc-hash   = { workspace = true }
 serde        = { workspace = true, features = ["rc"] }
 
-[dev-dependencies]
-postcard     = { workspace = true }
-
 [lints]
 workspace = true

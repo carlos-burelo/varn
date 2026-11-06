@@ -4036,7 +4036,6 @@ dependencies = [
  "bigdecimal",
  "memchr",
  "num-bigint",
- "postcard",
  "rustc-hash 1.1.0",
  "serde",
  "varn-core",
