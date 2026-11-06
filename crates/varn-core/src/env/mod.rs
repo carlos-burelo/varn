@@ -39,9 +39,7 @@ pub fn install_from_process_or_exit() -> &'static Settings {
 }
 
 pub fn process() -> &'static Settings {
-    PROCESS
-        .get()
-        .expect("varn_core::env::install runs at process start, before any reader")
+    PROCESS.get_or_init(|| from_process().0)
 }
 
 #[allow(clippy::disallowed_methods)]
