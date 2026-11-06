@@ -86,13 +86,38 @@ impl<'r> super::Binder<'r> {
             );
         } else if is_relative || is_package {
             if resolved_target.is_none() {
-                let message = match &package_failure {
-                    Some(reason) => format!("cannot resolve module '{source_str}': {reason}"),
-                    None => format!("cannot resolve module '{source_str}'"),
+                let base_path = std::path::Path::new(self.source_file.as_ref())
+                    .parent()
+                    .unwrap_or(std::path::Path::new("."));
+                let attempted = match varn_modules::resolver::resolve_in(&source_str, base_path) {
+                    Ok(varn_core::ModuleId::Local(path)) => Some(path.to_string()),
+                    Ok(_) | Err(_) => None,
                 };
-                self.emit(
-                    Diagnostic::error(ErrorCode::InvalidImportPath, message).with_range(i.range),
-                );
+                let message = match (&package_failure, &attempted) {
+                    (Some(reason), _) => {
+                        format!("cannot resolve module '{source_str}': {reason}")
+                    }
+                    (None, Some(path)) => format!(
+                        "cannot resolve module '{source_str}': no file at {}",
+                        varn_core::diagnostics::display_path(path)
+                    ),
+                    (None, None) => format!("cannot resolve module '{source_str}'"),
+                };
+                let mut diagnostic =
+                    Diagnostic::error(ErrorCode::InvalidImportPath, message).with_range(i.range);
+                let with_extension = format!("{source_str}.vn");
+                if is_relative
+                    && self
+                        .resolver
+                        .resolve_specifier(base_path, &with_extension)
+                        .is_some()
+                {
+                    diagnostic = diagnostic.with_suggestion(varn_core::Suggestion::did_you_mean(
+                        &with_extension,
+                        i.range,
+                    ));
+                }
+                self.emit(diagnostic);
             }
         } else if !is_stdlib {
             self.emit(
