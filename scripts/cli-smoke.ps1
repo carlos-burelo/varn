@@ -337,6 +337,16 @@ Check "bench-honors-permissions" {
     $denied.Code -ne 0 -and $granted.Code -eq 0
 }
 
+Check "bench-prints-plain-tables-and-a-cpu-profile" {
+    $f = Write-Vn "bench\hot.vn" 'function inner(n: int): int { let s = 0; for (let i = 0; i < 400000; i++) { s += (n + i) % 7; } return s; }
+function outer(): int { let t = 0; for (let i = 0; i < 40; i++) { t += inner(i); } return t; }
+print(outer());'
+    $folded = Join-Path $work "bench\hot.folded"
+    $r = Vn bench $f --runs 2 --profile --profile-hz 500 --profile-out $folded
+    $stacks = Get-Content $folded -Raw
+    $r.Code -eq 0 -and $r.Out -match "(?m)^phases" -and $r.Out -notmatch "[\u2500-\u257F]" -and $r.Out -match "cpu functions" -and $r.Out -match "inner" -and $stacks -match "outer;inner "
+}
+
 Check "fmt-check-passes-on-formatted" {
     $f = Write-Vn "fmt\ok.vn" 'print("a");'
     & $vn fmt $f *> $null
