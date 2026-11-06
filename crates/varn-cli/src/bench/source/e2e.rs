@@ -4,6 +4,7 @@ pub(super) fn measure_e2e(
     session: &varn_pipeline::Session,
     source: &varn_pipeline::Source,
     runs: usize,
+    warmup: usize,
     factory: &VmFactory,
 ) -> Result<Vec<Duration>, CliError> {
     use varn_pipeline::{CachePolicy, Request, Stage};
@@ -27,7 +28,9 @@ pub(super) fn measure_e2e(
         Ok(start.elapsed().saturating_sub(link))
     };
 
-    once().map_err(|e| CliError::fatal(format!("bench warmup failed: {e}")))?;
+    for _ in 0..warmup {
+        once().map_err(|e| CliError::fatal(format!("bench warmup failed: {e}")))?;
+    }
     (0..runs)
         .map(|_| once().map_err(|e| CliError::fatal(format!("bench run failed: {e}"))))
         .collect()

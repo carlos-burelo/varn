@@ -2,8 +2,8 @@ use std::rc::Rc;
 
 use super::detail::{cpu_profile, instrumented_run};
 use super::harness::{run_vm_to_completion, time_n, time_n_freq_setup, VmFactory};
+use super::output::emit;
 use super::report::jit::top_blocker;
-use super::report::plain::Report;
 use super::report::summary::{ExecSplit, Summary};
 use super::stats::PhaseStats;
 use super::BenchOpts;
@@ -16,7 +16,7 @@ pub fn run(session: &varn_pipeline::Session, path: &str, opts: &BenchOpts) -> Re
 
     let file_size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
 
-    let load_samples = time_n(runs, || {
+    let load_samples = time_n(runs, opts.warmup, || {
         crate::pipeline::portable::read_portable(path)
             .map(|_| ())
             .map_err(|e| e.to_string())
@@ -32,6 +32,7 @@ pub fn run(session: &varn_pipeline::Session, path: &str, opts: &BenchOpts) -> Re
 
     let (exec_samples, cpu_freq, tiered_during_window) = time_n_freq_setup(
         runs,
+        opts.warmup,
         || {
             varn_builtins::reset_testing_counters();
             factory.build()
@@ -51,7 +52,6 @@ pub fn run(session: &varn_pipeline::Session, path: &str, opts: &BenchOpts) -> Re
     let jit = varn_jit::JIT_STATS.snapshot();
     let records = varn_jit::stats::take_records();
 
-    let mut report = Report::new();
     let summary = Summary {
         path,
         runs,
@@ -67,16 +67,23 @@ pub fn run(session: &varn_pipeline::Session, path: &str, opts: &BenchOpts) -> Re
         cpu: cpu_freq,
         silenced_output: !opts.show_output,
     };
-    summary.fill(&mut report);
-
-    if opts.verbose {
-        instrumented_run(&mut report, &factory, &jit, &records, "bundle")?;
-    }
-    if let Some(profile) = &opts.profile {
-        cpu_profile(&mut report, &factory, profile)?;
-    }
-    report.print();
-    summary.warn();
+    let profile = opts
+        .profile
+        .as_ref()
+        .map(|profile| cpu_profile(&factory, profile))
+        .transpose()?;
+    emit(
+        opts,
+        &summary,
+        summary.record(),
+        profile.as_ref(),
+        |report| {
+            if opts.verbose {
+                instrumented_run(report, &factory, &jit, &records, "bundle")?;
+            }
+            Ok(())
+        },
+    )?;
 
     super::enforce_coverage_floor(&jit, opts.min_clif_coverage)
 }

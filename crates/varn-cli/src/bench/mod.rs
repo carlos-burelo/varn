@@ -1,6 +1,8 @@
 pub mod compiled;
 pub mod detail;
 pub mod harness;
+pub mod output;
+pub mod record;
 pub mod report;
 pub mod source;
 pub mod stats;
@@ -12,10 +14,20 @@ pub struct ProfileOpts {
     pub out: Option<String>,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Format {
+    Text,
+    Json,
+}
+
 pub struct BenchOpts {
     pub runs: usize,
+    pub warmup: usize,
     pub show_output: bool,
     pub verbose: bool,
+    pub format: Format,
+    pub baseline: Option<String>,
+    pub max_regression: Option<f64>,
     pub profile: Option<ProfileOpts>,
     pub min_clif_coverage: Option<f64>,
     pub capabilities: varn_pipeline::CapabilitySet,

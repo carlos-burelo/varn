@@ -3737,6 +3737,8 @@ dependencies = [
  "mimalloc",
  "postcard",
  "rustc-hash 1.1.0",
+ "serde",
+ "serde_json",
  "shlex",
  "varn-builtins",
  "varn-compiler",

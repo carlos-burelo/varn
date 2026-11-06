@@ -7,6 +7,7 @@ use super::plain::{
     Align::{Left, Right},
     Report, Table,
 };
+use crate::bench::record::{BuildRecord, JitRecord, PhaseRecord, Record};
 use crate::bench::stats::{PhaseStats, CV_UNRELIABLE};
 
 pub struct BuildId {
@@ -74,6 +75,30 @@ pub struct Summary<'a> {
 }
 
 impl Summary<'_> {
+    pub fn record(&self) -> Record {
+        let build = BuildId::detect();
+        let jit = self.jit;
+        let mut record = Record::new(
+            short_path(self.path),
+            BuildRecord {
+                profile: build.profile.to_owned(),
+                backend: build.backend.to_owned(),
+                commit: build.commit.map(str::to_owned),
+            },
+            JitRecord {
+                compiled: jit.compile_success,
+                seen: jit.functions_seen(),
+                blocked: jit.gate_rejected + jit.compile_fail,
+                warmup_frames: jit.never_compiled_frames(),
+                compiled_in_window: self.tiered_during_window,
+                compile_ns: jit.total_compile_time_ns,
+            },
+        );
+        record.phases = self.phases.iter().map(PhaseRecord::of).collect();
+        record.e2e = self.e2e.map(PhaseRecord::of);
+        record
+    }
+
     pub fn fill(&self, report: &mut Report) {
         let build = BuildId::detect();
 
@@ -108,7 +133,7 @@ impl Summary<'_> {
             self.phases
                 .iter()
                 .chain(self.e2e)
-                .flat_map(|p| [p.min, p.p50, p.mean(), p.max])
+                .flat_map(|p| [p.min, p.p50, p.mean(), p.p95, p.max])
                 .chain([total_p50, total_mean]),
         );
         report.title("phases");
@@ -118,11 +143,16 @@ impl Summary<'_> {
                 &scale.header("min"),
                 &scale.header("p50"),
                 &scale.header("mean"),
+                &scale.header("p95"),
                 &scale.header("max"),
                 "cv%",
+                "ci95%",
+                "out",
                 "share%",
             ],
-            [Left, Right, Right, Right, Right, Right, Right],
+            [
+                Left, Right, Right, Right, Right, Right, Right, Right, Right, Right,
+            ],
         );
         let nanos = |d: Duration| d.as_nanos() as u64;
         for phase in self.phases {
@@ -131,8 +161,11 @@ impl Summary<'_> {
                 scale.num(phase.min),
                 scale.num(phase.p50),
                 scale.num(phase.mean()),
+                scale.num(phase.p95),
                 scale.num(phase.max),
                 percent(phase.cv()),
+                percent(phase.ci_ratio()),
+                phase.outliers.to_string(),
                 share(nanos(phase.p50), nanos(total_p50)),
             ]);
         }
@@ -143,6 +176,9 @@ impl Summary<'_> {
             scale.num(total_mean),
             "-".to_owned(),
             "-".to_owned(),
+            "-".to_owned(),
+            "-".to_owned(),
+            "-".to_owned(),
             "100.0".to_owned(),
         ]);
         if let Some(e2e) = self.e2e {
@@ -151,8 +187,11 @@ impl Summary<'_> {
                 scale.num(e2e.min),
                 scale.num(e2e.p50),
                 scale.num(e2e.mean()),
+                scale.num(e2e.p95),
                 scale.num(e2e.max),
                 percent(e2e.cv()),
+                percent(e2e.ci_ratio()),
+                e2e.outliers.to_string(),
                 "-".to_owned(),
             ]);
         }

@@ -3,8 +3,8 @@ use std::time::{Duration, Instant};
 
 use super::detail::{cpu_profile, instrumented_run};
 use super::harness::{run_vm_to_completion, time_n, time_n_freq_setup, VmFactory};
+use super::output::emit;
 use super::report::jit::top_blocker;
-use super::report::plain::Report;
 use super::report::summary::{ExecSplit, SourceInfo, Summary};
 use super::report::vm::breakdown;
 use super::stats::PhaseStats;
@@ -30,7 +30,7 @@ pub fn run(
     let path = loaded.path();
     let source = loaded.text();
 
-    let read_samples = time_n(runs, || {
+    let read_samples = time_n(runs, opts.warmup, || {
         if eval.is_none() {
             crate::pipeline::Source::file(path).map_err(|e| e.to_string())?;
         }
@@ -60,6 +60,7 @@ pub fn run(
 
     let (exec_samples, cpu_freq, tiered_during_window) = time_n_freq_setup(
         runs,
+        opts.warmup,
         || {
             varn_builtins::reset_testing_counters();
             factory.build()
@@ -67,7 +68,7 @@ pub fn run(
         |machine| run_vm_to_completion(machine, factory.entry_proto()),
     )?;
 
-    let e2e_samples = e2e::measure_e2e(session, &loaded, runs, &factory)?;
+    let e2e_samples = e2e::measure_e2e(session, &loaded, runs, opts.warmup, &factory)?;
 
     let e2e_stats = PhaseStats::from_samples("e2e (cold)", &e2e_samples);
     let phases = vec![
@@ -87,7 +88,6 @@ pub fn run(
     let jit = varn_jit::JIT_STATS.snapshot();
     let records = varn_jit::stats::take_records();
 
-    let mut report = Report::new();
     let summary = Summary {
         path,
         runs,
@@ -106,45 +106,52 @@ pub fn run(
         cpu: cpu_freq,
         silenced_output: !opts.show_output,
     };
-    summary.fill(&mut report);
-
-    if opts.verbose {
-        let phase_p50 = |name: &str| phases.iter().find(|p| p.name == name).map(|p| p.p50);
-        breakdown(
-            &mut report,
-            "parser",
-            &[
-                ("program_loop", parse_profile.program_loop),
-                ("stmt_or_decl", parse_profile.stmt_or_decl),
-                ("block", parse_profile.block),
-                ("recover", parse_profile.recover),
-            ],
-            phase_p50("parse"),
-        );
-        let cp = &check_result.profile;
-        breakdown(
-            &mut report,
-            "checker",
-            &[
-                ("load_globals", cp.load_globals),
-                ("bind", cp.bind),
-                ("merge_core", cp.merge_core_members),
-                ("enrich_calls", cp.enrich_call_returns),
-                ("init", cp.init),
-                ("check_stmts", cp.check_stmts),
-                ("annotations", cp.collect_annotations),
-                ("finalize", cp.finalize),
-                ("cleanup", cp.cleanup),
-            ],
-            phase_p50("check"),
-        );
-        instrumented_run(&mut report, &factory, &jit, &records, "program")?;
-    }
-    if let Some(profile) = &opts.profile {
-        cpu_profile(&mut report, &factory, profile)?;
-    }
-    report.print();
-    summary.warn();
+    let profile = opts
+        .profile
+        .as_ref()
+        .map(|profile| cpu_profile(&factory, profile))
+        .transpose()?;
+    emit(
+        opts,
+        &summary,
+        summary.record(),
+        profile.as_ref(),
+        |report| {
+            if opts.verbose {
+                let phase_p50 = |name: &str| phases.iter().find(|p| p.name == name).map(|p| p.p50);
+                breakdown(
+                    report,
+                    "parser",
+                    &[
+                        ("program_loop", parse_profile.program_loop),
+                        ("stmt_or_decl", parse_profile.stmt_or_decl),
+                        ("block", parse_profile.block),
+                        ("recover", parse_profile.recover),
+                    ],
+                    phase_p50("parse"),
+                );
+                let cp = &check_result.profile;
+                breakdown(
+                    report,
+                    "checker",
+                    &[
+                        ("load_globals", cp.load_globals),
+                        ("bind", cp.bind),
+                        ("merge_core", cp.merge_core_members),
+                        ("enrich_calls", cp.enrich_call_returns),
+                        ("init", cp.init),
+                        ("check_stmts", cp.check_stmts),
+                        ("annotations", cp.collect_annotations),
+                        ("finalize", cp.finalize),
+                        ("cleanup", cp.cleanup),
+                    ],
+                    phase_p50("check"),
+                );
+                instrumented_run(report, &factory, &jit, &records, "program")?;
+            }
+            Ok(())
+        },
+    )?;
 
     super::enforce_coverage_floor(&jit, opts.min_clif_coverage)
 }

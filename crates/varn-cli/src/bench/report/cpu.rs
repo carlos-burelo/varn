@@ -18,9 +18,9 @@ const NAME_WIDTH: usize = 48;
 const FILE_WIDTH: usize = 40;
 
 #[derive(Default)]
-struct Counts {
-    own: u64,
-    total: u64,
+pub struct Counts {
+    pub own: u64,
+    pub total: u64,
 }
 
 pub fn print(report: &mut Report, profile: &CpuProfile) {
@@ -54,7 +54,7 @@ pub fn print(report: &mut Report, profile: &CpuProfile) {
     stacks(report, profile);
 }
 
-fn functions(report: &mut Report, profile: &CpuProfile) {
+pub fn rank_functions(profile: &CpuProfile) -> Vec<(u32, Counts)> {
     let mut counts: BTreeMap<u32, Counts> = BTreeMap::new();
     for (stack, samples) in &profile.stacks {
         if let Some(leaf) = stack.last() {
@@ -72,6 +72,11 @@ fn functions(report: &mut Report, profile: &CpuProfile) {
             profile.frames[*id as usize].function.clone(),
         )
     });
+    rows
+}
+
+fn functions(report: &mut Report, profile: &CpuProfile) {
+    let rows = rank_functions(profile);
     report.title("cpu functions");
     let mut table = Table::new(
         ["function", "file", "self", "self%", "total", "total%"],

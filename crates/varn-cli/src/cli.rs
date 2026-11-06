@@ -172,6 +172,12 @@ pub struct ReplArgs {
     pub debug_bytecode: bool,
 }
 
+#[derive(Clone, Copy, clap::ValueEnum)]
+pub enum BenchFormat {
+    Text,
+    Json,
+}
+
 #[derive(Args)]
 pub struct BenchArgs {
     #[command(flatten)]
@@ -185,11 +191,23 @@ pub struct BenchArgs {
     #[arg(long, default_value = "10", value_name = "N")]
     pub runs: usize,
 
+    #[arg(long, default_value = "1", value_name = "N")]
+    pub warmup: usize,
+
     #[arg(long)]
     pub show_output: bool,
 
     #[arg(short, long)]
     pub verbose: bool,
+
+    #[arg(long, value_enum, default_value = "text")]
+    pub format: BenchFormat,
+
+    #[arg(long, value_name = "FILE")]
+    pub baseline: Option<String>,
+
+    #[arg(long, value_name = "PCT")]
+    pub max_regression: Option<f64>,
 
     #[arg(long)]
     pub profile: bool,

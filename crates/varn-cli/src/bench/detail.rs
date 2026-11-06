@@ -47,10 +47,9 @@ const PROFILE_MAX_RUNS: usize = 2_000;
 const PROFILE_MAX_WALL: std::time::Duration = std::time::Duration::from_secs(10);
 
 pub fn cpu_profile(
-    report: &mut Report,
     factory: &VmFactory,
     opts: &super::ProfileOpts,
-) -> Result<(), CliError> {
+) -> Result<varn_vm::CpuProfile, CliError> {
     let mut profile = varn_vm::CpuProfile::new(opts.hz);
     let started = std::time::Instant::now();
     for _ in 0..PROFILE_MAX_RUNS {
@@ -65,10 +64,9 @@ pub fn cpu_profile(
             break;
         }
     }
-    super::report::cpu::print(report, &profile);
     if let Some(path) = &opts.out {
         std::fs::write(path, super::report::cpu::folded(&profile))
             .map_err(|e| CliError::fatal(format!("could not write {path}: {e}")))?;
     }
-    Ok(())
+    Ok(profile)
 }

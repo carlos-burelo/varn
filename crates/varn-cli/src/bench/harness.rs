@@ -84,8 +84,14 @@ fn compiled_keys() -> std::collections::BTreeSet<(String, usize)> {
         .collect()
 }
 
-pub fn time_n<F: Fn() -> Result<(), String>>(runs: usize, f: F) -> Result<Vec<Duration>, CliError> {
-    f().map_err(|e| CliError::fatal(format!("bench warmup failed: {e}")))?;
+pub fn time_n<F: Fn() -> Result<(), String>>(
+    runs: usize,
+    warmup: usize,
+    f: F,
+) -> Result<Vec<Duration>, CliError> {
+    for _ in 0..warmup {
+        f().map_err(|e| CliError::fatal(format!("bench warmup failed: {e}")))?;
+    }
 
     let mut samples = Vec::with_capacity(runs);
     for _ in 0..runs {
@@ -98,6 +104,7 @@ pub fn time_n<F: Fn() -> Result<(), String>>(runs: usize, f: F) -> Result<Vec<Du
 
 pub fn time_n_freq_setup<T, S, F>(
     runs: usize,
+    warmup: usize,
     setup: S,
     f: F,
 ) -> Result<(Vec<Duration>, Option<crate::cpu_freq::CpuFreq>, u64), CliError>
@@ -106,8 +113,10 @@ where
     F: Fn(&mut T) -> Result<(), String>,
 {
     varn_jit::stats::start_recording();
-    let mut warm = setup();
-    f(&mut warm).map_err(|e| CliError::fatal(format!("bench warmup failed: {e}")))?;
+    for _ in 0..warmup {
+        let mut warm = setup();
+        f(&mut warm).map_err(|e| CliError::fatal(format!("bench warmup failed: {e}")))?;
+    }
     let warmed = compiled_keys();
     varn_jit::stats::start_recording();
 
