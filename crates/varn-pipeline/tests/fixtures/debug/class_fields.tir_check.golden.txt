@@ -1,6 +1,6 @@
 
   tir check ──────────────────────────────────────── <fixtures>/class_fields.vn
-nodes 57   static 22   by name 0   static 100%
+nodes 54   static 22   by name 0   static 100%
   declared           dynamic     1   by name     0
   function type      dynamic     1   by name     0
   class object       dynamic     3   by name     0

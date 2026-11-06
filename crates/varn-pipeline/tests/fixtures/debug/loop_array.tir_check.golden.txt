@@ -1,6 +1,6 @@
 
   tir check ──────────────────────────────────────── <fixtures>/loop_array.vn
-nodes 78   static 33   by name 0   static 100%
+nodes 76   static 33   by name 0   static 100%
   declared           dynamic     1   by name     0
   function type      dynamic     3   by name     0
   class object       dynamic     2   by name     0

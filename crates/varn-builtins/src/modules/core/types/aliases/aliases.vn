@@ -45,6 +45,11 @@ export type NonNullable<T> = T extends null ? never : T
 export type ReturnType<T> = T extends (...args: dynamic[]) => infer R ? R : never
 
 /**
+ * The element type left after one level of array flattening.
+ */
+export type Flattened<E> = E extends (infer Item)[] ? Item : E
+
+/**
  * Awaited unwraps Task<T> to T.
  */
 export type Awaited<T> = T extends Task<infer U> ? U : T

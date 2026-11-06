@@ -1,6 +1,6 @@
 
   bytecode ───────────────────────────────────────── ...
-fn <module> (arity: 1, regs: 15, upvalues: 0)
+fn <module> (arity: 1, regs: 13, upvalues: 0)
   [2mconstants (6)[0m
   [2m[000][0m [34mfn makeAdder[0m(arity=2)
   [2m[001][0m [34mfn makeCounter[0m(arity=1)
@@ -8,7 +8,7 @@ fn <module> (arity: 1, regs: 15, upvalues: 0)
   [2m[003][0m [32m"closure counter 1"[0m
   [2m[004][0m [32m"closure counter 2"[0m
   [2m[005][0m [32m"closure ok"[0m
-  [2mcode (131) words[0m
+  [2mcode (122) words[0m
   Off  │ Lin │ Opcode               │ Operands / Hint
   ────────────────────────────────────────────────────────────────────────
   0000 │   1 │ [34mLoadStaticFn        [0m │ r1 = #0  [2m;[0m [34mfn makeAdder[0m(arity=2)
@@ -17,66 +17,60 @@ fn <module> (arity: 1, regs: 15, upvalues: 0)
   0007 │   1 │ [36mDefineGlobalIdx     [0m │ r1, global@2
   0010 │  13 │ [36mLoadGlobalIdx       [0m │ r1 = global@1
   0012 │  13 │ [36mLoadInt             [0m │ r2 = 5
-  0014 │  13 │ LoadNull            [0m │ r12 = null
-  0015 │  13 │ Move                [0m │ r13 = r2
-  0017 │  13 │ [35mCall                [0m │ r3 = r1, (r12..r13)
+  0014 │  13 │ LoadNull            [0m │ r11 = null
+  0015 │  13 │ Move                [0m │ r12 = r2
+  0017 │  13 │ [35mCall                [0m │ r3 = r1, (r11..r12)
   0020 │  14 │ [36mLoadInt             [0m │ r2 = 3
-  0022 │  14 │ LoadNull            [0m │ r12 = null
-  0023 │  14 │ Move                [0m │ r13 = r2
-  0025 │  14 │ [35mCall                [0m │ r4 = r3, (r12..r13)
+  0022 │  14 │ LoadNull            [0m │ r11 = null
+  0023 │  14 │ Move                [0m │ r12 = r2
+  0025 │  14 │ [35mCall                [0m │ r4 = r3, (r11..r12)
   0028 │  14 │ [36mLoadInt             [0m │ r2 = 8
   0030 │  14 │ [32mNeqInt              [0m │ r5 = r4 != r2
-  0032 │  14 │ [33mJumpIfFalse         [0m │ r5, → 0052
+  0032 │  14 │ [33mJumpIfFalse         [0m │ r5, → 0049
   0035 │  14 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@4
   0037 │  14 │ [36mLoadConst           [0m │ r6 = #2  [2m;[0m [32m"closure add5"[0m
   0039 │  14 │ Move                [0m │ r3 = r6
-  0041 │  14 │ LoadNull            [0m │ r7 = null
-  0042 │  14 │ LoadNull            [0m │ r12 = null
-  0043 │  14 │ Move                [0m │ r13 = r3
-  0045 │  14 │ Move                [0m │ r14 = r7
-  0047 │  14 │ [35mCall                [0m │ r8 = r1, (r12..r14)
-  0050 │  14 │ [33mThrow               [0m │ r8
-  0052 │  15 │ [36mLoadGlobalIdx       [0m │ r1 = global@2
-  0054 │  15 │ LoadNull            [0m │ r12 = null
-  0055 │  15 │ [35mCall                [0m │ r3 = r1, (r12)
-  0058 │  16 │ LoadNull            [0m │ r12 = null
-  0059 │  16 │ [35mCall                [0m │ r2 = r3, (r12)
-  0062 │  16 │ [36mLoadIntOne          [0m │ r4 = 1
-  0063 │  16 │ [32mNeqInt              [0m │ r5 = r2 != r4
-  0065 │  16 │ [33mJumpIfFalse         [0m │ r5, → 0085
-  0068 │  16 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@4
-  0070 │  16 │ [36mLoadConst           [0m │ r6 = #3  [2m;[0m [32m"closure counter 1"[0m
-  0072 │  16 │ Move                [0m │ r7 = r6
-  0074 │  16 │ LoadNull            [0m │ r9 = null
-  0075 │  16 │ LoadNull            [0m │ r12 = null
-  0076 │  16 │ Move                [0m │ r13 = r7
-  0078 │  16 │ Move                [0m │ r14 = r9
-  0080 │  16 │ [35mCall                [0m │ r8 = r1, (r12..r14)
-  0083 │  16 │ [33mThrow               [0m │ r8
-  0085 │  17 │ LoadNull            [0m │ r12 = null
-  0086 │  17 │ [35mCall                [0m │ r2 = r3, (r12)
-  0089 │  17 │ [36mLoadInt             [0m │ r4 = 2
-  0091 │  17 │ [32mNeqInt              [0m │ r5 = r2 != r4
-  0093 │  17 │ [33mJumpIfFalse         [0m │ r5, → 0113
-  0096 │  17 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@4
-  0098 │  17 │ [36mLoadConst           [0m │ r6 = #4  [2m;[0m [32m"closure counter 2"[0m
-  0100 │  17 │ Move                [0m │ r3 = r6
-  0102 │  17 │ LoadNull            [0m │ r7 = null
-  0103 │  17 │ LoadNull            [0m │ r12 = null
-  0104 │  17 │ Move                [0m │ r13 = r3
-  0106 │  17 │ Move                [0m │ r14 = r7
-  0108 │  17 │ [35mCall                [0m │ r8 = r1, (r12..r14)
-  0111 │  17 │ [33mThrow               [0m │ r8
-  0113 │  18 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@0
-  0115 │  18 │ [36mLoadConst           [0m │ r6 = #5  [2m;[0m [32m"closure ok"[0m
-  0117 │  18 │ Move                [0m │ r3 = r6
-  0119 │  18 │ LoadNull            [0m │ r12 = null
-  0120 │  18 │ Move                [0m │ r13 = r3
-  0122 │  18 │ [35mCall                [0m │ r7 = r1, (r12..r13)
-  0125 │  18 │ LoadNull            [0m │ r11 = null
-  0126 │  18 │ [33mReturn              [0m │ r11
-  0128 │   1 │ LoadNull            [0m │ r11 = null
-  0129 │   1 │ [33mReturn              [0m │ r11
+  0041 │  14 │ LoadNull            [0m │ r11 = null
+  0042 │  14 │ Move                [0m │ r12 = r3
+  0044 │  14 │ [35mCall                [0m │ r7 = r1, (r11..r12)
+  0047 │  14 │ [33mThrow               [0m │ r7
+  0049 │  15 │ [36mLoadGlobalIdx       [0m │ r1 = global@2
+  0051 │  15 │ LoadNull            [0m │ r11 = null
+  0052 │  15 │ [35mCall                [0m │ r3 = r1, (r11)
+  0055 │  16 │ LoadNull            [0m │ r11 = null
+  0056 │  16 │ [35mCall                [0m │ r2 = r3, (r11)
+  0059 │  16 │ [36mLoadIntOne          [0m │ r4 = 1
+  0060 │  16 │ [32mNeqInt              [0m │ r5 = r2 != r4
+  0062 │  16 │ [33mJumpIfFalse         [0m │ r5, → 0079
+  0065 │  16 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@4
+  0067 │  16 │ [36mLoadConst           [0m │ r6 = #3  [2m;[0m [32m"closure counter 1"[0m
+  0069 │  16 │ Move                [0m │ r8 = r6
+  0071 │  16 │ LoadNull            [0m │ r11 = null
+  0072 │  16 │ Move                [0m │ r12 = r8
+  0074 │  16 │ [35mCall                [0m │ r7 = r1, (r11..r12)
+  0077 │  16 │ [33mThrow               [0m │ r7
+  0079 │  17 │ LoadNull            [0m │ r11 = null
+  0080 │  17 │ [35mCall                [0m │ r2 = r3, (r11)
+  0083 │  17 │ [36mLoadInt             [0m │ r4 = 2
+  0085 │  17 │ [32mNeqInt              [0m │ r5 = r2 != r4
+  0087 │  17 │ [33mJumpIfFalse         [0m │ r5, → 0104
+  0090 │  17 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@4
+  0092 │  17 │ [36mLoadConst           [0m │ r6 = #4  [2m;[0m [32m"closure counter 2"[0m
+  0094 │  17 │ Move                [0m │ r3 = r6
+  0096 │  17 │ LoadNull            [0m │ r11 = null
+  0097 │  17 │ Move                [0m │ r12 = r3
+  0099 │  17 │ [35mCall                [0m │ r7 = r1, (r11..r12)
+  0102 │  17 │ [33mThrow               [0m │ r7
+  0104 │  18 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@0
+  0106 │  18 │ [36mLoadConst           [0m │ r6 = #5  [2m;[0m [32m"closure ok"[0m
+  0108 │  18 │ Move                [0m │ r3 = r6
+  0110 │  18 │ LoadNull            [0m │ r11 = null
+  0111 │  18 │ Move                [0m │ r12 = r3
+  0113 │  18 │ [35mCall                [0m │ r8 = r1, (r11..r12)
+  0116 │  18 │ LoadNull            [0m │ r10 = null
+  0117 │  18 │ [33mReturn              [0m │ r10
+  0119 │   1 │ LoadNull            [0m │ r10 = null
+  0120 │   1 │ [33mReturn              [0m │ r10
 
   fn makeAdder (arity: 2, regs: 4, upvalues: 0)
     [2mconstants (1)[0m

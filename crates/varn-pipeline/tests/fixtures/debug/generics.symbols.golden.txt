@@ -61,6 +61,7 @@
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mDefault             [0m │ [33mDefault[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mClass               [0m │ [33mClass[0m
   [2m1:0     [0m │ interface       │ [2m[core][0m [1mRem                 [0m │ [33mRem[0m
+  [2m1:0     [0m │ type            │ [2m[core][0m [1mFlattened           [0m │ [33mdynamic[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mMatchError          [0m │ [33mMatchError[0m
   [2m1:0     [0m │ class           │ [2m[core][0m [1mDivisionByZero      [0m │ [33mDivisionByZero[0m
   [2m1:0     [0m │ type            │ [2m[core][0m [1mRequired            [0m │ [33mdynamic[0m

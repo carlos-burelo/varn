@@ -1,3 +1,5 @@
+import { Flattened } from "core:types/aliases";
+
 /**
  * Contiguous, indexable, growable sequence of `T`.
  */
@@ -18,6 +20,7 @@ export declare class Array<T> {
     @throws(Error) filter(predicate: (item: T, index: int, array: T[]) => bool): T[];
     @throws(Error) find(predicate: (item: T, index: int, array: T[]) => bool): T?;
     @throws(Error) findIndex(predicate: (item: T, index: int, array: T[]) => bool): int?;
+    flat(): Flattened<T>[];
     @throws(Error) flatMap<U>(callback: (item: T, index: int, array: T[]) => U[]): U[];
     @throws(Error) forEach(callback: (item: T, index: int, array: T[]) => void): void;
     @throws(Error) map<U>(callback: (item: T, index: int, array: T[]) => U): U[];

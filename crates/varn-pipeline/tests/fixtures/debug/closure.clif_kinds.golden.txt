@@ -1,16 +1,16 @@
 
   clif ───────────────────────────────────────────── <module>
   <module> (native)
-    kinds (15 regs):
+    kinds (13 regs):
   block   │ kinds                                                                      
   ────────┼────────────────────────────────────────────────────────────────────────────
   block@0 │ v0:Ref, v1:Ref, v2:Ref, v3:Int, v4:Dynamic, v5:Int, v6:Int, v7:Int, v8:Bool
-  block@1 │ v9:Ref, v10:Str, v11:Dynamic, v12:Dynamic, v13:Ref                         
-  block@2 │ v14:Ref, v15:Dynamic, v16:Int, v17:Int, v18:Bool                           
-  block@3 │ v19:Ref, v20:Str, v21:Dynamic, v22:Dynamic, v23:Ref                        
-  block@4 │ v24:Int, v25:Int, v26:Bool                                                 
-  block@5 │ v27:Ref, v28:Str, v29:Dynamic, v30:Dynamic, v31:Ref                        
-  block@6 │ v32:Ref, v33:Str, v34:Dynamic, v35:Dynamic                                 
+  block@1 │ v9:Ref, v10:Str, v11:Dynamic, v12:Ref                                      
+  block@2 │ v13:Ref, v14:Dynamic, v15:Int, v16:Int, v17:Bool                           
+  block@3 │ v18:Ref, v19:Str, v20:Dynamic, v21:Ref                                     
+  block@4 │ v22:Int, v23:Int, v24:Bool                                                 
+  block@5 │ v25:Ref, v26:Str, v27:Dynamic, v28:Ref                                     
+  block@6 │ v29:Ref, v30:Str, v31:Dynamic, v32:Dynamic                                 
   makeAdder (framed)
     kinds (4 regs):
   block   │ kinds         
