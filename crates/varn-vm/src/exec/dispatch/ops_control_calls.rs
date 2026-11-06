@@ -80,6 +80,7 @@ impl ExecCtx {
                 let offset = ((code[*ip] as u32) << 16 | code[*ip + 1] as u32) as usize;
                 *ip += 2;
                 *ip -= offset;
+                self.frames[frame_idx].ip = *ip;
 
                 self.gc_backedge_safepoint();
                 if self.note_backedge(*ip, frame_idx, closure) {
