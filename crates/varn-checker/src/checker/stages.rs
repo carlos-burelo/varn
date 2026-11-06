@@ -84,6 +84,13 @@ pub(super) fn run_pass(
         .map(|entry| entry.ty)
         .chain(rec.symbol_types.values().copied())
         .chain(bind.annotation_types.values().copied())
+        .chain(
+            rec.desugar
+                .foreign_inherited_fields
+                .values()
+                .flatten()
+                .map(|field| field.ty),
+        )
         .collect();
     loop {
         reachable.sort_by_key(|ty| ty.0);
