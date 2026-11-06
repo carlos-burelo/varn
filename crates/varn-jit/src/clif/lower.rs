@@ -211,6 +211,7 @@ pub struct CodeImage {
     abs_relocs: Vec<(u32, super::reloc::AbsSym)>,
     natives: Vec<u64>,
     safepoints: Vec<(u32, Box<[u32]>)>,
+    locations: Vec<(u32, u32)>,
     activation: Activation,
     frameless: bool,
     #[serde(skip)]
@@ -264,6 +265,7 @@ impl CodeImage {
             abs_relocs,
             natives: lowered.natives,
             safepoints,
+            locations: raw.locations,
             activation,
             frameless: lowered.frameless,
             pinned: super::reloc::pinned_address(),
@@ -290,7 +292,11 @@ impl CodeImage {
         self.activation
     }
 
-    pub fn install(&self, resolver: &super::reloc::Resolver<'_>) -> Result<ClifArtifact, String> {
+    pub fn install(
+        &self,
+        resolver: &super::reloc::Resolver<'_>,
+        owner: usize,
+    ) -> Result<ClifArtifact, String> {
         let natives = super::reloc::Resolver {
             natives: &self.natives,
             ..*resolver
@@ -321,7 +327,13 @@ impl CodeImage {
                 slots: slots.clone(),
             })
             .collect();
-        crate::stack_roots::register(raw_ptr as usize, self.code.len(), safepoints);
+        crate::stack_roots::register(
+            raw_ptr as usize,
+            self.code.len(),
+            safepoints,
+            self.locations.clone(),
+            owner,
+        );
         let entry = unsafe { buf.as_ptr().add(self.wrapper_off as usize) };
         Ok(ClifArtifact {
             buffer: buf,

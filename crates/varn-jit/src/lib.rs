@@ -272,7 +272,7 @@ pub fn install(
             natives: &[],
             epoch: linker.current_epoch(),
         };
-        let art = image.install(&resolver)?;
+        let art = image.install(&resolver, proto as *const FunctionProto as usize)?;
         let jit_fn: JitFn = unsafe { std::mem::transmute(art.entry) };
         let (native, native_sig) = art.native_entry(proto);
         Ok(Compiled {

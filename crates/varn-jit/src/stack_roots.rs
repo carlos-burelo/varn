@@ -11,20 +11,51 @@ pub(crate) struct SafepointMap {
 struct CodeRange {
     end: usize,
     sites: Box<[SafepointMap]>,
+    locations: Box<[(u32, u32)]>,
+    owner: usize,
 }
 
 static CODE: RwLock<BTreeMap<usize, CodeRange>> = RwLock::new(BTreeMap::new());
 
 #[cfg(feature = "clif")]
-pub(crate) fn register(start: usize, len: usize, mut sites: Vec<SafepointMap>) {
+pub(crate) fn register(
+    start: usize,
+    len: usize,
+    mut sites: Vec<SafepointMap>,
+    mut locations: Vec<(u32, u32)>,
+    owner: usize,
+) {
     sites.sort_by_key(|s| s.return_offset);
+    locations.sort_by_key(|(offset, _)| *offset);
     CODE.write().expect("stack roots registry").insert(
         start,
         CodeRange {
             end: start + len,
             sites: sites.into_boxed_slice(),
+            locations: locations.into_boxed_slice(),
+            owner,
         },
     );
+}
+
+pub struct CodeLocation {
+    pub owner: usize,
+    pub ip: u32,
+}
+
+pub fn locate(address: usize) -> Option<CodeLocation> {
+    let code = CODE.try_read().ok()?;
+    let (start, range) = code.range(..=address).next_back()?;
+    if address >= range.end {
+        return None;
+    }
+    let offset = (address - start) as u32;
+    let at = range.locations.partition_point(|(from, _)| *from <= offset);
+    let (_, ip) = range.locations.get(at.checked_sub(1)?)?;
+    Some(CodeLocation {
+        owner: range.owner,
+        ip: *ip,
+    })
 }
 
 #[cfg(feature = "clif")]

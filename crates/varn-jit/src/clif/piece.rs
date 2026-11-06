@@ -8,6 +8,8 @@ pub(super) struct CompiledPiece {
     pub call_reloc_offsets: Vec<usize>,
 
     pub abs_relocs: Vec<(u32, super::reloc::AbsSym)>,
+
+    pub locations: Vec<(u32, u32)>,
 }
 
 pub(super) fn compile_piece(func: Function, isa: &OwnedTargetIsa) -> Result<CompiledPiece, String> {
@@ -55,11 +57,19 @@ pub(super) fn compile_piece(func: Function, isa: &OwnedTargetIsa) -> Result<Comp
                 slots: slots.into_boxed_slice(),
             });
         }
+        let locations = compiled
+            .buffer
+            .get_srclocs_sorted()
+            .iter()
+            .filter(|site| !site.loc.is_default())
+            .map(|site| (site.start, site.loc.bits()))
+            .collect();
         Ok(CompiledPiece {
             code: compiled.code_buffer().to_vec(),
             safepoints,
             call_reloc_offsets,
             abs_relocs,
+            locations,
         })
     })
 }

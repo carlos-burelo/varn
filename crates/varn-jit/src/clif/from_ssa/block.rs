@@ -140,6 +140,7 @@ pub(super) fn lower_block(
             ctx.views.forget(b, d);
         }
         ctx.site_ip.set(inst.ip);
+        b.set_srcloc(cranelift_codegen::ir::SourceLoc::new(inst.ip));
         if super::frame_policy::may_push_frame(ctx, &inst.op) {
             super::exceptions::note_site(b, ctx);
         }
