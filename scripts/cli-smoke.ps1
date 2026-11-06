@@ -170,7 +170,7 @@ import { spawnIsolate, channel, Sender } from "std:task"
 export async function sendInt(out: Sender<int>): Task<void> { await out.send(7) }
 print("entry-ran")
 const ch = channel<int>(1)
-await spawnIsolate(sendInt, [ch.tx])
+await spawnIsolate(sendInt, (ch.tx,))
 print(await ch.rx.receive())
 '@
     $f = Write-Vn "isolate\entry.vn" $src
