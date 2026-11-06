@@ -1,6 +1,7 @@
 // expect: error[wrapped]
-// expect: error[at high (tests/errors/cause-chain-is-reported.vn:9)]
+// expect: error[at high (tests/errors/cause-chain-is-reported.vn:10)]
 // expect: error[caused by: DivisionByZero: division by zero]
+// expect: error[at low (tests/errors/cause-chain-is-reported.vn:5)]
 function low(a: int, b: int): int { return a / b }
 function high(): int {
     try {

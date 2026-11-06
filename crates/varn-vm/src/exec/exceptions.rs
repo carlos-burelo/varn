@@ -56,6 +56,7 @@ struct ThrownParts {
     class: String,
     message: String,
     cause: Option<VmValue>,
+    stack: String,
 }
 
 fn describe_thrown(val: VmValue, heap: &Heap) -> ThrownParts {
@@ -63,6 +64,7 @@ fn describe_thrown(val: VmValue, heap: &Heap) -> ThrownParts {
         class: varn_core::RuntimeErrorKind::Error.class_name().to_owned(),
         message,
         cause: None,
+        stack: String::new(),
     };
     if !val.is_heap() {
         return plain(heap.str_repr(val));
@@ -82,6 +84,9 @@ fn describe_thrown(val: VmValue, heap: &Heap) -> ThrownParts {
                 .map(|nv| heap.str_repr(nv))
                 .unwrap_or_default(),
             cause: field(varn_core::MemberKey::Cause).filter(|c| !c.is_null()),
+            stack: field(varn_core::MemberKey::Stack)
+                .map(|nv| heap.str_repr(nv))
+                .unwrap_or_default(),
         };
     }
     if let Some(HeapObj::Object(obj_ref)) = heap.get(val.as_heap()) {
@@ -89,6 +94,10 @@ fn describe_thrown(val: VmValue, heap: &Heap) -> ThrownParts {
         let message = obj
             .get_field(varn_core::MemberKey::Message.as_str())
             .map(|nv| heap.str_repr(nv));
+        let stack = obj
+            .get_field(varn_core::MemberKey::Stack.as_str())
+            .map(|nv| heap.str_repr(nv))
+            .unwrap_or_default();
         let named = obj
             .get_field(varn_core::MemberKey::Name.as_str())
             .map(|nv| heap.str_repr(nv))
@@ -98,6 +107,7 @@ fn describe_thrown(val: VmValue, heap: &Heap) -> ThrownParts {
                 class,
                 message,
                 cause: None,
+                stack,
             },
             (Some(message), None) => plain(message),
             (None, _) => {
@@ -113,6 +123,64 @@ fn describe_thrown(val: VmValue, heap: &Heap) -> ThrownParts {
     plain(heap.str_repr(val))
 }
 
+pub(crate) fn format_stack(frames: &[FrameInfo]) -> String {
+    frames
+        .iter()
+        .map(|frame| {
+            format!(
+                "  at {} ({}:{})",
+                frame.fn_name,
+                varn_core::diagnostics::display_path(&frame.file),
+                frame.line
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn parse_stack(text: &str) -> Vec<FrameInfo> {
+    text.lines()
+        .filter_map(|line| {
+            let rest = line.trim().strip_prefix("at ")?;
+            let (name, location) = rest.split_once(" (")?;
+            let location = location.strip_suffix(')')?;
+            let (file, line_no) = location.rsplit_once(':')?;
+            Some(FrameInfo {
+                fn_name: name.to_owned(),
+                file: file.to_owned(),
+                line: line_no.parse().ok()?,
+            })
+        })
+        .collect()
+}
+
+fn stamp_stack(heap: &mut Heap, val: VmValue, frames: &[FrameInfo]) {
+    if !val.is_heap() || frames.is_empty() {
+        return;
+    }
+    let Some(class_id) = heap.instance(val.as_heap()).map(|inst| inst.class_id) else {
+        return;
+    };
+    let Some(cls) = varn_types::ClassObj::find_by_id(class_id) else {
+        return;
+    };
+    let layout = cls.layout();
+    let Some(field) = layout.get_field(varn_core::MemberKey::Stack.as_str()) else {
+        return;
+    };
+    let unset = heap
+        .instance(val.as_heap())
+        .and_then(|inst| inst.read_field(field))
+        .is_none_or(|current| heap.str_repr(current).is_empty());
+    if !unset {
+        return;
+    }
+    let text = heap.alloc_str_dynamic(&format_stack(frames));
+    if let Some(inst) = heap.instance(val.as_heap()) {
+        let _ = inst.write_field(field, text);
+    }
+}
+
 const MAX_CAUSE_DEPTH: usize = 8;
 
 pub fn build_thrown_error(val: VmValue, heap: &Heap, frames: &[CallFrame]) -> RuntimeError {
@@ -126,6 +194,11 @@ fn build_thrown_chain(
     remaining: usize,
 ) -> RuntimeError {
     let parts = describe_thrown(val, heap);
+    let frames = if frames.is_empty() {
+        parse_stack(&parts.stack)
+    } else {
+        frames
+    };
     let cause = parts
         .cause
         .filter(|_| remaining > 0)
@@ -157,15 +230,7 @@ pub(crate) fn thrown_value_for(err: &RuntimeError, heap: &mut Heap) -> VmValue {
         return msg;
     };
     let name = heap.alloc_str_dynamic(class_name);
-    let trace: Vec<String> = err
-        .frames
-        .iter()
-        .map(|frame| format!("  at {} ({}:{})", frame.fn_name, frame.file, frame.line))
-        .collect();
-    let stack = heap.alloc_str_dynamic(trace.join(
-        "
-",
-    ));
+    let stack = heap.alloc_str_dynamic(&format_stack(&err.frames));
     let (shape, n) = cls.instance_shape();
     let err_obj = heap.alloc_object_cell(shape, n, &[]);
     if let Some(HeapObj::Object(oref)) = heap.get(err_obj.as_heap()) {
@@ -250,7 +315,9 @@ pub(crate) unsafe fn raise(
     val: VmValue,
     depth: usize,
 ) -> Result<(), crate::error::RuntimeError> {
-    let err = build_thrown_error(val, unsafe { &(*ctx).heap }, unsafe { &(*ctx).frames });
+    let frames = collect_frames(unsafe { &(*ctx).frames });
+    stamp_stack(unsafe { &mut (*ctx).heap }, val, &frames);
+    let err = build_thrown_chain(val, unsafe { &(*ctx).heap }, frames, MAX_CAUSE_DEPTH);
     let thrown = err.thrown.unwrap_or(VmValue::null());
     if unsafe { dispatch_to_handler(ctx, thrown, depth) } {
         Ok(())
