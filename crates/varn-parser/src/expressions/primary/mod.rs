@@ -17,6 +17,7 @@ use class_expr::parse_class_expr;
 use function_expr::{parse_function_expr, parse_function_expr_inner_with_start};
 use import_meta::parse_import_meta;
 use new_expr::parse_new_expr;
+use std::num::IntErrorKind;
 use varn_core::ast::{ExprId, ExprKind};
 use varn_core::ParsedNumber;
 use varn_core::TokenKind;
@@ -39,11 +40,15 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> PResult<ExprId> {
             let raw_text = s.interner.resolve(raw);
             let value: i64 = match pre_parsed {
                 Some(ParsedNumber::Int(v)) => v,
-                Some(ParsedNumber::Float(_)) | None => {
-                    parse_int_radix(raw_text).ok_or_else(|| {
-                        ParseError::invalid(format!("integer literal `{}` overflows i64", raw_text))
-                    })?
-                }
+                Some(ParsedNumber::Float(_)) | None => match parse_int_radix(raw_text) {
+                    Ok(value) => value,
+                    Err(IntErrorKind::PosOverflow | IntErrorKind::NegOverflow) => {
+                        return Err(ParseError::invalid(format!(
+                            "integer literal `{raw_text}` overflows i64"
+                        )));
+                    }
+                    Err(_) => return Ok(s.expr(range, ExprKind::Missing)),
+                },
             };
             Ok(s.expr(range, ExprKind::IntLiteral { value, raw }))
         }
@@ -53,9 +58,10 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> PResult<ExprId> {
             let raw_text = s.interner.resolve(raw);
             let value: f64 = match pre_parsed {
                 Some(ParsedNumber::Float(v)) => v,
-                Some(ParsedNumber::Int(_)) | None => raw_text.parse().map_err(|_| {
-                    ParseError::invalid(format!("invalid float literal: {}", raw_text))
-                })?,
+                Some(ParsedNumber::Int(_)) | None => match raw_text.parse() {
+                    Ok(value) => value,
+                    Err(_) => return Ok(s.expr(range, ExprKind::Missing)),
+                },
             };
             Ok(s.expr(range, ExprKind::FloatLiteral { value, raw }))
         }

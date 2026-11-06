@@ -276,7 +276,7 @@ impl<'r> Checker<'r> {
                 }
             }
 
-            ExprKind::Missing => Type::Dynamic,
+            ExprKind::Missing => Type::Error,
             ExprKind::Is { .. } => Type::Bool,
             ExprKind::Sequence { expressions } => match expressions.last() {
                 Some(last) => self.infer_type(rec, *last, bind),

@@ -11,6 +11,29 @@ use crate::token_record::{push_token, TokenRecord};
 impl super::Scanner<'_> {
     pub(super) fn scan_number(&mut self, tokens: &mut Vec<TokenRecord>, lexemes: &mut Vec<u8>) {
         let start = self.pos;
+        self.scan_number_token(tokens, lexemes);
+        let following = self.src.get(self.pos).copied();
+        if let Some(problem) = number_problem(&self.src[start..self.pos], following) {
+            let end = if following.is_some_and(is_suffix_byte) {
+                let mut end = self.pos;
+                while self.src.get(end).copied().is_some_and(is_suffix_byte) {
+                    end += 1;
+                }
+                end
+            } else {
+                self.pos
+            };
+            self.report_span(
+                varn_core::ErrorCode::InvalidNumericLiteral,
+                problem,
+                start,
+                end,
+            );
+        }
+    }
+
+    fn scan_number_token(&mut self, tokens: &mut Vec<TokenRecord>, lexemes: &mut Vec<u8>) {
+        let start = self.pos;
         let (sl, sc) = self.location();
 
         if self.peek(0) == b'0' && (self.peek(1) == b'b' || self.peek(1) == b'B') {
@@ -376,4 +399,43 @@ fn is_single_char(content: &[u8]) -> bool {
         Some(_) => chars.next().is_none(),
         None => false,
     }
+}
+
+fn is_suffix_byte(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || byte == b'_'
+}
+
+fn number_problem(text: &[u8], following: Option<u8>) -> Option<&'static str> {
+    if following.is_some_and(is_suffix_byte) {
+        return Some("a number can only end with `n` (bigint) or `d` (decimal), not with other letters or digits");
+    }
+    let (digits, prefixed) = match text {
+        [b'0', b'x' | b'X' | b'b' | b'B' | b'o' | b'O', rest @ ..] => (rest, true),
+        _ => (text, false),
+    };
+    let digits = match digits {
+        [body @ .., b'n' | b'd'] => body,
+        _ => digits,
+    };
+    if prefixed && digits.iter().all(|byte| *byte == b'_') {
+        return Some("a prefixed number needs at least one digit after the prefix");
+    }
+    if digits.windows(2).any(|pair| pair == b"__")
+        || digits.first() == Some(&b'_')
+        || digits.last() == Some(&b'_')
+    {
+        return Some("the digit separator `_` must sit between two digits");
+    }
+    if !prefixed
+        && digits.windows(2).any(|pair| {
+            (pair[0] == b'_' && !pair[1].is_ascii_digit())
+                || (pair[1] == b'_' && !pair[0].is_ascii_digit())
+        })
+    {
+        return Some("the digit separator `_` must sit between two digits");
+    }
+    if !prefixed && matches!(digits.last(), Some(b'e' | b'E' | b'+' | b'-')) {
+        return Some("an exponent needs digits after `e`");
+    }
+    None
 }

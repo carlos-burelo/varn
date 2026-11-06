@@ -40,26 +40,27 @@ pub(crate) fn take_min_integer(s: &mut TokenStream, start: SourceRange) -> Optio
     ))
 }
 
-pub(super) fn parse_int_radix(raw: &str) -> Option<i64> {
+pub(super) fn parse_int_radix(raw: &str) -> Result<i64, std::num::IntErrorKind> {
     let cleaned = raw.replace('_', "");
-    if let Some(hex) = cleaned
+    let (digits, radix) = if let Some(hex) = cleaned
         .strip_prefix("0x")
         .or_else(|| cleaned.strip_prefix("0X"))
     {
-        i64::from_str_radix(hex, 16).ok()
+        (hex, 16)
     } else if let Some(bin) = cleaned
         .strip_prefix("0b")
         .or_else(|| cleaned.strip_prefix("0B"))
     {
-        i64::from_str_radix(bin, 2).ok()
+        (bin, 2)
     } else if let Some(oct) = cleaned
         .strip_prefix("0o")
         .or_else(|| cleaned.strip_prefix("0O"))
     {
-        i64::from_str_radix(oct, 8).ok()
+        (oct, 8)
     } else {
-        cleaned.parse().ok()
-    }
+        (cleaned.as_str(), 10)
+    };
+    i64::from_str_radix(digits, radix).map_err(|error| *error.kind())
 }
 
 pub(crate) struct EscapeIssue {
