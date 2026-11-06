@@ -347,6 +347,32 @@ print(outer());'
     $r.Code -eq 0 -and $r.Out -match "(?m)^phases" -and $r.Out -notmatch "[\u2500-\u257F]" -and $r.Out -match "cpu functions" -and $r.Out -match "inner" -and $stacks -match "outer;inner "
 }
 
+Check "bench-json-feeds-a-baseline-gate" {
+    $f = Write-Vn "bench\gate.vn" 'function work(): int { let s = 0; for (let i = 0; i < 2000000; i++) { s += i % 7; } return s; }
+print(work());'
+    $json = Join-Path $work "bench\gate.json"
+    & $vn bench $f --runs 4 --format json 2>$null | Set-Content $json -Encoding utf8
+    $record = Get-Content $json -Raw | ConvertFrom-Json
+    $same = Vn bench $f --runs 4 --baseline $json --max-regression 900
+    foreach ($phase in $record.phases) {
+        if ($phase.name -eq "execute (warm)") { $phase.mean_ns = [long]($phase.mean_ns / 20); $phase.p50_ns = [long]($phase.p50_ns / 20); $phase.ci95_ns = 1 }
+    }
+    $fast = Join-Path $work "bench\gate-fast.json"
+    $record | ConvertTo-Json -Depth 8 | Set-Content $fast -Encoding utf8
+    $gated = Vn bench $f --runs 4 --baseline $fast --max-regression 10
+    $record.schema -eq 1 -and $record.phases.Count -ge 2 -and $same.Code -eq 0 -and $gated.Code -ne 0 -and $gated.Out -match "slower than the baseline"
+}
+
+Check "bench-profile-tells-waiting-from-running" {
+    $f = Write-Vn "bench\idle.vn" 'import { sleep } from "std:task"
+async function main(): Task<void> { for (let i = 0; i < 30; i++) { await sleep(10); } }
+await main();'
+    $r = Vn bench $f --runs 2 --profile --profile-hz 500
+    $line = ($r.Out -split "`n" | Where-Object { $_ -match "^waiting, off cpu" }) -join ""
+    $percent = [double](($line -replace "[^0-9.]", " ").Trim() -split " ")[0]
+    $r.Code -eq 0 -and $percent -gt 50
+}
+
 Check "fmt-check-passes-on-formatted" {
     $f = Write-Vn "fmt\ok.vn" 'print("a");'
     & $vn fmt $f *> $null
