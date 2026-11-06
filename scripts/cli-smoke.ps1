@@ -373,6 +373,13 @@ await main();'
     $r.Code -eq 0 -and $percent -gt 50
 }
 
+Check "every-benchmark-compiles" {
+    $files = Get-ChildItem (Join-Path $RootDir "tests/benchmarks/vn") -Filter *.vn | ForEach-Object { $_.FullName }
+    $r = Vn check @files
+    if ($r.Code -ne 0) { Write-Host $r.Out }
+    $files.Count -gt 0 -and $r.Code -eq 0
+}
+
 Check "fmt-check-passes-on-formatted" {
     $f = Write-Vn "fmt\ok.vn" 'print("a");'
     & $vn fmt $f *> $null
