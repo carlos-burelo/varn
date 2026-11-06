@@ -1,3 +1,4 @@
 // expect: error[VN2010]
+// expect: error[VN1006]
 import { v } from "../helpers/broken-escape.vn"
 print(v)
