@@ -1,13 +1,14 @@
-// expect: error[wrapped]
-// expect: error[at high (tests/errors/cause-chain-is-reported.vn:10)]
+// expect: error[StdError: wrapped]
+// expect: error[at high (tests/errors/cause-chain-is-reported.vn:11)]
 // expect: error[caused by: DivisionByZero: division by zero]
-// expect: error[at low (tests/errors/cause-chain-is-reported.vn:5)]
+// expect: error[at low (tests/errors/cause-chain-is-reported.vn:6)]
+import { StdError } from "std:error"
 function low(a: int, b: int): int { return a / b }
 function high(): int {
     try {
         return low(1, 0)
     } catch (e) {
-        throw new Error("wrapped", e as Error)
+        throw new StdError("wrapped", e as Error)
     }
 }
 print(high())

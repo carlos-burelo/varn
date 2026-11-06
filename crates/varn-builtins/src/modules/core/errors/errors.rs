@@ -2,13 +2,7 @@ use varn_core::RuntimeErrorKind;
 use varn_macros::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
-fn init_error(
-    ctx: &mut dyn NativeCtx,
-    this: VmValue,
-    message: Option<&str>,
-    cause: Option<VmValue>,
-    class_name: &str,
-) {
+fn init_error(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>, class_name: &str) {
     let msg = match message {
         Some(m) => ctx.alloc_str(m),
         None => VmValue::null(),
@@ -18,11 +12,6 @@ fn init_error(
     ctx.set_field(this, varn_core::MemberKey::Name.as_str(), name);
     let stack = ctx.alloc_str("");
     ctx.set_field(this, varn_core::MemberKey::Stack.as_str(), stack);
-    ctx.set_field(
-        this,
-        varn_core::MemberKey::Cause.as_str(),
-        cause.unwrap_or_else(VmValue::null),
-    );
 }
 
 pub struct ErrorClass;
@@ -42,13 +31,8 @@ varn_contract! {
     contract: "src/modules/core/errors/errors.vn",
     class: "Error",
     impl ErrorClass {
-        fn constructor(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            message: Option<&str>,
-            cause: Option<VmValue>,
-        ) -> VmValue {
-            init_error(ctx, this, message, cause, RuntimeErrorKind::Error.class_name());
+        fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
+            init_error(ctx, this, message, RuntimeErrorKind::Error.class_name());
             this
         }
 
@@ -71,65 +55,40 @@ varn_contract! {
 
     class: "TypeError",
     impl TypeErrorClass {
-        fn constructor(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            message: Option<&str>,
-            cause: Option<VmValue>,
-        ) -> VmValue {
-            init_error(ctx, this, message, cause, RuntimeErrorKind::TypeError.class_name());
+        fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
+            init_error(ctx, this, message, RuntimeErrorKind::TypeError.class_name());
             this
         }
     }
 
     class: "RangeError",
     impl RangeErrorClass {
-        fn constructor(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            message: Option<&str>,
-            cause: Option<VmValue>,
-        ) -> VmValue {
-            init_error(ctx, this, message, cause, RuntimeErrorKind::RangeError.class_name());
+        fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
+            init_error(ctx, this, message, RuntimeErrorKind::RangeError.class_name());
             this
         }
     }
 
     class: "IntegerOverflow",
     impl IntegerOverflowClass {
-        fn constructor(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            message: Option<&str>,
-            cause: Option<VmValue>,
-        ) -> VmValue {
-            init_error(ctx, this, message, cause, RuntimeErrorKind::IntegerOverflow.class_name());
+        fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
+            init_error(ctx, this, message, RuntimeErrorKind::IntegerOverflow.class_name());
             this
         }
     }
 
     class: "DivisionByZero",
     impl DivisionByZeroClass {
-        fn constructor(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            message: Option<&str>,
-            cause: Option<VmValue>,
-        ) -> VmValue {
-            init_error(ctx, this, message, cause, RuntimeErrorKind::DivisionByZero.class_name());
+        fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
+            init_error(ctx, this, message, RuntimeErrorKind::DivisionByZero.class_name());
             this
         }
     }
 
     class: "MatchError",
     impl MatchErrorClass {
-        fn constructor(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            message: Option<&str>,
-            cause: Option<VmValue>,
-        ) -> VmValue {
-            init_error(ctx, this, message, cause, RuntimeErrorKind::MatchError.class_name());
+        fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>) -> VmValue {
+            init_error(ctx, this, message, RuntimeErrorKind::MatchError.class_name());
             this
         }
     }

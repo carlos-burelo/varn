@@ -14,8 +14,8 @@ fn is_unboxed_kind(kind: varn_core::RuntimeKind) -> bool {
 
 /// Los slots deben coincidir exacto. Los tipos solo importan por
 /// representación: unboxed (Int/Float/Bool/Char) exige igualdad porque los
-/// primitivos bajan idéntico en todo contexto; entre boxed basta que ambos
-/// lados sean referencias, sea cual sea su precisión nominal.
+/// primitivos bajan idéntico en todo contexto; en boxed basta que la copia
+/// sea igual o genérica (degrada a ByName, sano).
 fn fields_cover(
     copy: &[varn_tir::FieldInfo],
     copy_types: &varn_tir::TyTable,
@@ -33,7 +33,7 @@ fn fields_cover(
             (Some(a), Some(b)) => a == b,
             (None, Some(b)) => !is_unboxed_kind(b),
             (None, None) => true,
-            (Some(a), None) => !is_unboxed_kind(a),
+            (Some(_), None) => false,
         }
     })
 }
