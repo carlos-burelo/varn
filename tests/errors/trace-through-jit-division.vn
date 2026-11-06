@@ -1,0 +1,13 @@
+// expect: error[division by zero]
+// expect: error[at divide (tests/errors/trace-through-jit-division.vn:6)]
+// expect: error[at ratio (tests/errors/trace-through-jit-division.vn:9)]
+// expect: error[at <module> (tests/errors/trace-through-jit-division.vn:12)]
+function divide(a: int, b: int): int {
+    return a / b
+}
+function ratio(n: int): int {
+    return divide(10, n) + 1
+}
+let total = 0
+for (let i = 5000; i >= 0; i--) { total += ratio(i) }
+print(total)

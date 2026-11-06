@@ -230,6 +230,7 @@ pub struct JitHelpers {
     pub spawn: usize,
     pub stack_overflow: usize,
     pub call_depth_overflow: usize,
+    pub stamp_throw: usize,
     pub store_global_by_name: usize,
     pub store_module_slot: usize,
     pub store_upvalue: usize,

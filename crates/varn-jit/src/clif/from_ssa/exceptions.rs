@@ -90,6 +90,14 @@ pub(super) fn emit_throw_boxed(
     ctx: &Ctx<'_>,
     boxed: Value,
 ) -> Result<(), String> {
+    record_site(b, ctx);
+    let (tag, payload) = b.ins().isplit(boxed);
+    super::super::emit::call_helper_void(
+        b,
+        ctx.cc,
+        ctx.helpers.stamp_throw,
+        &[ctx.exec_ctx, tag, payload],
+    );
     if let Some((_, landing)) = current_landing(ctx) {
         b.ins().jump(landing, &[boxed.into()]);
         Ok(())

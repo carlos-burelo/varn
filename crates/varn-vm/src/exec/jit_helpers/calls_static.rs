@@ -112,6 +112,15 @@ pub(crate) extern "C" fn jit_call_depth_overflow(
     unsafe { jit_propagate_error(&mut *ctx, crate::frame::call_depth_exceeded()) }
 }
 
+#[varn_macros::jit_slow(field = "stamp_throw")]
+pub(crate) extern "C" fn jit_stamp_throw(ctx: *mut ExecCtx, tag: u64, payload: u64) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let thrown = VmValue::from_raw_parts(tag, payload);
+        crate::exec::exceptions::stamp_thrown(&mut ctx_ref.heap, thrown, &ctx_ref.frames);
+    }
+}
+
 #[varn_macros::jit_slow(field = "stack_overflow")]
 pub(crate) extern "C" fn jit_stack_overflow(
     ctx: *mut ExecCtx,

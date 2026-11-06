@@ -154,6 +154,10 @@ fn parse_stack(text: &str) -> Vec<FrameInfo> {
         .collect()
 }
 
+pub(crate) fn stamp_thrown(heap: &mut Heap, val: VmValue, frames: &[CallFrame]) {
+    stamp_stack(heap, val, &collect_frames(frames));
+}
+
 fn stamp_stack(heap: &mut Heap, val: VmValue, frames: &[FrameInfo]) {
     if !val.is_heap() || frames.is_empty() {
         return;

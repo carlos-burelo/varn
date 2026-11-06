@@ -1,0 +1,18 @@
+// expect: error[exhausted]
+// expect: error[at low (tests/errors/trace-through-jit-throw.vn:7)]
+// expect: error[at mid (tests/errors/trace-through-jit-throw.vn:11)]
+// expect: error[at high (tests/errors/trace-through-jit-throw.vn:14)]
+// expect: error[at <module> (tests/errors/trace-through-jit-throw.vn:17)]
+function low(n: int): int {
+    if (n == 4999) { throw new Error("exhausted") }
+    return n + 1
+}
+function mid(n: int): int {
+    return low(n) + 1
+}
+function high(n: int): int {
+    return mid(n) + 1
+}
+let total = 0
+for (let i = 0; i < 5000; i++) { total += high(i) }
+print(total)

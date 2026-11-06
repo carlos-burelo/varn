@@ -151,6 +151,20 @@ await describe("296 error model", async () => {
         expect((wrapped.cause as ParseError).position).toBe(3);
         expect(wrapped.path).toBe("$.user.age");
     });
+    await it("a hot function reports its call chain in the stack", async () => {
+        const fail = (n: int): int => {
+            if (n == 4999) { throw new Error("late"); }
+            return n;
+        };
+        const outer = (n: int): int => fail(n) + 1;
+        let stack = "";
+        let total = 0;
+        for (let i = 0; i < 5000; i++) {
+            try { total += outer(i); } catch (e: Error) { stack = e.stack; }
+        }
+        expect(stack.includes("at <closure>")).toBe(true);
+        expect(stack.includes("at <module>")).toBe(true);
+    });
     await it("Task.race rethrows the winner's error with its class", async () => {
         const failing = async () => {
             await readTextAsync("/definitely/not/here");
