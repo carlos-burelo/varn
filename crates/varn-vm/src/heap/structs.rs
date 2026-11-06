@@ -9,7 +9,30 @@ use std::rc::Rc;
 use varn_types::HeapRef;
 use varn_types::{ClassObj, RuntimeString};
 
+#[derive(Clone, Copy, Default)]
+pub struct GcTime {
+    pub major_ns: u64,
+    pub major_max_ns: u64,
+    pub minor_ns: u64,
+    pub minor_max_ns: u64,
+}
+
+impl GcTime {
+    pub(crate) fn add_major(&mut self, took: std::time::Duration) {
+        let ns = took.as_nanos() as u64;
+        self.major_ns += ns;
+        self.major_max_ns = self.major_max_ns.max(ns);
+    }
+
+    pub(crate) fn add_minor(&mut self, took: std::time::Duration) {
+        let ns = took.as_nanos() as u64;
+        self.minor_ns += ns;
+        self.minor_max_ns = self.minor_max_ns.max(ns);
+    }
+}
+
 pub struct HeapInner {
+    pub gc_time: GcTime,
     pub jit_epoch: u64,
     pub intrinsic_classes: FxHashMap<String, Rc<ClassObj>>,
     pub(crate) kind_classes: [Option<Rc<ClassObj>>; varn_core::RuntimeKind::COUNT],
@@ -54,6 +77,7 @@ impl HeapInner {
             char_interner: FxHashMap::default(),
             major_work: Vec::new(),
             gc_collections: 0,
+            gc_time: GcTime::default(),
             gc_total_freed: 0,
             gc_threshold: settings.old_floor(),
             gc_floor: settings.old_floor(),

@@ -123,6 +123,14 @@ pub fn counters(report: &mut Report, profile: &VmProfile) {
     report.title("gc");
     let mut table = Table::pairs();
     for (name, value) in [
+        ("major pause total ns", profile.gc_ns),
+        ("major pause max ns", profile.gc_max_pause_ns),
+        ("minor pause total ns", profile.minor_gc_ns),
+        ("minor pause max ns", profile.minor_gc_max_pause_ns),
+    ] {
+        table.row([name.to_owned(), value.to_string()]);
+    }
+    for (name, value) in [
         ("young allocs", profile.nursery_allocs),
         ("heap allocs", profile.heap_allocs),
         ("minor runs", profile.minor_gc_count),

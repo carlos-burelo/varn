@@ -27,13 +27,18 @@ impl ExecCtx {
     }
 
     pub fn run_minor_gc(&mut self) {
+        let start = std::time::Instant::now();
         let roots = self.gc_roots();
         self.heap.minor_gc(&roots);
+        self.heap.gc_time.add_minor(start.elapsed());
     }
 
     pub(crate) fn trigger_gc(&mut self) -> usize {
+        let start = std::time::Instant::now();
         let roots = self.gc_roots();
-        self.heap.collect(&roots)
+        let freed = self.heap.collect(&roots);
+        self.heap.gc_time.add_major(start.elapsed());
+        freed
     }
 
     pub(crate) fn gc_roots(&self) -> Vec<HeapRef> {

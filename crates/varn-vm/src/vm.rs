@@ -161,6 +161,10 @@ impl Vm {
             VmProfile {
                 heap_allocs: self.ctx.heap.alloc_count(),
                 gc_collections: self.ctx.heap.gc_collections,
+                gc_ns: self.ctx.heap.gc_time.major_ns,
+                gc_max_pause_ns: self.ctx.heap.gc_time.major_max_ns,
+                minor_gc_ns: self.ctx.heap.gc_time.minor_ns,
+                minor_gc_max_pause_ns: self.ctx.heap.gc_time.minor_max_ns,
                 gc_freed: self.ctx.heap.gc_total_freed,
                 heap_live: self.ctx.heap.live_count() as u64,
                 heap_total: self.ctx.heap.objects_len() as u64,
