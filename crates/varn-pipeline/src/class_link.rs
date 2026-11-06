@@ -71,17 +71,17 @@ pub fn verify_foreign_layouts(tables: &HashMap<String, ModuleClasses>) -> Result
                 .map(|(_, ci)| ci)
                 .expect("foreign entry vanished");
             if !fields_cover(&copy.fields, &entry.types, &local.fields, &defining.types) {
-                let show = |fields: &[varn_tir::FieldInfo]| {
+                let show = |fields: &[varn_tir::FieldInfo], types: &varn_tir::TyTable| {
                     fields
                         .iter()
-                        .map(|f| format!("{}:{:?}#{}", f.name, f.ty, f.slot))
+                        .map(|f| format!("{}:{:?}#{}", f.name, f.ty.non_nullable(types), f.slot))
                         .collect::<Vec<_>>()
                         .join(",")
                 };
                 return Err(format!(
                     "E_CLASS_LAYOUT_DIVERGENCE: '{name}' copied into '{module}' from '{origin}' differs from its definition (copy [{}] vs def [{}])",
-                    show(&copy.fields),
-                    show(&local.fields)
+                    show(&copy.fields, &entry.types),
+                    show(&local.fields, &defining.types)
                 ));
             }
         }
