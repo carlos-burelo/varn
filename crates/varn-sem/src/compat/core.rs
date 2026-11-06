@@ -48,6 +48,11 @@ pub fn types_compatible_with_cache(
     if declared == inferred {
         return true;
     }
+    if matches!(table.get(declared.0), TypeKind::Conditional { .. })
+        || matches!(table.get(inferred.0), TypeKind::Conditional { .. })
+    {
+        return true;
+    }
     if is_simple_type(declared, table) && is_simple_type(inferred, table) {
         return simple_types_compatible(declared, inferred, table);
     }
@@ -70,6 +75,11 @@ pub(super) fn types_compatible_impl(
         return fits;
     }
     if declared == inferred {
+        return true;
+    }
+    if matches!(table.get(declared.0), TypeKind::Conditional { .. })
+        || matches!(table.get(inferred.0), TypeKind::Conditional { .. })
+    {
         return true;
     }
     if is_simple_type(declared, table) && is_simple_type(inferred, table) {

@@ -158,6 +158,17 @@ impl TypeContext for BindView<'_> {
         self.bind.get_enum_members_local(name).cloned()
     }
 
+    fn is_type_parameter(&self, name: &str) -> bool {
+        let scope = self.bind.scopes.get(self.scope);
+        self.bind
+            .interner
+            .get(name)
+            .and_then(|atom| scope.resolve(atom, &self.bind.scopes))
+            .is_some_and(|id| {
+                self.bind.arena.get(id).kind == crate::symbol::SymbolKind::TypeParameter
+            })
+    }
+
     fn resolve_symbol(&self, name: &str) -> Option<Type> {
         let scope = self.bind.scopes.get(self.scope);
         let atom = self.bind.interner.get(name)?;

@@ -19,6 +19,10 @@ impl TypeContext for InferBindingContext<'_> {
         self.inner.map_or(0, |c| c.alias_expansion_depth())
     }
 
+    fn is_type_parameter(&self, name: &str) -> bool {
+        self.inner.is_some_and(|c| c.is_type_parameter(name))
+    }
+
     fn resolver(&self) -> Option<&dyn crate::resolver::ImportResolver> {
         self.inner.and_then(|c| c.resolver())
     }
@@ -159,6 +163,10 @@ impl TypeContext for MappedContext<'_> {
         self.inner.map_or(0, |c| c.alias_expansion_depth())
     }
 
+    fn is_type_parameter(&self, name: &str) -> bool {
+        self.inner.is_some_and(|c| c.is_type_parameter(name))
+    }
+
     fn resolver(&self) -> Option<&dyn crate::resolver::ImportResolver> {
         self.inner.and_then(|c| c.resolver())
     }
@@ -243,6 +251,10 @@ impl AliasSubstitutionContext<'_> {
 impl TypeContext for AliasSubstitutionContext<'_> {
     fn alias_expansion_depth(&self) -> usize {
         1 + self.inner.map_or(0, |c| c.alias_expansion_depth())
+    }
+
+    fn is_type_parameter(&self, name: &str) -> bool {
+        !self.binds_type_param(name) && self.inner.is_some_and(|c| c.is_type_parameter(name))
     }
 
     fn resolver(&self) -> Option<&dyn crate::resolver::ImportResolver> {

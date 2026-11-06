@@ -75,6 +75,10 @@ pub trait TypeContext {
         0
     }
 
+    fn is_type_parameter(&self, _name: &str) -> bool {
+        false
+    }
+
     fn atom_text(&self, atom: varn_core::Atom) -> Option<String> {
         self.interner()
             .and_then(|i| i.try_resolve(atom))

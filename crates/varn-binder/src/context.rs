@@ -82,6 +82,16 @@ impl TypeContext for Binder<'_> {
         self.type_members.enums.get(name).cloned()
     }
 
+    fn is_type_parameter(&self, name: &str) -> bool {
+        let scope = self.scopes.get(self.current);
+        self.interner
+            .get(name)
+            .and_then(|atom| scope.resolve(atom, &self.scopes))
+            .is_some_and(|id| {
+                self.arena.get(id).kind == varn_sem::symbol::SymbolKind::TypeParameter
+            })
+    }
+
     fn resolve_symbol(&self, name: &str) -> Option<Type> {
         let scope = self.scopes.get(self.current);
         let atom = self.interner.get(name)?;

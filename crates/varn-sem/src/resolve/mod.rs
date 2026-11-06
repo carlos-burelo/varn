@@ -18,6 +18,7 @@ use crate::types::{CheckerTyTable, Type, TypeContext};
 use varn_core::ast::TypeNode;
 use varn_core::TypeKind;
 
+pub(crate) use conditional::evaluate_conditional;
 use conditional::resolve_conditional;
 use keyed_access::{resolve_indexed_access, resolve_keyof};
 use mapped::resolve_mapped_type;
