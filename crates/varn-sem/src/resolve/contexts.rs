@@ -15,6 +15,10 @@ impl InferBindingContext<'_> {
 }
 
 impl TypeContext for InferBindingContext<'_> {
+    fn alias_expansion_depth(&self) -> usize {
+        self.inner.map_or(0, |c| c.alias_expansion_depth())
+    }
+
     fn resolver(&self) -> Option<&dyn crate::resolver::ImportResolver> {
         self.inner.and_then(|c| c.resolver())
     }
@@ -151,6 +155,10 @@ impl MappedContext<'_> {
 }
 
 impl TypeContext for MappedContext<'_> {
+    fn alias_expansion_depth(&self) -> usize {
+        self.inner.map_or(0, |c| c.alias_expansion_depth())
+    }
+
     fn resolver(&self) -> Option<&dyn crate::resolver::ImportResolver> {
         self.inner.and_then(|c| c.resolver())
     }
@@ -233,6 +241,10 @@ impl AliasSubstitutionContext<'_> {
 }
 
 impl TypeContext for AliasSubstitutionContext<'_> {
+    fn alias_expansion_depth(&self) -> usize {
+        1 + self.inner.map_or(0, |c| c.alias_expansion_depth())
+    }
+
     fn resolver(&self) -> Option<&dyn crate::resolver::ImportResolver> {
         self.inner.and_then(|c| c.resolver())
     }

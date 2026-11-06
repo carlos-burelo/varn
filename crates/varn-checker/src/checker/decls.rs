@@ -40,7 +40,9 @@ impl<'r> Checker<'r> {
                 self.check_export(rec, e, bind);
             }
 
-            Decl::TypeAlias(_) | Decl::Import(_) | Decl::SumType(_) => {}
+            Decl::TypeAlias(alias) => self.check_type_alias(alias, bind),
+
+            Decl::Import(_) | Decl::SumType(_) => {}
         }
     }
 }

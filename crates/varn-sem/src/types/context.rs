@@ -71,6 +71,10 @@ pub trait TypeContext {
         None
     }
 
+    fn alias_expansion_depth(&self) -> usize {
+        0
+    }
+
     fn atom_text(&self, atom: varn_core::Atom) -> Option<String> {
         self.interner()
             .and_then(|i| i.try_resolve(atom))

@@ -2,6 +2,8 @@ use crate::types::{CheckerTyTable, Type, TypeContext};
 use varn_core::ast::TypeNode;
 use varn_core::TypeKind;
 
+const MAX_ALIAS_EXPANSION: usize = 64;
+
 use super::aliases::try_stdlib_generic_alias;
 use super::contexts::AliasSubstitutionContext;
 use super::names::resolve_atom_name;
@@ -36,6 +38,9 @@ pub(super) fn resolve_generic_type(
         && !params.is_empty()
         && params.len() == resolved_args.len()
     {
+        if ctx.map_or(0, |c| c.alias_expansion_depth()) >= MAX_ALIAS_EXPANSION {
+            return Type::Error;
+        }
         let alias_ctx = AliasSubstitutionContext {
             inner: ctx,
             params,

@@ -1,11 +1,87 @@
 use super::Checker;
 use std::sync::Arc;
-use varn_core::ast::{ClassDecl, ClassMember, Param, TypeNode, TypeParam};
+use varn_core::ast::{ClassDecl, ClassMember, Param, TypeAliasDecl, TypeNode, TypeParam};
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 use varn_sem::bind::{BindResult, BindView};
 use varn_sem::types::TypeContext;
 
+enum AliasCycle {
+    Plain,
+    Expanding,
+}
+
 impl<'r> Checker<'r> {
+    pub(crate) fn check_type_alias(&mut self, alias: &TypeAliasDecl, bind: &BindResult) {
+        self.with_type_params(&alias.type_params, bind, |checker| {
+            checker.check_type_names(&alias.alias, bind);
+        });
+        let name = bind.interner.resolve(alias.id).to_owned();
+        let (code, detail) = match self.alias_reaches(&alias.alias, &name, bind, &mut Vec::new()) {
+            Some(AliasCycle::Plain) => (
+                ErrorCode::CircularTypeReference,
+                "refers to itself with nothing between",
+            ),
+            Some(AliasCycle::Expanding) => (
+                ErrorCode::InfiniteTypeExpansion,
+                "expands without end: it refers to itself with other type arguments",
+            ),
+            None => return,
+        };
+        self.unknown_type_names.insert(alias.id);
+        self.emit(
+            Diagnostic::error(code, format!("type alias '{name}' {detail}"))
+                .with_range(alias.alias.range),
+        );
+    }
+
+    fn alias_reaches(
+        &self,
+        node: &TypeNode,
+        target: &str,
+        bind: &BindResult,
+        seen: &mut Vec<String>,
+    ) -> Option<AliasCycle> {
+        match &node.kind {
+            TypeKind::Named(name, _) | TypeKind::Generic(name, _, _) => {
+                let text = self.resolve_bind_atom(bind, *name).to_string();
+                let generic = matches!(node.kind, TypeKind::Generic(..));
+                if text == target {
+                    return Some(if generic {
+                        AliasCycle::Expanding
+                    } else {
+                        AliasCycle::Plain
+                    });
+                }
+                if seen.contains(&text) {
+                    return None;
+                }
+                seen.push(text.clone());
+                let view = BindView::new(bind, self.resolver).at(self.current_scope);
+                let (_, body) = view.get_alias_node(&text)?;
+                self.alias_reaches(&body, target, bind, seen)
+            }
+            TypeKind::Union(members) | TypeKind::Intersection(members) => members
+                .iter()
+                .find_map(|member| self.alias_reaches(member, target, bind, seen)),
+            TypeKind::Primitive(_)
+            | TypeKind::Literal(_)
+            | TypeKind::This
+            | TypeKind::Array(_)
+            | TypeKind::Tuple(_)
+            | TypeKind::TemplateLiteral(_)
+            | TypeKind::Fn(_)
+            | TypeKind::Object(_)
+            | TypeKind::Typeof(_)
+            | TypeKind::KeyOf(_)
+            | TypeKind::IndexedAccess { .. }
+            | TypeKind::Mapped { .. }
+            | TypeKind::Conditional { .. }
+            | TypeKind::Infer(_)
+            | TypeKind::EnumVariant { .. }
+            | TypeKind::TypePredicate { .. } => None,
+        }
+    }
+
     pub(crate) fn check_type_names(&mut self, node: &TypeNode, bind: &BindResult) -> bool {
         if self.has_literal_container(node, bind) {
             self.emit(
