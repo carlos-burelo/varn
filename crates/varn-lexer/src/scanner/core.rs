@@ -122,6 +122,22 @@ impl super::Scanner<'_> {
                 continue;
             }
 
+            if !c.is_ascii() {
+                let width = std::str::from_utf8(&self.src[self.pos..])
+                    .ok()
+                    .and_then(|s| s.chars().next())
+                    .map_or(1, char::len_utf8);
+                let start = self.pos;
+                self.advance_bytes(width);
+                self.report_span(
+                    varn_core::ErrorCode::UnknownCharacter,
+                    "this character is not part of Varn's syntax",
+                    start,
+                    self.pos,
+                );
+                continue;
+            }
+
             if c == b'{' && self.template_depth > 0 {
                 let top = self.brace_depth.len() - 1;
                 self.brace_depth[top] += 1;

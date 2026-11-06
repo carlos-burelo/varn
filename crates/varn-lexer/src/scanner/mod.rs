@@ -157,6 +157,25 @@ impl<'a> Scanner<'a> {
         (self.cur_line, self.cur_col)
     }
 
+    pub(super) fn report_span(
+        &mut self,
+        code: varn_core::ErrorCode,
+        message: &str,
+        start: usize,
+        end: usize,
+    ) {
+        let (start_line, start_col) = self.location_at(start);
+        let (end_line, end_col) = self.location_at(end);
+        self.diagnostics.error(
+            code,
+            message,
+            varn_core::SourceRange::new(
+                varn_core::SourceLocation::new(start_line, start_col, start as u32),
+                varn_core::SourceLocation::new(end_line, end_col, end as u32),
+            ),
+        );
+    }
+
     pub(super) fn report_unterminated(
         &mut self,
         code: varn_core::ErrorCode,

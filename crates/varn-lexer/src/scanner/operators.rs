@@ -5,7 +5,7 @@ use crate::token_kind::{
     MINUS, MINUSEQ, MINUSMINUS, NEWLINE, PERCENT, PERCENTEQ, PIPE, PIPEEQ, PIPEGT, PIPEPIPE,
     PIPEPIPEEQ, PLUS, PLUSEQ, PLUSPLUS, QUESTION, QUESTIONDOT, QUESTIONLBRACKET, QUESTIONQUESTION,
     QUESTIONQUESTIONEQ, RANGLE, RBRACE, RBRACKET, RPAREN, SEMICOLON, SLASH, SLASHEQ, STAR, STAREQ,
-    STARSTAR, STARSTAREQ, TILDE, UNKNOWN,
+    STARSTAR, STARSTAREQ, TILDE,
 };
 use crate::token_record::{push_token, TokenRecord};
 
@@ -225,7 +225,15 @@ impl super::Scanner<'_> {
                     BANG
                 }
             }
-            _ => UNKNOWN,
+            _ => {
+                self.report_span(
+                    varn_core::ErrorCode::UnknownCharacter,
+                    "this character is not part of Varn's syntax",
+                    start,
+                    self.pos,
+                );
+                return;
+            }
         };
 
         let (el, ec) = self.location();

@@ -1,7 +1,6 @@
 use varn_core::TokenKind;
 
 pub(crate) const EOF: u32 = TokenKind::EOF as u32;
-pub(crate) const UNKNOWN: u32 = TokenKind::Dynamic as u32;
 pub(crate) const IDENTIFIER: u32 = TokenKind::Identifier as u32;
 pub(crate) const INTEGER_LITERAL: u32 = TokenKind::IntegerLiteral as u32;
 pub(crate) const FLOAT_LITERAL: u32 = TokenKind::FloatLiteral as u32;
