@@ -124,6 +124,20 @@ pub(super) fn emit_catch_param(values: &[Option<Value>], try_val: u32) -> Result
         .ok_or_else(|| format!("from_ssa: catch value {try_val} not defined at landing"))
 }
 
+pub(super) fn site_store<'a>(ctx: &'a Ctx<'_>) -> Option<super::super::emit::SiteStore<'a>> {
+    let ip = ctx.site_ip.get();
+    (ctx.frame.is_some() && ip != 0).then_some(super::super::emit::SiteStore {
+        layout: &ctx.helpers.call_layout,
+        ip,
+    })
+}
+
+pub(super) fn record_site(b: &mut FunctionBuilder, ctx: &Ctx<'_>) {
+    if let Some(site) = site_store(ctx) {
+        super::super::emit::store_site(b, ctx.exec_ctx, &site);
+    }
+}
+
 pub(super) fn clear_error_flag(b: &mut FunctionBuilder, ctx: &Ctx<'_>) -> Result<(), String> {
     let Some(fr) = ctx.frame.as_ref() else {
         return Ok(());
@@ -192,6 +206,7 @@ pub(super) fn call_checked(
     helper: usize,
     args: &[Value],
 ) -> Result<(), String> {
+    record_site(b, ctx);
     clear_error_flag(b, ctx)?;
     super::super::emit::call_helper_void(b, ctx.cc, helper, args);
     check_error_branch(b, ctx)
@@ -203,6 +218,7 @@ pub(super) fn call_checked_value(
     helper: usize,
     args: &[Value],
 ) -> Result<Value, String> {
+    record_site(b, ctx);
     clear_error_flag(b, ctx)?;
     let v = super::super::emit::call_helper(b, ctx.cc, helper, args);
     check_error_branch(b, ctx)?;

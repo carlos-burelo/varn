@@ -123,6 +123,31 @@ pub(in crate::clif) fn unbox_int(
     }
 }
 
+pub(crate) struct SiteStore<'a> {
+    pub layout: &'a crate::JitCallLayout,
+    pub ip: u32,
+}
+
+pub(crate) fn store_site(
+    b: &mut FunctionBuilder,
+    exec_ctx: cranelift_codegen::ir::Value,
+    site: &SiteStore<'_>,
+) {
+    let lay = site.layout;
+    let m = cranelift_codegen::ir::MemFlagsData::trusted();
+    let base = b
+        .ins()
+        .load(types::I64, m, exec_ctx, lay.frames_ptr_off as i32);
+    let len = b
+        .ins()
+        .load(types::I64, m, exec_ctx, lay.frames_len_off as i32);
+    let top = b.ins().iadd_imm_s(len, -1);
+    let off = b.ins().imul_imm_u(top, lay.frame_size as i64);
+    let slot = b.ins().iadd(base, off);
+    let at = b.ins().iconst(types::I64, i64::from(site.ip));
+    b.ins().store(m, at, slot, lay.frame_ip_off as i32);
+}
+
 pub(in crate::clif) fn guard_overflow(
     b: &mut FunctionBuilder,
     cc: cranelift_codegen::isa::CallConv,
@@ -136,12 +161,16 @@ pub(in crate::clif) fn guard_overflow(
     native_result_offset: i32,
     landing: Option<cranelift_codegen::ir::Block>,
     err_ret: Option<cranelift_codegen::ir::Block>,
+    site: Option<&SiteStore<'_>>,
 ) -> cranelift_codegen::ir::Value {
     let raise = b.create_block();
     let cont = b.create_block();
     b.ins().brif(overflow, raise, &[], cont, &[]);
 
     b.switch_to_block(raise);
+    if let Some(site) = site {
+        store_site(b, exec_ctx, site);
+    }
     let ba = box_int(b, lhs);
     let bb = box_int(b, rhs);
     let (a_tag, a_payload) = b.ins().isplit(ba);

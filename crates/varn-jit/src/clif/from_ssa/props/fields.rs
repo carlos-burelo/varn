@@ -16,6 +16,7 @@ fn field_io<'a>(b: &mut FunctionBuilder, ctx: &'a Ctx<'_>) -> Result<FieldIo<'a>
         exec_ctx: exec_ctx(ctx),
         landing,
         err_ret,
+        site: super::super::exceptions::site_store(ctx),
     })
 }
 pub(crate) fn emit_get_fixed_field(

@@ -166,6 +166,7 @@ fn guarded(
         res_off,
         landing,
         err_ret,
+        super::exceptions::site_store(ctx).as_ref(),
     )
 }
 
@@ -189,6 +190,7 @@ pub(super) fn emit_un(
             let cont = b.create_block();
             b.ins().brif(fits, cont, &[], raise, &[]);
             b.switch_to_block(raise);
+            super::exceptions::record_site(b, ctx);
             let boxed = box_int(b, a);
             let (tag, payload) = b.ins().isplit(boxed);
             let zero = b.ins().iconst(types::I64, 0);

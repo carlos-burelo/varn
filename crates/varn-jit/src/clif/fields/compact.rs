@@ -14,10 +14,14 @@ pub(crate) struct FieldIo<'a> {
     pub exec_ctx: Value,
     pub landing: Option<Block>,
     pub err_ret: Option<Block>,
+    pub site: Option<emit::SiteStore<'a>>,
 }
 
 fn call_checked_void(b: &mut FunctionBuilder, io: &FieldIo, helper: usize, args: &[Value]) {
     use cranelift_codegen::ir::MemFlagsData;
+    if let Some(site) = &io.site {
+        emit::store_site(b, io.exec_ctx, site);
+    }
     let zero = b.ins().iconst(types::I64, 0);
     b.ins().store(
         MemFlagsData::trusted(),

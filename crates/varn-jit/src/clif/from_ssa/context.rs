@@ -52,6 +52,8 @@ pub(super) struct Ctx<'a> {
 
     pub emitting_block: std::cell::Cell<usize>,
 
+    pub site_ip: std::cell::Cell<u32>,
+
     pub carried: FxHashMap<u32, cranelift_frontend::Variable>,
 
     pub try_live: FxHashSet<u32>,

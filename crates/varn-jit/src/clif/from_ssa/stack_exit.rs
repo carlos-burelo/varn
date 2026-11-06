@@ -57,6 +57,7 @@ fn guard_limit(b: &mut FunctionBuilder, ctx: &Ctx<'_>, exhausted: Value, helper:
     b.ins().brif(exhausted, raise, &[], cont, &[]);
 
     b.switch_to_block(raise);
+    super::exceptions::record_site(b, ctx);
     let zero = b.ins().iconst(types::I64, 0);
     let err_off = helpers.jit_error_flag_offset as i32;
     b.ins().store(m, zero, ctx.exec_ctx, err_off);

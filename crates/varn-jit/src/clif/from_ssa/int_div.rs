@@ -42,5 +42,6 @@ pub(super) fn emit(
         res_off,
         landing,
         err_ret,
+        super::exceptions::site_store(ctx).as_ref(),
     )
 }

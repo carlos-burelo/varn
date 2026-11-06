@@ -162,6 +162,7 @@ pub(in crate::clif) fn try_lower(
         fused_awaits: super::extra::fused_await_calls(ssa, &try_live),
         try_live,
         pure_try: Default::default(),
+        site_ip: Default::default(),
     };
     {
         let mut st = ctx.pure_try.borrow_mut();
