@@ -147,12 +147,10 @@ impl<'m> Builder<'m> {
             this: None,
             body: None,
         });
-        let caller_line = self.cur_line;
         if let Some(offset) = super::stmt::stmt_offset(&tf.body[0]) {
             self.set_line_at(offset);
         }
         let res = self.lower_expr(ret_expr);
-        self.cur_line = caller_line;
         self.pop_inline();
 
         let v = res?;

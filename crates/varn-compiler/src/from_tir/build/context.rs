@@ -105,7 +105,9 @@ impl<'m> Builder<'m> {
     }
 
     pub(super) fn pop_inline(&mut self) -> Option<InlineFrame> {
-        self.inline_scope_stack.pop();
+        if let Some(scope) = self.inline_scope_stack.pop() {
+            self.cur_line = self.inline_scopes[scope as usize - 1].call_line;
+        }
         self.inlining.pop()
     }
 
