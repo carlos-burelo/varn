@@ -5,9 +5,11 @@ mod sampler;
 pub(crate) use activity::Activity;
 
 use std::collections::BTreeMap;
+use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use rustc_hash::FxHashMap;
+use varn_types::{FunctionProto, PoolEntry};
 
 use crate::vm::Vm;
 use capture::Shared;
@@ -15,6 +17,7 @@ use sampler::Sampler;
 
 const SLOTS_PER_RUN: usize = 16_384;
 const BUSY_FRACTION_DENOMINATOR: u64 = 10;
+const NATIVE_FRAME: &str = "<native>";
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ProfileFrame {
@@ -37,6 +40,7 @@ pub struct CpuProfile {
     pub stacks: BTreeMap<Vec<u32>, u64>,
     pub lines: BTreeMap<(u32, u32), u64>,
     index: BTreeMap<ProfileFrame, u32>,
+    protos: FxHashMap<usize, Rc<FunctionProto>>,
 }
 
 impl CpuProfile {
@@ -56,6 +60,7 @@ impl CpuProfile {
             stacks: BTreeMap::new(),
             lines: BTreeMap::new(),
             index: BTreeMap::new(),
+            protos: FxHashMap::default(),
         }
     }
 
@@ -68,49 +73,97 @@ impl CpuProfile {
         self.index.insert(frame, id);
         id
     }
+
+    fn adopt(&mut self, root: &Rc<FunctionProto>) {
+        let mut pending = vec![Rc::clone(root)];
+        while let Some(proto) = pending.pop() {
+            let key = Rc::as_ptr(&proto) as usize;
+            if self.protos.contains_key(&key) {
+                continue;
+            }
+            for entry in &proto.chunk.constants {
+                if let PoolEntry::Function(child) = entry {
+                    pending.push(Rc::clone(child));
+                }
+            }
+            self.protos.insert(key, proto);
+        }
+    }
+
+    fn describe(&mut self, key: usize, ip: usize) -> Vec<(u32, u32)> {
+        let Some(proto) = self.protos.get(&key).map(Rc::clone) else {
+            let id = self.intern(ProfileFrame {
+                function: NATIVE_FRAME.to_owned(),
+                file: String::new(),
+            });
+            return vec![(id, 0)];
+        };
+        let mut infos = Vec::new();
+        crate::exec::exceptions::frame_chain(&proto, ip, &mut infos);
+        infos
+            .into_iter()
+            .rev()
+            .map(|info| {
+                let id = self.intern(ProfileFrame {
+                    function: info.fn_name,
+                    file: info.file,
+                });
+                (id, info.line)
+            })
+            .collect()
+    }
 }
 
 pub struct CpuProfiler {
     shared: Box<Shared>,
     sampler: Sampler,
     started: Instant,
-    hz: u32,
 }
 
 impl CpuProfiler {
-    pub fn start(vm: &mut Vm, hz: u32) -> Result<Self, String> {
-        if hz == 0 {
+    pub fn start(vm: &mut Vm, into: &mut CpuProfile) -> Result<Self, String> {
+        if into.hz == 0 {
             return Err("the sampling rate must be at least 1 Hz".to_owned());
+        }
+        let roots: Vec<Rc<FunctionProto>> = vm
+            .ctx
+            .precompiled
+            .values()
+            .cloned()
+            .chain(vm.ctx.frames.iter().map(|f| Rc::clone(&f.closure().proto)))
+            .collect();
+        for root in &roots {
+            into.adopt(root);
         }
         vm.ctx.frames.reserve(crate::frame::MAX_CALL_DEPTH);
         let shared = Box::new(Shared::new(SLOTS_PER_RUN, &raw const vm.ctx.frames));
-        let period = Duration::from_secs_f64(1.0 / f64::from(hz));
+        let period = Duration::from_secs_f64(1.0 / f64::from(into.hz));
         let sampler = Sampler::start(&shared, period)?;
         Ok(Self {
             shared,
             sampler,
             started: Instant::now(),
-            hz,
         })
     }
 
     fn waiting_flags(shared: &Shared) -> Vec<bool> {
-        let mut flags = vec![false];
-        flags.extend((1..shared.recorded()).map(|index| {
-            let (now, before) = (shared.slot(index), shared.slot(index - 1));
-            let spent = now.cpu.saturating_sub(before.cpu);
-            let elapsed = now.at_ns.saturating_sub(before.at_ns);
-            spent < elapsed / BUSY_FRACTION_DENOMINATOR
-        }));
-        flags
+        (0..shared.recorded())
+            .map(|index| {
+                if index == 0 {
+                    return false;
+                }
+                let (now, before) = (shared.slot(index), shared.slot(index - 1));
+                let spent = now.cpu.saturating_sub(before.cpu);
+                let elapsed = now.at_ns.saturating_sub(before.at_ns);
+                spent < elapsed / BUSY_FRACTION_DENOMINATOR
+            })
+            .collect()
     }
 
-    pub fn finish(self, into: &mut CpuProfile, _vm: &Vm) {
+    pub fn finish(self, into: &mut CpuProfile) {
         let wall = self.started.elapsed();
-        let waiting = {
-            self.sampler.stop();
-            Self::waiting_flags(&self.shared)
-        };
+        self.sampler.stop();
+        let waiting = Self::waiting_flags(&self.shared);
         into.wall += wall;
         into.runs += 1;
         into.dropped += self.shared.dropped() as u64;
@@ -120,13 +173,12 @@ impl CpuProfiler {
             let mut entries: Vec<capture::Entry> = slot.frames[..slot.depth as usize].to_vec();
             let compiled = varn_jit::stack_roots::locate(slot.pc);
             if let Some(site) = &compiled {
-                let owner = site.owner;
                 let exact = capture::Entry {
-                    proto: owner,
+                    proto: site.owner,
                     ip: site.ip as usize,
                 };
                 match entries.last_mut() {
-                    Some(top) if top.proto == owner => *top = exact,
+                    Some(top) if top.proto == site.owner => *top = exact,
                     Some(_) | None => entries.push(exact),
                 }
             }
@@ -140,25 +192,14 @@ impl CpuProfiler {
             let mut stack: Vec<u32> = Vec::new();
             let mut leaf: Option<(u32, u32)> = None;
             for entry in &entries {
-                let chain = resolved
-                    .entry((entry.proto, entry.ip))
-                    .or_insert_with(|| {
-                        let proto = unsafe { &*(entry.proto as *const varn_types::FunctionProto) };
-                        let mut infos = Vec::new();
-                        crate::exec::exceptions::frame_chain(proto, entry.ip, &mut infos);
-                        infos
-                            .into_iter()
-                            .rev()
-                            .map(|info| {
-                                let id = into.intern(ProfileFrame {
-                                    function: info.fn_name,
-                                    file: info.file,
-                                });
-                                (id, info.line)
-                            })
-                            .collect()
-                    })
-                    .clone();
+                let chain = match resolved.get(&(entry.proto, entry.ip)) {
+                    Some(chain) => chain.clone(),
+                    None => {
+                        let chain = into.describe(entry.proto, entry.ip);
+                        resolved.insert((entry.proto, entry.ip), chain.clone());
+                        chain
+                    }
+                };
                 stack.extend(chain.iter().map(|(id, _)| *id));
                 leaf = chain.last().copied();
             }
@@ -182,11 +223,10 @@ impl CpuProfiler {
                 stack.push(id);
                 leaf = (id, 0);
             }
-            *into.lines.entry(leaf).or_insert(0) += 1;
             into.samples += 1;
             into.truncated += u64::from(slot.truncated);
+            *into.lines.entry(leaf).or_insert(0) += 1;
             *into.stacks.entry(stack).or_insert(0) += 1;
         }
-        debug_assert_eq!(self.hz, into.hz);
     }
 }
