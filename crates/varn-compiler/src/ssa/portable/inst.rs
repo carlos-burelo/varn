@@ -29,6 +29,7 @@ pub(super) fn project_inst(
                 live,
             },
             line: inst.line,
+            ip: site.next_ip,
         });
     }
     let kind = &inst.kind;
@@ -40,5 +41,6 @@ pub(super) fn project_inst(
         dest: inst.dest.map(|v| v.0),
         op,
         line: inst.line,
+        ip: site.next_ip,
     })
 }

@@ -36,6 +36,7 @@ pub struct SsaInst {
     pub dest: Option<u32>,
     pub op: SsaOp,
     pub line: u32,
+    pub ip: u32,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
