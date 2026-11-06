@@ -1,5 +1,16 @@
 import { Csv } from "std:encoding";
 
+type Sale = {
+    id: int,
+    customer: str,
+    product: str,
+    category: str,
+    quantity: int,
+    unitPrice: float,
+    status: str,
+    timestamp: str
+};
+
 // 1. Generate 50,000 transaction records in CSV format
 let categories = ["Electronics", "Apparel", "Home", "Books", "Sports"];
 let statuses = ["COMPLETED", "PENDING", "CANCELLED", "COMPLETED", "COMPLETED"];
@@ -18,19 +29,19 @@ for (let i = 0; i < 50000; i = i + 1) {
 let csvText = rows.join("\n");
 
 // 2. Real-world Data Ingestion, Filtering, Aggregation and Serialization Pipeline
-let parsed = Csv.parse(csvText);
+let parsed = Csv.parse<Sale>(csvText);
 
-let completedSales: dynamic[] = [];
+let completedSales: Sale[] = [];
 let categoryRevenue = new Map<str, float>();
 let totalRevenue = 0.0;
 
 for (let i = 0; i < parsed.length; i = i + 1) {
     let row = parsed[i];
     if (row.status === "COMPLETED") {
-        let lineTotal: float = (row.quantity as float) * (row.unitPrice as float);
+        let lineTotal: float = (row.quantity as float) * row.unitPrice;
         totalRevenue = totalRevenue + lineTotal;
 
-        let catName: str = row.category as str;
+        let catName: str = row.category;
         let currentRev = categoryRevenue.get(catName);
         if (currentRev == null) {
             categoryRevenue.set(catName, lineTotal);

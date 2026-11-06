@@ -1,6 +1,8 @@
 import { Json } from "std:encoding";
 
-let items: { id: int, name: str, active: bool, score: float }[] = [];
+type Item = { id: int, name: str, active: bool, score: float };
+
+let items: Item[] = [];
 for (let i = 0; i < 50000; i = i + 1) {
     items.push({
         id: i,
@@ -14,15 +16,15 @@ let jsonStr = Json.stringify(items);
 
 // Warmup and pure parse/stringify benchmark
 let iterations = 20;
-let parsed = Json.parse(jsonStr) as dynamic[];
+let parsed = Json.parse<Item[]>(jsonStr);
 for (let k = 0; k < iterations; k = k + 1) {
-    parsed = Json.parse(jsonStr) as dynamic[];
+    parsed = Json.parse<Item[]>(jsonStr);
     let s = Json.stringify(parsed);
 }
 
 print(parsed.length);
 let idSum = 0;
 for (let i = 0; i < parsed.length; i = i + 1) {
-    idSum = idSum + (parsed[i]["id"] as int);
+    idSum = idSum + parsed[i].id;
 }
 print(idSum.toString());

@@ -1,5 +1,24 @@
 import { Csv } from "std:encoding";
 
+type Row = {
+    id: int,
+    customer_id: str,
+    product_category: str,
+    amount: int,
+    tax_rate: float,
+    status: str,
+    created_at: str
+};
+type Enriched = {
+    id: int,
+    customer_id: str,
+    category: str,
+    base_amount: float,
+    final_total: float,
+    tier: str,
+    date: str
+};
+
 // Real-world CSV ETL: Parse, Validate, Enrich, Aggregate, and Re-export
 
 // 1. Generate realistic 10,000 row CSV dataset
@@ -20,18 +39,18 @@ for (let i = 1; i <= 10000; i = i + 1) {
 let rawCsv = csvLines.join("\n");
 
 // 2. Parse CSV Dataset
-let parsedRows = Csv.parse(rawCsv);
+let parsedRows = Csv.parse<Row>(rawCsv);
 
 // 3. Filter & Enrich Records
-let enrichedRows: { [key: str]: dynamic }[] = [];
+let enrichedRows: Enriched[] = [];
 let totalCompletedRevenue = 0.0;
 let vipCount = 0;
 
 for (let i = 0; i < parsedRows.length; i = i + 1) {
-    let row = parsedRows[i] as { [key: str]: dynamic };
-    if (row["status"] === "completed") {
-        let amt = row["amount"] as float;
-        let taxRate = row["tax_rate"] as float;
+    let row = parsedRows[i];
+    if (row.status === "completed") {
+        let amt = row.amount as float;
+        let taxRate = row.tax_rate;
         let finalTotal = amt * (1.0 + taxRate);
         let isVip = amt >= 500.0;
 
@@ -41,13 +60,13 @@ for (let i = 0; i < parsedRows.length; i = i + 1) {
         totalCompletedRevenue = totalCompletedRevenue + finalTotal;
 
         enrichedRows.push({
-            "id": row["id"],
-            "customer_id": row["customer_id"],
-            "category": row["product_category"],
-            "base_amount": amt,
-            "final_total": finalTotal,
-            "tier": isVip ? "VIP" : "Standard",
-            "date": row["created_at"]
+            id: row.id,
+            customer_id: row.customer_id,
+            category: row.product_category,
+            base_amount: amt,
+            final_total: finalTotal,
+            tier: isVip ? "VIP" : "Standard",
+            date: row.created_at
         });
     }
 }
