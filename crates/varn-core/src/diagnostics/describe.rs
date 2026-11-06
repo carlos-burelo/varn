@@ -4,6 +4,8 @@ use super::diagnostic::DiagnosticKind;
 impl ErrorCode {
     pub const ALL: &'static [ErrorCode] = &[
         ErrorCode::UnterminatedString,
+        ErrorCode::InvalidNumericLiteral,
+        ErrorCode::UnknownCharacter,
         ErrorCode::UnterminatedTemplate,
         ErrorCode::UnterminatedRegex,
         ErrorCode::InvalidEscapeSequence,
@@ -101,6 +103,8 @@ impl ErrorCode {
                 DiagnosticKind::Warning
             }
             ErrorCode::UnterminatedString
+            | ErrorCode::InvalidNumericLiteral
+            | ErrorCode::UnknownCharacter
             | ErrorCode::UnterminatedTemplate
             | ErrorCode::UnterminatedRegex
             | ErrorCode::InvalidEscapeSequence
@@ -186,6 +190,8 @@ impl ErrorCode {
     pub fn summary(self) -> &'static str {
         match self {
             ErrorCode::UnterminatedString => "A string literal reaches the end of the file without its closing quote.",
+            ErrorCode::InvalidNumericLiteral => "A number literal is malformed: a prefix without digits, a misplaced `_`, an exponent without digits, or an unknown suffix.",
+            ErrorCode::UnknownCharacter => "The source contains a character that is not part of Varn's syntax.",
             ErrorCode::UnterminatedTemplate => "A template literal reaches the end of the file without its closing backtick.",
             ErrorCode::UnterminatedRegex => "A regular expression literal has no closing slash.",
             ErrorCode::InvalidEscapeSequence => "A backslash escape in a literal is not one Varn defines (\\n \\t \\r \\0 \\\\ \\' \\\" \\xHH \\u{...}).",

@@ -2,6 +2,8 @@
 #[repr(u32)]
 pub enum ErrorCode {
     UnterminatedString = 1001,
+    InvalidNumericLiteral = 1002,
+    UnknownCharacter = 1003,
     UnterminatedTemplate = 1004,
     UnterminatedRegex = 1005,
     InvalidEscapeSequence = 1006,
@@ -99,6 +101,8 @@ impl ErrorCode {
     pub fn name(self) -> &'static str {
         match self {
             ErrorCode::UnterminatedString => "unterminated-string",
+            ErrorCode::InvalidNumericLiteral => "invalid-numeric-literal",
+            ErrorCode::UnknownCharacter => "unknown-character",
             ErrorCode::UnterminatedTemplate => "unterminated-template",
             ErrorCode::UnterminatedRegex => "unterminated-regex",
             ErrorCode::InvalidEscapeSequence => "invalid-escape-sequence",
