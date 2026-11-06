@@ -1,0 +1,4 @@
+// expect: warning[VN3025]
+@deprecated("use current")
+function legacy(): int { return 1 }
+print(legacy())

@@ -1,0 +1,2 @@
+// expect: error[VN2020]
+const limit: int

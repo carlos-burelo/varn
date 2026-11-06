@@ -1,0 +1,4 @@
+// expect: error[VN4011]
+async function value(): Task<int> { return 1 }
+function plain(): int { return await value() }
+print(plain())

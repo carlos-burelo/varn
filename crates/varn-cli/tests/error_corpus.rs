@@ -179,3 +179,38 @@ fn every_error_fixture_is_rejected_as_declared() {
         failures.join("\n\n")
     );
 }
+
+#[test]
+fn every_diagnostic_code_has_a_fixture() {
+    let root = repo_root();
+    let mut declared = std::collections::BTreeSet::new();
+    for entry in std::fs::read_dir(root.join("tests/errors")).expect("tests/errors") {
+        let path = entry.expect("entry").path();
+        if path.extension().is_none_or(|e| e != "vn") {
+            continue;
+        }
+        let source = std::fs::read_to_string(&path).expect("fixture");
+        for line in source
+            .lines()
+            .map_while(|line| line.trim().strip_prefix("// expect: "))
+        {
+            if let Some(code) = line
+                .split_once("[VN")
+                .and_then(|(_, rest)| rest.strip_suffix(']'))
+                .and_then(|digits| digits.parse::<u32>().ok())
+            {
+                declared.insert(code);
+            }
+        }
+    }
+    let uncovered: Vec<String> = varn_core::ErrorCode::ALL
+        .iter()
+        .filter(|code| **code != varn_core::ErrorCode::CompilationInternalError)
+        .filter(|code| !declared.contains(&code.code_number()))
+        .map(ToString::to_string)
+        .collect();
+    assert!(
+        uncovered.is_empty(),
+        "codes without a fixture in tests/errors: {uncovered:?}"
+    );
+}

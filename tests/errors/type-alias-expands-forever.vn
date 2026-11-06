@@ -1,0 +1,3 @@
+// expect: error[VN3020]
+type Grow<T> = Grow<T[]>
+const v: Grow<int> = 1

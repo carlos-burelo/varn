@@ -1,0 +1,4 @@
+// expect: error[VN2008]
+type Letter = "a"
+const letters: Letter[] = ["a"]
+print(letters)

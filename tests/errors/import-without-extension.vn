@@ -1,0 +1,4 @@
+// expect: error[VN2010]
+// expect: suggestion: Did you mean `../helpers/broken-escape.vn`?
+import { v } from "../helpers/broken-escape"
+print(v)

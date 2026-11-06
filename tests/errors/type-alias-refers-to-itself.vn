@@ -1,0 +1,3 @@
+// expect: error[VN3009]
+type Loop = Loop
+const v: Loop = 1

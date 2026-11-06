@@ -1,0 +1,2 @@
+// expect: error[VN1008]
+const bad = "\u{110000}"
