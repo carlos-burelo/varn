@@ -24,32 +24,35 @@ pub(crate) fn pop_try(handlers: &mut Vec<TryHandler>) {
 pub(crate) fn collect_frames(frames: &[CallFrame]) -> Vec<FrameInfo> {
     let mut out = Vec::with_capacity(frames.len());
     for frame in frames.iter().rev() {
-        let proto = &frame.closure().proto;
-        let function_name = proto
-            .name
-            .as_deref()
-            .map_or_else(|| "<anonymous>".to_owned(), str::to_owned);
-        let file = proto.chunk.source_file.as_ref().to_owned();
-        let at = frame.ip.saturating_sub(1);
-        let mut scope = proto.chunk.lines.get_scope(at);
-        let mut line = proto.chunk.lines.get_line(at).max(1);
-        loop {
-            let enclosing = if scope == 0 {
-                None
-            } else {
-                proto.chunk.inline_scopes.get(scope as usize - 1)
-            };
-            out.push(FrameInfo {
-                fn_name: enclosing.map_or_else(|| function_name.clone(), |s| s.function.clone()),
-                file: file.clone(),
-                line,
-            });
-            let Some(enclosing) = enclosing else { break };
-            line = enclosing.call_line.max(1);
-            scope = enclosing.parent;
-        }
+        frame_chain(&frame.closure().proto, frame.ip, &mut out);
     }
     out
+}
+
+pub(crate) fn frame_chain(proto: &varn_types::FunctionProto, ip: usize, out: &mut Vec<FrameInfo>) {
+    let function_name = proto
+        .name
+        .as_deref()
+        .map_or_else(|| "<anonymous>".to_owned(), str::to_owned);
+    let file = proto.chunk.source_file.as_ref().to_owned();
+    let at = ip.saturating_sub(1);
+    let mut scope = proto.chunk.lines.get_scope(at);
+    let mut line = proto.chunk.lines.get_line(at).max(1);
+    loop {
+        let enclosing = if scope == 0 {
+            None
+        } else {
+            proto.chunk.inline_scopes.get(scope as usize - 1)
+        };
+        out.push(FrameInfo {
+            fn_name: enclosing.map_or_else(|| function_name.clone(), |s| s.function.clone()),
+            file: file.clone(),
+            line,
+        });
+        let Some(enclosing) = enclosing else { break };
+        line = enclosing.call_line.max(1);
+        scope = enclosing.parent;
+    }
 }
 
 struct ThrownParts {

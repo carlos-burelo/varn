@@ -2,6 +2,7 @@ pub mod alloc_profile;
 pub mod arch;
 pub(crate) mod clif_link;
 pub(crate) mod closure;
+pub mod cpu_profile;
 pub mod debug;
 pub(crate) mod error;
 pub mod exec;
@@ -31,6 +32,7 @@ pub(crate) mod task;
 pub(crate) mod value;
 pub(crate) mod vm;
 
+pub use cpu_profile::{CpuProfile, CpuProfiler, ProfileFrame};
 pub use error::{FrameInfo, RuntimeError, VmResult};
 pub use frame::VM_STACK_BYTES;
 pub use globals::GlobalStore;

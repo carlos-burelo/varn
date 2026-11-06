@@ -4060,6 +4060,7 @@ name = "varn-vm"
 version = "0.1.0"
 dependencies = [
  "bigdecimal",
+ "libc",
  "memchr",
  "num-bigint",
  "num-traits",
