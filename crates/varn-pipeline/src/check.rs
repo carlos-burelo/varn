@@ -18,8 +18,42 @@ pub(crate) fn check_program(
         resolver,
         varn_sem::output::CheckOptions::compile(),
     );
-    reject_errors(&result.diagnostics, &program.filename, source)?;
+    if result.diagnostics.has_errors() {
+        let mut reports = vec![DiagnosticReport::new(
+            &program.filename,
+            source,
+            result.diagnostics.clone(),
+        )];
+        reports.extend(dependency_syntax_reports(&result.bind.deps, resolver));
+        return Err(Failure::diagnostics_across(&program.filename, reports));
+    }
     Ok(result)
+}
+
+fn dependency_syntax_reports(
+    direct: &[std::sync::Arc<str>],
+    resolver: &crate::ModuleResolver,
+) -> Vec<DiagnosticReport> {
+    use varn_sem::resolver::ImportResolver;
+    let mut pending: Vec<String> = direct.iter().map(|d| d.to_string()).collect();
+    let mut visited = std::collections::BTreeSet::new();
+    let mut reports = Vec::new();
+    while let Some(path) = pending.pop() {
+        if !visited.insert(path.clone()) {
+            continue;
+        }
+        if let Some(failure) = resolver.module_syntax_failure(&path) {
+            let mut bag = DiagnosticBag::new();
+            for diagnostic in &failure.diagnostics {
+                bag.push(diagnostic.clone());
+            }
+            reports.push(DiagnosticReport::new(&path, &failure.source, bag));
+        } else if let Some(bind) = resolver.module_bind(&path) {
+            pending.extend(bind.deps.iter().map(|d| d.to_string()));
+        }
+    }
+    reports.sort_by(|a, b| a.file.cmp(&b.file));
+    reports
 }
 
 pub(crate) fn check_tolerant(

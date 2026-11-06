@@ -3,10 +3,29 @@ use crate::exports::ExportMap;
 use std::path::Path;
 use std::sync::Arc;
 
+pub struct SyntaxFailure {
+    pub source: Arc<str>,
+    pub diagnostics: Vec<varn_core::Diagnostic>,
+}
+
+impl SyntaxFailure {
+    pub fn first_detail(&self) -> String {
+        self.diagnostics.first().map_or_else(String::new, |first| {
+            format!(
+                "{} ({}:{}:{})",
+                first.message,
+                varn_core::diagnostics::display_path(&first.file),
+                first.range.start.line,
+                first.range.start.column
+            )
+        })
+    }
+}
+
 pub trait ImportResolver {
     fn module_bind(&self, abs_path: &str) -> Option<Arc<BindResult>>;
 
-    fn module_syntax_failure(&self, abs_path: &str) -> Option<String>;
+    fn module_syntax_failure(&self, abs_path: &str) -> Option<Arc<SyntaxFailure>>;
 
     fn module_exports(&self, abs_path: &str, visiting: &mut Vec<String>) -> Arc<ExportMap>;
 

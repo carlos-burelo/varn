@@ -166,21 +166,19 @@ fn first_non_blank(text: &str) -> usize {
     text.len() - text.trim_start().len()
 }
 
-pub fn render_report(file: &str, source: &str, diagnostics: &super::DiagnosticBag) -> String {
-    let rendered: Vec<String> = diagnostics
+pub fn render_diagnostics(source: &str, diagnostics: &super::DiagnosticBag) -> String {
+    diagnostics
         .iter()
         .map(|d| format_diagnostic(d, source))
-        .collect();
-    let errors = diagnostics.iter().filter(|d| d.is_error()).count();
-    let warnings = diagnostics
-        .iter()
-        .filter(|d| d.kind == DiagnosticKind::Warning)
-        .count();
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+pub fn render_summary(subject: &str, errors: usize, warnings: usize) -> String {
     format!(
-        "{}\n\n{}: could not compile `{}` due to {}{}",
-        rendered.join("\n"),
+        "{}: could not compile `{}` due to {}{}",
         chalk("error").red().bold(),
-        display_path(file),
+        display_path(subject),
         count_phrase(errors, "error"),
         if warnings > 0 {
             format!("; {}", count_phrase(warnings, "warning"))

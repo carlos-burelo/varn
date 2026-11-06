@@ -15,7 +15,10 @@ impl ImportResolver for ModuleResolver {
         self.graph.lock().heavy_stats()
     }
 
-    fn module_syntax_failure(&self, abs_path: &str) -> Option<String> {
+    fn module_syntax_failure(
+        &self,
+        abs_path: &str,
+    ) -> Option<Arc<varn_sem::resolver::SyntaxFailure>> {
         let canonical = varn_modules::canonical_or_original(Path::new(abs_path));
         let failures = self.syntax_failures.lock();
         failures

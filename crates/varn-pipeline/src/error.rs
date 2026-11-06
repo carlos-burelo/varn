@@ -28,6 +28,33 @@ impl DiagnosticReport {
     }
 }
 
+pub struct DiagnosticFailure {
+    pub subject: Arc<str>,
+    pub reports: Vec<DiagnosticReport>,
+}
+
+impl DiagnosticFailure {
+    pub fn error_count(&self) -> usize {
+        self.reports
+            .iter()
+            .map(|report| report.diagnostics.iter().filter(|d| d.is_error()).count())
+            .sum()
+    }
+
+    pub fn warning_count(&self) -> usize {
+        self.reports
+            .iter()
+            .map(|report| {
+                report
+                    .diagnostics
+                    .iter()
+                    .filter(|d| d.kind == varn_core::DiagnosticKind::Warning)
+                    .count()
+            })
+            .sum()
+    }
+}
+
 pub struct RuntimeFailure {
     pub class: String,
     pub message: String,
@@ -47,7 +74,7 @@ impl RuntimeFailure {
 }
 
 pub enum Failure {
-    Diagnostics(DiagnosticReport),
+    Diagnostics(DiagnosticFailure),
     Runtime(RuntimeFailure),
     Io(String),
     Internal(String),
@@ -64,7 +91,14 @@ impl Failure {
     }
 
     pub fn diagnostics(file: &str, source: &str, diagnostics: DiagnosticBag) -> Self {
-        Failure::Diagnostics(DiagnosticReport::new(file, source, diagnostics))
+        Failure::diagnostics_across(file, vec![DiagnosticReport::new(file, source, diagnostics)])
+    }
+
+    pub fn diagnostics_across(subject: &str, reports: Vec<DiagnosticReport>) -> Self {
+        Failure::Diagnostics(DiagnosticFailure {
+            subject: Arc::from(relative_path(subject)),
+            reports,
+        })
     }
 }
 
@@ -135,15 +169,28 @@ impl fmt::Display for RuntimeFailure {
 impl fmt::Display for Failure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Failure::Diagnostics(report) => write!(
-                f,
-                "{}",
-                varn_core::diagnostics::render_report(
-                    &report.file,
-                    &report.source,
-                    &report.diagnostics
+            Failure::Diagnostics(failure) => {
+                for report in &failure.reports {
+                    writeln!(
+                        f,
+                        "{}",
+                        varn_core::diagnostics::render_diagnostics(
+                            &report.source,
+                            &report.diagnostics
+                        )
+                    )?;
+                }
+                write!(
+                    f,
+                    "
+{}",
+                    varn_core::diagnostics::render_summary(
+                        &failure.subject,
+                        failure.error_count(),
+                        failure.warning_count()
+                    )
                 )
-            ),
+            }
             Failure::Runtime(failure) => write!(f, "{failure}"),
             Failure::Io(message) | Failure::Internal(message) => write!(f, "{message}"),
             Failure::Project(error) => write!(f, "{error}"),

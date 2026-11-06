@@ -18,15 +18,15 @@ impl ModuleResolver {
             match varn_parser::parse(tokens, lexeme_buf, key, varn_core::AtomInterner::new()) {
                 Ok(parsed) => parsed,
                 Err(errors) => {
-                    let first = errors.iter().chain(lex_errs.iter()).next()?;
-                    let detail = format!(
-                        "{} ({}:{}:{})",
-                        first.message,
-                        varn_core::diagnostics::display_path(key),
-                        first.range.start.line,
-                        first.range.start.column
+                    let diagnostics: Vec<varn_core::Diagnostic> =
+                        lex_errs.iter().cloned().chain(errors).collect();
+                    self.syntax_failures.lock().insert(
+                        key.to_owned(),
+                        Arc::new(varn_sem::resolver::SyntaxFailure {
+                            source: Arc::from(source),
+                            diagnostics,
+                        }),
                     );
-                    self.syntax_failures.lock().insert(key.to_owned(), detail);
                     return None;
                 }
             };

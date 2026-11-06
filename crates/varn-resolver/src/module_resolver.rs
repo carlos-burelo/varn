@@ -7,7 +7,8 @@ pub struct ModuleResolver {
     pub(super) graph: parking_lot::Mutex<ModuleGraph>,
 
     pub(super) in_flight: parking_lot::Mutex<rustc_hash::FxHashSet<String>>,
-    pub(super) syntax_failures: parking_lot::Mutex<rustc_hash::FxHashMap<String, String>>,
+    pub(super) syntax_failures:
+        parking_lot::Mutex<rustc_hash::FxHashMap<String, Arc<varn_sem::resolver::SyntaxFailure>>>,
     binding: parking_lot::ReentrantMutex<()>,
 
     pub(super) core_exports: parking_lot::Mutex<Option<Arc<varn_sem::cores::CoreExports>>>,

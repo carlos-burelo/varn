@@ -57,7 +57,8 @@ impl<'r> super::Binder<'r> {
 
         let syntax_failure = resolved_target
             .as_deref()
-            .and_then(|abs| self.resolver.module_syntax_failure(abs));
+            .and_then(|abs| self.resolver.module_syntax_failure(abs))
+            .map(|failure| failure.first_detail());
 
         let stdlib_exports = if is_stdlib {
             Some(self.resolver.stdlib_exports(&source_str))
