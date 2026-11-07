@@ -4,6 +4,7 @@ use super::number::fast_parse_f64;
 
 pub(super) fn fast_parse_json(ctx: &mut ExecCtx, text: &str) -> Option<VmValue> {
     let mut parser = FastJsonParser {
+        text,
         bytes: text.as_bytes(),
         pos: 0,
         ctx,
@@ -18,6 +19,7 @@ pub(super) fn fast_parse_json(ctx: &mut ExecCtx, text: &str) -> Option<VmValue> 
 }
 
 pub(super) struct FastJsonParser<'a, 'ctx> {
+    text: &'a str,
     bytes: &'a [u8],
     pos: usize,
     ctx: &'ctx mut ExecCtx,
@@ -87,19 +89,20 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
 
     fn read_string_text(&mut self) -> Option<std::borrow::Cow<'a, str>> {
         let bytes: &'a [u8] = self.bytes;
+        let text: &'a str = self.text;
         let start = self.pos + 1;
         let first = memchr::memchr2(b'"', b'\\', &bytes[start..])? + start;
         if bytes[first] == b'"' {
             self.pos = first + 1;
             return Some(std::borrow::Cow::Borrowed(Self::plain_text(
-                &bytes[start..first],
+                text, start, first,
             )?));
         }
         let mut out = String::with_capacity(first - start + 16);
         let mut chunk = start;
         let mut at = first;
         loop {
-            out.push_str(Self::plain_text(&bytes[chunk..at])?);
+            out.push_str(Self::plain_text(text, chunk, at)?);
             if bytes[at] == b'"' {
                 self.pos = at + 1;
                 return Some(std::borrow::Cow::Owned(out));
@@ -139,11 +142,11 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
         }
     }
 
-    fn plain_text(span: &[u8]) -> Option<&str> {
-        if span.iter().any(|&b| b < 0x20) {
+    fn plain_text(text: &'a str, from: usize, to: usize) -> Option<&'a str> {
+        if text.as_bytes().get(from..to)?.iter().any(|&b| b < 0x20) {
             return None;
         }
-        std::str::from_utf8(span).ok()
+        text.get(from..to)
     }
 
     fn hex4(bytes: &[u8], at: usize) -> Option<u32> {
