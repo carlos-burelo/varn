@@ -218,3 +218,41 @@ pub(super) fn object_arm(
     }
     ok
 }
+
+pub(super) fn record_arm(
+    decl_fields: ObjectMembersId,
+    inf_fields: ObjectMembersId,
+    bind: Option<&BindView>,
+    cache: &mut FxHashMap<(Type, Type, usize), bool>,
+    in_progress: &mut FxHashSet<(Type, Type, usize)>,
+    table: &CheckerTyTable,
+) -> bool {
+    let decl = table.get_object_members(decl_fields);
+    let inf = table.get_object_members(inf_fields);
+    let shared_names_agree = inf.iter().all(|im| match im {
+        ObjectTypeMember::Property { name, optional, .. } => decl.iter().any(|dm| {
+            matches!(
+                dm,
+                ObjectTypeMember::Property { name: n, optional: o, .. }
+                    if n == name && o == optional
+            )
+        }),
+        ObjectTypeMember::Method { .. }
+        | ObjectTypeMember::Index { .. }
+        | ObjectTypeMember::Callable { .. } => true,
+    });
+    let extras_are_optional = decl.iter().all(|dm| match dm {
+        ObjectTypeMember::Property { name, optional, .. } => {
+            *optional
+                || inf
+                    .iter()
+                    .any(|im| matches!(im, ObjectTypeMember::Property { name: n, .. } if n == name))
+        }
+        ObjectTypeMember::Method { .. }
+        | ObjectTypeMember::Index { .. }
+        | ObjectTypeMember::Callable { .. } => true,
+    });
+    shared_names_agree
+        && extras_are_optional
+        && object_arm(decl_fields, inf_fields, bind, cache, in_progress, table)
+}

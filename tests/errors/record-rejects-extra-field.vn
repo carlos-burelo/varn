@@ -1,0 +1,4 @@
+// expect: error[VN3001]
+type Pt = { x: int }
+const wide = { x: 1, y: 2 }
+const p: Pt = wide

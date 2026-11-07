@@ -1,0 +1,52 @@
+import { describe, it, expect } from "std:test";
+
+interface Named { name: str }
+interface Located { name: str; address?: Place }
+interface Place { city: str }
+
+type Options = { retries: int; verbose?: bool }
+type Pair = { left: int; right: int }
+
+class Person { name: str = "ana" }
+
+function nameOf(n: Named): str { return n.name }
+function describe2(l: Located): str { return l.name }
+function retriesOf(o: Options): int { return o.retries }
+function sum(p: Pair): int { return p.left + p.right }
+
+await describe("339 record and interface types", async () => {
+    await it("a record satisfies an interface structurally", () => {
+        const r = { name: "bo", extra: 1 }
+        expect(nameOf(r)).toBe("bo")
+        expect(nameOf({ name: "cy" })).toBe("cy")
+    })
+
+    await it("a class satisfies an interface", () => {
+        expect(nameOf(new Person())).toBe("ana")
+    })
+
+    await it("nested literals fit optional interface members", () => {
+        const located: Located = { name: "di", address: { city: "NY" } }
+        expect(describe2(located)).toBe("di")
+        expect(describe2({ name: "ed" })).toBe("ed")
+    })
+
+    await it("a record without optional fields widens to one that has them", () => {
+        const base = { retries: 3 }
+        expect(retriesOf(base)).toBe(3)
+        expect(retriesOf({ retries: 4, verbose: true })).toBe(4)
+    })
+
+    await it("records with the same fields are one type whatever the order", () => {
+        const a = { left: 1, right: 2 }
+        const b = { right: 2, left: 1 }
+        expect(sum(a)).toBe(3)
+        expect(sum(b)).toBe(3)
+    })
+
+    await it("the right side of ?? is typed by the left", () => {
+        const given: { [key: str]: str }? = null
+        const headers = given ?? {}
+        expect(headers["x"]).toBe(null)
+    })
+})

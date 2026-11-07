@@ -1,0 +1,4 @@
+// expect: error[VN3001]
+struct Cell { x: int }
+type Pt = { x: int }
+const p: Pt = new Cell(1)

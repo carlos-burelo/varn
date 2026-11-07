@@ -207,10 +207,31 @@ pub(super) fn nominal_arms(
             },
         ),
         (TypeKind::Record(_) | TypeKind::Interface(_), TypeKind::Generic(..)) => Some(false),
-        (
-            TypeKind::Record(decl_fields) | TypeKind::Interface(decl_fields),
-            TypeKind::Named(in_, origin_i),
-        ) => Some(
+        (TypeKind::Record(_), TypeKind::Named(in_, origin_i)) => Some(
+            if let (Some(bind), Some(in_s)) = (bind, resolve_atom(bind, in_)) {
+                let origin_i_s = origin_i.and_then(|o| resolve_atom(Some(bind), o));
+                if named_members(bind, &in_s, origin_i_s.as_deref()).is_some() {
+                    false
+                } else if named_alias(bind, &in_s, origin_i_s.as_deref()).is_some() {
+                    named_fallback(
+                        declared,
+                        inferred,
+                        in_,
+                        origin_i,
+                        Some(bind),
+                        cache,
+                        in_progress,
+                        table,
+                        false,
+                    )
+                } else {
+                    !is_known_named(bind, &in_s)
+                }
+            } else {
+                true
+            },
+        ),
+        (TypeKind::Interface(decl_fields), TypeKind::Named(in_, origin_i)) => Some(
             if let (Some(bind), Some(in_s)) = (bind, resolve_atom(bind, in_)) {
                 let origin_i_s = origin_i.and_then(|o| resolve_atom(Some(bind), o));
                 if let Some(inf_members) = named_members(bind, &in_s, origin_i_s.as_deref()) {

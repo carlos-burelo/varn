@@ -1,7 +1,7 @@
 use super::arrays::array_arms;
 use super::generics::generic_arms;
 use super::nominal::{class_value_arm, nominal_arms};
-use super::objects::object_arm;
+use super::objects::{object_arm, record_arm};
 use super::scalar::{is_simple_type, simple_types_compatible, t};
 use super::unions::union_arms;
 use crate::bind::{BindResult, BindView};
@@ -187,12 +187,16 @@ pub(super) fn types_compatible_impl(
                 nominal_arms(declared, inferred, d, i, bind, cache, in_progress, table)
             {
                 r
+            } else if let (TypeKind::Record(decl_fields), TypeKind::Record(inf_fields)) = (d, i) {
+                record_arm(decl_fields, inf_fields, bind, cache, in_progress, table)
             } else if let (
-                TypeKind::Record(decl_fields) | TypeKind::Interface(decl_fields),
+                TypeKind::Interface(decl_fields),
                 TypeKind::Record(inf_fields) | TypeKind::Interface(inf_fields),
             ) = (d, i)
             {
                 object_arm(decl_fields, inf_fields, bind, cache, in_progress, table)
+            } else if let (TypeKind::Record(_), TypeKind::Interface(_)) = (d, i) {
+                false
             } else {
                 false
             }

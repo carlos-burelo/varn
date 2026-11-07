@@ -1,0 +1,4 @@
+// expect: error[VN3001]
+interface Named { x: int }
+type Pt = { x: int }
+function take(n: Named): Pt { return n }
