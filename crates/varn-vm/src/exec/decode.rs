@@ -14,14 +14,32 @@ fn rebuild(heap: &mut Heap, layout: &ObjectLayout, values: Vec<VmValue>) -> VmVa
     if layout.shape.class.is_none() {
         heap.alloc_object_with_shape(&layout.shape, values)
     } else {
-        heap.alloc_object_pairs(
-            layout
-                .entries
-                .iter()
-                .map(|(name, _)| Arc::clone(name))
-                .zip(values),
-        )
+        heap.alloc_object_pairs(layout.names().iter().map(Arc::clone).zip(values))
     }
+}
+
+thread_local! {
+    static LAST_ALIGNMENT: std::cell::Cell<(u32, usize, bool)> =
+        const { std::cell::Cell::new((0, 0, false)) };
+}
+
+fn aligned_with(
+    shape: &varn_types::Shape,
+    fields: &[varn_core::type_desc::FieldDesc],
+    desc: usize,
+) -> bool {
+    let (last_shape, last_desc, last) = LAST_ALIGNMENT.with(std::cell::Cell::get);
+    if last_shape == shape.id && last_desc == desc {
+        return last;
+    }
+    let names = shape.ordered_names();
+    let aligned = names.len() == fields.len()
+        && names
+            .iter()
+            .zip(fields)
+            .all(|(name, field)| field.name == **name);
+    LAST_ALIGNMENT.with(|cell| cell.set((shape.id, desc, aligned)));
+    aligned
 }
 
 pub(crate) fn project(
@@ -98,9 +116,9 @@ fn walk(
                 return v;
             };
             let values: Vec<VmValue> = layout
-                .entries
+                .values
                 .iter()
-                .map(|(_, x)| walk(heap, stack_floor, *x, inner, scope, visiting))
+                .map(|x| walk(heap, stack_floor, *x, inner, scope, visiting))
                 .collect();
             rebuild(heap, &layout, values)
         }
@@ -129,37 +147,40 @@ fn walk(
             let Some(layout) = object_layout(heap, v) else {
                 return v;
             };
-            let entries = &layout.entries;
-            if entries
-                .iter()
-                .any(|(name, _)| !fields.iter().any(|field| field.name == **name))
-            {
-                return v;
-            }
+            let names = layout.names();
             let inner = Scope {
                 desc,
                 parent: scope,
             };
-            let aligned = entries.len() == fields.len()
-                && entries
+            if aligned_with(&layout.shape, fields, desc as *const TypeDesc as usize) {
+                let values: Vec<VmValue> = layout
+                    .values
                     .iter()
                     .zip(fields)
-                    .all(|((name, _), field)| field.name == **name);
-            if aligned {
-                let values: Vec<VmValue> = entries
-                    .iter()
-                    .zip(fields)
-                    .map(|((_, x), field)| {
+                    .map(|(x, field)| {
                         walk(heap, stack_floor, *x, &field.ty, Some(&inner), visiting)
                     })
                     .collect();
                 return rebuild(heap, &layout, values);
             }
+            if names
+                .iter()
+                .any(|name| !fields.iter().any(|field| field.name == **name))
+            {
+                return v;
+            }
             let mut pairs: Vec<(Arc<str>, VmValue)> = Vec::with_capacity(fields.len());
             for field in fields {
-                if let Some((name, x)) = entries.iter().find(|(name, _)| **name == *field.name) {
-                    let projected = walk(heap, stack_floor, *x, &field.ty, Some(&inner), visiting);
-                    pairs.push((Arc::clone(name), projected));
+                if let Some(at) = names.iter().position(|name| **name == *field.name) {
+                    let projected = walk(
+                        heap,
+                        stack_floor,
+                        layout.values[at],
+                        &field.ty,
+                        Some(&inner),
+                        visiting,
+                    );
+                    pairs.push((Arc::clone(&names[at]), projected));
                 }
             }
             heap.alloc_object_pairs(pairs)

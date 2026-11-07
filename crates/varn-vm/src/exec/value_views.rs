@@ -29,7 +29,13 @@ pub(crate) fn object_entries(
 
 pub(crate) struct ObjectLayout {
     pub shape: std::rc::Rc<varn_types::Shape>,
-    pub entries: Vec<(std::sync::Arc<str>, VmValue)>,
+    pub values: Vec<VmValue>,
+}
+
+impl ObjectLayout {
+    pub(crate) fn names(&self) -> &[std::sync::Arc<str>] {
+        self.shape.ordered_names()
+    }
 }
 
 pub(crate) fn object_layout(
@@ -44,13 +50,10 @@ pub(crate) fn object_layout(
     };
     let obj = obj.borrow();
     let shape = std::rc::Rc::clone(obj.shape());
-    let entries = shape
-        .ordered_names()
-        .iter()
-        .enumerate()
-        .filter_map(|(slot, name)| Some((std::sync::Arc::clone(name), obj.field_at(slot)?)))
-        .collect();
-    Some(ObjectLayout { shape, entries })
+    let values = (0..shape.ordered_names().len())
+        .map(|slot| obj.field_at(slot))
+        .collect::<Option<Vec<_>>>()?;
+    Some(ObjectLayout { shape, values })
 }
 
 pub(crate) fn elements(heap: &Heap, v: VmValue) -> Option<Vec<VmValue>> {
