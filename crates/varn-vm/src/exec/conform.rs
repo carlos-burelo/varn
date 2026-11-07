@@ -39,9 +39,25 @@ pub(crate) fn decode_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Native
     }
 }
 
-fn parse_descriptor(text: &str) -> Result<TypeDesc, NativeError> {
-    TypeDesc::decode(text)
-        .ok_or_else(|| mismatch(format!("conform: malformed type descriptor '{text}'")))
+thread_local! {
+    static DESCRIPTORS: RefCell<rustc_hash::FxHashMap<String, std::rc::Rc<TypeDesc>>> =
+        RefCell::new(rustc_hash::FxHashMap::default());
+}
+
+fn parse_descriptor(text: &str) -> Result<std::rc::Rc<TypeDesc>, NativeError> {
+    DESCRIPTORS.with(|cache| {
+        if let Some(desc) = cache.borrow().get(text) {
+            return Ok(std::rc::Rc::clone(desc));
+        }
+        let desc = std::rc::Rc::new(
+            TypeDesc::decode(text)
+                .ok_or_else(|| mismatch(format!("conform: malformed type descriptor '{text}'")))?,
+        );
+        cache
+            .borrow_mut()
+            .insert(text.to_owned(), std::rc::Rc::clone(&desc));
+        Ok(desc)
+    })
 }
 
 pub(crate) fn conform(
@@ -55,7 +71,7 @@ pub(crate) fn conform(
         heap,
         stack_floor,
         value,
-        &parse_descriptor(text)?,
+        &*parse_descriptor(text)?,
         witnesses,
     )
 }
