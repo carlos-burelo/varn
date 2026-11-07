@@ -248,7 +248,8 @@ impl<'r> Checker<'r> {
             TypeKind::Fn(_)
             | TypeKind::Named(_, _)
             | TypeKind::Generic(_, _, _)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::EnumVariant { .. } => true,
             TypeKind::Primitive(p) => matches!(
                 p,

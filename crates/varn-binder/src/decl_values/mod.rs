@@ -36,7 +36,8 @@ pub(super) fn type_node_to_name(node: &TypeNode, interner: &varn_core::AtomInter
         | TypeKind::Tuple(_)
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
-        | TypeKind::Object(_)
+        | TypeKind::Record(_)
+        | TypeKind::Interface(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }

@@ -63,7 +63,8 @@ impl Checker<'_> {
             | TypeKind::Generic(..)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -128,7 +129,8 @@ impl Checker<'_> {
                         | TypeKind::Tuple(_)
                         | TypeKind::TemplateLiteral(_)
                         | TypeKind::Fn(_)
-                        | TypeKind::Object(_)
+                        | TypeKind::Record(_)
+                        | TypeKind::Interface(_)
                         | TypeKind::Typeof(_)
                         | TypeKind::KeyOf(_)
                         | TypeKind::IndexedAccess { .. }
@@ -151,7 +153,8 @@ impl Checker<'_> {
             }
             TypeKind::This
             | TypeKind::Array(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Fn(_)
             | TypeKind::Typeof(_)
             | TypeKind::IndexedAccess { .. }

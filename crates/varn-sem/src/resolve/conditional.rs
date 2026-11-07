@@ -173,7 +173,8 @@ fn resolve_extends_with_infer(
         | TypeKind::Tuple(_)
         | TypeKind::Named(..)
         | TypeKind::TemplateLiteral(_)
-        | TypeKind::Object(_)
+        | TypeKind::Record(_)
+        | TypeKind::Interface(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }
@@ -270,7 +271,8 @@ fn pattern_is_deferrable(node: &TypeNode) -> bool {
         | TypeKind::Intersection(_)
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
-        | TypeKind::Object(_)
+        | TypeKind::Record(_)
+        | TypeKind::Interface(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }
@@ -320,7 +322,8 @@ fn resolve_pattern(
         | TypeKind::Named(..)
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
-        | TypeKind::Object(_)
+        | TypeKind::Record(_)
+        | TypeKind::Interface(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }
@@ -419,7 +422,8 @@ fn match_pattern(
             | TypeKind::Generic(..)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }

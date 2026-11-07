@@ -111,7 +111,8 @@ pub(super) fn types_compatible_impl(
         | TypeKind::Generic(..)
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
-        | TypeKind::Object(_)
+        | TypeKind::Record(_)
+        | TypeKind::Interface(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }
@@ -186,7 +187,11 @@ pub(super) fn types_compatible_impl(
                 nominal_arms(declared, inferred, d, i, bind, cache, in_progress, table)
             {
                 r
-            } else if let (TypeKind::Object(decl_fields), TypeKind::Object(inf_fields)) = (d, i) {
+            } else if let (
+                TypeKind::Record(decl_fields) | TypeKind::Interface(decl_fields),
+                TypeKind::Record(inf_fields) | TypeKind::Interface(inf_fields),
+            ) = (d, i)
+            {
                 object_arm(decl_fields, inf_fields, bind, cache, in_progress, table)
             } else {
                 false

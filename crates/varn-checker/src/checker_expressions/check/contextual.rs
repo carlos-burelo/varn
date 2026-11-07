@@ -96,7 +96,8 @@ impl<'r> Checker<'r> {
                 | TypeKind::Generic(..)
                 | TypeKind::TemplateLiteral(_)
                 | TypeKind::Fn(_)
-                | TypeKind::Object(_)
+                | TypeKind::Record(_)
+                | TypeKind::Interface(_)
                 | TypeKind::Typeof(_)
                 | TypeKind::KeyOf(_)
                 | TypeKind::IndexedAccess { .. }
@@ -163,7 +164,9 @@ impl<'r> Checker<'r> {
             } else {
                 let ty_kind = self.ty_table.get(ty.0);
                 let resolved = match ty_kind {
-                    TypeKind::Object(mid) => self.ty_table.get_object_members(mid).to_vec(),
+                    TypeKind::Record(mid) | TypeKind::Interface(mid) => {
+                        self.ty_table.get_object_members(mid).to_vec()
+                    }
                     TypeKind::Generic(_, args, _)
                         if ty.is_builtin(varn_core::BuiltinType::Map, &self.ty_table)
                             && self.ty_table.get_list(args).len() == 2 =>
@@ -232,7 +235,8 @@ impl<'r> Checker<'r> {
                             | TypeKind::Named(..)
                             | TypeKind::TemplateLiteral(_)
                             | TypeKind::Fn(_)
-                            | TypeKind::Object(_)
+                            | TypeKind::Record(_)
+                            | TypeKind::Interface(_)
                             | TypeKind::Typeof(_)
                             | TypeKind::KeyOf(_)
                             | TypeKind::IndexedAccess { .. }

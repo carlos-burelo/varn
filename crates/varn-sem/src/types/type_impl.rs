@@ -59,7 +59,8 @@ impl Type {
             | TypeKind::Generic(..)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -105,7 +106,8 @@ impl Type {
             | TypeKind::Generic(..)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -180,9 +182,14 @@ impl Type {
         Type::resolved(table.intern(TypeKind::Generic(name, list, origin)))
     }
 
-    pub fn object(members: Vec<ObjectTypeMember>, table: &mut CheckerTyTable) -> Self {
+    pub fn record(members: Vec<ObjectTypeMember>, table: &mut CheckerTyTable) -> Self {
         let mid = table.intern_object_members(members);
-        Type::resolved(table.intern(TypeKind::Object(mid)))
+        Type::resolved(table.intern(TypeKind::Record(mid)))
+    }
+
+    pub fn interface(members: Vec<ObjectTypeMember>, table: &mut CheckerTyTable) -> Self {
+        let mid = table.intern_object_members(members);
+        Type::resolved(table.intern(TypeKind::Interface(mid)))
     }
 
     pub fn union(members: Vec<Type>, table: &mut CheckerTyTable) -> Self {
@@ -240,7 +247,8 @@ impl Type {
                 | TypeKind::Generic(..)
                 | TypeKind::TemplateLiteral(_)
                 | TypeKind::Fn(_)
-                | TypeKind::Object(_)
+                | TypeKind::Record(_)
+                | TypeKind::Interface(_)
                 | TypeKind::Typeof(_)
                 | TypeKind::KeyOf(_)
                 | TypeKind::IndexedAccess { .. }
@@ -325,7 +333,8 @@ impl Type {
             | TypeKind::Generic(..)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -356,7 +365,8 @@ impl Type {
             | TypeKind::Tuple(_)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }

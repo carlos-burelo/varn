@@ -76,7 +76,8 @@ pub(super) fn infer_member(c: &mut CallTypeCtx, object: ExprId, property: ExprId
         | TypeKind::Tuple(_)
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
-        | TypeKind::Object(_)
+        | TypeKind::Record(_)
+        | TypeKind::Interface(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }

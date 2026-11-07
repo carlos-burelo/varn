@@ -40,7 +40,8 @@ pub(super) fn class_value_arm(
             | TypeKind::Tuple(_)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -76,7 +77,8 @@ pub(super) fn class_value_arm(
             | TypeKind::Tuple(_)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -169,8 +171,11 @@ pub(super) fn nominal_arms(
                 }),
             )
         }
-        (TypeKind::Generic(..), TypeKind::Object(_)) => Some(false),
-        (TypeKind::Named(dn, origin_d), TypeKind::Object(inf_fields)) => Some(
+        (TypeKind::Generic(..), TypeKind::Record(_) | TypeKind::Interface(_)) => Some(false),
+        (
+            TypeKind::Named(dn, origin_d),
+            TypeKind::Record(inf_fields) | TypeKind::Interface(inf_fields),
+        ) => Some(
             if let (Some(bind), Some(dn_s)) = (bind, resolve_atom(bind, dn)) {
                 let origin_d_s = origin_d.and_then(|o| resolve_atom(Some(bind), o));
                 if let Some(decl_members) = named_members(bind, &dn_s, origin_d_s.as_deref()) {
@@ -201,8 +206,11 @@ pub(super) fn nominal_arms(
                 true
             },
         ),
-        (TypeKind::Object(_), TypeKind::Generic(..)) => Some(false),
-        (TypeKind::Object(decl_fields), TypeKind::Named(in_, origin_i)) => Some(
+        (TypeKind::Record(_) | TypeKind::Interface(_), TypeKind::Generic(..)) => Some(false),
+        (
+            TypeKind::Record(decl_fields) | TypeKind::Interface(decl_fields),
+            TypeKind::Named(in_, origin_i),
+        ) => Some(
             if let (Some(bind), Some(in_s)) = (bind, resolve_atom(bind, in_)) {
                 let origin_i_s = origin_i.and_then(|o| resolve_atom(Some(bind), o));
                 if let Some(inf_members) = named_members(bind, &in_s, origin_i_s.as_deref()) {

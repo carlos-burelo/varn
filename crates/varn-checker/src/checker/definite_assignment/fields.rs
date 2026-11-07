@@ -21,7 +21,8 @@ fn admits_null(kind: &AstTypeKind) -> bool {
         | TypeKind::Generic(..)
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
-        | TypeKind::Object(_)
+        | TypeKind::Record(_)
+        | TypeKind::Interface(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }

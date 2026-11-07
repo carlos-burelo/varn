@@ -54,7 +54,7 @@ pub fn expr_satisfies_target_type(
             });
         }
     }
-    if let (TypeKind::Object(mid), ExprKind::Object { properties }) =
+    if let (TypeKind::Record(mid) | TypeKind::Interface(mid), ExprKind::Object { properties }) =
         (table.get(target_ty.0), expr_kind)
     {
         let members = table.get_object_members(mid);

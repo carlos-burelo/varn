@@ -38,7 +38,8 @@ impl<'r> Checker<'r> {
             | TypeKind::Intersection(_)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }

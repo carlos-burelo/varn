@@ -21,7 +21,10 @@ impl Checker<'_> {
     ) -> Option<ResolvedOperator> {
         if !matches!(
             self.ty_table.get(recv.0),
-            TypeKind::Named(..) | TypeKind::Generic(..) | TypeKind::Object(_)
+            TypeKind::Named(..)
+                | TypeKind::Generic(..)
+                | TypeKind::Record(_)
+                | TypeKind::Interface(_)
         ) {
             return None;
         }
@@ -53,7 +56,8 @@ impl Checker<'_> {
                 | TypeKind::Named(..)
                 | TypeKind::Generic(..)
                 | TypeKind::TemplateLiteral(_)
-                | TypeKind::Object(_)
+                | TypeKind::Record(_)
+                | TypeKind::Interface(_)
                 | TypeKind::Typeof(_)
                 | TypeKind::KeyOf(_)
                 | TypeKind::IndexedAccess { .. }

@@ -66,7 +66,8 @@ impl fmt::Display for TypeDisplay<'_> {
                 | TypeKind::Named(..)
                 | TypeKind::Generic(..)
                 | TypeKind::TemplateLiteral(_)
-                | TypeKind::Object(_)
+                | TypeKind::Record(_)
+                | TypeKind::Interface(_)
                 | TypeKind::Typeof(_)
                 | TypeKind::KeyOf(_)
                 | TypeKind::IndexedAccess { .. }
@@ -146,7 +147,7 @@ impl fmt::Display for TypeDisplay<'_> {
                 }
                 write!(f, ") => {}", self.child(ft.return_type))
             }
-            TypeKind::Object(mid) => {
+            TypeKind::Record(mid) | TypeKind::Interface(mid) => {
                 write!(f, "{{ ")?;
                 for (i, m) in table.get_object_members(mid).iter().enumerate() {
                     if i > 0 {
@@ -239,7 +240,8 @@ impl fmt::Display for TypeDisplay<'_> {
                         | TypeKind::Generic(..)
                         | TypeKind::TemplateLiteral(_)
                         | TypeKind::Fn(_)
-                        | TypeKind::Object(_)
+                        | TypeKind::Record(_)
+                        | TypeKind::Interface(_)
                         | TypeKind::Typeof(_)
                         | TypeKind::KeyOf(_)
                         | TypeKind::IndexedAccess { .. }

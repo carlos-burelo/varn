@@ -41,7 +41,8 @@ impl<'r> Binder<'r> {
                 .filter_map(|p| p.constraint.as_ref())
                 .chain(std::iter::once(ret.as_ref()))
                 .collect(),
-            K::Object(members) => members.iter().flat_map(interface_member_types).collect(),
+            K::Record(members) => members.iter().flat_map(interface_member_types).collect(),
+            K::Interface(never) => match *never {},
             K::IndexedAccess { object, index } => vec![object.as_ref(), index.as_ref()],
             K::Mapped { source, value, .. } => vec![source.as_ref(), value.as_ref()],
             K::Conditional {

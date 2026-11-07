@@ -119,7 +119,9 @@ impl<'r> Checker<'r> {
         if value_ty.is_unresolved() {
             return *value_ty;
         }
-        if let varn_core::TypeKind::Object(id) = self.ty_table.get(value_ty.0) {
+        if let varn_core::TypeKind::Record(id) | varn_core::TypeKind::Interface(id) =
+            self.ty_table.get(value_ty.0)
+        {
             let remaining: Vec<varn_sem::types::ObjectTypeMember> = self
                 .ty_table
                 .get_object_members(id)
@@ -134,7 +136,7 @@ impl<'r> Checker<'r> {
                 })
                 .cloned()
                 .collect();
-            return Type::object(remaining, std::sync::Arc::make_mut(&mut self.ty_table));
+            return Type::record(remaining, std::sync::Arc::make_mut(&mut self.ty_table));
         }
         self.emit(
             varn_core::Diagnostic::error(
@@ -381,7 +383,8 @@ impl<'r> Checker<'r> {
             | TypeKind::Tuple(_)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -476,7 +479,8 @@ impl Checker<'_> {
             ),
             varn_core::TypeKind::Named(..)
             | varn_core::TypeKind::Generic(..)
-            | varn_core::TypeKind::Object(_)
+            | varn_core::TypeKind::Record(_)
+            | varn_core::TypeKind::Interface(_)
             | varn_core::TypeKind::Fn(_)
             | varn_core::TypeKind::EnumVariant { .. } => true,
             varn_core::TypeKind::Literal(_)

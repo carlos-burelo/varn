@@ -177,7 +177,7 @@ fn lower_kind(
 
         TypeKind::Union(members) => lower_union(members, table, interner, tt, names),
 
-        TypeKind::Object(members) => {
+        TypeKind::Record(members) | TypeKind::Interface(members) => {
             let members = table.get_object_members(members);
             if let [varn_sem::types::ObjectTypeMember::Index {
                 key_ty, value_ty, ..
@@ -304,7 +304,8 @@ fn lower_builtin(
         | TypeKind::Tuple(_)
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
-        | TypeKind::Object(_)
+        | TypeKind::Record(_)
+        | TypeKind::Interface(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }

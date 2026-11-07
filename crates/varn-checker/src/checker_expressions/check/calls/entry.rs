@@ -373,7 +373,8 @@ impl Checker<'_> {
             | TypeKind::Intersection(_)
             | TypeKind::Tuple(_)
             | TypeKind::TemplateLiteral(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }

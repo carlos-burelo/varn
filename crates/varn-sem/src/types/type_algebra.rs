@@ -22,7 +22,8 @@ impl Type {
             | TypeKind::Generic(..)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -76,7 +77,8 @@ impl Type {
             | TypeKind::Generic(..)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -124,7 +126,8 @@ impl Type {
             | TypeKind::Generic(..)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -179,7 +182,8 @@ impl Type {
             | TypeKind::Generic(..)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -262,13 +266,21 @@ impl Type {
                     table,
                 )
             }
-            TypeKind::Object(mid) => {
+            TypeKind::Record(mid) => {
                 let members = table.get_object_members(mid).to_vec();
                 let new_members: Vec<ObjectTypeMember> = members
                     .into_iter()
                     .map(|m| m.map_generics(mapping, table))
                     .collect();
-                Type::object(new_members, table)
+                Type::record(new_members, table)
+            }
+            TypeKind::Interface(mid) => {
+                let members = table.get_object_members(mid).to_vec();
+                let new_members: Vec<ObjectTypeMember> = members
+                    .into_iter()
+                    .map(|m| m.map_generics(mapping, table))
+                    .collect();
+                Type::interface(new_members, table)
             }
             TypeKind::Tuple(els) => {
                 let ids = table.get_list(els).to_vec();
@@ -398,7 +410,7 @@ impl Type {
                     table,
                 )
             }
-            TypeKind::Object(mid) => {
+            TypeKind::Record(mid) => {
                 let members = table.get_object_members(mid).to_vec();
                 let members: Vec<ObjectTypeMember> = members
                     .into_iter()
@@ -408,7 +420,19 @@ impl Type {
                         })
                     })
                     .collect();
-                Type::object(members, table)
+                Type::record(members, table)
+            }
+            TypeKind::Interface(mid) => {
+                let members = table.get_object_members(mid).to_vec();
+                let members: Vec<ObjectTypeMember> = members
+                    .into_iter()
+                    .map(|m| {
+                        m.map_types(table, &mut |ty, table| {
+                            ty.qualify_nominals(origin, is_nominal, table)
+                        })
+                    })
+                    .collect();
+                Type::interface(members, table)
             }
             TypeKind::Named(..)
             | TypeKind::Primitive(_)
@@ -443,7 +467,8 @@ impl Type {
             | TypeKind::Tuple(_)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }

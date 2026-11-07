@@ -102,7 +102,9 @@ impl<'r> Checker<'r> {
         };
         if !matches!(
             self.ty_table.get(inferred.0),
-            varn_core::TypeKind::Named(..) | varn_core::TypeKind::Object(_)
+            varn_core::TypeKind::Named(..)
+                | varn_core::TypeKind::Record(_)
+                | varn_core::TypeKind::Interface(_)
         ) {
             return None;
         }
@@ -139,7 +141,7 @@ impl<'r> Checker<'r> {
             .iter()
             .map(|cm| cm.as_object_member(table).map_generics(&mapping, table))
             .collect();
-        Some(Type::object(object_members, table))
+        Some(Type::interface(object_members, table))
     }
 
     pub(crate) fn value_assignable_to(

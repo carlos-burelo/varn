@@ -70,7 +70,8 @@ impl<'r> Checker<'r> {
             | TypeKind::Tuple(_)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -117,7 +118,7 @@ impl<'r> Checker<'r> {
                     TypeKind::Primitive(prim) => Some(prim.to_string()),
                     TypeKind::Named(name, _) => {
                         let text = self.resolve_bind_atom(bind, *name);
-                        TypeKind::<(), (), (), (), ()>::of_primitive_name(&text)
+                        TypeKind::<(), (), (), (), (), ()>::of_primitive_name(&text)
                             .is_some()
                             .then(|| text.to_string())
                     }
@@ -130,7 +131,8 @@ impl<'r> Checker<'r> {
                     | TypeKind::Generic(..)
                     | TypeKind::TemplateLiteral(_)
                     | TypeKind::Fn(_)
-                    | TypeKind::Object(_)
+                    | TypeKind::Record(_)
+                    | TypeKind::Interface(_)
                     | TypeKind::Typeof(_)
                     | TypeKind::KeyOf(_)
                     | TypeKind::IndexedAccess { .. }
@@ -159,7 +161,8 @@ impl<'r> Checker<'r> {
             | TypeKind::This
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::Mapped { .. }
@@ -219,7 +222,7 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) -> bool {
         let text = self.resolve_bind_atom(bind, name);
-        if TypeKind::<(), (), (), (), ()>::of_primitive_name(&text).is_some()
+        if TypeKind::<(), (), (), (), (), ()>::of_primitive_name(&text).is_some()
             || text.as_ref() == varn_core::well_known::RECORD
             || self.active_type_params.contains(text.as_ref())
         {

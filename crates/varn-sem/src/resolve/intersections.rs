@@ -28,7 +28,9 @@ pub(super) fn resolve_intersection_type(
     let parts_opt: Option<Vec<Vec<ObjectTypeMember>>> = resolved
         .iter()
         .map(|m| match table.get(m.0) {
-            TypeKind::Object(mid) => Some(table.get_object_members(mid).to_vec()),
+            TypeKind::Record(mid) | TypeKind::Interface(mid) => {
+                Some(table.get_object_members(mid).to_vec())
+            }
             TypeKind::Named(name, origin) => {
                 let ctx = ctx?;
                 let name_str = ctx.atom_text(name)?;
@@ -65,8 +67,15 @@ pub(super) fn resolve_intersection_type(
         .collect();
 
     if let Some(parts) = parts_opt {
+        let all_records = resolved
+            .iter()
+            .all(|m| matches!(table.get(m.0), TypeKind::Record(_)));
         let fields = merge_members(parts.into_iter().flatten(), table);
-        return Type::object(fields, table);
+        return if all_records {
+            Type::record(fields, table)
+        } else {
+            Type::interface(fields, table)
+        };
     }
     let ids: Vec<crate::types::CheckerTyId> = resolved.iter().map(|t| t.0).collect();
     let list = table.intern_list(&ids);

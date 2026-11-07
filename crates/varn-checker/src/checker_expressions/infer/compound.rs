@@ -53,7 +53,7 @@ impl<'r> Checker<'r> {
             TypeKind::Generic(..) | TypeKind::Named(..) => {
                 builtin == Some(varn_core::BuiltinType::Map)
             }
-            TypeKind::Object(mid) => self
+            TypeKind::Record(mid) | TypeKind::Interface(mid) => self
                 .ty_table
                 .get_object_members(mid)
                 .iter()
@@ -79,7 +79,10 @@ impl<'r> Checker<'r> {
         if !keyed
             && matches!(
                 obj_kind,
-                TypeKind::Object(_) | TypeKind::Named(..) | TypeKind::Generic(..)
+                TypeKind::Record(_)
+                    | TypeKind::Interface(_)
+                    | TypeKind::Named(..)
+                    | TypeKind::Generic(..)
             )
             && builtin != Some(varn_core::BuiltinType::Bytes)
             && let varn_core::ast::ExprKind::StrLiteral { value } = &arena.expr(property).kind
@@ -133,7 +136,7 @@ impl<'r> Checker<'r> {
             {
                 obj_ty.builtin_arg(0, &self.ty_table)
             }
-            TypeKind::Object(mid) => self
+            TypeKind::Record(mid) | TypeKind::Interface(mid) => self
                 .ty_table
                 .get_object_members(mid)
                 .iter()

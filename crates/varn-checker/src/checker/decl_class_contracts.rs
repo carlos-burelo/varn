@@ -341,7 +341,7 @@ impl<'r> Checker<'r> {
             })
             .map(|cm| cm.as_object_member(table).map_generics(&mapping, table))
             .collect();
-        let object = varn_sem::types::Type::object(object_members, table);
+        let object = varn_sem::types::Type::interface(object_members, table);
         Some(self.types_compatible_cached(&object, instance, Some(bind)))
     }
 

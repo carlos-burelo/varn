@@ -78,7 +78,8 @@ impl<'r> Checker<'r> {
             TypeKind::Array(_)
             | TypeKind::Tuple(_)
             | TypeKind::Fn(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::EnumVariant { .. } => true,
             TypeKind::Union(list) => self

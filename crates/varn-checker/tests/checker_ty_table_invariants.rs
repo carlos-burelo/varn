@@ -78,7 +78,7 @@ fn absorb_is_a_union_that_preserves_ids() {
         optional: false,
         readonly: false,
     }]);
-    let foreign_obj = foreign.intern(TypeKind::Object(foreign_members));
+    let foreign_obj = foreign.intern(TypeKind::Record(foreign_members));
 
     local.absorb(&foreign);
 

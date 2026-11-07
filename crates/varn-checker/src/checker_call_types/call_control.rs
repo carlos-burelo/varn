@@ -22,7 +22,8 @@ pub(super) fn infer_await(c: &mut CallTypeCtx, argument: ExprId) -> Option<Type>
         | TypeKind::Generic(..)
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
-        | TypeKind::Object(_)
+        | TypeKind::Record(_)
+        | TypeKind::Interface(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }

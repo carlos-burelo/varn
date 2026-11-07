@@ -72,7 +72,8 @@ pub(super) fn resolve_mapped(
             | TypeKind::Generic(..)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -94,7 +95,7 @@ pub(super) fn resolve_mapped(
                 key_ty: key_ty.0,
                 value_ty: value_ty.0,
             };
-            return Type::object(vec![member], table);
+            return Type::record(vec![member], table);
         }
         return Type::Dynamic;
     }
@@ -130,5 +131,5 @@ pub(super) fn resolve_mapped(
             }
         })
         .collect();
-    Type::object(members, table)
+    Type::record(members, table)
 }

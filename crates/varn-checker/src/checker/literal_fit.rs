@@ -127,7 +127,8 @@ impl Checker<'_> {
             | TypeKind::Generic(..)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }
@@ -165,7 +166,7 @@ impl Checker<'_> {
                 });
             }
         }
-        if let (ExprKind::Object { properties }, TypeKind::Object(mid)) =
+        if let (ExprKind::Object { properties }, TypeKind::Record(mid) | TypeKind::Interface(mid)) =
             (&arena.expr(literal).kind, shape_kind)
         {
             {
@@ -255,7 +256,7 @@ impl Checker<'_> {
                 });
             }
             let as_declared =
-                Type::object(filled, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                Type::record(filled, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
             return self.types_compatible_cached(shape, &as_declared, Some(bind));
         }
         false
@@ -302,7 +303,8 @@ impl Checker<'_> {
             | TypeKind::Generic(..)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
-            | TypeKind::Object(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }

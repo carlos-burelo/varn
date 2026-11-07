@@ -153,7 +153,8 @@ pub(crate) fn classify(t: &TypeNode, interner: &AtomInterner) -> Mapped {
         | TypeKind::Generic(..)
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Fn(_)
-        | TypeKind::Object(_)
+        | TypeKind::Record(_)
+        | TypeKind::Interface(_)
         | TypeKind::Typeof(_)
         | TypeKind::KeyOf(_)
         | TypeKind::IndexedAccess { .. }

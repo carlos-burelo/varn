@@ -11,6 +11,7 @@ pub type AstTypeKind = TypeKind<
     Vec<TypeNode>,
     (Vec<TypeParam>, Box<TypeNode>),
     Vec<InterfaceMember>,
+    std::convert::Infallible,
     ExprId,
 >;
 

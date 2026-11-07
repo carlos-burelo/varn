@@ -17,7 +17,7 @@ impl Type {
                 ids.push(f.return_type);
                 ids.extend(f.type_param_defaults.iter().flatten().copied());
             }
-            TypeKind::Object(id) => {
+            TypeKind::Record(id) | TypeKind::Interface(id) => {
                 for member in table.get_object_members(id) {
                     match member {
                         ObjectTypeMember::Property { ty, .. } => ids.push(*ty),

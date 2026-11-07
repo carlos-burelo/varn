@@ -147,7 +147,8 @@ fn checked_widen_ty(
         | varn_core::TypeKind::Generic(..)
         | varn_core::TypeKind::TemplateLiteral(_)
         | varn_core::TypeKind::Fn(_)
-        | varn_core::TypeKind::Object(_)
+        | varn_core::TypeKind::Record(_)
+        | varn_core::TypeKind::Interface(_)
         | varn_core::TypeKind::Typeof(_)
         | varn_core::TypeKind::KeyOf(_)
         | varn_core::TypeKind::IndexedAccess { .. }

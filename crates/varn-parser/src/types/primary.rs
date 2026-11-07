@@ -204,7 +204,7 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> PResult<TypeNode> {
             }
             s.expect(TokenKind::RBrace)?;
             let full_range = s.span_from(range);
-            Ok(s.type_node(full_range, TypeKind::Object(members)))
+            Ok(s.type_node(full_range, TypeKind::Record(members)))
         }
 
         TokenKind::Str

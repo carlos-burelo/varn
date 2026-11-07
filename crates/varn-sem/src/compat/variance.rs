@@ -92,7 +92,7 @@ fn walk(ctx: &mut Ctx, id: crate::types::CheckerTyId, pol: Pol, shadow: &[String
                 walk_both(ctx, *id, shadow);
             }
         }
-        TypeKind::Object(mid) => {
+        TypeKind::Record(mid) | TypeKind::Interface(mid) => {
             for m in table.get_object_members(mid) {
                 match m {
                     ObjectTypeMember::Property { ty, readonly, .. } => {
@@ -211,7 +211,8 @@ pub fn measure_params(
                     | TypeKind::Named(..)
                     | TypeKind::Generic(..)
                     | TypeKind::TemplateLiteral(_)
-                    | TypeKind::Object(_)
+                    | TypeKind::Record(_)
+                    | TypeKind::Interface(_)
                     | TypeKind::Typeof(_)
                     | TypeKind::KeyOf(_)
                     | TypeKind::IndexedAccess { .. }
