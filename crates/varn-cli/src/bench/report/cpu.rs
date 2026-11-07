@@ -64,6 +64,15 @@ pub fn print(report: &mut Report, profile: &CpuProfile, timed_run: Option<Durati
     }
 
     functions(report, profile);
+    if profile
+        .frames
+        .iter()
+        .any(|frame| frame.function.starts_with("[rust] <"))
+    {
+        report.line(
+            "note: rust functions are unnamed in this build, use cargo build --profile profiling",
+        );
+    }
     lines(report, profile);
     edges(report, profile);
     stacks(report, profile);

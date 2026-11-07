@@ -1,6 +1,7 @@
 mod activity;
 mod capture;
 mod sampler;
+mod symbols;
 
 pub(crate) use activity::Activity;
 
@@ -40,6 +41,7 @@ pub struct CpuProfile {
     pub lines: BTreeMap<(u32, u32), u64>,
     index: BTreeMap<ProfileFrame, u32>,
     protos: FxHashMap<usize, Rc<FunctionProto>>,
+    symbols: symbols::Symbols,
 }
 
 impl CpuProfile {
@@ -60,6 +62,7 @@ impl CpuProfile {
             lines: BTreeMap::new(),
             index: BTreeMap::new(),
             protos: FxHashMap::default(),
+            symbols: symbols::Symbols::default(),
         }
     }
 
@@ -213,17 +216,21 @@ impl CpuProfiler {
                 continue;
             };
             let pseudo = if collecting {
-                Some("<gc>")
+                Some("<gc>".to_owned())
             } else if compiling {
-                Some("<jit compile>")
+                Some("<jit compile>".to_owned())
             } else if idle {
-                Some("<waiting>")
+                Some("<waiting>".to_owned())
+            } else if compiled.is_none() {
+                into.symbols
+                    .name(slot.pc)
+                    .map(|symbol| format!("[rust] {symbol}"))
             } else {
                 None
             };
             if let Some(name) = pseudo {
                 let id = into.intern(ProfileFrame {
-                    function: name.to_owned(),
+                    function: name,
                     file: String::new(),
                 });
                 stack.push(id);
