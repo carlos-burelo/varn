@@ -32,7 +32,7 @@ pub fn parse_interface_decl(s: &mut TokenStream) -> PResult<InterfaceDecl> {
         if s.check(TokenKind::RBrace) {
             break;
         }
-        body.push(parse_interface_member(s)?);
+        body.push(parse_interface_member(s, MemberContext::Contract)?);
     }
     s.expect(TokenKind::RBrace)?;
 
@@ -48,9 +48,37 @@ pub fn parse_interface_decl(s: &mut TokenStream) -> PResult<InterfaceDecl> {
     })
 }
 
-pub fn parse_interface_member(s: &mut TokenStream) -> PResult<InterfaceMember> {
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum MemberContext {
+    Contract,
+    Record,
+}
+
+pub fn parse_interface_member(
+    s: &mut TokenStream,
+    context: MemberContext,
+) -> PResult<InterfaceMember> {
     let mem_range = s.range();
-    let readonly = s.eat(TokenKind::Readonly);
+    let (readonly, mutable) = match context {
+        MemberContext::Record => (s.eat(TokenKind::Readonly), false),
+        MemberContext::Contract => {
+            if s.check(TokenKind::Readonly) {
+                let at = s.range();
+                s.push_error(
+                    "interface properties are read-only by default; write `mut` for a writable one"
+                        .to_owned(),
+                    at,
+                );
+                s.advance();
+            }
+            let is_modifier = s.check(TokenKind::Mut)
+                && !matches!(
+                    s.peek_kind(1),
+                    TokenKind::Colon | TokenKind::Question | TokenKind::LParen | TokenKind::LAngle
+                );
+            (false, is_modifier && s.eat(TokenKind::Mut))
+        }
+    };
     let is_async = s.check(TokenKind::Async)
         && !matches!(
             s.peek_kind(1),
@@ -66,6 +94,7 @@ pub fn parse_interface_member(s: &mut TokenStream) -> PResult<InterfaceMember> {
         let return_type = parse_type(s)?;
         s.eat(TokenKind::Semicolon);
         let full_range = s.span_from(mem_range);
+        reject_mut_on_callable_member(s, mutable, mem_range);
         return Ok(InterfaceMember::Index {
             param,
             return_type,
@@ -78,6 +107,7 @@ pub fn parse_interface_member(s: &mut TokenStream) -> PResult<InterfaceMember> {
         let return_type = parse_type(s)?;
         s.eat(TokenKind::Semicolon);
         let full_range = s.span_from(mem_range);
+        reject_mut_on_callable_member(s, mutable, mem_range);
         return Ok(InterfaceMember::Callable {
             params,
             return_type,
@@ -102,6 +132,7 @@ pub fn parse_interface_member(s: &mut TokenStream) -> PResult<InterfaceMember> {
         };
         s.eat_semicolon();
         let full_range = s.span_from(mem_range);
+        reject_mut_on_callable_member(s, mutable, mem_range);
         return Ok(InterfaceMember::Method {
             key: s.interner.intern(&key),
             type_params,
@@ -121,7 +152,10 @@ pub fn parse_interface_member(s: &mut TokenStream) -> PResult<InterfaceMember> {
         key: s.interner.intern(&key),
         type_ann,
         optional,
-        readonly,
+        readonly: match context {
+            MemberContext::Record => readonly,
+            MemberContext::Contract => !mutable,
+        },
         range: full_range,
     })
 }
@@ -178,4 +212,17 @@ pub fn parse_namespace_decl(s: &mut TokenStream, is_declare: bool) -> PResult<Na
         doc: None,
         range: full_range,
     })
+}
+
+fn reject_mut_on_callable_member(
+    s: &mut TokenStream,
+    mutable: bool,
+    range: varn_core::source::SourceRange,
+) {
+    if mutable {
+        s.push_error(
+            "`mut` applies to properties, not to methods".to_owned(),
+            range,
+        );
+    }
 }

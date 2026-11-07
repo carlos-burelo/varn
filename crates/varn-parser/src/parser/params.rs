@@ -182,6 +182,7 @@ fn parse_param(s: &mut TokenStream) -> PResult<Param> {
             | TokenKind::Override
             | TokenKind::Declare
             | TokenKind::Native
+            | TokenKind::Mut
             | TokenKind::Extends
             | TokenKind::Implements
             | TokenKind::Get

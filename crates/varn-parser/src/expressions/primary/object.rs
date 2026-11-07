@@ -297,6 +297,7 @@ fn parse_prop_key(s: &mut TokenStream) -> PResult<PropKey> {
         | TokenKind::Abstract
         | TokenKind::Override
         | TokenKind::Readonly
+        | TokenKind::Mut
         | TokenKind::Declare
         | TokenKind::Native
         | TokenKind::Extends

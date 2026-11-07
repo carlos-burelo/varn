@@ -141,6 +141,7 @@ pub(crate) fn token_to_assign_op(kind: TokenKind) -> Option<AssignOp> {
         | TokenKind::Abstract
         | TokenKind::Override
         | TokenKind::Readonly
+        | TokenKind::Mut
         | TokenKind::Declare
         | TokenKind::Native
         | TokenKind::Extends

@@ -1,0 +1,4 @@
+// expect: error[VN2002]
+interface Named {
+    readonly name: str
+}

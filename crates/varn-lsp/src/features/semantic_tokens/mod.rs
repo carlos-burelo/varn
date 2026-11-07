@@ -250,6 +250,7 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
             | TokenKind::Abstract
             | TokenKind::Override
             | TokenKind::Readonly
+            | TokenKind::Mut
             | TokenKind::Declare
             | TokenKind::Native
             | TokenKind::Extends

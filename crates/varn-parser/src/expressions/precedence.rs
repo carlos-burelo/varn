@@ -152,6 +152,7 @@ pub(crate) fn binary_prec(kind: TokenKind) -> Option<(Prec, bool)> {
         | TokenKind::Abstract
         | TokenKind::Override
         | TokenKind::Readonly
+        | TokenKind::Mut
         | TokenKind::Declare
         | TokenKind::Native
         | TokenKind::Extends

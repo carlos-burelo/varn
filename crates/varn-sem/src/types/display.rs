@@ -148,6 +148,7 @@ impl fmt::Display for TypeDisplay<'_> {
                 write!(f, ") => {}", self.child(ft.return_type))
             }
             TypeKind::Record(mid) | TypeKind::Interface(mid) => {
+                let contract = matches!(table.get(self.ty.0), TypeKind::Interface(_));
                 write!(f, "{{ ")?;
                 for (i, m) in table.get_object_members(mid).iter().enumerate() {
                     if i > 0 {
@@ -160,7 +161,9 @@ impl fmt::Display for TypeDisplay<'_> {
                             optional,
                             readonly,
                         } => {
-                            if *readonly {
+                            if contract && !*readonly {
+                                write!(f, "mut ")?;
+                            } else if !contract && *readonly {
                                 write!(f, "readonly ")?;
                             }
                             let shown = self.child(*ty).to_string();

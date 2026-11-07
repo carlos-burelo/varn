@@ -156,6 +156,7 @@ pub(super) fn member_key_name(s: &mut TokenStream) -> PResult<String> {
         | TokenKind::Abstract
         | TokenKind::Override
         | TokenKind::Readonly
+        | TokenKind::Mut
         | TokenKind::Declare
         | TokenKind::Native
         | TokenKind::Extends

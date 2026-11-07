@@ -163,6 +163,7 @@ pub fn parse_pattern(s: &mut TokenStream) -> PResult<Pattern> {
         | TokenKind::Abstract
         | TokenKind::Override
         | TokenKind::Readonly
+        | TokenKind::Mut
         | TokenKind::Declare
         | TokenKind::Native
         | TokenKind::Extends

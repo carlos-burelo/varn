@@ -74,6 +74,7 @@ keywords! {
     Abstract => "abstract",
     Override => "override",
     Readonly => "readonly",
+    Mut => "mut",
     Declare => "declare",
     Native => "native",
     Extends => "extends",

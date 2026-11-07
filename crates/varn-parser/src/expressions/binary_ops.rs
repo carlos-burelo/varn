@@ -139,6 +139,7 @@ pub(crate) fn token_to_binary_op(kind: TokenKind) -> Option<BinaryOp> {
         | TokenKind::Abstract
         | TokenKind::Override
         | TokenKind::Readonly
+        | TokenKind::Mut
         | TokenKind::Declare
         | TokenKind::Native
         | TokenKind::Extends

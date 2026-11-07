@@ -50,3 +50,25 @@ await describe("339 record and interface types", async () => {
         expect(headers["x"]).toBe(null)
     })
 })
+
+class Animal { name: str = "animal" }
+class Dog extends Animal { constructor() { super(); this.name = "dog" } }
+interface Holder { pet: Animal }
+interface Slot { mut pet: Animal }
+class Kennel { pet: Animal = new Animal() }
+function petOf(h: Holder): str { return h.pet.name }
+function replace(s: Slot, a: Animal): void { s.pet = a }
+
+await describe("339 read-only and mut interface members", async () => {
+    await it("a read-only member is covariant", () => {
+        const holder = { pet: new Dog() }
+        expect(petOf(holder)).toBe("dog")
+        expect(petOf(new Kennel())).toBe("animal")
+    })
+
+    await it("a mut member writes through the interface", () => {
+        const kennel = new Kennel()
+        replace(kennel, new Dog())
+        expect(kennel.pet.name).toBe("dog")
+    })
+})

@@ -7,7 +7,7 @@ interface Labelled {
     weight: int | float
 }
 interface Sized {
-    readonly size: int | str
+    size: int | str
 }
 class Crate {
     size: int = 3

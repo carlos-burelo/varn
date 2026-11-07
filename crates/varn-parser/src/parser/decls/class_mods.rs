@@ -10,7 +10,7 @@ pub(super) fn parse_member_mods(s: &mut TokenStream) -> Modifiers {
         if kind.is_keyword()
             || matches!(
                 kind,
-                TokenKind::Async | TokenKind::Readonly | TokenKind::Declare
+                TokenKind::Async | TokenKind::Readonly | TokenKind::Mut | TokenKind::Declare
             )
         {
             let nk = s.peek_kind(1);
@@ -187,6 +187,7 @@ pub(super) fn parse_member_mods(s: &mut TokenStream) -> Modifiers {
             | TokenKind::False
             | TokenKind::Null
             | TokenKind::Native
+            | TokenKind::Mut
             | TokenKind::Extends
             | TokenKind::Implements
             | TokenKind::Get

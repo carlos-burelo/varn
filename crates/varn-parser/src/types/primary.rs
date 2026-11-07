@@ -197,7 +197,10 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> PResult<TypeNode> {
                 if s.check(TokenKind::RBrace) {
                     break;
                 }
-                members.push(crate::parser::decls::type_decls::parse_interface_member(s)?);
+                members.push(crate::parser::decls::type_decls::parse_interface_member(
+                    s,
+                    crate::parser::decls::type_decls::MemberContext::Record,
+                )?);
 
                 s.eat(TokenKind::Comma);
                 s.eat(TokenKind::Semicolon);
@@ -237,6 +240,7 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> PResult<TypeNode> {
         | TokenKind::Static
         | TokenKind::Abstract
         | TokenKind::Readonly
+        | TokenKind::Mut
         | TokenKind::Native
         | TokenKind::Constructor
         | TokenKind::Destructor => {

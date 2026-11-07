@@ -172,6 +172,7 @@ fn paren_leads_to_arrow(s: &TokenStream) -> bool {
                                 | TokenKind::Abstract
                                 | TokenKind::Override
                                 | TokenKind::Readonly
+                                | TokenKind::Mut
                                 | TokenKind::Declare
                                 | TokenKind::Native
                                 | TokenKind::Extends
@@ -336,6 +337,7 @@ fn paren_leads_to_arrow(s: &TokenStream) -> bool {
             | TokenKind::Abstract
             | TokenKind::Override
             | TokenKind::Readonly
+            | TokenKind::Mut
             | TokenKind::Declare
             | TokenKind::Native
             | TokenKind::Extends

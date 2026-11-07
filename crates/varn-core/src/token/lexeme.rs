@@ -123,6 +123,7 @@ impl TokenKind {
             | TokenKind::Abstract
             | TokenKind::Override
             | TokenKind::Readonly
+            | TokenKind::Mut
             | TokenKind::Declare
             | TokenKind::Native
             | TokenKind::Extends

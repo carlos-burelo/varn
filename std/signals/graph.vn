@@ -12,10 +12,10 @@ export class Source {
 }
 
 export interface Observer {
-    sources: Source[];
-    seen: int[];
+    mut sources: Source[];
+    mut seen: int[];
     alive: bool;
-    cleanups: (() => void)[];
+    mut cleanups: (() => void)[];
     notify(): void;
     run(): void;
 }

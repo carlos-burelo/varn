@@ -165,6 +165,7 @@ pub fn parse_block(s: &mut TokenStream) -> PResult<StmtId> {
                         | TokenKind::Abstract
                         | TokenKind::Override
                         | TokenKind::Readonly
+                        | TokenKind::Mut
                         | TokenKind::Native
                         | TokenKind::Extends
                         | TokenKind::Implements

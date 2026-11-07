@@ -171,6 +171,7 @@ pub(super) fn parse_postfix_expr(s: &mut TokenStream) -> PResult<ExprId> {
             | TokenKind::Abstract
             | TokenKind::Override
             | TokenKind::Readonly
+            | TokenKind::Mut
             | TokenKind::Declare
             | TokenKind::Native
             | TokenKind::Extends

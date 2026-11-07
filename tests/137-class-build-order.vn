@@ -56,8 +56,8 @@ class InitDerived extends InitBase {
 }
 
 interface HasZW {
-    z: int
-    w: int
+    mut z: int
+    mut w: int
 }
 class ViewBase {
     z: int

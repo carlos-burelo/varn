@@ -245,6 +245,7 @@ fn find_rparen_col_on_line(state: &DocumentState, line: u32, after_col: u32) -> 
             | varn_core::TokenKind::Abstract
             | varn_core::TokenKind::Override
             | varn_core::TokenKind::Readonly
+            | varn_core::TokenKind::Mut
             | varn_core::TokenKind::Declare
             | varn_core::TokenKind::Native
             | varn_core::TokenKind::Extends

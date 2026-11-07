@@ -173,6 +173,7 @@ pub fn keyword_hover(kind: TokenKind) -> Option<Hover> {
         | TokenKind::Abstract
         | TokenKind::Override
         | TokenKind::Readonly
+        | TokenKind::Mut
         | TokenKind::Declare
         | TokenKind::Native
         | TokenKind::Extends
