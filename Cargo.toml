@@ -127,6 +127,10 @@ panic = "abort"
 [profile.release.build-override]
 opt-level = 0
 
+[profile.profiling]
+inherits = "release"
+debug = "line-tables-only"
+
 [profile.dev]
 opt-level = 1
 debug = 0
