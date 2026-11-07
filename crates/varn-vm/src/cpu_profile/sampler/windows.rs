@@ -13,6 +13,7 @@ const THREAD_QUERY_LIMITED_INFORMATION: u32 = 0x0800;
 const CONTEXT_CONTROL: u32 = 0x0010_0001;
 const CONTEXT_FLAGS_OFFSET: usize = 0x30;
 const CONTEXT_RIP_OFFSET: usize = 0xF8;
+const CONTEXT_RSP_OFFSET: usize = 0x98;
 const CONTEXT_BYTES: usize = 1232;
 
 #[repr(C, align(16))]
@@ -117,7 +118,15 @@ fn run(target: &Target, shared: &Shared, period: Duration, stop: &AtomicBool) {
             rip.copy_from_slice(&context.0[CONTEXT_RIP_OFFSET..CONTEXT_RIP_OFFSET + 8]);
             let mut cycles = 0u64;
             unsafe { QueryThreadCycleTime(target.0, &mut cycles) };
-            unsafe { shared.capture(u64::from_le_bytes(rip) as usize, cycles) };
+            let mut rsp = [0u8; 8];
+            rsp.copy_from_slice(&context.0[CONTEXT_RSP_OFFSET..CONTEXT_RSP_OFFSET + 8]);
+            let stack = u64::from_le_bytes(rsp) as usize;
+            let caller = if stack != 0 && stack.is_multiple_of(8) {
+                unsafe { *(stack as *const usize) }
+            } else {
+                0
+            };
+            unsafe { shared.capture(u64::from_le_bytes(rip) as usize, caller, cycles) };
         }
         unsafe { ResumeThread(target.0) };
     }

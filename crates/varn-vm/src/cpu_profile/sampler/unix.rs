@@ -10,7 +10,7 @@ static ACTIVE: AtomicPtr<Shared> = AtomicPtr::new(std::ptr::null_mut());
 extern "C" fn on_signal(_: libc::c_int, _: *mut libc::siginfo_t, context: *mut libc::c_void) {
     let shared = ACTIVE.load(Ordering::Acquire);
     if !shared.is_null() {
-        unsafe { (*shared).capture(program_counter(context), thread_cpu_nanos()) };
+        unsafe { (*shared).capture(program_counter(context), 0, thread_cpu_nanos()) };
     }
 }
 

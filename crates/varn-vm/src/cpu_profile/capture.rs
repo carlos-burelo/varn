@@ -27,6 +27,7 @@ pub(super) struct Slot {
     pub truncated: bool,
     pub activity: u8,
     pub pc: usize,
+    pub caller: usize,
     pub cpu: u64,
     pub at_ns: u64,
     pub frames: [Entry; MAX_DEPTH],
@@ -71,7 +72,7 @@ impl Shared {
         unsafe { &*self.slots.add(index) }
     }
 
-    pub(crate) unsafe fn capture(&self, pc: usize, cpu: u64) {
+    pub(crate) unsafe fn capture(&self, pc: usize, caller: usize, cpu: u64) {
         let index = self.taken.fetch_add(1, Ordering::AcqRel);
         if index >= self.capacity {
             return;
@@ -81,6 +82,7 @@ impl Shared {
         let skipped = stack.len().saturating_sub(MAX_DEPTH);
         slot.truncated = skipped > 0;
         slot.pc = pc;
+        slot.caller = caller;
         slot.cpu = cpu;
         slot.at_ns = self.start.elapsed().as_nanos() as u64;
         slot.activity = super::activity::snapshot();

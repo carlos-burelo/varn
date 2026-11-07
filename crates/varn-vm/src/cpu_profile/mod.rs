@@ -229,6 +229,17 @@ impl CpuProfiler {
                 None
             };
             if let Some(name) = pseudo {
+                if name.starts_with("[rust] <")
+                    && slot.caller != 0
+                    && let Some(caller) = into.symbols.name(slot.caller)
+                {
+                    let caller = format!("[rust] {caller}");
+                    let caller_id = into.intern(ProfileFrame {
+                        function: caller,
+                        file: String::new(),
+                    });
+                    stack.push(caller_id);
+                }
                 let id = into.intern(ProfileFrame {
                     function: name,
                     file: String::new(),
