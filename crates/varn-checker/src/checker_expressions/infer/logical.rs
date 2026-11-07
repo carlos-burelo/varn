@@ -19,10 +19,18 @@ impl<'r> Checker<'r> {
             varn_core::ast::LogicalOp::And => self.in_branch(rec, left, bind, true, |c, rec| {
                 c.infer_type(rec, right, bind)
             }),
-            varn_core::ast::LogicalOp::Or => self.in_branch(rec, left, bind, false, |c, rec| {
-                c.infer_type(rec, right, bind)
-            }),
-            varn_core::ast::LogicalOp::Nullish => self.infer_type(rec, right, bind),
+            varn_core::ast::LogicalOp::Or => {
+                let expected =
+                    l_ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                self.in_branch(rec, left, bind, false, |c, rec| {
+                    c.infer_expecting(rec, right, expected, bind)
+                })
+            }
+            varn_core::ast::LogicalOp::Nullish => {
+                let expected =
+                    l_ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+                self.infer_expecting(rec, right, expected, bind)
+            }
         };
         match op {
             varn_core::ast::LogicalOp::And => {

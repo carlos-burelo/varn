@@ -45,7 +45,7 @@ impl<'r> Checker<'r> {
         })
     }
 
-    pub(super) fn forwarded_operands(&self, expr: ExprId) -> Vec<u32> {
+    pub(crate) fn forwarded_operands(&self, expr: ExprId) -> Vec<u32> {
         use varn_core::ast::ExprKind;
         let mut forwarded = Vec::new();
         let mut pending = vec![expr];

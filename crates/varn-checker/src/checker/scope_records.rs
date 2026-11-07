@@ -134,3 +134,30 @@ impl<'r> Checker<'r> {
         }
     }
 }
+
+impl Checker<'_> {
+    pub(crate) fn infer_expecting(
+        &mut self,
+        rec: &mut Recorder,
+        expr: varn_core::ast::ExprId,
+        expected: Type,
+        bind: &varn_sem::bind::BindResult,
+    ) -> Type {
+        let prev = self.expected_type.take();
+        let prev_pending = self.expected_pending;
+        let prev_owner = self.expected_owner;
+        let prev_forwarded = std::mem::take(&mut self.expected_forwarded);
+        self.expected_type = Some(expected);
+        self.expected_pending = false;
+        self.expected_owner = Some(expr.index());
+        self.expected_forwarded = self.forwarded_operands(expr);
+        let result = self.infer_type_internal(rec, expr, bind);
+        self.infer_cache
+            .insert((expr, self.current_scope, self.infer_env_rev), result);
+        self.expected_type = prev;
+        self.expected_pending = prev_pending;
+        self.expected_owner = prev_owner;
+        self.expected_forwarded = prev_forwarded;
+        result
+    }
+}
