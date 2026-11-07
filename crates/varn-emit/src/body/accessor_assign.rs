@@ -47,9 +47,6 @@ impl<'a> FnEmitter<'a> {
             .and_then(|entry| self.signatures.get(entry.sig.0 as usize))
             .and_then(|sig| sig.params.first().copied())?;
         let obj = self.lower_expr(object);
-        if Self::is_class_ref(&obj, &ci.name, self.m.globals) {
-            return None;
-        }
         let v = self.assign_value(value);
         let v = match combine {
             None => self.widened(v, param),

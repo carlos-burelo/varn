@@ -28,6 +28,15 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
+    pub(super) fn class_ref_of(&self, obj: &varn_tir::TirExpr) -> Option<&'a ClassInfo> {
+        let BackendTy::Dynamic(DynReason::ClassObject(instance)) = obj.ty.non_nullable(self.tt)
+        else {
+            return None;
+        };
+        let ci = self.class_of(self.tt.get(instance))?;
+        Self::is_class_ref(obj, &ci.name, self.m.globals).then_some(ci)
+    }
+
     pub(super) fn core_class_name(&self, ty: BackendTy) -> Option<&'static str> {
         use varn_core::RuntimeKind as T;
         let tag = match ty.non_nullable(self.tt) {

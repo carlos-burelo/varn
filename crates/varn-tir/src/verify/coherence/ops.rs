@@ -1,6 +1,6 @@
 use crate::node::{TirBinOp, TirExpr};
 use crate::resolution::Resolution;
-use crate::ty::BackendTy;
+use crate::ty::{BackendTy, DynReason};
 use crate::verify::VerifyError;
 use crate::TirModule;
 
@@ -99,9 +99,18 @@ pub(super) fn check_field(
             }
         }
         Resolution::StaticField(slot) => {
-            let BackendTy::Class(c) = object.ty.non_nullable(&m.types) else {
+            let BackendTy::Dynamic(DynReason::ClassObject(instance)) =
+                object.ty.non_nullable(&m.types)
+            else {
                 errors.push(VerifyError::new(
-                    format!("static field slot {slot} on non-class receiver"),
+                    format!("static field slot {slot} on non-class-object receiver"),
+                    e.span,
+                ));
+                return;
+            };
+            let BackendTy::Class(c) = m.types.get(instance) else {
+                errors.push(VerifyError::new(
+                    format!("static field slot {slot} on a class object of no known class"),
                     e.span,
                 ));
                 return;

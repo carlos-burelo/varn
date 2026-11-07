@@ -131,8 +131,7 @@ impl<'a> FnEmitter<'a> {
         checked: Option<varn_tir::SigId>,
         span: Span,
     ) -> TirExpr {
-        if let Some(ci) = self.class_of(recv.ty)
-            && Self::is_class_ref(&recv, &ci.name, self.m.globals)
+        if let Some(ci) = self.class_ref_of(&recv)
             && let Some(slot) = ci.static_slot(&name)
         {
             let sig = checked.or(ci.static_at(slot).and_then(|s| s.sig));
