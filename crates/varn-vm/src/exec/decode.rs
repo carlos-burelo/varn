@@ -1,4 +1,4 @@
-use crate::exec::value_views::{elements, object_entries};
+use crate::exec::value_views::{elements, object_entries, object_layout, ObjectLayout};
 use crate::heap::Heap;
 use crate::value::VmValue;
 use std::sync::Arc;
@@ -8,6 +8,20 @@ use varn_types::value::ValueMap;
 struct Scope<'a> {
     desc: &'a TypeDesc,
     parent: Option<&'a Scope<'a>>,
+}
+
+fn rebuild(heap: &mut Heap, layout: &ObjectLayout, values: Vec<VmValue>) -> VmValue {
+    if layout.shape.class.is_none() {
+        heap.alloc_object_with_shape(&layout.shape, values)
+    } else {
+        heap.alloc_object_pairs(
+            layout
+                .entries
+                .iter()
+                .map(|(name, _)| Arc::clone(name))
+                .zip(values),
+        )
+    }
 }
 
 pub(crate) fn project(
@@ -80,19 +94,15 @@ fn walk(
             heap.alloc_tuple_vm(items)
         }
         TypeDesc::Dict(inner) => {
-            let Some(entries) = object_entries(heap, v) else {
+            let Some(layout) = object_layout(heap, v) else {
                 return v;
             };
-            let pairs: Vec<(Arc<str>, VmValue)> = entries
-                .into_iter()
-                .map(|(name, x)| {
-                    (
-                        Arc::<str>::from(name),
-                        walk(heap, stack_floor, x, inner, scope, visiting),
-                    )
-                })
+            let values: Vec<VmValue> = layout
+                .entries
+                .iter()
+                .map(|(_, x)| walk(heap, stack_floor, *x, inner, scope, visiting))
                 .collect();
-            heap.alloc_object_pairs(pairs)
+            rebuild(heap, &layout, values)
         }
         TypeDesc::Map(key, inner) => {
             let entries = if let Some(entries) = object_entries(heap, v) {
@@ -116,12 +126,13 @@ fn walk(
             heap.alloc_map_vm(map)
         }
         TypeDesc::Object(fields) => {
-            let Some(entries) = object_entries(heap, v) else {
+            let Some(layout) = object_layout(heap, v) else {
                 return v;
             };
+            let entries = &layout.entries;
             if entries
                 .iter()
-                .any(|(name, _)| !fields.iter().any(|field| field.name == *name))
+                .any(|(name, _)| !fields.iter().any(|field| field.name == **name))
             {
                 return v;
             }
@@ -129,11 +140,26 @@ fn walk(
                 desc,
                 parent: scope,
             };
+            let aligned = entries.len() == fields.len()
+                && entries
+                    .iter()
+                    .zip(fields)
+                    .all(|((name, _), field)| field.name == **name);
+            if aligned {
+                let values: Vec<VmValue> = entries
+                    .iter()
+                    .zip(fields)
+                    .map(|((_, x), field)| {
+                        walk(heap, stack_floor, *x, &field.ty, Some(&inner), visiting)
+                    })
+                    .collect();
+                return rebuild(heap, &layout, values);
+            }
             let mut pairs: Vec<(Arc<str>, VmValue)> = Vec::with_capacity(fields.len());
             for field in fields {
-                if let Some((_, x)) = entries.iter().find(|(name, _)| *name == field.name) {
+                if let Some((name, x)) = entries.iter().find(|(name, _)| **name == *field.name) {
                     let projected = walk(heap, stack_floor, *x, &field.ty, Some(&inner), visiting);
-                    pairs.push((Arc::from(field.name.as_str()), projected));
+                    pairs.push((Arc::clone(name), projected));
                 }
             }
             heap.alloc_object_pairs(pairs)
