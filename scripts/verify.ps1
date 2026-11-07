@@ -8,11 +8,15 @@
     2. Linter (cargo clippy)
     3. Auditoría de gobernanza de tamaño de archivos
     4. Compilación del binario de producción (cargo build --release --bin vn)
-    5. Matriz obligatoria de 4 cuadrantes sobre tests/main.vn
+    5. Suite tests/main.vn: el camino de producción (@embedded + JIT) con -Fast,
+       la matriz completa de 5 cuadrantes sin banderas
     6. Benchmark de estabilidad (opcional con -Fast)
 
 .PARAMETER Fast
-    Omite el paso de benchmark para iteración rápida.
+    Puerta previa al push: corre solo el camino que se distribuye (std @embedded
+    con JIT) y omite el benchmark. La matriz de 4 cuadrantes completa la corre el
+    CI en cada push; sin banderas se corre aquí completa, útil al tocar JIT, su
+    caché o el cargador de std.
 
 .PARAMETER SkipLint
     Omite cargo fmt y cargo clippy.
@@ -178,7 +182,13 @@ function Run-Quadrant($name, $envVars, $argsList) {
     }
 }
 
-# 5. Matriz de Validacion de 4 Cuadrantes
+# 5. Suite de integracion
+if ($Fast -and -not $Quick) {
+    Write-StepHeader "5/6: Camino de produccion (tests/main.vn con @embedded + JIT)"
+    $q3 = Run-Quadrant "[@embedded std] + [JIT Habilitado]" @{ "VARN_STD" = "@embedded"; "VARN_STD_BUNDLE" = $stdBundle } @("run", "tests/main.vn")
+    if (-not $q3) { $failedSteps += "Camino de produccion (@embedded + JIT)" }
+    Write-WarningMsg "Cuadrantes 1, 2, 4 y 5 los corre el CI; correr sin banderas al tocar JIT, su cache o el cargador de std."
+} else {
 Write-StepHeader "5/6: Matriz Obligatoria de 4 Cuadrantes (tests/main.vn)"
 
 # Q1: dev-checkout + JIT
@@ -204,6 +214,7 @@ if (-not $q4) { $failedSteps += "Cuadrante 4 (@embedded + No-JIT)" }
 # Q5: cache JIT tibia (de Q1/Q3) recompilada y comparada byte a byte
 $q5 = Run-Quadrant "5: [cache JIT] + [VARN_JIT_CACHE=verify]" @{ "VARN_JIT_CACHE" = "verify" } @("run", "tests/main.vn")
 if (-not $q5) { $failedSteps += "Cuadrante 5 (cache JIT verify)" }
+}
 }
 
 # 5b. Corpus de errores (lo ejecuta el CI; sin esto un fixture obsoleto solo falla alli)

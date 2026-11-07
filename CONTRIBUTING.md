@@ -84,7 +84,7 @@ Para simplificar la validación y asegurar cero roturas antes de hacer commit/pu
 - **Windows (PowerShell)**:
   ```powershell
   .\scripts\verify.ps1              # Ejecución completa (fmt + clippy + audit + release + 5 cuadrantes + bench)
-  .\scripts\verify.ps1 -Fast        # Release sin benchmark (4 cuadrantes + cuadrante 5 de caché JIT)
+  .\scripts\verify.ps1 -Fast        # Puerta de push: release sin benchmark, solo el camino de producción (@embedded + JIT)
   .\scripts\verify.ps1 -Quick       # Iteración: perfil `quick` (sin LTO) + solo cuadrante 1, sin lint ni bench
   .\scripts\verify.ps1 -SkipLint    # Omite cargo fmt y cargo clippy
   .\scripts\verify.ps1 -CleanCache  # Limpia la caché de Varn antes de cada cuadrante
