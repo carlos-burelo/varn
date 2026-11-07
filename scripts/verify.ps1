@@ -251,7 +251,8 @@ Write-Host "  RESUMEN DE PRE-VERIFICACION LOCAL (Tiempo total: ${elapsed}s)" -Fo
 Write-Host ("=" * 70) -ForegroundColor Cyan
 
 if ($failedSteps.Count -eq 0) {
-    Write-Host "`n [TODO CORRECTO] Todas las verificaciones y la matriz de 4 cuadrantes pasaron exitosamente." -ForegroundColor Green
+    $scope = if ($Quick) { "el cuadrante 1" } elseif ($Fast) { "el camino de produccion (@embedded + JIT)" } else { "la matriz de 4 cuadrantes" }
+    Write-Host "`n [TODO CORRECTO] Todas las verificaciones y $scope pasaron exitosamente." -ForegroundColor Green
     Write-Host " El codigo esta listo para produccion y es seguro hacer commit / push.`n" -ForegroundColor Green
     exit 0
 } else {
