@@ -65,6 +65,6 @@ await describe("85 stdlib sqlite ws archive", async () => {
         remove(zipPath);
     });
     await it("std:ws client API shape verification", async () => {
-        expect(typeof WebSocket == "class").toBe(true);
+        expect(WebSocket::type).toBe("WebSocket");
     });
 });

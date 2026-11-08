@@ -27,7 +27,7 @@ await describe("194 generator declared yield", async () => {
 
     await it("an integer literal yielded as float arrives as a float", () => {
         let kinds = ""
-        for (const value of halves()) { kinds = kinds + typeof value + " " }
+        for (const value of halves()) { kinds = kinds + value::type + " " }
         expect(kinds).toBe("float float ")
     })
 

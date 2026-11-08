@@ -3,15 +3,15 @@ import { describe, it, expect } from "std:test";
 class Wrap<T> {
     value: T
     constructor(value: T) { this.value = value }
-    set(v: T): str { this.value = v; return typeof this.value }
-    setOpt(v: T?): str { return typeof v }
+    set(v: T): str { this.value = v; return this.value::type }
+    setOpt(v: T?): str { return v::type }
 }
 
-function takeFloat(x: float): str { return typeof x }
-function takeOpt(x: float?): str { return typeof x }
+function takeFloat(x: float): str { return x::type }
+function takeOpt(x: float?): str { return x::type }
 function restFloat(...xs: float[]): str {
     if (xs.length == 0) { return "empty" }
-    return typeof xs[0]
+    return xs[0]::type
 }
 function restInt(...xs: int[]): int { return xs.length }
 function greet(name: str, punct: str = "!"): str { return name + punct }
@@ -22,7 +22,7 @@ await describe("204 call params are canonical", async () => {
         let total = 0
         for (let i = 0; i < 300; i = i + 1) { total = total + w.set(1).length + w.setOpt(2).length }
         expect(w.set(1)).toBe("float")
-        expect(typeof w.value).toBe("float")
+        expect(w.value::type).toBe("float")
         expect(w.setOpt(1)).toBe("float")
         expect(w.setOpt(null)).toBe("null")
         expect(total).toBe(300 * (5 + 5))

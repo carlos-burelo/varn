@@ -16,11 +16,11 @@ enum Color {
     Blue
 }
 function isStr(val: dynamic): val is str {
-    return typeof val == "str";
+    return val is str;
 }
 
 function isInt(val: dynamic): val is int {
-    return typeof val == "int";
+    return val is int;
 }
 
 function processValue(val: dynamic): str {

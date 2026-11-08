@@ -29,12 +29,12 @@ function lastValue(head: Node): int {
     return seen
 }
 function size(x: int | str): int {
-    if (typeof x == "int") { return x }
+    if (x is int) { return x }
     return x.length
 }
 function name(x: int | str | bool): str {
-    if (typeof x == "str") { return x }
-    if (typeof x != "int") {
+    if (x is str) { return x }
+    if (!(x is int)) {
         const flag: bool = x
         return flag ? "yes" : "no"
     }
@@ -64,7 +64,7 @@ await describe("192 narrowing follows assignment", async () => {
         expect(lastValue(chain)).toBe(3)
     })
 
-    await it("ruling a type out with typeof leaves the others", () => {
+    await it("ruling a type out with leaves::type the others", () => {
         let total = 0
         for (let i = 0; i < 300; i = i + 1) { total = total + size(i) + size("ab") }
         expect(total).toBe(44850 + 600)

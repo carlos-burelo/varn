@@ -25,7 +25,7 @@ await describe("184 string index", async () => {
     await it("indexes by character, short and long strings", () => {
         expect("abc"[1]).toBe("b")
         expect(at("abcabcabcabcabcabcabcabc", 22)).toBe("b")
-        expect(typeof "abc"[0]).toBe("str")
+        expect("abc"[0]::type).toBe("str")
     })
 
     await it("counts characters, not bytes", () => {

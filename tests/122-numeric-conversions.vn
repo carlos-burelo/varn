@@ -44,7 +44,7 @@ await describe("122 numeric conversions", async () => {
         expect((big as int)).toBe(42);
         expect(faultOf(() => huge as int)).toBe("ovf");
         expect((dec as int)).toBe(7);
-        expect(typeof (fromDyn as float)).toBe("float");
+        expect((fromDyn as float)::type).toBe("float");
         expect((fromDynF as int)).toBe(5);
         while (i < 500) { acc = acc + f2i(2.5); i = i + 1 }
         expect(acc).toBe(1000);

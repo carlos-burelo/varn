@@ -57,6 +57,6 @@ pub const fn binary_operator_method(op: BinaryOp) -> Option<OperatorMethod> {
 pub const fn unary_operator_method(op: UnaryOp) -> Option<OperatorMethod> {
     match op {
         UnaryOp::Minus => Some(value("Neg", "neg")),
-        UnaryOp::Plus | UnaryOp::Not | UnaryOp::BitNot | UnaryOp::Typeof => None,
+        UnaryOp::Plus | UnaryOp::Not | UnaryOp::BitNot => None,
     }
 }

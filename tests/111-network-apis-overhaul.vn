@@ -60,11 +60,11 @@ function testHttpServerAndClientApis(): void {
         expect(app.isListening).toBeFalsy();;
 
     // 3. http client free helpers
-        expect(typeof get).toBe("function");;
-        expect(typeof post).toBe("function");;
-        expect(typeof put).toBe("function");;
-        expect(typeof patch).toBe("function");;
-        expect(typeof del).toBe("function");;
+        expect(get::type).toBe("function");;
+        expect(post::type).toBe("function");;
+        expect(put::type).toBe("function");;
+        expect(patch::type).toBe("function");;
+        expect(del::type).toBe("function");;
 
 }
 
@@ -74,7 +74,7 @@ function testWebSocket(): void {
         expect(WebSocketReadyState.Closing as int).toBe(2);;
         expect(WebSocketReadyState.Closed as int).toBe(3);;
 
-        expect(typeof WebSocket == "class").toBeTruthy();;
+        expect(WebSocket::type).toBe("WebSocket");
 
 }
 let testPort = 19876;

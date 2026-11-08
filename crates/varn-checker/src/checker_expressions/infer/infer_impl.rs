@@ -207,7 +207,6 @@ impl<'r> Checker<'r> {
                             .map_or(inner, |resolved| resolved.result)
                     }
                     varn_core::ast::operators::UnaryOp::Plus => self.infer_type(rec, operand, bind),
-                    varn_core::ast::operators::UnaryOp::Typeof => Type::Str,
                     varn_core::ast::operators::UnaryOp::BitNot => {
                         let inner = self.infer_type(rec, operand, bind);
                         if inner.is_int() {

@@ -212,19 +212,6 @@ impl<'a> FnEmitter<'a> {
             varn_core::ast::operators::UnaryOp::Not => TirUnOp::Not,
             varn_core::ast::operators::UnaryOp::BitNot => TirUnOp::BitNot,
             varn_core::ast::operators::UnaryOp::Plus => return self.lower_expr(operand),
-
-            varn_core::ast::operators::UnaryOp::Typeof => {
-                let inner = self.lower_expr(operand);
-                return TirExpr {
-                    kind: TirExprKind::Unary {
-                        op: TirUnOp::Typeof,
-                        operand: Box::new(inner),
-                    },
-                    ty: BackendTy::Str,
-                    res: Resolution::None,
-                    span,
-                };
-            }
         };
 
         let inner = self.lower_expr(operand);

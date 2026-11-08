@@ -35,7 +35,7 @@ await describe("180 for-of over collections", async () => {
     await it("a Map yields key/value tuples in insertion order", () => {
         expect(totalAges()).toBe(39)
         const seen: str[] = []
-        for (const entry of ages) { seen.push(typeof entry) }
+        for (const entry of ages) { seen.push(entry::type) }
         expect(seen.length).toBe(2)
         expect(seen[0]).toBe("Tuple")
         const names: str[] = []

@@ -12,7 +12,7 @@ await describe("126 unit", async () => {
         await it("group 1 part 1", async () => {
         expect(`${u}`).toBe("()");
         expect(u == ()).toBeTruthy();
-        expect(typeof u).toBe("Tuple");
+        expect(u::type).toBe("Tuple");
         expect(nothing() == alsoNothing()).toBeTruthy();
     });
 

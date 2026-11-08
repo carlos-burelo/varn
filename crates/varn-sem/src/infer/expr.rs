@@ -128,7 +128,6 @@ pub fn infer_expr_type(
                     | TypeKind::EnumVariant { .. }
                     | TypeKind::TypePredicate { .. } => Type::Dynamic,
                 },
-                _ => Type::Dynamic,
             }
         }
         ExprKind::Binary {

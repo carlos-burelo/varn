@@ -32,9 +32,9 @@ function testCli(): void {
         expect(parsed.positionals[0]).toBe("src/main.vn");;
 
     // 4. Prompt exports
-        expect(typeof Prompt.ask).toBe("function");;
-        expect(typeof Prompt.confirm).toBe("function");;
-        expect(typeof Prompt.password).toBe("function");;
+        expect(Prompt.ask::type).toBe("function");;
+        expect(Prompt.confirm::type).toBe("function");;
+        expect(Prompt.password::type).toBe("function");;
 
 }
 

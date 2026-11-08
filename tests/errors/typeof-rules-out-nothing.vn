@@ -1,5 +1,0 @@
-// expect: error[VN3001]
-function f(x: int | str): int {
-    if (typeof x == "bool") { return 0 }
-    return x
-}

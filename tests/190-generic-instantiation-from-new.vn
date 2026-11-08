@@ -78,6 +78,6 @@ await describe("190 generic instantiation from new", async () => {
         wide.value = null
         const typed: Box<float> = new Box(2)
         expect(wide.value).toBe(null)
-        expect(typeof typed.value).toBe("float")
+        expect(typed.value::type).toBe("float")
     })
 })

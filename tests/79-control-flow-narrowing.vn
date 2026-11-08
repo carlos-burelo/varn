@@ -27,17 +27,17 @@ function processTruthy(val: str?): bool {
     return false;
 }
 
-// 4. Narrowing con typeof
+// 4. Narrowing con is sobre tipos primitivos
 function processTypeof(val: dynamic): str {
-    if (typeof val == "str") {
+    if (val is str) {
         return val.toUpperCase();
-    } else if (typeof val == "int") {
+    } else if (val is int) {
         return `number:${val}`;
     }
     return "other";
 }
 
-// 5. Narrowing con Instanceof
+// 5. Narrowing con is sobre clases
 class Animal {
     name: str;
     constructor(name: str) {

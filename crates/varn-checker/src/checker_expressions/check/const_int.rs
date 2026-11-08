@@ -68,7 +68,7 @@ pub(super) fn const_int_expr(e: ExprId, arena: &varn_core::ast::AstArena) -> Con
             match op {
                 UnaryOp::Minus => lift(varn_core::neg_int(v)),
                 UnaryOp::Plus => Value(v),
-                UnaryOp::Not | UnaryOp::BitNot | UnaryOp::Typeof => NotConst,
+                UnaryOp::Not | UnaryOp::BitNot => NotConst,
             }
         }
         ExprKind::Paren { expression } => const_int_expr(*expression, arena),

@@ -7,4 +7,3 @@ mod null_check;
 mod predicates;
 mod truthiness;
 mod type_guards;
-mod typeof_check;

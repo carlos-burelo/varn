@@ -1,0 +1,3 @@
+// expect: error[VN2007]
+const n = 5
+const kind = typeof n

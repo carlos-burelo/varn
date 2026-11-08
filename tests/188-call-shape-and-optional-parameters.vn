@@ -10,8 +10,8 @@ class Acc {
     maybe(n: int?): int { return this.total + (n ?? 1) }
     text(s: str, n: int?): int { return s.length + (n ?? 0) }
     omit(n: int, k: int = 2): int { return n + k }
-    loose(v: dynamic): str { return typeof v }
-    half(x: float?): str { return typeof x }
+    loose(v: dynamic): str { return v::type }
+    half(x: float?): str { return x::type }
 }
 class Wide extends Acc {
     override maybe(n: int?): int { return (n ?? 100) * 2 }
@@ -27,9 +27,9 @@ class Box<T> {
 }
 
 class Scale {
-    by(factor: float = 2): str { return typeof factor }
+    by(factor: float = 2): str { return factor::type }
 }
-function ratio(x: float = 1): str { return typeof x }
+function ratio(x: float = 1): str { return x::type }
 class Span {
     from: int
     to: int
@@ -68,7 +68,7 @@ function optional(s?: str): str { return s ?? "none" }
 function forward(s?: str): str { return optional(s) }
 function forwardDefault(k: int?): int { return withDefault(k) }
 function freeMaybe(n: int?): int { let k = n ?? 1; k = k + 1; return k }
-function freeFloat(x: float?): str { return typeof x }
+function freeFloat(x: float?): str { return x::type }
 
 function callMethods(a: Acc, i: int): int {
     return a.exact(i) + a.maybe(i) + a.text("abc", i) + a.omit(i)
@@ -134,15 +134,15 @@ await describe("188 call shape and optional parameters", async () => {
         const counted = new Box<decimal>(count)
         const table = new Map<str, float>()
         table.set("a", 1)
-        expect(typeof box.value).toBe("float")
-        expect(typeof held.value).toBe("float")
-        expect(typeof exact.value).toBe("decimal")
-        expect(typeof counted.value).toBe("decimal")
-        expect(typeof table.get("a")).toBe("float")
+        expect(box.value::type).toBe("float")
+        expect(held.value::type).toBe("float")
+        expect(exact.value::type).toBe("decimal")
+        expect(counted.value::type).toBe("decimal")
+        expect(table.get("a")::type).toBe("float")
     })
 
     await it("a default value has the declared type of its parameter", () => {
-        const scaled = (x: float = 1): str => typeof x
+        const scaled = (x: float = 1): str => x::type
         const base = 4
         const offset = (n: int, by: int = n + 1): int => by
         for (let i = 0; i < 300; i = i + 1) { ratio(); ratio(2); ratio(2.5) }
@@ -185,7 +185,7 @@ await describe("188 call shape and optional parameters", async () => {
         expect(total).toBe(4 * 79800 + 400 * 4)
         expect(new Tally(1) is Tally).toBe(true)
         expect(new Counter(1) is Tally).toBe(true)
-        expect(typeof new Holder(2.5).held).toBe("float")
+        expect(new Holder(2.5).held::type).toBe("float")
     })
 
     await it("an assignment takes an integer literal the way an initialiser does", () => {
@@ -201,12 +201,12 @@ await describe("188 call shape and optional parameters", async () => {
         plain = 4
         maybe = 5
         filled ??= 6
-        expect(typeof box.value).toBe("float")
-        expect(typeof table["k"]).toBe("float")
-        expect(typeof values[0]).toBe("float")
-        expect(typeof plain).toBe("float")
-        expect(typeof maybe).toBe("float")
-        expect(typeof filled).toBe("float")
+        expect(box.value::type).toBe("float")
+        expect(table["k"]::type).toBe("float")
+        expect(values[0]::type).toBe("float")
+        expect(plain::type).toBe("float")
+        expect(maybe::type).toBe("float")
+        expect(filled::type).toBe("float")
         expect(plain + values[0]).toBe(6.0)
     })
 

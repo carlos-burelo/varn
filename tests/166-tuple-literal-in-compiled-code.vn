@@ -4,7 +4,7 @@ function kindInLoopFunction(): str {
     const pair = (1, "a")
     let n = 0
     for (let i = 0; i < 2000; i = i + 1) { n = n + 1 }
-    return typeof pair
+    return pair::type
 }
 
 function make(i: int): (int, str) { return (i, "x") }
@@ -13,7 +13,7 @@ function sumFirsts(count: int): int {
     let total = 0
     for (let i = 0; i < count; i = i + 1) {
         const pair = make(i)
-        if (typeof pair == "Tuple") { total = total + pair[0] }
+        if (pair is (int, int)) { total = total + pair[0] }
     }
     return total
 }

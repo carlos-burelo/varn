@@ -27,7 +27,7 @@ impl<'r> Checker<'r> {
                 self.require_number(rec, operand, "this operator", bind)
             }
             UnaryOp::BitNot if !overloaded => self.require_int(rec, operand, "this operator", bind),
-            UnaryOp::Minus | UnaryOp::Plus | UnaryOp::BitNot | UnaryOp::Not | UnaryOp::Typeof => {}
+            UnaryOp::Minus | UnaryOp::Plus | UnaryOp::BitNot | UnaryOp::Not => {}
         }
         if overflows_int_literal(expr, arena) && !overflows_int_literal(operand, arena) {
             self.report_int_overflow(expr);
