@@ -52,7 +52,7 @@ enum Level {
     low,
     high;
     label(): () => str {
-        return () => this === Level.low ? "low" : "high";
+        return () => this == Level.low ? "low" : "high";
     }
 }
 

@@ -47,7 +47,7 @@ await describe("312 time values reject what they cannot hold", async () => {
         let ms = -8000000000000000;
         let bad = 0;
         while (ms < 8000000000000000) {
-            if (fromISO(toISOString(ms)) !== ms) bad = bad + 1;
+            if (fromISO(toISOString(ms)) != ms) bad = bad + 1;
             ms = ms + 123456789012345;
         }
         expect(bad).toBe(0);

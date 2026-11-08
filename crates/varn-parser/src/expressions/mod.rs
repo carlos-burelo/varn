@@ -111,6 +111,23 @@ pub(super) fn parse_binary_expr(s: &mut TokenStream, min_prec: Prec) -> PResult<
                 break;
             }
             let op_kind = kind;
+            match op_kind {
+                TokenKind::EqEqEq => {
+                    let at = s.range();
+                    s.push_error(
+                        "`===` does not exist: `==` compares by value, write `==`".to_owned(),
+                        at,
+                    );
+                }
+                TokenKind::BangEqEq => {
+                    let at = s.range();
+                    s.push_error(
+                        "`!==` does not exist: `!=` compares by value, write `!=`".to_owned(),
+                        at,
+                    );
+                }
+                _ => {}
+            }
             s.advance();
             let next_min = if right_assoc {
                 Prec::Multiplicative

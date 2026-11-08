@@ -11,7 +11,7 @@ class Vec2 {
     neg(): Vec2 { return new Vec2(-this.x, -this.y) }
     rem(k: int): Vec2 { return new Vec2(this.x % k, this.y % k) }
     pow(k: int): Vec2 { return new Vec2(this.x ** k, this.y ** k) }
-    equals(o: Vec2): bool { return this.x === o.x && this.y === o.y }
+    equals(o: Vec2): bool { return this.x == o.x && this.y == o.y }
     compare(o: Vec2): int { return (this.x * this.x + this.y * this.y) - (o.x * o.x + o.y * o.y) }
 }
 
@@ -25,7 +25,7 @@ class Plain { v: int; constructor(v: int) { this.v = v } }
 const p = new Plain(1)
 await describe("133 operator capabilities", async () => {
         await it("group 1 part 1", async () => {
-        expect(s.x === 4 && s.y).toBe(6);
+        expect(s.x == 4 && s.y).toBe(6);
         expect((b - a).x).toBe(2);
         expect((a * 3).y).toBe(6);
         expect((b / 1).x).toBe(3);
@@ -33,8 +33,8 @@ await describe("133 operator capabilities", async () => {
     });
 
     await it("group 1 part 2", async () => {
-        expect((b % 2).x === 1 && (b % 2).y).toBe(0);
-        expect((b ** 2).x === 9 && (b ** 2).y).toBe(16);
+        expect((b % 2).x == 1 && (b % 2).y).toBe(0);
+        expect((b ** 2).x == 9 && (b ** 2).y).toBe(16);
         expect((a + b - a).equals(b)).toBeTruthy();
         expect((a + b).equals(new Vec2(4, 6))).toBeTruthy();
         expect(!a.equals(b)).toBeTruthy();

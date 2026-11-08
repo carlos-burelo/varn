@@ -68,12 +68,12 @@ export class Database {
 
     get(sql: str, ...params: SqlParam[]): SqlRow? {
         const rows = query$(this.live(), sql, params, 1);
-        return rows.length === 0 ? null : rows[0];
+        return rows.length == 0 ? null : rows[0];
     }
 
     async getAsync(sql: str, ...params: SqlParam[]): Task<SqlRow?> {
         const rows = await queryAsync$(this.live(), sql, params, 1);
-        return rows.length === 0 ? null : rows[0];
+        return rows.length == 0 ? null : rows[0];
     }
 
     sql(strings: str[], ...values: SqlParam[]): SqlRow[] {
@@ -82,7 +82,7 @@ export class Database {
 
     sqlOne(strings: str[], ...values: SqlParam[]): SqlRow? {
         const rows = query$(this.live(), placeholders(strings, values), values, 1);
-        return rows.length === 0 ? null : rows[0];
+        return rows.length == 0 ? null : rows[0];
     }
 
     transaction<T>(body: () => T): T {

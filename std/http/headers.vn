@@ -20,14 +20,14 @@ export class Headers {
 
     has(name: str): bool {
         let key = name.toLowerCase();
-        return this._map[key] !== null;
+        return this._map[key] != null;
     }
 
     delete(name: str): void {
         let key = name.toLowerCase();
         let newMap: { [key: str]: str } = {};
         for (let k in this._map) {
-            if (k !== key) {
+            if (k != key) {
                 newMap[k] = this._map[k]!;
             }
         }
@@ -37,7 +37,7 @@ export class Headers {
     append(name: str, value: str): void {
         let key = name.toLowerCase();
         let existing = this._map[key];
-        if (existing !== null) {
+        if (existing != null) {
             this._map[key] = existing + ", " + value;
         } else {
             this._map[key] = value;
@@ -48,7 +48,7 @@ export class Headers {
         let result: { [key: str]: str } = {};
         for (let k in this._map) {
             let v = this._map[k];
-            if (v !== null) {
+            if (v != null) {
                 result[k] = v;
             }
         }

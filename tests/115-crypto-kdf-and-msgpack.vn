@@ -18,7 +18,7 @@ function testCryptoPrimitives(): void {
         expect(key1.toHex()).toBe(key2.toHex());;
 
     let differentKey = pbkdf2("other_password", salt, 1000, 32);
-        expect(key1.toHex() !== differentKey.toHex()).toBeTruthy();;
+        expect(key1.toHex() != differentKey.toHex()).toBeTruthy();;
 
     // 3. timingSafeEqual
         expect(timingSafeEqual(key1, key2)).toBeTruthy();;

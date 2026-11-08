@@ -33,6 +33,6 @@ await describe("242 async generator next() is a task", async () => {
         const pending = gen.next();
         expect((await pending)!).toBe(1);
         expect((await gen.next())!).toBe(2);
-        expect((await gen.next()) === null).toBeTruthy();
+        expect((await gen.next()) == null).toBeTruthy();
     });
 });

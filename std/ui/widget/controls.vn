@@ -26,7 +26,7 @@ function paintText(cx: PaintContext, slot: int, x: float, y: float, w: float, h:
                 if (cx.focus.current() == slot) {
                     cx.focus.clear();
                 }
-            } else if (value == SUBMITTED && submit !== null) {
+            } else if (value == SUBMITTED && submit != null) {
                 submit(ed.text);
             }
         },
@@ -109,12 +109,12 @@ export class FieldNode extends Widget {
         const slot = cx.idFor();
         const ed = this.edit ?? cx.fr.editFor(slot);
         const bound = this.bound;
-        if (bound !== null) {
+        if (bound != null) {
             ed.text = bound.peek();
         }
         const kind = this.multiline ? UiControlKind.Area : UiControlKind.Field;
         paintText(cx, slot, x, y, w, h, ed, kind, this.hint, this.size, this.onSubmit, (text: str) => {
-            if (bound !== null) {
+            if (bound != null) {
                 bound.set(text);
             }
         });

@@ -58,7 +58,7 @@ export class HttpServer {
         let route = new Route(method, pattern, handler);
         if (route.isStatic) {
             let bucket = this._staticRoutes[pattern];
-            if (bucket === null) {
+            if (bucket == null) {
                 this._staticRoutes[pattern] = [route];
             } else {
                 bucket.push(route);
@@ -100,7 +100,7 @@ export class HttpServer {
     cors(origin: str = "*", methods: HttpMethod[] = ALL_METHODS, headers: str = "*"): HttpServer {
         let allowed = methods.map((m: HttpMethod): str => httpMethodName$(m)).join(",");
         this.use(async (req: Request, next: () => Task<Response?>): Task<Response?> => {
-            if (req.method === HttpMethod.OPTIONS) {
+            if (req.method == HttpMethod.OPTIONS) {
                 let res = new Response("", 204);
                 res.headers.set("Access-Control-Allow-Origin", origin);
                 res.headers.set("Access-Control-Allow-Methods", allowed);
@@ -108,7 +108,7 @@ export class HttpServer {
                 return res;
             }
             let res = await next();
-            if (res !== null) {
+            if (res != null) {
                 res.headers.set("Access-Control-Allow-Origin", origin);
                 res.headers.set("Access-Control-Allow-Methods", allowed);
                 res.headers.set("Access-Control-Allow-Headers", headers);
@@ -147,7 +147,7 @@ export class HttpServer {
     close(): void {
         if (!this._isListening) return;
         this._isListening = false;
-        if (this._listenerId !== -1) {
+        if (this._listenerId != -1) {
             tcpCloseListener$(this._listenerId);
             this._listenerId = -1;
         }
@@ -172,7 +172,7 @@ export class HttpServer {
 
     private async _sendWebResponse(connId: int, responseObj: Response): Task<void> {
         let stream = responseObj.bodyStream;
-        if (stream !== null) {
+        if (stream != null) {
             await this._sendChunked(connId, responseObj, stream);
             return;
         }
@@ -185,9 +185,9 @@ export class HttpServer {
         let reading = true;
         while (reading) {
             let chunk = await reader.read(8192);
-            if (chunk === null) {
+            if (chunk == null) {
                 reading = false;
-            } else if (chunk.length === 0) {
+            } else if (chunk.length == 0) {
                 reading = false;
             } else {
                 let hexLen = chunk.length.toHex();
@@ -201,7 +201,7 @@ export class HttpServer {
 
     private _match(method: HttpMethod, pathOnly: str): Matched? {
         let bucket = this._staticRoutes[pathOnly];
-        if (bucket !== null) {
+        if (bucket != null) {
             for (let route of bucket) {
                 if (route.accepts(method)) {
                     return { handler: route.handler, params: {} };
@@ -212,13 +212,13 @@ export class HttpServer {
             let pathSegments = pathOnly.split("/");
             for (let route of this._dynamicRoutes) {
                 let params = route.match(method, pathSegments);
-                if (params !== null) {
+                if (params != null) {
                     return { handler: route.handler, params: params };
                 }
             }
         }
         let fallback = this._fetchHandler;
-        if (fallback !== null) {
+        if (fallback != null) {
             return { handler: fallback, params: {} };
         }
         return null;
@@ -228,7 +228,7 @@ export class HttpServer {
         let pathOnly = rawReq.path;
         let queryStr = "";
         let qIdx = rawReq.path.indexOf("?");
-        if (qIdx !== null) {
+        if (qIdx != null) {
             pathOnly = rawReq.path.slice(0, qIdx);
             queryStr = rawReq.path.slice(qIdx + 1);
         }
@@ -245,7 +245,7 @@ export class HttpServer {
             for (let i = 0; i < pairs.length; i = i + 1) {
                 let pair = pairs[i];
                 let eqIdx = pair.indexOf("=");
-                if (eqIdx !== null && eqIdx > 0) {
+                if (eqIdx != null && eqIdx > 0) {
                     queryObj[pair.slice(0, eqIdx)] = pair.slice(eqIdx + 1);
                 } else {
                     queryObj[pair] = "true";
@@ -253,7 +253,7 @@ export class HttpServer {
             }
         }
         reqObj.query = queryObj;
-        if (matched !== null) {
+        if (matched != null) {
             reqObj.params = matched.params;
         }
 
@@ -266,14 +266,14 @@ export class HttpServer {
                 };
                 return await mw(reqObj, next);
             }
-            if (matched !== null) {
+            if (matched != null) {
                 return await matched.handler(reqObj);
             }
             return null;
         };
 
         let finalResp = await runPipeline(0);
-        if (finalResp !== null) {
+        if (finalResp != null) {
             await self._sendWebResponse(connId, finalResp);
         } else {
             let notFoundHeaders: { [key: str]: str } = { "Content-Type": "text/plain" };
@@ -299,15 +299,15 @@ export class HttpServer {
             } catch (err) {
                 break;
             }
-            if (rawReq === null) {
+            if (rawReq == null) {
                 break;
             }
             let connHdr = rawReq.headers["connection"];
-            if (connHdr !== null && connHdr.toLowerCase() === "close") {
+            if (connHdr != null && connHdr.toLowerCase() == "close") {
                 keepAlive = false;
             }
             let method = rawReq.method;
-            if (method === null) {
+            if (method == null) {
                 let errHeaders: { [key: str]: str } = { "Content-Type": "text/plain", "Connection": "close" };
                 await sendHttpResponse$(connId, 501, "Not Implemented", errHeaders, "Not Implemented", []);
                 break;
@@ -333,7 +333,7 @@ export class HttpServer {
 
 export function serve(handler?: Handler, port: int = 3000): HttpServer {
     let server = new HttpServer();
-    if (handler !== null) {
+    if (handler != null) {
         server.all("*", handler);
         server.listen(port);
     }

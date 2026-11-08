@@ -31,7 +31,7 @@ await describe("119 numeric errors", async () => {
         try {
         mul(9223372036854775807, 2)
         } catch (e) {
-        caught = e instanceof Error && e.name === "IntegerOverflow"
+        caught = e instanceof Error && e.name == "IntegerOverflow"
         }
         expect(caught).toBeTruthy();
         expect(rem(MIN, 0 - 1)).toBe(0);

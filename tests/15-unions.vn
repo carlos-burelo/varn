@@ -10,7 +10,7 @@ function processValue(v: StringOrInt): str {
     }
 }
 function orNull(v: MaybeStr): int {
-    if (v === null) return 0;
+    if (v == null) return 0;
     return v.length;
 }
 class Square2 {

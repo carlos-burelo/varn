@@ -20,17 +20,17 @@ class Route {
     }
 
     match(method: string, pathSegments: string[]): Record<string, string> | null {
-        if (this.method !== "*" && this.method !== method) {
+        if (this.method != "*" && this.method != method) {
             return null;
         }
-        if (this.segments.length !== pathSegments.length) {
+        if (this.segments.length != pathSegments.length) {
             return null;
         }
 
         // Fast check: verify literal segments match first
         for (let i = 0; i < this.segments.length; i++) {
             const seg = this.segments[i];
-            if (!seg.startsWith(":") && seg !== pathSegments[i]) {
+            if (!seg.startsWith(":") && seg != pathSegments[i]) {
                 return null;
             }
         }
@@ -203,7 +203,7 @@ let totalBytes = 0;
 
 for (let i = 0; i < reqs.length; i++) {
     const res = router.dispatch(reqs[i]);
-    if (res.status === 200 || res.status === 201) {
+    if (res.status == 200 || res.status == 201) {
         successCount++;
     }
     totalBytes += res.body.length;

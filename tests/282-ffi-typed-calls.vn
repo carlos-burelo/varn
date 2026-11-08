@@ -7,7 +7,7 @@ function failsWith(run: () => dynamic, fragment: str): bool {
         run()
         return false
     } catch (e) {
-        return e.message.indexOf(fragment) !== null
+        return e.message.indexOf(fragment) != null
     }
 }
 

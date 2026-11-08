@@ -68,7 +68,7 @@ await describe("143 jit native ops", async () => {
     await it("group 1 part 2", async () => {
         expect(nAffix).toBe(1000 * 11);
         expect(nCodes).toBe(1000 * (259814 + 2192));
-        expect(nWrapped === 1333 && nvWrap(1)).toBe(-9223372036854775807 - 1);
+        expect(nWrapped == 1333 && nvWrap(1)).toBe(-9223372036854775807 - 1);
     });
 
 

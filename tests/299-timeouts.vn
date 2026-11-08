@@ -41,7 +41,7 @@ await describe("299 timeouts", async () => {
         let reply = "";
         while (true) {
             const chunk = await client.read(8192);
-            if (chunk === null) {
+            if (chunk == null) {
                 break;
             }
             reply = reply + (chunk as Bytes).toString();

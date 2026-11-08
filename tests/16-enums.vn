@@ -14,8 +14,8 @@ function describeDir(d: Direction): str {
 await describe("16 Enums", async () => {
     await it("values", () => {
         const dir: Direction = Direction.North;
-        expect(dir === Direction.North).toBeTruthy();
-        expect(Direction.North !== Direction.South).toBeTruthy();
+        expect(dir == Direction.North).toBeTruthy();
+        expect(Direction.North != Direction.South).toBeTruthy();
         expect(HttpMethod.POST.rawValue).toBe(1);
         expect(Direction.East.rawValue).toBe(2);
     });

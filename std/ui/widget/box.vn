@@ -31,14 +31,14 @@ export class BoxNode extends Widget {
         const pad = this.pad;
         const child = this.child;
         const bounded = this.bounds(c);
-        const measured = child === null ? null : layoutAt(child, "child", c.looseChild(bounded.maxW - 2.0 * pad, bounded.maxH - 2.0 * pad));
-        const inner = measured === null ? new Size(0.0, 0.0) : measured.size;
+        const measured = child == null ? null : layoutAt(child, "child", c.looseChild(bounded.maxW - 2.0 * pad, bounded.maxH - 2.0 * pad));
+        const inner = measured == null ? new Size(0.0, 0.0) : measured.size;
         const size = fixedSize(this, bounded, new Size(inner.w + 2.0 * pad, inner.h + 2.0 * pad));
         const children: Placement[] = [];
-        if (child !== null) {
+        if (child != null) {
             const wantW = size.w - 2.0 * pad;
             const wantH = size.h - 2.0 * pad;
-            const placed = (measured !== null && measured.size.w == wantW && measured.size.h == wantH) ? measured : layoutAt(child, "child", c.tightChild(wantW, wantH));
+            const placed = (measured != null && measured.size.w == wantW && measured.size.h == wantH) ? measured : layoutAt(child, "child", c.tightChild(wantW, wantH));
             placed.x = pad;
             placed.y = pad;
             children.push(placed);
@@ -51,7 +51,7 @@ export class BoxNode extends Widget {
             return this.w;
         }
         const child = this.child;
-        return 2.0 * this.pad + (child === null ? 0.0 : child.minWidth());
+        return 2.0 * this.pad + (child == null ? 0.0 : child.minWidth());
     }
 
     override minHeight(): float {
@@ -59,7 +59,7 @@ export class BoxNode extends Widget {
             return this.h;
         }
         const child = this.child;
-        return 2.0 * this.pad + (child === null ? 0.0 : child.minHeight());
+        return 2.0 * this.pad + (child == null ? 0.0 : child.minHeight());
     }
 
     private bounds(c: Constraints): Constraints {
@@ -77,7 +77,7 @@ export class BoxNode extends Widget {
             cx.win.rect(x, y, w, h, this.color, this.radius);
         }
         const click = this.onClick;
-        if (click !== null) {
+        if (click != null) {
             cx.click(UiControlKind.Surface, x, y, w, h, 0, false, click);
         }
         for (const placed of p.children) {
@@ -146,12 +146,12 @@ export class PaddingNode extends Widget {
 
     override minWidth(): float {
         const child = this.child;
-        return this.left + this.right + (child === null ? 0.0 : child.minWidth());
+        return this.left + this.right + (child == null ? 0.0 : child.minWidth());
     }
 
     override minHeight(): float {
         const child = this.child;
-        return this.top + this.bottom + (child === null ? 0.0 : child.minHeight());
+        return this.top + this.bottom + (child == null ? 0.0 : child.minHeight());
     }
 
 
@@ -159,14 +159,14 @@ export class PaddingNode extends Widget {
         const horizontal = this.left + this.right;
         const vertical = this.top + this.bottom;
         const child = this.child;
-        const measured = child === null ? null : layoutAt(child, "child", c.looseChild(c.maxW - horizontal, c.maxH - vertical));
-        const inner = measured === null ? new Size(0.0, 0.0) : measured.size;
+        const measured = child == null ? null : layoutAt(child, "child", c.looseChild(c.maxW - horizontal, c.maxH - vertical));
+        const inner = measured == null ? new Size(0.0, 0.0) : measured.size;
         const size = fixedSize(this, c, new Size(inner.w + horizontal, inner.h + vertical));
         const children: Placement[] = [];
-        if (child !== null) {
+        if (child != null) {
             const wantW = size.w - horizontal < 0.0 ? 0.0 : size.w - horizontal;
             const wantH = size.h - vertical < 0.0 ? 0.0 : size.h - vertical;
-            const placed = (measured !== null && measured.size.w == wantW && measured.size.h == wantH) ? measured : layoutAt(child, "child", c.tightChild(wantW, wantH));
+            const placed = (measured != null && measured.size.w == wantW && measured.size.h == wantH) ? measured : layoutAt(child, "child", c.tightChild(wantW, wantH));
             placed.x = this.left;
             placed.y = this.top;
             children.push(placed);
@@ -195,12 +195,12 @@ export class SizedBoxNode extends Widget {
 
     override computeLayout(c: Constraints): Placement {
         const child = this.child;
-        const measured = child === null ? null : layoutAt(child, "child", c);
-        const inner = measured === null ? new Size(0.0, 0.0) : measured.size;
+        const measured = child == null ? null : layoutAt(child, "child", c);
+        const inner = measured == null ? new Size(0.0, 0.0) : measured.size;
         const size = fixedSize(this, c, inner);
         const children: Placement[] = [];
-        if (child !== null) {
-            const placed = (measured !== null && measured.size.w == size.w && measured.size.h == size.h) ? measured : layoutAt(child, "child", c.tightChild(size.w, size.h));
+        if (child != null) {
+            const placed = (measured != null && measured.size.w == size.w && measured.size.h == size.h) ? measured : layoutAt(child, "child", c.tightChild(size.w, size.h));
             children.push(placed);
         }
         return new Placement(this, size, children);

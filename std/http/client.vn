@@ -11,7 +11,7 @@ async function doFetch(connId: int, parsedUrl: Url, method: HttpMethod, headers:
     if (queryStr.length > 0) {
         target = target + "?" + queryStr;
     }
-    if (!isHttpFieldValue$(target) || target.indexOf(" ") !== null) {
+    if (!isHttpFieldValue$(target) || target.indexOf(" ") != null) {
         throw new TypeError(`invalid request target '${target}'`);
     }
     let requestStr = httpMethodName$(method) + " " + target + " HTTP/1.1\r\n";
@@ -23,10 +23,10 @@ async function doFetch(connId: int, parsedUrl: Url, method: HttpMethod, headers:
             throw new TypeError(`invalid HTTP header '${key}'`);
         }
         const lower = key.toLowerCase();
-        if (lower === "host") {
+        if (lower == "host") {
             hasHost = true;
         }
-        if (lower === "connection") {
+        if (lower == "connection") {
             hasConnection = true;
         }
     }
@@ -43,7 +43,7 @@ async function doFetch(connId: int, parsedUrl: Url, method: HttpMethod, headers:
 
     for (let key in headers) {
         const lower = key.toLowerCase();
-        if (lower === "content-length" || lower === "transfer-encoding") {
+        if (lower == "content-length" || lower == "transfer-encoding") {
             continue;
         }
         requestStr = `${requestStr}${key}: ${headers[key]}\r\n`;
@@ -64,14 +64,14 @@ async function doFetch(connId: int, parsedUrl: Url, method: HttpMethod, headers:
 
     let rawResp: RawResponse? = null;
     try {
-        rawResp = await readHttpResponse(connId, method === HttpMethod.HEAD);
+        rawResp = await readHttpResponse(connId, method == HttpMethod.HEAD);
     } catch (e) {
         tcpClose$(connId);
         throw e;
     }
     tcpClose$(connId);
 
-    if (rawResp === null) {
+    if (rawResp == null) {
         throw new ProtocolError(`empty response from ${parsedUrl.host}:${parsedUrl.port}`);
     }
 
@@ -93,14 +93,14 @@ async function fetchOnce(url: str, method: HttpMethod, headers: { [key: str]: st
     const parsedUrl = Url.parse(url);
     const host = parsedUrl.host;
 
-    const secure = parsedUrl.protocol === "https";
-    if (!secure && parsedUrl.protocol !== "http") {
+    const secure = parsedUrl.protocol == "https";
+    if (!secure && parsedUrl.protocol != "http") {
         throw new TypeError(`unsupported protocol '${parsedUrl.protocol}' in ${url}`);
     }
 
     let port = secure ? 443 : 80;
     const parsedPort = parsedUrl.port;
-    if (parsedPort !== null) {
+    if (parsedPort != null) {
         port = parsedPort;
     }
 
@@ -122,7 +122,7 @@ async function fetchFollowing(url: str, init: RequestInit, state: FetchState): T
         const response = await fetchOnce(current, method, headers, body, init.ca, init.identity, state);
         response.url = current;
         const location = response.headers.get("location");
-        if (!follow || location === null || !isRedirect(response.status)) {
+        if (!follow || location == null || !isRedirect(response.status)) {
             return response;
         }
         if (hops >= limit) {
@@ -132,7 +132,7 @@ async function fetchFollowing(url: str, init: RequestInit, state: FetchState): T
         const from = Url.parse(current);
         const next = resolveLocation(from, location as str);
         const nextMethod = redirectedMethod(response.status, method);
-        const dropBody = nextMethod !== method;
+        const dropBody = nextMethod != method;
         headers = redirectedHeaders(headers, dropBody, !sameOrigin(from, Url.parse(next)));
         if (dropBody) {
             body = "";
@@ -145,7 +145,7 @@ async function fetchFollowing(url: str, init: RequestInit, state: FetchState): T
 export async function fetch(url: str, init: RequestInit = {}): Task<Response> {
     const state = new FetchState();
     const limit = init.timeoutMs;
-    if (limit === null) {
+    if (limit == null) {
         return await fetchFollowing(url, init, state);
     }
     try {

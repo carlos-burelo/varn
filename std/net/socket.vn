@@ -77,7 +77,7 @@ export class TcpStream implements AsyncReader, AsyncWriter {
 
     async readText(size: int = 4096): Task<str> {
         let b = await this.read(size);
-        if (b === null) {
+        if (b == null) {
             return "";
         }
         let valid = b as Bytes;
@@ -89,11 +89,11 @@ export class TcpStream implements AsyncReader, AsyncWriter {
         let totalLen = 0;
         while (this._isOpen) {
             let chunk = await this.read(4096);
-            if (chunk === null) {
+            if (chunk == null) {
                 break;
             }
             let valid = chunk as Bytes;
-            if (valid.length === 0) {
+            if (valid.length == 0) {
                 break;
             }
             chunks.push(valid);

@@ -12,7 +12,7 @@ function segMatch(seg: str, name: str): bool {
 function matchFrom(seg: str, si: int, name: str, ni: int): bool {
     while (si < seg.length) {
         let c = seg[si];
-        if (c === "*") {
+        if (c == "*") {
             let k = ni;
             while (k <= name.length) {
                 if (matchFrom(seg, si + 1, name, k)) {
@@ -25,14 +25,14 @@ function matchFrom(seg: str, si: int, name: str, ni: int): bool {
         if (ni >= name.length) {
             return false;
         }
-        if (c === "?") {
+        if (c == "?") {
             si = si + 1;
             ni = ni + 1;
             continue;
         }
-        if (c === "[") {
+        if (c == "[") {
             let rel = seg.slice(si).indexOf("]");
-            if (rel === null) {
+            if (rel == null) {
                 return false;
             }
             let close = si + rel;
@@ -40,13 +40,13 @@ function matchFrom(seg: str, si: int, name: str, ni: int): bool {
             let hit = false;
             let j = 0;
             while (j < set.length) {
-                if (j + 2 < set.length && set[j + 1] === "-") {
+                if (j + 2 < set.length && set[j + 1] == "-") {
                     if (name[ni] >= set[j] && name[ni] <= set[j + 2]) {
                         hit = true;
                     }
                     j = j + 3;
                 } else {
-                    if (name[ni] === set[j]) {
+                    if (name[ni] == set[j]) {
                         hit = true;
                     }
                     j = j + 1;
@@ -59,7 +59,7 @@ function matchFrom(seg: str, si: int, name: str, ni: int): bool {
             ni = ni + 1;
             continue;
         }
-        if (c !== name[ni]) {
+        if (c != name[ni]) {
             return false;
         }
         si = si + 1;
@@ -82,7 +82,7 @@ function walk(dir: str, segs: str[], idx: int, out: str[]): void {
         return;
     }
     let seg = segs[idx];
-    if (seg === "**") {
+    if (seg == "**") {
         walk(dir, segs, idx + 1, out);
         let entries: str[];
         try {
@@ -109,7 +109,7 @@ function walk(dir: str, segs: str[], idx: int, out: str[]): void {
             continue;
         }
         let full = join(dir, entry);
-        if (idx === segs.length - 1) {
+        if (idx == segs.length - 1) {
             out.push(full);
         } else if (isDir(full)) {
             walk(full, segs, idx + 1, out);
@@ -126,15 +126,15 @@ export function glob(pattern: str): str[] {
         }
     }
     let base = "";
-    if (norm.startsWith("/") || (norm.length >= 2 && norm[1] === ":")) {
-        if (norm.length >= 2 && norm[1] === ":") {
+    if (norm.startsWith("/") || (norm.length >= 2 && norm[1] == ":")) {
+        if (norm.length >= 2 && norm[1] == ":") {
             base = norm.slice(0, 3);
-            if (segs.length > 0 && segs[0].length === 2 && segs[0][1] === ":") {
+            if (segs.length > 0 && segs[0].length == 2 && segs[0][1] == ":") {
                 segs = segs.slice(1);
             }
         } else {
             base = "/";
-            if (segs.length === 0) {
+            if (segs.length == 0) {
                 return ["/"];
             }
         }

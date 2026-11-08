@@ -20,7 +20,7 @@ await describe("07 Closures", async () => {
         const add10 = makeAdder(10);
         expect(add5(3)).toBe(8);
         expect(add10(3)).toBe(13);
-        expect(add5(0) !== add10(0)).toBeTruthy();
+        expect(add5(0) != add10(0)).toBeTruthy();
     });
 
     await it("counter state", () => {

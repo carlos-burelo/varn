@@ -27,7 +27,7 @@ await describe("35 decimal bigint", async () => {
         expect(d2 - d1).toBe(1.0d)
         expect(d1 * d2).toBe(3.75d)
         expect(1.0d).toBe(1.0d)
-        expect(1.0d !== 2.0d).toBeTruthy()
+        expect(1.0d != 2.0d).toBeTruthy()
         expect(d1 < d2).toBeTruthy()
         expect(d1 <= d1).toBeTruthy()
         expect(d2 > d1).toBeTruthy()
@@ -66,13 +66,13 @@ await describe("35 decimal bigint", async () => {
         expect(bi1.toInt()).toBe(100)
         expect(bi2.toFloat()).toBe(1.0)
         expect(100n).toBe(100n)
-        expect(1n !== 2n).toBeTruthy()
+        expect(1n != 2n).toBeTruthy()
         expect(bi2 < bi1).toBeTruthy()
         expect(bi1 > bi2).toBeTruthy()
         
         // int ↔ bigint equality (cross-type comparison)
         expect(42n).toBe(42n)
-        expect(42n !== 43n).toBeTruthy()
+        expect(42n != 43n).toBeTruthy()
         expect(isBigInt(100n)).toBeTruthy()
         
         // ── Arbitrary precision (ADR-0016) ───────────────────────────────

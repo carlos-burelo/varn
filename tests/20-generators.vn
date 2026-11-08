@@ -23,7 +23,7 @@ await describe("20 Generators", async () => {
         const gen = range_gen(0, 5);
         const g0 = gen.next();
         expect(g0!).toBe(0);
-        expect(g0 !== null).toBeTruthy();
+        expect(g0 != null).toBeTruthy();
         gen.next();
         gen.next();
         const g3 = gen.next();
@@ -31,7 +31,7 @@ await describe("20 Generators", async () => {
         const g4 = gen.next();
         expect(g4!).toBe(4);
         const gend = gen.next();
-        expect(gend === null).toBeTruthy();
+        expect(gend == null).toBeTruthy();
     });
 
     await it("fibonacci generator", () => {

@@ -34,7 +34,7 @@ class LinkedList<T> {
     toArray(): T[] {
         const arr: T[] = [];
         let cur = this.head;
-        while (cur !== null) {
+        while (cur != null) {
             arr.push(cur.value);
             cur = cur.next;
         }

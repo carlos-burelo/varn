@@ -17,7 +17,7 @@ await describe("305 number conversions and formatting", async () => {
         expect(outcome(() => float.parse("").toString())).toBe("parse");
         expect(outcome(() => float.parse("-Infinity").toString())).toBe("-Infinity");
         expect(outcome(() => float.parse("NaN").toString())).toBe("NaN");
-        expect(float.tryParse("x") === null).toBe(true);
+        expect(float.tryParse("x") == null).toBe(true);
         expect((float.tryParse("2.5") as float).toString()).toBe("2.5");
     });
 

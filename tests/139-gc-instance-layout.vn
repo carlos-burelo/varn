@@ -113,7 +113,7 @@ await describe("139 gc instance layout", async () => {
 
     await it("scalar instances and old writes", async () => {
         expect(gcOldAnyN).toBe(190);
-        expect(gcOld.a === 7 && gcOld.b === -7 && gcOld.f === 3.5 && !gcOld.flag).toBeTruthy();
+        expect(gcOld.a == 7 && gcOld.b == -7 && gcOld.f == 3.5 && !gcOld.flag).toBeTruthy();
         expect(gcScalarSum).toBe(2 * 12497500 + 5000);
     });
 });

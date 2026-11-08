@@ -24,7 +24,7 @@ export namespace Hex {
     }
 
     export function decodeBytes(hexString: str): Bytes {
-        if (hexString.length % 2 !== 0) {
+        if (hexString.length % 2 != 0) {
             throw new ParseError("invalid hex string length");
         }
         let bytes: int[] = [];

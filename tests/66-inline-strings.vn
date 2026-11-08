@@ -26,7 +26,7 @@ function utf8Str(n: int): str { return `héllo-ñ${n}`}
 function mapRoundTrip(n: int): bool {
   const m = new Map<str, int>()
   m.set(isStr(n), n)
-  return m.get(`ab${n}`) === n
+  return m.get(`ab${n}`) == n
 }
 
 // Survives a collection: built, held, then heavy allocation, then read.
@@ -34,8 +34,8 @@ function inlineSurvivesGc(n: int): bool {
   const held = isStr(999999)
   let junk = ""
   for (let i = 0; i < n; i = i + 1) { junk = `g${i}`}
-  if (junk === "") { return false }
-  return held === "ab999999"
+  if (junk == "") { return false }
+  return held == "ab999999"
 }
 
 // Accumulation still takes the extensible-buffer path rather than turning into

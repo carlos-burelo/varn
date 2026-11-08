@@ -8,22 +8,22 @@ async function readRequest(conn: TcpStream): Task<str> {
     let text = "";
     while (true) {
         const chunk = await conn.read(4096);
-        if (chunk === null) {
+        if (chunk == null) {
             return text
         }
         text = text + (chunk as Bytes).toString();
         const headEnd = text.indexOf("\r\n\r\n");
-        if (headEnd === null) {
+        if (headEnd == null) {
             continue
         }
         const lower = text.slice(0, headEnd).toLowerCase();
         const marker = lower.indexOf("content-length:");
-        if (marker === null) {
+        if (marker == null) {
             return text
         }
         const tail = lower.slice(marker + 15);
         const lineEnd = tail.indexOf("\r\n");
-        const declared = int.parse((lineEnd === null ? tail : tail.slice(0, lineEnd)).trim());
+        const declared = int.parse((lineEnd == null ? tail : tail.slice(0, lineEnd)).trim());
         if (Bytes.fromString(text.slice(headEnd + 4)).length >= declared) {
             return text
         }
@@ -135,9 +135,9 @@ await describe("290 http client framing", async () => {
             await conn.write("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
         }));
         await fetch("http://127.0.0.1:19899/echo", { method: HttpMethod.POST, body: "é" });
-        expect(seen.request.indexOf("Content-Length: 2\r\n") !== null).toBeTruthy();
-        expect(seen.request.indexOf("Host: 127.0.0.1:19899\r\n") !== null).toBeTruthy();
-        expect(seen.request.indexOf("Connection: close\r\n") !== null).toBeTruthy();
+        expect(seen.request.indexOf("Content-Length: 2\r\n") != null).toBeTruthy();
+        expect(seen.request.indexOf("Host: 127.0.0.1:19899\r\n") != null).toBeTruthy();
+        expect(seen.request.indexOf("Connection: close\r\n") != null).toBeTruthy();
         listener.close();
     });
 });

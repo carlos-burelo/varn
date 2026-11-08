@@ -74,7 +74,7 @@ function testWebSocket(): void {
         expect(WebSocketReadyState.Closing as int).toBe(2);;
         expect(WebSocketReadyState.Closed as int).toBe(3);;
 
-        expect(typeof WebSocket === "class").toBeTruthy();;
+        expect(typeof WebSocket == "class").toBeTruthy();;
 
 }
 let testPort = 19876;

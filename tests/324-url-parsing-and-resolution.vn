@@ -119,6 +119,6 @@ await describe("324 url parsing and resolution", async () => {
         const url = Url.parse("http://host/p?sig=a%2Fb+c&x=%7E");
         expect(url.toString()).toBe("http://host/p?sig=a%2Fb+c&x=%7E");
         url.query.append("y", "1");
-        expect(url.toString().indexOf("y=1") !== null).toBe(true);
+        expect(url.toString().indexOf("y=1") != null).toBe(true);
     });
 });

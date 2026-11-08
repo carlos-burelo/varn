@@ -48,7 +48,7 @@ let vipCount = 0;
 
 for (let i = 0; i < parsedRows.length; i = i + 1) {
     let row = parsedRows[i];
-    if (row.status === "completed") {
+    if (row.status == "completed") {
         let amt = row.amount as float;
         let taxRate = row.tax_rate;
         let finalTotal = amt * (1.0 + taxRate);

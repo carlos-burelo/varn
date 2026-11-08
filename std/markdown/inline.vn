@@ -14,15 +14,15 @@ export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
     }
 
     while (i < text.length) {
-        if (text[i] === "\\" && i + 1 < text.length) {
+        if (text[i] == "\\" && i + 1 < text.length) {
             buf = buf + text[i + 1];
             i = i + 2;
             continue;
         }
 
-        if (text[i] === "`") {
+        if (text[i] == "`") {
             let endBacktick = findFrom(text, "`", i + 1);
-            if (endBacktick !== -1) {
+            if (endBacktick != -1) {
                 flushBuf();
                 let codeContent = text.slice(i + 1, endBacktick);
                 nodes.push(new MarkdownNode(MarkdownNodeKind.InlineCode, codeContent));
@@ -33,19 +33,19 @@ export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
 
         if (startsWithAt(text, "![", i)) {
             let closeBracket = findFrom(text, "]", i + 2);
-            if (closeBracket !== -1 && startsWithAt(text, "(", closeBracket + 1)) {
+            if (closeBracket != -1 && startsWithAt(text, "(", closeBracket + 1)) {
                 let closeParen = findFrom(text, ")", closeBracket + 2);
-                if (closeParen !== -1) {
+                if (closeParen != -1) {
                     flushBuf();
                     let altText = text.slice(i + 2, closeBracket);
                     let urlAndTitle = text.slice(closeBracket + 2, closeParen).trim();
                     let url = urlAndTitle;
                     let title = "";
                     let quoteIdx = urlAndTitle.indexOf("\"");
-                    if (quoteIdx !== null) {
+                    if (quoteIdx != null) {
                         url = urlAndTitle.slice(0, quoteIdx).trim();
                         let endQuote = urlAndTitle.lastIndexOf("\"");
-                        if (endQuote !== null && endQuote > quoteIdx) {
+                        if (endQuote != null && endQuote > quoteIdx) {
                             title = urlAndTitle.slice(quoteIdx + 1, endQuote);
                         }
                     }
@@ -59,21 +59,21 @@ export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
             }
         }
 
-        if (text[i] === "[") {
+        if (text[i] == "[") {
             let closeBracket = findFrom(text, "]", i + 1);
-            if (closeBracket !== -1 && startsWithAt(text, "(", closeBracket + 1)) {
+            if (closeBracket != -1 && startsWithAt(text, "(", closeBracket + 1)) {
                 let closeParen = findFrom(text, ")", closeBracket + 2);
-                if (closeParen !== -1) {
+                if (closeParen != -1) {
                     flushBuf();
                     let linkText = text.slice(i + 1, closeBracket);
                     let urlAndTitle = text.slice(closeBracket + 2, closeParen).trim();
                     let url = urlAndTitle;
                     let title = "";
                     let quoteIdx = urlAndTitle.indexOf("\"");
-                    if (quoteIdx !== null) {
+                    if (quoteIdx != null) {
                         url = urlAndTitle.slice(0, quoteIdx).trim();
                         let endQuote = urlAndTitle.lastIndexOf("\"");
-                        if (endQuote !== null && endQuote > quoteIdx) {
+                        if (endQuote != null && endQuote > quoteIdx) {
                             title = urlAndTitle.slice(quoteIdx + 1, endQuote);
                         }
                     }
@@ -91,9 +91,9 @@ export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
             }
         }
 
-        if (text[i] === "<") {
+        if (text[i] == "<") {
             let closeAngle = findFrom(text, ">", i + 1);
-            if (closeAngle !== -1) {
+            if (closeAngle != -1) {
                 let linkContent = text.slice(i + 1, closeAngle);
                 if (linkContent.startsWith("http://") || linkContent.startsWith("https://") || linkContent.startsWith("mailto:")) {
                     flushBuf();
@@ -109,7 +109,7 @@ export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
 
         if (startsWithAt(text, "~~", i)) {
             let endStrike = findFrom(text, "~~", i + 2);
-            if (endStrike !== -1) {
+            if (endStrike != -1) {
                 flushBuf();
                 let strikeContent = text.slice(i + 2, endStrike);
                 let strikeNode = new MarkdownNode(MarkdownNodeKind.Strikethrough);
@@ -126,7 +126,7 @@ export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
         if (startsWithAt(text, "***", i) || startsWithAt(text, "___", i)) {
             let marker = text.slice(i, i + 3);
             let endIdx = findFrom(text, marker, i + 3);
-            if (endIdx !== -1) {
+            if (endIdx != -1) {
                 flushBuf();
                 let content = text.slice(i + 3, endIdx);
                 let boldNode = new MarkdownNode(MarkdownNodeKind.Bold);
@@ -145,7 +145,7 @@ export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
         if (startsWithAt(text, "**", i) || startsWithAt(text, "__", i)) {
             let marker = text.slice(i, i + 2);
             let endIdx = findFrom(text, marker, i + 2);
-            if (endIdx !== -1) {
+            if (endIdx != -1) {
                 flushBuf();
                 let content = text.slice(i + 2, endIdx);
                 let boldNode = new MarkdownNode(MarkdownNodeKind.Bold);
@@ -159,10 +159,10 @@ export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
             }
         }
 
-        if (text[i] === "*" || text[i] === "_") {
+        if (text[i] == "*" || text[i] == "_") {
             let marker = text[i];
             let endIdx = findFrom(text, marker, i + 1);
-            if (endIdx !== -1 && endIdx > i + 1) {
+            if (endIdx != -1 && endIdx > i + 1) {
                 flushBuf();
                 let content = text.slice(i + 1, endIdx);
                 let italicNode = new MarkdownNode(MarkdownNodeKind.Italic);

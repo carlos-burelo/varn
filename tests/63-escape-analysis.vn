@@ -62,7 +62,7 @@ class EaPartial {
   b: int?
   constructor(a: int) { this.a = a }
 }
-function eaPartialB(): bool { const p = new EaPartial(4); return p.b === null }
+function eaPartialB(): bool { const p = new EaPartial(4); return p.b == null }
 
 // Inheritance brings a super constructor whose effects are not in this body.
 class EaBase {
@@ -88,7 +88,7 @@ await describe("63 escape analysis", async () => {
         expect(eaSum(1000)).toBe(1000000)
         expect(eaOrder()).toBe(1107)
         const eaKept = eaEscapeReturn(3)
-        expect(eaKept.x === 3 && eaKept.y === 3).toBeTruthy()
+        expect(eaKept.x == 3 && eaKept.y == 3).toBeTruthy()
         expect(eaEscapeArray(5)).toBe(9)
         expect(eaEscapeArg(6)).toBe(12)
         expect(eaIdentity()).toBe(false)

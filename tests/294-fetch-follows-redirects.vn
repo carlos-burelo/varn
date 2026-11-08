@@ -21,7 +21,7 @@ await describe("294 fetch follows redirects", async () => {
     origin.get("/dir/sub/page", async (req: Request) => new Response("relative " + (req.query["x"] ?? "none"), 200, {}));
     origin.get("/up/start", async (req: Request) => redirect("../two", 302));
     origin.post("/post-redirect", async (req: Request) => redirect("/method", 302));
-    origin.get("/method", async (req: Request) => new Response(req.method === HttpMethod.GET ? "GET" : "other", 200, {}));
+    origin.get("/method", async (req: Request) => new Response(req.method == HttpMethod.GET ? "GET" : "other", 200, {}));
     origin.post("/keep", async (req: Request) => redirect("/echo-body", 307));
     origin.post("/echo-body", async (req: Request) => new Response("body=" + req.text(), 200, {}));
     origin.get("/loop", async (req: Request) => redirect("/loop", 302));
@@ -71,7 +71,7 @@ await describe("294 fetch follows redirects", async () => {
 
     await it("a redirect loop stops at the limit", async () => {
         const message = await failureOf(() => fetch("http://127.0.0.1:19920/loop", { maxRedirects: 3 }));
-        expect(message.indexOf("more than 3 redirects") !== null).toBeTruthy();
+        expect(message.indexOf("more than 3 redirects") != null).toBeTruthy();
     });
 
     origin.close();

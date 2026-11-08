@@ -17,21 +17,21 @@ export namespace Stats {
             }
             total = next;
         }
-        if (total - total !== 0.0) {
+        if (total - total != 0.0) {
             return total;
         }
         return total + lost;
     }
 
     export function mean(values: float[]): float {
-        if (values.length === 0) {
+        if (values.length == 0) {
             throw new RangeError("Stats.mean requires at least one value");
         }
         return sum(values) / (values.length as float);
     }
 
     export function min(values: float[]): float {
-        if (values.length === 0) {
+        if (values.length == 0) {
             throw new RangeError("Stats.min requires at least one value");
         }
         let best = values[0];
@@ -42,7 +42,7 @@ export namespace Stats {
     }
 
     export function max(values: float[]): float {
-        if (values.length === 0) {
+        if (values.length == 0) {
             throw new RangeError("Stats.max requires at least one value");
         }
         let best = values[0];
@@ -53,7 +53,7 @@ export namespace Stats {
     }
 
     export function variance(values: float[]): float {
-        if (values.length === 0) {
+        if (values.length == 0) {
             throw new RangeError("Stats.variance requires at least one value");
         }
         let avg = mean(values);
@@ -70,17 +70,17 @@ export namespace Stats {
     }
 
     export function median(values: float[]): float {
-        if (values.length === 0) {
+        if (values.length == 0) {
             throw new RangeError("Stats.median requires at least one value");
         }
         for (let v of values) {
-            if (v !== v) {
+            if (v != v) {
                 return v;
             }
         }
         let ordered = sortedCopy(values);
         let mid = ordered.length >> 1;
-        if (ordered.length % 2 === 1) {
+        if (ordered.length % 2 == 1) {
             return ordered[mid];
         }
         return (ordered[mid - 1] + ordered[mid]) / 2.0;

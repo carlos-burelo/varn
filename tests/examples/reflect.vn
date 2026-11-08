@@ -34,7 +34,7 @@ await describe("example std:reflect", async () => {
         tag.set(target, "v1");
         expect(tag.has(target)).toBe(true);
         expect(tag.get(target)).toBe("v1");
-        expect(tag.get({ id: 2 }) === null).toBe(true);
+        expect(tag.get({ id: 2 }) == null).toBe(true);
     });
 });
 

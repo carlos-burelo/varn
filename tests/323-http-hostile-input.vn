@@ -7,7 +7,7 @@ async function readToEnd(client: TcpStream): Task<str> {
     let text = "";
     while (true) {
         const chunk = await client.read(8192);
-        if (chunk === null) {
+        if (chunk == null) {
             return text
         }
         text = text + (chunk as Bytes).toString();
@@ -92,14 +92,14 @@ await describe("323 http refuses hostile input", async () => {
     await it("a handler cannot split the response through a header, a status text or a cookie", async () => {
         const value = await exchange(19920, "GET /inject HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
         expect(status(value)).toBe("HTTP/1.1 500");
-        expect(value.indexOf("pwn") === null).toBe(true);
+        expect(value.indexOf("pwn") == null).toBe(true);
         const name = await exchange(19920, "GET /inject-name HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
         expect(status(name)).toBe("HTTP/1.1 500");
         const cookie = await exchange(19920, "GET /cookie HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
         expect(status(cookie)).toBe("HTTP/1.1 500");
         const text = await exchange(19920, "GET /status-text HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
         expect(status(text)).toBe("HTTP/1.1 500");
-        expect(text.indexOf("X-Evil") === null).toBe(true);
+        expect(text.indexOf("X-Evil") == null).toBe(true);
     });
 
     await it("a keep-alive connection serving many requests keeps working", async () => {
@@ -113,7 +113,7 @@ await describe("323 http refuses hostile input", async () => {
         let rest = reply;
         while (true) {
             const at = rest.indexOf("HTTP/1.1 200");
-            if (at === null) {
+            if (at == null) {
                 break;
             }
             answered = answered + 1;

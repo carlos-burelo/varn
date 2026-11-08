@@ -46,7 +46,7 @@ for (let i = 0; i < 100000; i = i + 1) {
     let stat = statuses[i % 5];
     let qty = (i % 8) + 1;
     let price = (((i % 150) + 10) as float) * 1.5;
-    let disc = (i % 3) === 0;
+    let disc = (i % 3) == 0;
     orders.push(new OrderItem(
         i,
         `SKU_${(i % 2000)}`,
@@ -64,7 +64,7 @@ for (let i = 0; i < 100000; i = i + 1) {
 let validOrders: OrderItem[] = [];
 for (let i = 0; i < orders.length; i = i + 1) {
     let o = orders[i];
-    if (o.status === "completed" && o.quantity > 0) {
+    if (o.status == "completed" && o.quantity > 0) {
         validOrders.push(o);
     }
 }
@@ -107,7 +107,7 @@ for (let i = 0; i < highValueSummaries.length; i = i + 1) {
 let foundItem: OrderSummary? = null;
 let targetId = 4242;
 for (let i = 0; i < highValueSummaries.length; i = i + 1) {
-    if (highValueSummaries[i].id === targetId) {
+    if (highValueSummaries[i].id == targetId) {
         foundItem = highValueSummaries[i];
         break;
     }

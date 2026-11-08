@@ -10,11 +10,11 @@ await describe("example Regex", async () => {
 
     await it("execs first match with groups", () => {
         let found = new Regex("(\\w+)@(\\w+)").exec("user@host");
-        expect(found !== null).toBe(true);
+        expect(found != null).toBe(true);
         expect(found!!.match).toBe("user@host");
         expect(found!!.groups[0]).toBe("user");
         expect(found!!.groups[1]).toBe("host");
-        expect(new Regex("zzz").exec("abc") === null).toBe(true);
+        expect(new Regex("zzz").exec("abc") == null).toBe(true);
     });
 
     await it("finds all matches", () => {

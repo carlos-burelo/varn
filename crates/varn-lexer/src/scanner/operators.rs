@@ -1,11 +1,11 @@
 use crate::token_kind::{
-    AMP, AMPAMP, AMPAMPEQ, AMPEQ, ARROW, AT, BACKSLASH, BACKTICK, BANG, BANGEQ, CARET, CARETEQ,
-    COLON, COLONCOLON, COMMA, DOLLAR, DOT, DOTDOT, DOTDOTDOT, DOTDOTEQ, EQ, EQEQ, FATARROW, GTEQ,
-    GTGT, GTGTEQ, GTGTGT, GTGTGTEQ, HASH, LANGLE, LBRACE, LBRACKET, LPAREN, LTEQ, LTLT, LTLTEQ,
-    MINUS, MINUSEQ, MINUSMINUS, NEWLINE, PERCENT, PERCENTEQ, PIPE, PIPEEQ, PIPEGT, PIPEPIPE,
-    PIPEPIPEEQ, PLUS, PLUSEQ, PLUSPLUS, QUESTION, QUESTIONDOT, QUESTIONLBRACKET, QUESTIONQUESTION,
-    QUESTIONQUESTIONEQ, RANGLE, RBRACE, RBRACKET, RPAREN, SEMICOLON, SLASH, SLASHEQ, STAR, STAREQ,
-    STARSTAR, STARSTAREQ, TILDE,
+    AMP, AMPAMP, AMPAMPEQ, AMPEQ, ARROW, AT, BACKSLASH, BACKTICK, BANG, BANGEQ, BANGEQEQ, CARET,
+    CARETEQ, COLON, COLONCOLON, COMMA, DOLLAR, DOT, DOTDOT, DOTDOTDOT, DOTDOTEQ, EQ, EQEQ, EQEQEQ,
+    FATARROW, GTEQ, GTGT, GTGTEQ, GTGTGT, GTGTGTEQ, HASH, LANGLE, LBRACE, LBRACKET, LPAREN, LTEQ,
+    LTLT, LTLTEQ, MINUS, MINUSEQ, MINUSMINUS, NEWLINE, PERCENT, PERCENTEQ, PIPE, PIPEEQ, PIPEGT,
+    PIPEPIPE, PIPEPIPEEQ, PLUS, PLUSEQ, PLUSPLUS, QUESTION, QUESTIONDOT, QUESTIONLBRACKET,
+    QUESTIONQUESTION, QUESTIONQUESTIONEQ, RANGLE, RBRACE, RBRACKET, RPAREN, SEMICOLON, SLASH,
+    SLASHEQ, STAR, STAREQ, STARSTAR, STARSTAREQ, TILDE,
 };
 use crate::token_record::{push_token, TokenRecord};
 
@@ -207,8 +207,11 @@ impl super::Scanner<'_> {
                 if self.peek(0) == b'=' {
                     self.cur_col += 1;
                     self.pos += 1;
-                    self.match_byte(b'=');
-                    EQEQ
+                    if self.match_byte(b'=') {
+                        EQEQEQ
+                    } else {
+                        EQEQ
+                    }
                 } else if self.match_byte(b'>') {
                     FATARROW
                 } else {
@@ -219,8 +222,11 @@ impl super::Scanner<'_> {
                 if self.peek(0) == b'=' {
                     self.cur_col += 1;
                     self.pos += 1;
-                    self.match_byte(b'=');
-                    BANGEQ
+                    if self.match_byte(b'=') {
+                        BANGEQEQ
+                    } else {
+                        BANGEQ
+                    }
                 } else {
                     BANG
                 }

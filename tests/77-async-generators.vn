@@ -48,7 +48,7 @@ async function runAsyncGenerators() {
     expect((await manual.next())!).toBe(10)
     expect((await manual.next())!).toBe(20)
     expect((await manual.next())!).toBe(30)
-    expect((await manual.next()) === null).toBeTruthy()
+    expect((await manual.next()) == null).toBeTruthy()
 
     // More than one await between two yields.
     const between = awaitsBetweenYields()
@@ -62,7 +62,7 @@ async function runAsyncGenerators() {
     expect(total).toBe(60)
 
     const heaps = (await yieldsHeapValues().next())!
-    expect(heaps.length === 2 && heaps[1] === 20).toBeTruthy()
+    expect(heaps.length == 2 && heaps[1] == 20).toBeTruthy()
 
     // A generator can await a real suspension, not just an already-settled task.
     async function* awaitsSleep() {

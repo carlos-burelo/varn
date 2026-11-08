@@ -21,7 +21,7 @@ function parseField(text: str, lo: int, hi: int): bool[] {
         let step = 1;
         let range = g;
         let slash = g.indexOf("/");
-        if (slash !== null) {
+        if (slash != null) {
             range = g.slice(0, slash);
             step = int.parse(g.slice(slash + 1));
             if (step <= 0) {
@@ -30,9 +30,9 @@ function parseField(text: str, lo: int, hi: int): bool[] {
         }
         let from = lo;
         let to = hi;
-        if (range !== "" && range !== "*") {
+        if (range != "" && range != "*") {
             let dash = range.indexOf("-");
-            if (dash !== null) {
+            if (dash != null) {
                 from = int.parse(range.slice(0, dash));
                 to = int.parse(range.slice(dash + 1));
             } else {
@@ -56,13 +56,13 @@ function parseField(text: str, lo: int, hi: int): bool[] {
 }
 
 function daysInMonth(year: int, month: int): int {
-    if (month === 2) {
-        if ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0) {
+    if (month == 2) {
+        if ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0) {
             return 29;
         }
         return 28;
     }
-    if (month === 4 || month === 6 || month === 9 || month === 11) {
+    if (month == 4 || month == 6 || month == 9 || month == 11) {
         return 30;
     }
     return 31;
@@ -79,7 +79,7 @@ function allSet(flags: bool[]): bool {
 
 function dowOf(ms: int): int {
     let days = ms / 86400000;
-    if (ms < 0 && ms % 86400000 !== 0) {
+    if (ms < 0 && ms % 86400000 != 0) {
         days = days - 1;
     }
     let d = (days + 4) % 7;
@@ -98,7 +98,7 @@ export namespace Cron {
                 clean.push(f);
             }
         }
-        if (clean.length !== 5) {
+        if (clean.length != 5) {
             throw new ParseError("Cron: expected 5 fields, got " + clean.length.toString());
         }
         let wd8 = parseField(clean[4], 0, 7);

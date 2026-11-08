@@ -20,11 +20,11 @@ function offences(text: str): int {
     let count = 0;
     for (const line of text.split("\n")) {
         const at = line.indexOf("new Error(");
-        if (at === null) {
+        if (at == null) {
             continue
         }
         const quote = line.slice(at + 10, at + 11);
-        if (quote !== "\"" && quote !== "`") {
+        if (quote != "\"" && quote != "`") {
             continue
         }
         const rest = line.slice(at + 11);
@@ -37,7 +37,7 @@ function offences(text: str): int {
             }
             name = name + rest.slice(i, i + 1);
         }
-        if (name.endsWith("Error") && rest.slice(name.length, name.length + 1) === ":") {
+        if (name.endsWith("Error") && rest.slice(name.length, name.length + 1) == ":") {
             count = count + 1;
         }
     }
@@ -59,7 +59,7 @@ await describe("298 std errors are typed", async () => {
         let total = 0;
         for (const file of sources("std")) {
             const text = readText(file);
-            if (text.indexOf("toStdError") !== null || text.indexOf("stdError(") !== null) {
+            if (text.indexOf("toStdError") != null || text.indexOf("stdError(") != null) {
                 total = total + 1;
             }
         }

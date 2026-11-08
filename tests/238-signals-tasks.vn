@@ -69,7 +69,7 @@ await describe("238 signals meet tasks", async () => {
             throw new Error("nope")
         })
         await sleep(20)
-        expect(broken.error.value === null).toBe(false)
+        expect(broken.error.value == null).toBe(false)
         expect(broken.loading.value).toBe(false)
         broken.dispose()
     })

@@ -1,0 +1,2 @@
+// expect: error[VN2002]
+const same = 1 === 1

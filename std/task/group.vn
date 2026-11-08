@@ -72,7 +72,7 @@ export class TaskGroup<T> {
         if (this.isCancelled) {
             throw new CancelledError("TaskGroup is cancelled");
         }
-        if (timeoutMs === null) {
+        if (timeoutMs == null) {
             return await this.joinInner();
         }
         try {

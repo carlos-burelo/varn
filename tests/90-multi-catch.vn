@@ -23,13 +23,13 @@ await describe("90 multi catch", async () => {
     await it("Multiple distinct typed catch blocks / Union type multi-catch: catch (e: A | ", async () => {
         function testHandler(mode: int): str {
         try {
-        if (mode === 1) {
+        if (mode == 1) {
         throw new TypeError("bad type argument");
-        } else if (mode === 2) {
+        } else if (mode == 2) {
         throw new RangeError("index out of bounds");
-        } else if (mode === 3) {
+        } else if (mode == 3) {
         throw new CustomNetworkError(503, "service unavailable");
-        } else if (mode === 4) {
+        } else if (mode == 4) {
         throw new CustomDatabaseError("ERR_CONN", "db timeout");
         } else {
         return "success";
@@ -55,9 +55,9 @@ await describe("90 multi catch", async () => {
 
         function handleUnion(mode: int): str {
         try {
-        if (mode === 1) {
+        if (mode == 1) {
         throw new TypeError("type fault");
-        } else if (mode === 2) {
+        } else if (mode == 2) {
         throw new RangeError("range fault");
         } else {
         throw new CustomNetworkError(404, "not found");
@@ -77,7 +77,7 @@ await describe("90 multi catch", async () => {
     await it("Fallback catch-all after typed catches / Catch block without parameter: catch {", async () => {
         function handleWithFallback(mode: int): str {
         try {
-        if (mode === 1) {
+        if (mode == 1) {
         throw new TypeError("type fault");
         } else {
         throw new CustomDatabaseError("SQL_ERR", "query failed");

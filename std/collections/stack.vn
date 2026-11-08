@@ -14,7 +14,7 @@ export class Stack<S> {
     }
 
     peek(): S? {
-        if (this.items.length === 0) {
+        if (this.items.length == 0) {
             return null;
         }
         return this.items[this.items.length - 1];
@@ -25,7 +25,7 @@ export class Stack<S> {
     }
 
     get isEmpty(): bool {
-        return this.items.length === 0;
+        return this.items.length == 0;
     }
 
     clear(): void {

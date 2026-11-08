@@ -17,8 +17,8 @@ await describe("128 match exhaustiveness", async () => {
     });
 
     await it("group 1 part 2", async () => {
-        expect(orZero(null) === 0 && orZero(5) === 5).toBeTruthy();
-        expect(describeCount(0) === "zero" && describeCount(5) === "many").toBeTruthy();
+        expect(orZero(null) == 0 && orZero(5) == 5).toBeTruthy();
+        expect(describeCount(0) == "zero" && describeCount(5) == "many").toBeTruthy();
     });
 
 

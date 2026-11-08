@@ -38,7 +38,7 @@ function triple(n: int): int {
 
 @test
 function builtinSum(): void {
-    if (add(20, 22) !== 42) {
+    if (add(20, 22) != 42) {
         throw new Error("builtin sum broke");
     }
 }
@@ -46,7 +46,7 @@ function builtinSum(): void {
 @test
 async function builtinAsync(): void {
     let v = pureMul(6, 7);
-    if (v !== 42) {
+    if (v != 42) {
         throw new Error("builtin async broke");
     }
 }

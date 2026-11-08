@@ -20,7 +20,7 @@ async function main() {
     let listener = await listenWithRetry(19877);
     let client = await listener.accept();
     let data = await client.read(1024);
-    if (data !== null) {
+    if (data != null) {
         let b = data as Bytes;
         await client.writeAll(b);
     }

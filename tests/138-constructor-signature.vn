@@ -35,8 +35,8 @@ await describe("138 constructor signature", async () => {
     });
 
     await it("mixed params and inheritance", async () => {
-        expect(mixed.total === 2.5 && mixed.label == "OK").toBeTruthy();
-        expect(child.b === -4 && child.c === -5).toBeTruthy();
+        expect(mixed.total == 2.5 && mixed.label == "OK").toBeTruthy();
+        expect(child.b == -4 && child.c == -5).toBeTruthy();
     });
 
 });

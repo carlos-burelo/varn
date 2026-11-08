@@ -59,8 +59,8 @@ await describe("86 tagged templates", async () => {
         expect(rows[0]["id"]).toBe(1);
         let targetId = 2;
         let singleUser = db.sqlOne`SELECT id, name, role FROM users WHERE id = ${targetId};`;
-        expect(singleUser !== null).toBe(true);
-        if (singleUser !== null) {
+        expect(singleUser != null).toBe(true);
+        if (singleUser != null) {
         expect(singleUser["name"]).toBe("Bob");
         expect(singleUser["role"]).toBe("editor");
         }

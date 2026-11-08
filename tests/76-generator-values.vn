@@ -75,15 +75,15 @@ await describe("76 generator values", async () => {
         expect(counted.next()!).toBe(2)
         expect(yieldsStrings().next()!).toBe("a string")
         const yieldedArray = yieldsArrays().next()!
-        expect(yieldedArray.length === 3 && yieldedArray[1] === 2).toBeTruthy()
+        expect(yieldedArray.length == 3 && yieldedArray[1] == 2).toBeTruthy()
         const yieldedObject = yieldsObjects().next()!
-        expect(yieldedObject.a === 1 && yieldedObject.b === 2).toBeTruthy()
+        expect(yieldedObject.a == 1 && yieldedObject.b == 2).toBeTruthy()
         const nested = yieldsAGenerator().next()!
         expect(nested.next()!).toBe(41)
         const returning = returnsAHeapValue()
         returning.next()
         const finalResult = returning.next()
-        expect(finalResult === null).toBeTruthy()
+        expect(finalResult == null).toBeTruthy()
         
         
     });

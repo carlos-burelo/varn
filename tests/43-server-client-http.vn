@@ -14,7 +14,7 @@ async function runHttpVerification() {
     // 1. Test Client: Fetch GET
     let getRes = await fetch("http://127.0.0.1:19881/");
     expect(getRes.status).toBe(200);
-    expect(getRes.text().indexOf('"ok":true') !== null).toBeTruthy();
+    expect(getRes.text().indexOf('"ok":true') != null).toBeTruthy();
 
     // 2. Test Client: Fetch POST with body & headers
     let postRes = await fetch("http://127.0.0.1:19881/api", { method: HttpMethod.POST, headers: { "Content-Type": "application/json" }, body: '{"message":"hello"}' });
@@ -44,7 +44,7 @@ async function runHttpVerification() {
     let resp = json({ success: true, count: 42 });
     expect(resp.status).toBe(200);
     expect(resp.ok).toBe(true);
-    expect(resp.text().indexOf('"success":true') !== null).toBeTruthy();
+    expect(resp.text().indexOf('"success":true') != null).toBeTruthy();
 
     let redir = redirect("https://varn.dev", 301);
     expect(redir.status).toBe(301);

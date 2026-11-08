@@ -25,7 +25,7 @@ export class CheckboxNode extends Widget {
 
     override computeLayout(c: Constraints): Placement {
         const text = this.label;
-        if (text === null) {
+        if (text == null) {
             return new Placement(this, fixedSize(this, c, new Size(this.size, this.size)), []);
         }
         const placed = layoutAt(text, "label", c.looseChild(c.maxW - this.size - TOGGLE_GAP, c.maxH));
@@ -66,7 +66,7 @@ export class SwitchNode extends Widget {
 
     override computeLayout(c: Constraints): Placement {
         const text = this.label;
-        if (text === null) {
+        if (text == null) {
             return new Placement(this, fixedSize(this, c, new Size(this.trackW, this.trackH)), []);
         }
         const placed = layoutAt(text, "label", c.looseChild(c.maxW - this.trackW - TOGGLE_GAP, c.maxH));

@@ -47,7 +47,7 @@ await describe("293 a throw inside a catch replaces the caught native error", as
 
     await it("a rethrown error keeps its own message", async () => {
         const message = await messageOf(() => rethrown("abc"));
-        expect(message.indexOf("invalid digit") !== null).toBeTruthy();
+        expect(message.indexOf("invalid digit") != null).toBeTruthy();
     });
 
     await it("a function that succeeds is unaffected", async () => {

@@ -16,7 +16,7 @@ await describe("Math & Assertions Subsuite", async () => {
         expect(false).toBeFalsy();
         expect(null).toBeNull();
         expect("hello").toBeNotNull();
-        expect(10 === 20).toBeFalsy();
+        expect(10 == 20).toBeFalsy();
         expect("abcdef").toContain("bcd");
         expect([1, 2, 3]).toContain(2);
         expect(3.14159).toBeCloseTo(3.14160, 0.001);

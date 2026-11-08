@@ -46,7 +46,7 @@ function scFastLoop(n: int): int {
   let hits = 0
   for (let i = 0; i < n; i = i + 1) {
     const s = `a${(i % 100)}`
-    if (s === (`a${(i % 100)}`)) { hits = hits + 1 }
+    if (s == (`a${(i % 100)}`)) { hits = hits + 1 }
   }
   return hits
 }
@@ -56,7 +56,7 @@ function scFastLoop(n: int): int {
 function scStraddle(n: int): int {
   let hits = 0
   for (let i = 0; i < n; i = i + 1) {
-    const s = i % 2 === 0 ? (`a${(i % 100)}`) : (`abcdefgh${(i % 100)}`)
+    const s = i % 2 == 0 ? (`a${(i % 100)}`) : (`abcdefgh${(i % 100)}`)
     if (s.length > 0) { hits = hits + 1 }
   }
   return hits

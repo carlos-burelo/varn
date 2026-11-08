@@ -21,12 +21,12 @@ export class PriorityQueue<T> {
     }
 
     pop(): T? {
-        if (this._heap.length === 0) {
+        if (this._heap.length == 0) {
             return null;
         }
         let top = this._heap[0];
         let last = this._heap.pop();
-        if (this._heap.length > 0 && last !== null) {
+        if (this._heap.length > 0 && last != null) {
             this._heap[0] = last;
             this._siftDown(0);
         }
@@ -34,7 +34,7 @@ export class PriorityQueue<T> {
     }
 
     peek(): T? {
-        if (this._heap.length === 0) {
+        if (this._heap.length == 0) {
             return null;
         }
         return this._heap[0];
@@ -45,7 +45,7 @@ export class PriorityQueue<T> {
     }
 
     get isEmpty(): bool {
-        return this._heap.length === 0;
+        return this._heap.length == 0;
     }
 
     clear(): void {
@@ -87,7 +87,7 @@ export class PriorityQueue<T> {
                 smallest = right;
             }
 
-            if (smallest !== current) {
+            if (smallest != current) {
                 let temp = this._heap[current];
                 this._heap[current] = this._heap[smallest];
                 this._heap[smallest] = temp;

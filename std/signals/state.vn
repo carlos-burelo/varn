@@ -13,12 +13,12 @@ export class State<T> {
 
     get(make: () => T): T {
         const owner = currentOwner();
-        if (owner === null) {
+        if (owner == null) {
             throw new Error("signals: State.get needs an active owner");
         }
         const host: Owner = owner;
         const existing = this.values.get(host);
-        if (existing !== null) {
+        if (existing != null) {
             return existing.value;
         }
         const value = make();

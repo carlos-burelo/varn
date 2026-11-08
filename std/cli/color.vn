@@ -81,10 +81,10 @@ export namespace Color {
 
         for (let index = 0; index < length; index = index + 1) {
             let character = text[index];
-            if (character === "\x1b") {
+            if (character == "\x1b") {
                 inEscape = true;
             } else if (inEscape) {
-                if (character === "m") {
+                if (character == "m") {
                     inEscape = false;
                 }
             } else {
@@ -96,11 +96,11 @@ export namespace Color {
 
     export function isInteractive(): bool {
         let noColor = env$("NO_COLOR");
-        if (noColor !== null && noColor.length > 0) {
+        if (noColor != null && noColor.length > 0) {
             return false;
         }
         let term = env$("TERM");
-        if (term === "dumb") {
+        if (term == "dumb") {
             return false;
         }
         return true;

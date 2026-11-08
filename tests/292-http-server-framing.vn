@@ -7,7 +7,7 @@ async function readToEnd(client: TcpStream): Task<str> {
     let text = "";
     while (true) {
         const chunk = await client.read(8192);
-        if (chunk === null) {
+        if (chunk == null) {
             return text
         }
         text = text + (chunk as Bytes).toString();
@@ -34,7 +34,7 @@ function count(haystack: str, needle: str): int {
     let from = haystack;
     while (true) {
         const at = from.indexOf(needle);
-        if (at === null) {
+        if (at == null) {
             return found
         }
         found = found + 1;
@@ -60,7 +60,7 @@ await describe("292 http server framing", async () => {
             text("\r\n0\r\n\r\n")
         ]);
         expect(reply.startsWith("HTTP/1.1 200")).toBeTruthy();
-        expect(reply.indexOf("héllo") !== null).toBeTruthy();
+        expect(reply.indexOf("héllo") != null).toBeTruthy();
     });
 
     await it("Content-Length counts bytes", async () => {
@@ -68,7 +68,7 @@ await describe("292 http server framing", async () => {
             text("POST /echo HTTP/1.1\r\nHost: x\r\nContent-Length: 4\r\nConnection: close\r\n\r\n"),
             Bytes.fromString("éé")
         ]);
-        expect(reply.indexOf("éé") !== null).toBeTruthy();
+        expect(reply.indexOf("éé") != null).toBeTruthy();
     });
 
     await it("pipelined requests on one connection are all answered", async () => {
@@ -98,7 +98,7 @@ await describe("292 http server framing", async () => {
         expect((interim as Bytes).toString().startsWith("HTTP/1.1 100")).toBeTruthy();
         await client.write(text("hello"));
         const reply = await readToEnd(client);
-        expect(reply.indexOf("hello") !== null).toBeTruthy();
+        expect(reply.indexOf("hello") != null).toBeTruthy();
         client.close();
     });
 

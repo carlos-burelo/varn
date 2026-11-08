@@ -11,8 +11,8 @@ await describe("231 an alias keeps the origin of the class it names", async () =
     await it("an alias declared in another module is the same type as the class", () => {
         expect(make().draw(0.0)).toBe("leaf")
         expect(viaHelper().size).toBe(-1.0)
-        expect(maybe(true) !== null).toBe(true)
-        expect(maybe(false) === null).toBe(true)
+        expect(maybe(true) != null).toBe(true)
+        expect(maybe(false) == null).toBe(true)
         expect(asRoot(make()) instanceof Leaf).toBe(true)
     })
 })

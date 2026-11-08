@@ -22,7 +22,7 @@ await describe("example std:net", async () => {
         let cli = UdpSocket.bind(19883, "127.0.0.1");
         cli.send("127.0.0.1", 19882, "ping-udp");
         let packet = await srv.recv();
-        expect(packet !== null).toBe(true);
+        expect(packet != null).toBe(true);
         expect(packet!.data.toString()).toBe("ping-udp");
         cli.close();
         srv.close();
@@ -34,7 +34,7 @@ await describe("example std:net", async () => {
         expect(url.host).toBe("example.com");
         expect(url.port).toBe(8080);
         expect(url.query.get("q")).toBe("varn");
-        expect(url.toString().indexOf("https://") !== null).toBe(true);
+        expect(url.toString().indexOf("https://") != null).toBe(true);
         let query = Query.parse("?a=1&a=2&b=3");
         expect(query.getAll("a").length).toBe(2);
         expect(query.get("b")).toBe("3");

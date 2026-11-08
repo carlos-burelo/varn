@@ -15,7 +15,7 @@ async function echoOnce(listener: TcpListener): Task<void> {
     try {
         while (true) {
             const chunk = await conn.read(16384);
-            if (chunk === null) {
+            if (chunk == null) {
                 break
             }
             await conn.write(chunk as Bytes);
@@ -62,7 +62,7 @@ await describe("289 tls", async () => {
         let sum = 0;
         while (received < size) {
             const chunk = await client.read(65536);
-            if (chunk === null) {
+            if (chunk == null) {
                 break
             }
             const bytes = chunk as Bytes;
@@ -86,7 +86,7 @@ await describe("289 tls", async () => {
         const listener = TcpListener.listenTls(19892, cert, key);
         spawn(echoOnce(listener));
         const message = await failureOf(() => TcpStream.connectTls("localhost", 19892, null, null, 1));
-        expect(message.indexOf("UnknownIssuer") !== null).toBeTruthy();
+        expect(message.indexOf("UnknownIssuer") != null).toBeTruthy();
         listener.close();
     });
 
@@ -99,7 +99,7 @@ await describe("289 tls", async () => {
         expect(res.status).toBe(200);
         expect(res.text()).toBe("over tls");
         const message = await failureOf(() => fetch("https://localhost:19893/secure"));
-        expect(message.indexOf("UnknownIssuer") !== null).toBeTruthy();
+        expect(message.indexOf("UnknownIssuer") != null).toBeTruthy();
         server.close();
     });
     await it("a listener requiring client certificates accepts a client that presents one", async () => {
@@ -121,7 +121,7 @@ await describe("289 tls", async () => {
             const client = await TcpStream.connectTls("localhost", 19895, ca, null, 1);
             await client.write("anonymous");
             const reply = await client.read(64);
-            if (reply !== null) {
+            if (reply != null) {
                 echoed = (reply as Bytes).toString();
             }
         } catch (e) {

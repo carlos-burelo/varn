@@ -10,7 +10,7 @@ await describe("example std:cli", async () => {
 
     await it("colors and strips ansi", () => {
         let painted = Color.red("boom");
-        expect(painted === "boom").toBe(false);
+        expect(painted == "boom").toBe(false);
         expect(Color.stripAnsi(painted)).toBe("boom");
         expect(Color.stripAnsi(Color.bold(Color.green("ok")))).toBe("ok");
     });
@@ -20,8 +20,8 @@ await describe("example std:cli", async () => {
         table.addRow(["api", "8080"]);
         table.addRow(["web", "3000"]);
         let out = table.render();
-        expect(out.indexOf("api") !== null).toBe(true);
-        expect(out.indexOf("3000") !== null).toBe(true);
+        expect(out.indexOf("api") != null).toBe(true);
+        expect(out.indexOf("3000") != null).toBe(true);
     });
 });
 

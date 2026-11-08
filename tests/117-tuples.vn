@@ -17,9 +17,9 @@ await describe("117 tuples", async () => {
     });
 
     await it("group 1 part 2", async () => {
-        expect(p[0] === 7 && p[1]).toBe("x");
+        expect(p[0] == 7 && p[1]).toBe("x");
         expect(u == v).toBeTruthy();
-        expect(r.age === 3 && r.ok).toBeTruthy();
+        expect(r.age == 3 && r.ok).toBeTruthy();
     });
 
 

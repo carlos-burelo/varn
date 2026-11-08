@@ -127,7 +127,7 @@ export class CapabilityError extends StdError {
     target: str? = null;
 
     constructor(capability: str, target?: str, cause?: Error) {
-        super(target === null ? `permission denied (${capability})` : `permission denied (${capability}) for ${target}`, cause);
+        super(target == null ? `permission denied (${capability})` : `permission denied (${capability}) for ${target}`, cause);
         this.name = "CapabilityError";
         this.code = errorCode$("CapabilityError");
         this.capability = capability;

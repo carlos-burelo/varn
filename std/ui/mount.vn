@@ -5,7 +5,7 @@ const views = new Map<ComponentScope, View<Widget>>();
 
 export function viewAt(scope: ComponentScope): View<Widget> {
     const existing = views.get(scope);
-    if (existing !== null) {
+    if (existing != null) {
         return existing;
     }
     const fresh = new View<Widget>(scope);

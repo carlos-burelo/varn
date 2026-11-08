@@ -23,16 +23,16 @@ await describe("300 sqlite contract", async () => {
         const db = seeded();
         db.exec("INSERT INTO pet (id, name, owner_id, weight) VALUES (?, ?, ?, ?)", 7, "rex", 1, 2.5);
         const row = db.get("SELECT name, id, weight, photo FROM pet WHERE id = ?", 7);
-        expect(row !== null).toBe(true);
+        expect(row != null).toBe(true);
         let order = "";
         for (let column in row!) {
-            order = order + (order.length === 0 ? "" : ",") + column;
+            order = order + (order.length == 0 ? "" : ",") + column;
         }
         expect(order).toBe("name,id,weight,photo");
         expect(row!["name"]).toBe("rex");
         expect(row!["id"]).toBe(7);
         expect(row!["weight"]).toBe(2.5);
-        expect(row!["photo"] === null).toBe(true);
+        expect(row!["photo"] == null).toBe(true);
         db.close();
     });
 
@@ -55,7 +55,7 @@ await describe("300 sqlite contract", async () => {
 
     await it("get returns null when nothing matches and stops at the first row", async () => {
         const db = seeded();
-        expect(db.get("SELECT * FROM pet") === null).toBe(true);
+        expect(db.get("SELECT * FROM pet") == null).toBe(true);
         db.exec("INSERT INTO pet (id, name) VALUES (?, ?)", 1, "a");
         db.exec("INSERT INTO pet (id, name) VALUES (?, ?)", 2, "b");
         expect(db.get("SELECT id FROM pet ORDER BY id")!["id"]).toBe(1);
@@ -144,7 +144,7 @@ await describe("300 sqlite contract", async () => {
         expect(rows.length).toBe(1);
         expect(rows[0]["name"]).toBe("rex");
         expect((await db.getAsync("SELECT name FROM pet WHERE id = ?", 1))!["name"]).toBe("rex");
-        expect((await db.getAsync("SELECT name FROM pet WHERE id = ?", 9)) === null).toBe(true);
+        expect((await db.getAsync("SELECT name FROM pet WHERE id = ?", 9)) == null).toBe(true);
         let code = "";
         try {
             await db.execAsync("INSERT INTO pet (id, name) VALUES (?, ?)", 2, "rex");

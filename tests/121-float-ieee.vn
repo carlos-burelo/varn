@@ -17,8 +17,8 @@ await describe("121 float ieee", async () => {
         await it("group 1 part 1", async () => {
         expect(inf).toBe(Infinity);
         expect(fdiv(0.0 - 1.0, 0.0)).toBe(0.0 - Infinity);
-        expect(nan !== nan).toBeTruthy();
-        expect(modNan !== modNan).toBeTruthy();
+        expect(nan != nan).toBeTruthy();
+        expect(modNan != modNan).toBeTruthy();
     });
 
     await it("group 1 part 2", async () => {

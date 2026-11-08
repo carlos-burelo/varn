@@ -50,7 +50,7 @@ export namespace Mime {
             key = key.slice(1);
         }
         let found = TYPES[key];
-        if (found !== null) {
+        if (found != null) {
             return found as str;
         }
         return "application/octet-stream";
@@ -58,7 +58,7 @@ export namespace Mime {
 
     export function detect(path: str): str {
         let dot = path.lastIndexOf(".");
-        if (dot === null) {
+        if (dot == null) {
             return "application/octet-stream";
         }
         return lookup(path.slice(dot + 1));

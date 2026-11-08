@@ -8,20 +8,20 @@ export function escapeHtmlStr(s: str): str {
 }
 
 export function isWhitespaceChar(c: str): bool {
-    return c === " " || c === "\t" || c === "\r" || c === "\n";
+    return c == " " || c == "\t" || c == "\r" || c == "\n";
 }
 
 export function findFrom(s: str, search: str, fromIdx: int): int {
     if (fromIdx >= s.length) return -1;
     let sub = s.slice(fromIdx);
     let idx = sub.indexOf(search);
-    if (idx === null) return -1;
+    if (idx == null) return -1;
     return fromIdx + idx;
 }
 
 export function startsWithAt(s: str, prefix: str, pos: int): bool {
     if (pos + prefix.length > s.length) return false;
-    return s.slice(pos, pos + prefix.length) === prefix;
+    return s.slice(pos, pos + prefix.length) == prefix;
 }
 
 export function slugify(text: str): str {
@@ -32,7 +32,7 @@ export function slugify(text: str): str {
         let isAlphaNum = (code >= 97 && code <= 122) || (code >= 48 && code <= 57);
         if (isAlphaNum) {
             out = out + s[i];
-        } else if (code === 32 || code === 45 || code === 95) {
+        } else if (code == 32 || code == 45 || code == 95) {
             if (!out.endsWith("-") && out.length > 0) {
                 out = out + "-";
             }

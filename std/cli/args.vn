@@ -7,7 +7,7 @@ export interface ParsedArgs {
 
 export namespace Cli {
     export function parse(rawArgs?: str[]): ParsedArgs {
-        let input = rawArgs !== null ? rawArgs : args$();
+        let input = rawArgs != null ? rawArgs : args$();
         let flags: { [key: str]: str } = {};
         let positionals: str[] = [];
 
@@ -16,7 +16,7 @@ export namespace Cli {
             if (arg.startsWith("--")) {
                 let body = arg.slice(2);
                 let eqIdx = body.indexOf("=");
-                if (eqIdx !== null && eqIdx > 0) {
+                if (eqIdx != null && eqIdx > 0) {
                     let k = body.slice(0, eqIdx);
                     let v = body.slice(eqIdx + 1);
                     flags[k] = v;

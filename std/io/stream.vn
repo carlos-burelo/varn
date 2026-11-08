@@ -26,11 +26,11 @@ export class Stream {
         let total = 0;
         while (true) {
             let chunk = await reader.read(bufferSize);
-            if (chunk === null) {
+            if (chunk == null) {
                 break;
             }
             let b = chunk as Bytes;
-            if (b.length === 0) {
+            if (b.length == 0) {
                 break;
             }
             let written = await writer.write(b);

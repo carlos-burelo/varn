@@ -20,18 +20,18 @@ const rawCsv = csvLines.join("\n");
 // 2. Parse CSV Dataset
 function parseCsv(text: string): Record<string, any>[] {
     const lines = text.trim().split("\n");
-    if (lines.length === 0) return [];
+    if (lines.length == 0) return [];
     const headers = lines[0].split(",");
     const rows: Record<string, any>[] = [];
     for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
-        if (line.length === 0) continue;
+        if (line.length == 0) continue;
         const vals = line.split(",");
         const row: Record<string, any> = {};
         for (let h = 0; h < headers.length; h++) {
             const val = vals[h];
             const num = Number(val);
-            row[headers[h]] = !isNaN(num) && val !== "" ? num : val;
+            row[headers[h]] = !isNaN(num) && val != "" ? num : val;
         }
         rows.push(row);
     }
@@ -47,7 +47,7 @@ let vipCount = 0;
 
 for (let i = 0; i < parsedRows.length; i++) {
     const row = parsedRows[i];
-    if (row["status"] === "completed") {
+    if (row["status"] == "completed") {
         const amt = Number(row["amount"]);
         const taxRate = Number(row["tax_rate"]);
         const finalTotal = amt * (1.0 + taxRate);
@@ -72,7 +72,7 @@ for (let i = 0; i < parsedRows.length; i++) {
 
 // 4. Serialize back to CSV format
 function stringifyCsv(rows: Record<string, any>[]): string {
-    if (rows.length === 0) return "";
+    if (rows.length == 0) return "";
     const headers = Object.keys(rows[0]);
     const out: string[] = [headers.join(",")];
     for (let i = 0; i < rows.length; i++) {

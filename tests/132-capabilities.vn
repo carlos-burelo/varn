@@ -3,7 +3,7 @@ import { describe, it, expect } from "std:test";
 class Money {
     cents: int
     constructor(c: int) { this.cents = c }
-    equals(other: Money): bool { return this.cents === other.cents }
+    equals(other: Money): bool { return this.cents == other.cents }
     compare(other: Money): int { return this.cents - other.cents }
     hash(): int { return this.cents }
     clone(): Money { return new Money(this.cents) }
@@ -25,7 +25,7 @@ const g: Debug = new Money(7)
 const plus: Add<Money, Money> = new Money(1)
 const minus: Neg<Money> = new Money(2)
 
-class Box { v: int; constructor(v: int) { this.v = v } get(key: int): int? { return key === 0 ? this.v : null } }
+class Box { v: int; constructor(v: int) { this.v = v } get(key: int): int? { return key == 0 ? this.v : null } }
 const ix: Indexable<int, int> = new Box(4)
 
 class Settings {
@@ -37,13 +37,13 @@ await describe("132 capabilities", async () => {
         await it("group 1 part 1", async () => {
         expect(same(new Money(1), new Money(1))).toBeTruthy();
         expect(c.compare(new Money(3)) > 0).toBeTruthy();
-        expect(h.hash() === 5 && k.clone().cents).toBe(9);
-        expect(d.toString() === "$7" && g.debug()).toBe("Money(7)");
+        expect(h.hash() == 5 && k.clone().cents).toBe(9);
+        expect(d.toString() == "$7" && g.debug()).toBe("Money(7)");
     });
 
     await it("group 1 part 2", async () => {
-        expect(plus.add(new Money(2)).cents === 3 && minus.neg().cents).toBe(-2);
-        expect(ix.get(0) === 4 && ix.get(1)).toBe(null);
+        expect(plus.add(new Money(2)).cents == 3 && minus.neg().cents).toBe(-2);
+        expect(ix.get(0) == 4 && ix.get(1)).toBe(null);
         expect(make(Settings).retries).toBe(3);
     });
 

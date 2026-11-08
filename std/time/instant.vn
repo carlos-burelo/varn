@@ -24,12 +24,12 @@ export class Instant {
 }
 
 function isLeap(year: int): bool {
-    return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+    return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
 }
 
 function daysInMonth(year: int, month: int): int {
-    if (month === 2) return isLeap(year) ? 29 : 28;
-    if (month === 4 || month === 6 || month === 9 || month === 11) return 30;
+    if (month == 2) return isLeap(year) ? 29 : 28;
+    if (month == 4 || month == 6 || month == 9 || month == 11) return 30;
     return 31;
 }
 
@@ -83,7 +83,7 @@ export class PlainDateTime {
             order(a.minute, b.minute), order(a.second, b.second), order(a.millisecond, b.millisecond)
         ];
         for (const f of fields) {
-            if (f !== 0) return f;
+            if (f != 0) return f;
         }
         return 0;
     }

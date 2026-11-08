@@ -18,7 +18,7 @@ export function renderAst(node: MarkdownNode, options?: MarkdownOptions): str {
     let brTag = optXhtml ? "<br />" : "<br>";
     let hrTag = optXhtml ? "<hr />\n" : "<hr>\n";
 
-    if (node.kind === MarkdownNodeKind.Root) {
+    if (node.kind == MarkdownNodeKind.Root) {
         let out = "";
         for (let child of node.children) {
             out = out + renderAst(child, options);
@@ -26,7 +26,7 @@ export function renderAst(node: MarkdownNode, options?: MarkdownOptions): str {
         return out;
     }
 
-    if (node.kind === MarkdownNodeKind.Heading) {
+    if (node.kind == MarkdownNodeKind.Heading) {
         let tag = `h${node.level}`;
         let inner = "";
         for (let c of node.children) {
@@ -35,7 +35,7 @@ export function renderAst(node: MarkdownNode, options?: MarkdownOptions): str {
         return "<" + tag + ">" + inner + "</" + tag + ">\n";
     }
 
-    if (node.kind === MarkdownNodeKind.Paragraph) {
+    if (node.kind == MarkdownNodeKind.Paragraph) {
         let inner = "";
         for (let c of node.children) {
             inner = inner + renderAst(c, options);
@@ -46,7 +46,7 @@ export function renderAst(node: MarkdownNode, options?: MarkdownOptions): str {
         return "<p>" + inner + "</p>\n";
     }
 
-    if (node.kind === MarkdownNodeKind.CodeBlock) {
+    if (node.kind == MarkdownNodeKind.CodeBlock) {
         let code = optEscape ? escapeHtmlStr(node.text) : node.text;
         if (node.lang.length > 0) {
             return "<pre><code class=\"language-" + escapeHtmlStr(node.lang) + "\">" + code + "\n</code></pre>\n";
@@ -54,7 +54,7 @@ export function renderAst(node: MarkdownNode, options?: MarkdownOptions): str {
         return "<pre><code>" + code + "\n</code></pre>\n";
     }
 
-    if (node.kind === MarkdownNodeKind.Blockquote) {
+    if (node.kind == MarkdownNodeKind.Blockquote) {
         let inner = "";
         for (let c of node.children) {
             inner = inner + renderAst(c, options);
@@ -62,9 +62,9 @@ export function renderAst(node: MarkdownNode, options?: MarkdownOptions): str {
         return "<blockquote>\n" + inner + "</blockquote>\n";
     }
 
-    if (node.kind === MarkdownNodeKind.List) {
+    if (node.kind == MarkdownNodeKind.List) {
         let tag = node.ordered ? "ol" : "ul";
-        let startAttr = (node.ordered && node.start !== 1) ? (` start="${node.start}"`) : "";
+        let startAttr = (node.ordered && node.start != 1) ? (` start="${node.start}"`) : "";
         let inner = "";
         for (let c of node.children) {
             inner = inner + renderAst(c, options);
@@ -72,7 +72,7 @@ export function renderAst(node: MarkdownNode, options?: MarkdownOptions): str {
         return "<" + tag + startAttr + ">\n" + inner + "</" + tag + ">\n";
     }
 
-    if (node.kind === MarkdownNodeKind.ListItem) {
+    if (node.kind == MarkdownNodeKind.ListItem) {
         let inner = "";
         if (node.checked != null) {
             let chk = node.checked ? " checked=\"\"" : "";
@@ -85,7 +85,7 @@ export function renderAst(node: MarkdownNode, options?: MarkdownOptions): str {
         return "<li>" + inner + "</li>\n";
     }
 
-    if (node.kind === MarkdownNodeKind.Table) {
+    if (node.kind == MarkdownNodeKind.Table) {
         let headRow = node.children.length > 0 ? node.children[0] : null;
         let thead = "";
         if (headRow != null) {
@@ -118,45 +118,45 @@ export function renderAst(node: MarkdownNode, options?: MarkdownOptions): str {
         return "<table>\n" + thead + tbody + "</table>\n";
     }
 
-    if (node.kind === MarkdownNodeKind.ThematicBreak) {
+    if (node.kind == MarkdownNodeKind.ThematicBreak) {
         return hrTag;
     }
 
-    if (node.kind === MarkdownNodeKind.Text) {
+    if (node.kind == MarkdownNodeKind.Text) {
         return optEscape ? escapeHtmlStr(node.text) : node.text;
     }
 
-    if (node.kind === MarkdownNodeKind.InlineCode) {
+    if (node.kind == MarkdownNodeKind.InlineCode) {
         let code = optEscape ? escapeHtmlStr(node.text) : node.text;
         return "<code>" + code + "</code>";
     }
 
-    if (node.kind === MarkdownNodeKind.Bold) {
+    if (node.kind == MarkdownNodeKind.Bold) {
         let inner = "";
         for (let c of node.children) inner = inner + renderAst(c, options);
         return "<strong>" + inner + "</strong>";
     }
 
-    if (node.kind === MarkdownNodeKind.Italic) {
+    if (node.kind == MarkdownNodeKind.Italic) {
         let inner = "";
         for (let c of node.children) inner = inner + renderAst(c, options);
         return "<em>" + inner + "</em>";
     }
 
-    if (node.kind === MarkdownNodeKind.Strikethrough) {
+    if (node.kind == MarkdownNodeKind.Strikethrough) {
         let inner = "";
         for (let c of node.children) inner = inner + renderAst(c, options);
         return "<del>" + inner + "</del>";
     }
 
-    if (node.kind === MarkdownNodeKind.Link) {
+    if (node.kind == MarkdownNodeKind.Link) {
         let inner = "";
         for (let c of node.children) inner = inner + renderAst(c, options);
         let titleAttr = node.title.length > 0 ? (" title=\"" + escapeHtmlStr(node.title) + "\"") : "";
         return "<a href=\"" + escapeHtmlStr(node.url) + "\"" + titleAttr + ">" + inner + "</a>";
     }
 
-    if (node.kind === MarkdownNodeKind.Image) {
+    if (node.kind == MarkdownNodeKind.Image) {
         let titleAttr = node.title.length > 0 ? (" title=\"" + escapeHtmlStr(node.title) + "\"") : "";
         let altAttr = " alt=\"" + escapeHtmlStr(node.text) + "\"";
         let srcAttr = " src=\"" + escapeHtmlStr(node.url) + "\"";
@@ -173,15 +173,15 @@ export function toPlainText(ast: MarkdownNode): str {
     let out: str[] = [];
 
     function walk(n: MarkdownNode): void {
-        if (n.kind === MarkdownNodeKind.Text || n.kind === MarkdownNodeKind.InlineCode) {
+        if (n.kind == MarkdownNodeKind.Text || n.kind == MarkdownNodeKind.InlineCode) {
             out.push(n.text);
-        } else if (n.kind === MarkdownNodeKind.CodeBlock) {
+        } else if (n.kind == MarkdownNodeKind.CodeBlock) {
             out.push(n.text + "\n");
         } else {
             for (let c of n.children) {
                 walk(c);
             }
-            if (n.kind === MarkdownNodeKind.Paragraph || n.kind === MarkdownNodeKind.Heading || n.kind === MarkdownNodeKind.ListItem || n.kind === MarkdownNodeKind.ThematicBreak) {
+            if (n.kind == MarkdownNodeKind.Paragraph || n.kind == MarkdownNodeKind.Heading || n.kind == MarkdownNodeKind.ListItem || n.kind == MarkdownNodeKind.ThematicBreak) {
                 out.push("\n");
             }
         }
@@ -195,7 +195,7 @@ export function extractHeadings(ast: MarkdownNode): MarkdownHeading[] {
     let list: MarkdownHeading[] = [];
 
     function walk(n: MarkdownNode): void {
-        if (n.kind === MarkdownNodeKind.Heading) {
+        if (n.kind == MarkdownNodeKind.Heading) {
             list.push({
                 level: n.level,
                 text: n.text,
@@ -215,14 +215,14 @@ export function extractLinks(ast: MarkdownNode): MarkdownLink[] {
     let links: MarkdownLink[] = [];
 
     function walk(n: MarkdownNode): void {
-        if (n.kind === MarkdownNodeKind.Link) {
+        if (n.kind == MarkdownNodeKind.Link) {
             links.push({
                 text: n.text,
                 url: n.url,
                 title: n.title,
                 isImage: false
             });
-        } else if (n.kind === MarkdownNodeKind.Image) {
+        } else if (n.kind == MarkdownNodeKind.Image) {
             links.push({
                 text: n.text,
                 url: n.url,

@@ -46,8 +46,8 @@ await describe("70 result extensions", async () => {
         const someOpt: str? = "varn";
         const noneOpt: str? = null;
         
-        expect(someOpt !== null).toBeTruthy();
-        expect(noneOpt === null).toBeTruthy();
+        expect(someOpt != null).toBeTruthy();
+        expect(noneOpt == null).toBeTruthy();
         
         // 3. Failure paths
         const caught = Result.catching<int>(() => {

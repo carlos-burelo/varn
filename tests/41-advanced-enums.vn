@@ -78,7 +78,7 @@ await describe("41 advanced enums", async () => {
         expect(dir.name).toBe("North")
         expect(dir.rawValue).toBe(0)
         expect(Direction.North).toBe(Direction.North)
-        expect(Direction.North !== Direction.South).toBeTruthy()
+        expect(Direction.North != Direction.South).toBeTruthy()
         
         expect(Status.Pending.rawValue).toBe(0)
         expect(Status.Success.rawValue).toBe(10)

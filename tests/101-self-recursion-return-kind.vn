@@ -46,7 +46,7 @@ function collect(n: int): int[] {
 // Nullable return: `SlotKind::Dynamic`, the kind `renderAst` actually had.
 function findDeep(n: int): str? {
     if (n <= 0) { return null }
-    if (n === 1) { return "bottom" }
+    if (n == 1) { return "bottom" }
     return findDeep(n - 1)
 }
 
@@ -65,12 +65,12 @@ let badNull = 0
 await describe("101 self recursion return kind", async () => {
         await it("group 1 part 1", async () => {
         while (i < 300) {
-        if (repeatStr("ab", 3) !== "ababab") { badStr = badStr + 1 }
-        if (countDown(10) !== 55) { badInt = badInt + 1 }
-        if (halve(8.0, 3) !== 1.0) { badFloat = badFloat + 1 }
-        if (isEvenDepth(4) !== true) { badBool = badBool + 1 }
-        if (collect(3).length !== 3) { badArr = badArr + 1 }
-        if (findDeep(5) !== "bottom") { badNull = badNull + 1 }
+        if (repeatStr("ab", 3) != "ababab") { badStr = badStr + 1 }
+        if (countDown(10) != 55) { badInt = badInt + 1 }
+        if (halve(8.0, 3) != 1.0) { badFloat = badFloat + 1 }
+        if (isEvenDepth(4) != true) { badBool = badBool + 1 }
+        if (collect(3).length != 3) { badArr = badArr + 1 }
+        if (findDeep(5) != "bottom") { badNull = badNull + 1 }
         i = i + 1
         }
         expect(badStr).toBe(0);

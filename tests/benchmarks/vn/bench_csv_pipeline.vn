@@ -37,7 +37,7 @@ let totalRevenue = 0.0;
 
 for (let i = 0; i < parsed.length; i = i + 1) {
     let row = parsed[i];
-    if (row.status === "COMPLETED") {
+    if (row.status == "COMPLETED") {
         let lineTotal: float = (row.quantity as float) * row.unitPrice;
         totalRevenue = totalRevenue + lineTotal;
 

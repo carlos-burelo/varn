@@ -17,13 +17,13 @@ await describe("129 map generic keys", async () => {
         await it("group 1 part 1", async () => {
         byId.set(1, "one")
         byId.set(2, "two")
-        expect(byId.get(1) === "one" && byId.get(3)).toBe(null);
+        expect(byId.get(1) == "one" && byId.get(3)).toBe(null);
         expect(byId.has(2) && byId.size).toBe(2);
         expect(byId.delete(1) && !byId.has(1)).toBeTruthy();
         big.set(10n ** 30n, 1)
         expect(big.get(10n ** 30n)).toBe(1);
         flags.set(true, "yes")
-        expect(flags.get(true) === "yes" && flags.get(false)).toBe(null);
+        expect(flags.get(true) == "yes" && flags.get(false)).toBe(null);
     });
 
     await it("group 1 part 2", async () => {

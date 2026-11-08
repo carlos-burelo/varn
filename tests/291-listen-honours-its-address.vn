@@ -22,18 +22,18 @@ function netFailure(run: () => dynamic): NetError? {
 
 await describe("291 listen honours its address", async () => {
     await it("a name that is not an IP address is rejected", async () => {
-        expect(failure(() => TcpListener.listen(19900, "not-an-ip")).indexOf("not an IP address") !== null).toBeTruthy();
+        expect(failure(() => TcpListener.listen(19900, "not-an-ip")).indexOf("not an IP address") != null).toBeTruthy();
     });
 
     await it("a port outside 0..65535 is rejected", async () => {
-        expect(failure(() => TcpListener.listen(70000)).indexOf("out of range") !== null).toBeTruthy();
-        expect(failure(() => TcpListener.listen(-1)).indexOf("out of range") !== null).toBeTruthy();
+        expect(failure(() => TcpListener.listen(70000)).indexOf("out of range") != null).toBeTruthy();
+        expect(failure(() => TcpListener.listen(-1)).indexOf("out of range") != null).toBeTruthy();
     });
 
     await it("a second listener cannot take a port that is in use", async () => {
         const first = TcpListener.listen(19901);
         const second = netFailure(() => TcpListener.listen(19901));
-        expect(second !== null).toBeTruthy();
+        expect(second != null).toBeTruthy();
         expect((second as NetError).port).toBe(19901);
         expect((second as NetError).host).toBe("127.0.0.1");
         first.close();

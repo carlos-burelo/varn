@@ -137,7 +137,7 @@ await describe("94 ecma features and meta reflection", async () => {
         let j = 0;
         do {
         j = j + 1;
-        if (j === 3) {
+        if (j == 3) {
         continue;
         }
         if (j > 5) {

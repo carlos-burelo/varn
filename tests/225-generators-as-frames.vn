@@ -88,7 +88,7 @@ await describe("225 generators as frames", async () => {
             } catch (e) {
                 msg = e.message
             }
-            after = g.next() === null
+            after = g.next() == null
         }
         expect(msg).toBe("boom")
         expect(after).toBe(true)
@@ -107,7 +107,7 @@ await describe("225 generators as frames", async () => {
         expect(g.next()!).toBe(1)
         const second = await spawn((async () => g.next()!)())
         expect(second).toBe(2)
-        expect(g.next() === null).toBe(true)
+        expect(g.next() == null).toBe(true)
     })
 
     await it("an async generator settles its awaits inside next", async () => {

@@ -69,7 +69,7 @@ function throughATuple() {
     const left = { id: 3, extra: "l" }
     const right = { id: 4, extra: "r" }
     const pair = (readId(left), readId(right))
-    expect(pair[0] === 3 && pair[1] === 4).toBeTruthy()
+    expect(pair[0] == 3 && pair[1] == 4).toBeTruthy()
 }
 await describe("74 regalloc interference", async () => {
     await it("tests", async () => {

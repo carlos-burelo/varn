@@ -20,16 +20,16 @@ function isSchemeChar(code: int, first: bool): bool {
     if (first) {
         return alpha;
     }
-    return alpha || (code >= 48 && code <= 57) || code === 43 || code === 45 || code === 46;
+    return alpha || (code >= 48 && code <= 57) || code == 43 || code == 45 || code == 46;
 }
 
 function schemeEnd(text: str): int {
     for (let i = 0; i < text.length; i = i + 1) {
         const code = text.charCodeAt(i) as int;
-        if (code === 58) {
+        if (code == 58) {
             return i > 0 ? i : -1;
         }
-        if (!isSchemeChar(code, i === 0)) {
+        if (!isSchemeChar(code, i == 0)) {
             return -1;
         }
     }
@@ -37,7 +37,7 @@ function schemeEnd(text: str): int {
 }
 
 function parsePort(text: str, source: str): int? {
-    if (text.length === 0) {
+    if (text.length == 0) {
         return null;
     }
     let value = 0;
@@ -57,7 +57,7 @@ function parsePort(text: str, source: str): int? {
 function requireHostChars(host: str, bracketed: bool, source: str): void {
     for (let i = 0; i < host.length; i = i + 1) {
         const code = host.charCodeAt(i) as int;
-        const forbidden = code <= 32 || code === 127 || code === 47 || code === 92 || code === 63 || code === 35 || code === 64 || code === 91 || code === 93 || (!bracketed && code === 58);
+        const forbidden = code <= 32 || code == 127 || code == 47 || code == 92 || code == 63 || code == 35 || code == 64 || code == 91 || code == 93 || (!bracketed && code == 58);
         if (forbidden) {
             throw new ParseError(`invalid host in '${source}'`);
         }
@@ -67,13 +67,13 @@ function requireHostChars(host: str, bracketed: bool, source: str): void {
 function parseAuthority(authority: str, ref: Reference, source: str): void {
     const at = authority.lastIndexOf("@");
     let hostPort = authority;
-    if (at !== null) {
+    if (at != null) {
         ref.userinfo = authority.slice(0, at);
         hostPort = authority.slice(at + 1);
     }
     if (hostPort.startsWith("[")) {
         const close = hostPort.indexOf("]");
-        if (close === null) {
+        if (close == null) {
             throw new ParseError(`unterminated IPv6 host in '${source}'`);
         }
         const inside = hostPort.slice(1, close);
@@ -90,7 +90,7 @@ function parseAuthority(authority: str, ref: Reference, source: str): void {
     }
     const colon = hostPort.lastIndexOf(":");
     let hostText = hostPort;
-    if (colon !== null) {
+    if (colon != null) {
         hostText = hostPort.slice(0, colon);
         ref.port = parsePort(hostPort.slice(colon + 1), source);
     }
@@ -101,19 +101,19 @@ function parseAuthority(authority: str, ref: Reference, source: str): void {
 function splitReference(text: str): Reference {
     for (let i = 0; i < text.length; i = i + 1) {
         const code = text.charCodeAt(i) as int;
-        if (code <= 32 || code === 127) {
+        if (code <= 32 || code == 127) {
             throw new ParseError(`a URL cannot hold spaces or control characters: '${text}'`);
         }
     }
     const ref = new Reference();
     let rest = text;
     const hash = rest.indexOf("#");
-    if (hash !== null) {
+    if (hash != null) {
         ref.fragment = rest.slice(hash + 1);
         rest = rest.slice(0, hash);
     }
     const question = rest.indexOf("?");
-    if (question !== null) {
+    if (question != null) {
         ref.hasQuery = true;
         ref.query = rest.slice(question + 1);
         rest = rest.slice(0, question);
@@ -127,8 +127,8 @@ function splitReference(text: str): Reference {
         const body = rest.slice(2);
         const slash = body.indexOf("/");
         ref.hasAuthority = true;
-        ref.path = slash === null ? "" : body.slice(slash);
-        parseAuthority(slash === null ? body : body.slice(0, slash), ref, text);
+        ref.path = slash == null ? "" : body.slice(slash);
+        parseAuthority(slash == null ? body : body.slice(0, slash), ref, text);
     } else {
         ref.path = rest;
     }
@@ -137,7 +137,7 @@ function splitReference(text: str): Reference {
 
 function dropLastSegment(output: str): str {
     const at = output.lastIndexOf("/");
-    return at === null ? "" : output.slice(0, at);
+    return at == null ? "" : output.slice(0, at);
 }
 
 function removeDotSegments(path: str): str {
@@ -150,20 +150,20 @@ function removeDotSegments(path: str): str {
             input = input.slice(2);
         } else if (input.startsWith("/./")) {
             input = input.slice(2);
-        } else if (input === "/.") {
+        } else if (input == "/.") {
             input = "/";
         } else if (input.startsWith("/../")) {
             input = input.slice(3);
             output = dropLastSegment(output);
-        } else if (input === "/..") {
+        } else if (input == "/..") {
             input = "/";
             output = dropLastSegment(output);
-        } else if (input === "." || input === "..") {
+        } else if (input == "." || input == "..") {
             input = "";
         } else {
             const start = input.startsWith("/") ? 1 : 0;
             const cut = input.slice(start).indexOf("/");
-            const segment = cut === null ? input : input.slice(0, start + cut);
+            const segment = cut == null ? input : input.slice(0, start + cut);
             output = output + segment;
             input = input.slice(segment.length);
         }
@@ -172,11 +172,11 @@ function removeDotSegments(path: str): str {
 }
 
 function mergePaths(base: Url, relative: str): str {
-    if (base.host.length > 0 && base.path.length === 0) {
+    if (base.host.length > 0 && base.path.length == 0) {
         return "/" + relative;
     }
     const slash = base.path.lastIndexOf("/");
-    return slash === null ? relative : base.path.slice(0, slash + 1) + relative;
+    return slash == null ? relative : base.path.slice(0, slash + 1) + relative;
 }
 
 export class Url {
@@ -192,7 +192,7 @@ export class Url {
 
     static parse(url: str): Url {
         const ref = splitReference(url);
-        if (ref.scheme.length === 0) {
+        if (ref.scheme.length == 0) {
             throw new ParseError(`'${url}' is not an absolute URL: it has no scheme`);
         }
         const out = new Url();
@@ -200,7 +200,7 @@ export class Url {
         out.userinfo = ref.userinfo;
         out.host = ref.host;
         out.port = ref.port;
-        out.path = ref.hasAuthority && ref.path.length === 0 ? "/" : ref.path;
+        out.path = ref.hasAuthority && ref.path.length == 0 ? "/" : ref.path;
         out.keepQuery(ref.query);
         out.fragment = ref.fragment;
         return out;
@@ -223,7 +223,7 @@ export class Url {
             out.host = ref.host;
             out.port = ref.port;
             const path = removeDotSegments(ref.path);
-            out.path = ref.hasAuthority && path.length === 0 ? "/" : path;
+            out.path = ref.hasAuthority && path.length == 0 ? "/" : path;
             out.keepQuery(ref.query);
             return out;
         }
@@ -231,7 +231,7 @@ export class Url {
         out.userinfo = origin.userinfo;
         out.host = origin.host;
         out.port = origin.port;
-        if (ref.path.length === 0) {
+        if (ref.path.length == 0) {
             out.path = origin.path;
             if (ref.hasQuery) {
                 out.keepQuery(ref.query);
@@ -247,13 +247,13 @@ export class Url {
 
     queryText(): str {
         const current = this.query.toString();
-        return current === this._sourceNormalized ? this._sourceQuery : current;
+        return current == this._sourceNormalized ? this._sourceQuery : current;
     }
 
     authority(): str {
-        const shown = this.host.indexOf(":") === null ? this.host : "[" + this.host + "]";
+        const shown = this.host.indexOf(":") == null ? this.host : "[" + this.host + "]";
         const port = this.port;
-        return port === null ? shown : `${shown}:${port}`;
+        return port == null ? shown : `${shown}:${port}`;
     }
 
     withQuery(query: Query): Url {
@@ -272,7 +272,7 @@ export class Url {
         let out = this.protocol.length > 0 ? this.protocol + ":" : "";
         if (this.host.length > 0) {
             out = out + "//" + (this.userinfo.length > 0 ? this.userinfo + "@" : "") + this.authority();
-            out = out + (this.path.length === 0 ? "/" : this.path);
+            out = out + (this.path.length == 0 ? "/" : this.path);
         } else {
             out = out + this.path;
         }

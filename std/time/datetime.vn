@@ -5,7 +5,7 @@ export class DateTime {
     timestamp: int;
 
     constructor(timestampMs?: int) {
-        if (timestampMs !== null) {
+        if (timestampMs != null) {
             this.timestamp = timestampMs;
         } else {
             this.timestamp = nowMs$();

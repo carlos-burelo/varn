@@ -33,7 +33,7 @@ await describe("example std:http", async () => {
         await delay(800);
         let res = await get("http://127.0.0.1:19882/hello");
         expect(res.status).toBe(200);
-        expect(res.text().indexOf("world") !== null).toBe(true);
+        expect(res.text().indexOf("world") != null).toBe(true);
         proc.kill();
     });
 
@@ -47,7 +47,7 @@ await describe("example std:http", async () => {
     await it("mime, auth and multipart helpers", () => {
         expect(Mime.detect("photo.png")).toBe("image/png");
         expect(Auth.bearer("Bearer abc123")).toBe("abc123");
-        expect(Auth.basic("Basic dXNlcjpwYXNz") !== null).toBe(true);
+        expect(Auth.basic("Basic dXNlcjpwYXNz") != null).toBe(true);
         let boundary = Multipart.boundaryOf("multipart/form-data; boundary=----xyz");
         expect(boundary).toBe("----xyz");
         let parts = Multipart.parse("------xyz\r\nContent-Disposition: form-data; name=\"f\"\r\n\r\nv\r\n------xyz--\r\n", "----xyz");

@@ -33,7 +33,7 @@ await describe("147 jit globals", async () => {
     });
 
     await it("globals counts", async () => {
-        expect(gCounter === 2200 && bumped === 2200).toBeTruthy();
+        expect(gCounter == 2200 && bumped == 2200).toBeTruthy();
         expect(gLast == "run0").toBeTruthy();
         expect(finite).toBe(1100);
     });

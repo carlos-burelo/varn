@@ -53,9 +53,9 @@ function conReturn(): void {
 // Lanza DESPUÉS de haber salido de la región por la vía temprana. Si quedó un
 // handler colgante, éste se traga el error y el `catch` de fuera nunca corre.
 function lanzaTrasSalir(via: str): void {
-    if (via === "break") { conBreak(); }
-    if (via === "continue") { conContinue(); }
-    if (via === "return") { conReturn(); }
+    if (via == "break") { conBreak(); }
+    if (via == "continue") { conContinue(); }
+    if (via == "return") { conReturn(); }
     throw new Error("debe llegar al catch del llamante");
 }
 

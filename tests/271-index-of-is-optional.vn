@@ -21,8 +21,8 @@ await describe("271 indexOf is optional", async () => {
         let found = 0;
         let missing = 0;
         for (let i = 0; i < 2000; i = i + 1) {
-            if (where("héllo wörld", "ö") !== null) { found = found + 1 }
-            if (where("héllo wörld", "zz") === null) { missing = missing + 1 }
+            if (where("héllo wörld", "ö") != null) { found = found + 1 }
+            if (where("héllo wörld", "zz") == null) { missing = missing + 1 }
         }
         expect(found).toBe(2000);
         expect(missing).toBe(2000);
@@ -31,7 +31,7 @@ await describe("271 indexOf is optional", async () => {
 
     await it("narrowing lets the index be used after a check", () => {
         const at = "key=value".indexOf("=");
-        if (at !== null) {
+        if (at != null) {
             expect("key=value".slice(at + 1)).toBe("value");
         }
     });

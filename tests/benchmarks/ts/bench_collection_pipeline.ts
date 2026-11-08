@@ -46,7 +46,7 @@ for (let i = 0; i < 100000; i++) {
     const stat = statuses[i % 5];
     const qty = (i % 8) + 1;
     const price = ((i % 150) + 10) * 1.5;
-    const disc = (i % 3) === 0;
+    const disc = (i % 3) == 0;
     orders.push(new OrderItem(
         i,
         `SKU_${i % 2000}`,
@@ -64,7 +64,7 @@ for (let i = 0; i < 100000; i++) {
 const validOrders: OrderItem[] = [];
 for (let i = 0; i < orders.length; i++) {
     const o = orders[i];
-    if (o.status === "completed" && o.quantity > 0) {
+    if (o.status == "completed" && o.quantity > 0) {
         validOrders.push(o);
     }
 }
@@ -107,10 +107,10 @@ for (let i = 0; i < highValueSummaries.length; i++) {
 let foundItem: OrderSummary | null = null;
 const targetId = 4242;
 for (let i = 0; i < highValueSummaries.length; i++) {
-    if (highValueSummaries[i].id === targetId) {
+    if (highValueSummaries[i].id == targetId) {
         foundItem = highValueSummaries[i];
         break;
     }
 }
 
-console.log(`Collection Pipeline: Processed ${orders.length} orders -> ${highValueSummaries.length} high value summaries, Total Net = $${totalNet}, Target Found = ${foundItem !== null}`);
+console.log(`Collection Pipeline: Processed ${orders.length} orders -> ${highValueSummaries.length} high value summaries, Total Net = $${totalNet}, Target Found = ${foundItem != null}`);

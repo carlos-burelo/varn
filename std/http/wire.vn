@@ -82,7 +82,7 @@ export class WireReader {
     }
 
     private compact(): void {
-        if (this.cursor > 0 && this.cursor === this.buffer.length) {
+        if (this.cursor > 0 && this.cursor == this.buffer.length) {
             this.buffer.clear();
             this.cursor = 0;
         }
@@ -93,7 +93,7 @@ export class WireReader {
             return false;
         }
         const chunk = await tcpRead$(this.conn, READ_SIZE);
-        if (chunk === null) {
+        if (chunk == null) {
             this.ended = true;
             return false;
         }
@@ -108,7 +108,7 @@ export class WireReader {
         while (true) {
             const end = this.buffer.length;
             for (let i = scanned; i + 1 < end; i = i + 1) {
-                if (this.buffer.byteAt(i) === 13 && this.buffer.byteAt(i + 1) === 10) {
+                if (this.buffer.byteAt(i) == 13 && this.buffer.byteAt(i + 1) == 10) {
                     if (i - this.cursor > limit) {
                         throw new LineTooLongError(limit);
                     }
@@ -167,8 +167,8 @@ function hexDigit(code: int): int {
 
 function parseChunkSize(line: str): int {
     const extension = line.indexOf(";");
-    const digits = (extension === null ? line : line.slice(0, extension)).trim();
-    if (digits.length === 0 || digits.length > 15) {
+    const digits = (extension == null ? line : line.slice(0, extension)).trim();
+    if (digits.length == 0 || digits.length > 15) {
         throw new ProtocolError("malformed chunk size line");
     }
     let size = 0;
@@ -186,15 +186,15 @@ export async function readChunkedBody(wire: WireReader, maxBytes: int): Task<Byt
     const body = new ByteBuilder();
     while (true) {
         const sizeLine = await wire.line();
-        if (sizeLine === null) {
+        if (sizeLine == null) {
             throw new ProtocolError("connection closed inside a chunked body");
         }
         const size = parseChunkSize(sizeLine as str);
-        if (size === 0) {
+        if (size == 0) {
             let trailers = 0;
             while (true) {
                 const trailer = await wire.line();
-                if (trailer === null || (trailer as str).length === 0) {
+                if (trailer == null || (trailer as str).length == 0) {
                     break;
                 }
                 trailers = trailers + 1;
@@ -208,13 +208,13 @@ export async function readChunkedBody(wire: WireReader, maxBytes: int): Task<Byt
             throw new BodyTooLargeError(maxBytes);
         }
         const data = await wire.take(size);
-        if (data === null) {
+        if (data == null) {
             throw new ProtocolError("connection closed inside a chunk");
         }
         const bytes = data as Bytes;
         body.append(bytes, 0, bytes.length);
         const terminator = await wire.line();
-        if (terminator === null || (terminator as str).length !== 0) {
+        if (terminator == null || (terminator as str).length != 0) {
             throw new ProtocolError("a chunk is not followed by CRLF");
         }
     }

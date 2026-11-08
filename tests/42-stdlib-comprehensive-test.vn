@@ -106,7 +106,7 @@ async function runComprehensiveTest(): Task<void> {
     expect(urlObj.fragment).toBe("main");
 
     // 10. std:path
-    let isWindows = sysPlatform() === "windows";
+    let isWindows = sysPlatform() == "windows";
     let expectedNormalize = isWindows ? "a\\c" : "a/c";
     let expectedJoin = isWindows ? "a\\b\\c" : "a/b/c";
     expect(Path.normalize("a/b/../c")).toBe(expectedNormalize);
@@ -149,7 +149,7 @@ async function runComprehensiveTest(): Task<void> {
         one(),
         two(),
     ]);
-    expect(all[0] === 1 && all[1] === 2).toBeTruthy();
+    expect(all[0] == 1 && all[1] == 2).toBeTruthy();
 
     using group = new TaskGroup<int>();
     async function ten(): Task<int> { return 10; }
@@ -157,7 +157,7 @@ async function runComprehensiveTest(): Task<void> {
     let g1 = group.spawn(ten());
     let g2 = group.spawn(twenty());
     let joined = await group.join();
-    expect(joined[0] === 10 && joined[1] === 20).toBeTruthy();
+    expect(joined[0] == 10 && joined[1] == 20).toBeTruthy();
 
     // 14. std:dispose
     let dispObj = new ResourceImpl();
@@ -170,8 +170,8 @@ async function runComprehensiveTest(): Task<void> {
     // 15. null is the single absent value: `T?`, `??` and a binding condition.
     let optSome: int? = 99;
     let optNone: int? = null;
-    expect(optSome !== null).toBeTruthy();
-    expect(optNone === null).toBeTruthy();
+    expect(optSome != null).toBeTruthy();
+    expect(optNone == null).toBeTruthy();
     expect(optSome!).toBe(99);
     expect(optSome ?? 50).toBe(99);
     expect(optNone ?? 50).toBe(50);
@@ -214,7 +214,7 @@ async function runComprehensiveTest(): Task<void> {
 
     expect(partialVar.x).toBe(42);
     expect(readonlyVar.a).toBe(true);
-    expect(requiredVar.x === 10 && requiredVar.y === "yes").toBeTruthy();
+    expect(requiredVar.x == 10 && requiredVar.y == "yes").toBeTruthy();
     expect(mutableVar.a).toBe(false);
     expect(recordVar["tested"]).toBe(100);
 }

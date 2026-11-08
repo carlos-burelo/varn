@@ -10,7 +10,7 @@ await describe("287 fs exists and stat tell the truth", async () => {
     await it("stat reports a real modification time", async () => {
         const info = stat(tempDir());
         expect(info.isDir).toBe(true);
-        expect(info.mtime !== null).toBeTruthy();
+        expect(info.mtime != null).toBeTruthy();
         expect((info.mtime as int) > 0).toBeTruthy();
     });
 });

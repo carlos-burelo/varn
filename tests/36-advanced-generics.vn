@@ -65,7 +65,7 @@ class Cons<T> {
     length(): int {
         let n = 0
         let cur: Cons<T> | null = this
-        while (cur !== null) {
+        while (cur != null) {
             n = n + 1
             cur = cur.tail
         }
@@ -74,7 +74,7 @@ class Cons<T> {
     toArray(): T[] {
         const arr: T[] = []
         let cur: Cons<T> | null = this
-        while (cur !== null) {
+        while (cur != null) {
             arr.push(cur.head)
             cur = cur.tail
         }

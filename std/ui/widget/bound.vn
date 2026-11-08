@@ -12,7 +12,7 @@ export function writer<T>(source: T | Signal<T>, change: ((next: T) => void)?): 
         const bound = source;
         return (next: T) => bound.set(next);
     }
-    if (change === null) {
+    if (change == null) {
         throw new Error("a widget given a plain value needs its change callback");
     }
     return change;

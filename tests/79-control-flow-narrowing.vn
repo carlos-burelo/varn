@@ -2,18 +2,18 @@ import { describe, it, expect } from "std:test";
 
 
 
-// 1. Narrowing con x !== null
+// 1. Narrowing con x != null
 function processOptional(val: str?): int {
-    if (val !== null) {
+    if (val != null) {
         // 'val' se reduce a 'str' automáticamente; .length es válido sin error
         return val.length;
     }
     return 0;
 }
 
-// 2. Narrowing con null !== x
+// 2. Narrowing con null != x
 function processInverted(val: str?): int {
-    if (null !== val) {
+    if (null != val) {
         return val.length;
     }
     return -1;
@@ -29,9 +29,9 @@ function processTruthy(val: str?): bool {
 
 // 4. Narrowing con typeof
 function processTypeof(val: dynamic): str {
-    if (typeof val === "str") {
+    if (typeof val == "str") {
         return val.toUpperCase();
-    } else if (typeof val === "int") {
+    } else if (typeof val == "int") {
         return `number:${val}`;
     }
     return "other";

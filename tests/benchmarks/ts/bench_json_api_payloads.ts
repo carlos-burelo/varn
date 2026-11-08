@@ -9,7 +9,7 @@ for (let i = 0; i < 5000; i++) {
         "requestId": "req_" + i,
         "organization": {
             "id": orgId,
-            "tier": (i % 2 === 0) ? "enterprise" : "pro",
+            "tier": (i % 2 == 0) ? "enterprise" : "pro",
             "settings": {
                 "maxUsers": 1000,
                 "features": ["sso", "audit_logs", "custom_roles", "api_access"]
@@ -47,7 +47,7 @@ for (let i = 0; i < rawPayloads.length; i++) {
     const parsed = JSON.parse(rawPayloads[i]);
     
     const org = parsed["organization"];
-    if (org["tier"] === "enterprise") {
+    if (org["tier"] == "enterprise") {
         enterpriseCount++;
     }
     

@@ -18,7 +18,7 @@ export function endFrame(): void {
     for (let key of keys) {
         if (!touched.has(key)) {
             const gone = owners.get(key);
-            if (gone !== null) {
+            if (gone != null) {
                 gone.dispose();
             }
             owners.delete(key);
@@ -45,7 +45,7 @@ export function scopeAtMount(definition: int): ComponentScope {
     const key = `${mountPath}@${definition}`;
     touched.add(key);
     const existing = owners.get(key);
-    if (existing !== null) {
+    if (existing != null) {
         return existing;
     }
     const fresh = new ComponentScope();
@@ -66,7 +66,7 @@ export class View<T> {
     describe(body: () => T): T {
         this._body.set(body);
         const existing = this._cell;
-        if (existing !== null) {
+        if (existing != null) {
             return existing.value;
         }
         const fresh = computed((): T => this.produce());
@@ -76,18 +76,18 @@ export class View<T> {
 
     dispose(): void {
         const cell = this._cell;
-        if (cell !== null) {
+        if (cell != null) {
             cell.dispose();
         }
     }
 
     private produce(): T {
         const body = this._body.value;
-        if (body === null) {
+        if (body == null) {
             throw new Error("ui: a view has no body");
         }
         const scope = this._scope;
-        if (scope === null) {
+        if (scope == null) {
             return body();
         }
         return withOwner(scope, body);

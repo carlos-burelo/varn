@@ -1,40 +1,40 @@
 import { describe, it, expect } from "std:test";
 
 function neither(a: str?, b: str?): str {
-    if (a !== null && b !== null) {
+    if (a != null && b != null) {
         return "both";
     }
-    if (a !== null) {
+    if (a != null) {
         return "only a " + a;
     }
-    if (b !== null) {
+    if (b != null) {
         return "only b " + b;
     }
     return "none";
 }
 
 function eitherNull(a: int?, b: int?): int {
-    if (a === null || b === null) {
+    if (a == null || b == null) {
         return -1;
     }
     return a + b;
 }
 
 function bothNullAfterOr(a: int?, b: int?): bool {
-    if (a === null || b === null) {
+    if (a == null || b == null) {
         return true;
     }
     return a > 0 && b > 0;
 }
 
 function nested(a: int?, b: int?, c: int?): int {
-    if (a !== null && b !== null && c !== null) {
+    if (a != null && b != null && c != null) {
         return a + b + c;
     }
-    if (a !== null) {
+    if (a != null) {
         return a;
     }
-    if (c !== null) {
+    if (c != null) {
         return c;
     }
     return 0;

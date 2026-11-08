@@ -17,7 +17,7 @@ function matchesAt(hay: Bytes, needle: Bytes, at: int): bool {
         return false;
     }
     for (let i = 0; i < needle.length; i = i + 1) {
-        if (hay.getByte(at + i) !== needle.getByte(i)) {
+        if (hay.getByte(at + i) != needle.getByte(i)) {
             return false;
         }
     }
@@ -39,24 +39,24 @@ function parameters(value: str): { [key: str]: str } {
     let i = 0;
     const length = value.length;
     while (i < length) {
-        while (i < length && (value.charCodeAt(i) === 32 || value.charCodeAt(i) === 9 || value.charCodeAt(i) === 59)) {
+        while (i < length && (value.charCodeAt(i) == 32 || value.charCodeAt(i) == 9 || value.charCodeAt(i) == 59)) {
             i = i + 1;
         }
         let keyEnd = i;
-        while (keyEnd < length && value.charCodeAt(keyEnd) !== 61 && value.charCodeAt(keyEnd) !== 59) {
+        while (keyEnd < length && value.charCodeAt(keyEnd) != 61 && value.charCodeAt(keyEnd) != 59) {
             keyEnd = keyEnd + 1;
         }
         const key = value.slice(i, keyEnd).trim().toLowerCase();
         i = keyEnd;
-        if (i >= length || value.charCodeAt(i) === 59) {
+        if (i >= length || value.charCodeAt(i) == 59) {
             continue;
         }
         i = i + 1;
         let text = "";
-        if (i < length && value.charCodeAt(i) === 34) {
+        if (i < length && value.charCodeAt(i) == 34) {
             i = i + 1;
-            while (i < length && value.charCodeAt(i) !== 34) {
-                if (value.charCodeAt(i) === 92 && i + 1 < length) {
+            while (i < length && value.charCodeAt(i) != 34) {
+                if (value.charCodeAt(i) == 92 && i + 1 < length) {
                     i = i + 1;
                 }
                 text = text + value.slice(i, i + 1);
@@ -65,13 +65,13 @@ function parameters(value: str): { [key: str]: str } {
             i = i + 1;
         } else {
             let end = i;
-            while (end < length && value.charCodeAt(end) !== 59) {
+            while (end < length && value.charCodeAt(end) != 59) {
                 end = end + 1;
             }
             text = value.slice(i, end).trim();
             i = end;
         }
-        if (key.length > 0 && out[key] === null) {
+        if (key.length > 0 && out[key] == null) {
             out[key] = text;
         }
     }
@@ -82,9 +82,9 @@ function parsePartHeaders(block: str): { [key: str]: str } {
     const out: { [key: str]: str } = {};
     for (const line of block.split("\r\n")) {
         const colon = line.indexOf(":");
-        if (colon !== null && colon > 0) {
+        if (colon != null && colon > 0) {
             const name = line.slice(0, colon).trim().toLowerCase();
-            if (out[name] === null) {
+            if (out[name] == null) {
                 out[name] = line.slice(colon + 1).trim();
             }
         }
@@ -94,7 +94,7 @@ function parsePartHeaders(block: str): { [key: str]: str } {
 
 export namespace Multipart {
     export function parse(input: str | Bytes, boundary: str): FormPart[] {
-        if (boundary.length === 0 || boundary.length > 70) {
+        if (boundary.length == 0 || boundary.length > 70) {
             throw new ParseError("a multipart boundary has 1 to 70 characters");
         }
         const data: Bytes = input is str ? Bytes.fromString(input) : input as Bytes;
@@ -110,7 +110,7 @@ export namespace Multipart {
             if (matchesAt(data, Bytes.fromString("--"), pos)) {
                 break;
             }
-            while (pos < data.length && (data.getByte(pos) === 32 || data.getByte(pos) === 9)) {
+            while (pos < data.length && (data.getByte(pos) == 32 || data.getByte(pos) == 9)) {
                 pos = pos + 1;
             }
             if (!matchesAt(data, CRLF, pos)) {
@@ -135,7 +135,7 @@ export namespace Multipart {
             }
             const headers = parsePartHeaders(headerText);
             const disposition = headers["content-disposition"];
-            const attributes = disposition === null ? {} : parameters(disposition);
+            const attributes = disposition == null ? {} : parameters(disposition);
             const content = data.slice(bodyStart, next);
             parts.push({
                 name: attributes["name"] ?? "",
@@ -152,11 +152,11 @@ export namespace Multipart {
 
     export function boundaryOf(contentType: str): str? {
         const semicolon = contentType.indexOf(";");
-        if (semicolon === null) {
+        if (semicolon == null) {
             return null;
         }
         const value = parameters(contentType.slice(semicolon + 1))["boundary"];
-        if (value === null || value.length === 0) {
+        if (value == null || value.length == 0) {
             return null;
         }
         return value;

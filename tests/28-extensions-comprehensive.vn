@@ -14,13 +14,13 @@ extension StringUtils on str {
         let i = 0;
         while (i < this.length) {
             const ch = this[i];
-            if (ch !== " " && !inWord) { count = count + 1; inWord = true; }
-            else if (ch === " ") { inWord = false; }
+            if (ch != " " && !inWord) { count = count + 1; inWord = true; }
+            else if (ch == " ") { inWord = false; }
             i = i + 1;
         }
         return count;
     }
-    isEmpty(): bool { return this.length === 0; }
+    isEmpty(): bool { return this.length == 0; }
     repeatChars(n: int): str {
         if (n <= 0) return "";
         let result = "";
@@ -44,13 +44,13 @@ extension PointOps on Point {
         let dy: float = (this.y - other.y) as float;
         return (dx * dx + dy * dy) ** 0.5;
     }
-    isOrigin(): bool { return this.x === 0 && this.y === 0; }
+    isOrigin(): bool { return this.x == 0 && this.y == 0; }
     negate(): Point {
         return new Point(-this.x, -this.y);
     }
 }
 extension IntOps on int {
-    isEven(): bool { return this % 2 === 0; }
+    isEven(): bool { return this % 2 == 0; }
     isOdd(): bool { return !this.isEven(); }
     squared(): int { return this * this; }
     clamp(lo: int, hi: int): int {

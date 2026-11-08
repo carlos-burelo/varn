@@ -14,8 +14,8 @@ extension StringUtils on str {
         let i = 0;
         while (i < this.length) {
             const ch = this[i];
-            if (ch !== " " && !inWord) { count = count + 1; inWord = true; }
-            else if (ch === " ") { inWord = false; }
+            if (ch != " " && !inWord) { count = count + 1; inWord = true; }
+            else if (ch == " ") { inWord = false; }
             i = i + 1;
         }
         return count;
@@ -34,7 +34,7 @@ extension SlotAccessor on Slot {
     set label(s: str) { this.value = s.length; }
 }
 extension IntUtils on int {
-    isEven(): bool { return this % 2 === 0; }
+    isEven(): bool { return this % 2 == 0; }
     clamp(lo: int, hi: int): int {
         if (this < lo) { return lo; }
         if (this > hi) { return hi; }

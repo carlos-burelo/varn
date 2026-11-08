@@ -4,13 +4,13 @@ import { now } from "std:time";
 import { timingSafeEqual } from "std:crypto/password";
 
 function macName(algo: str): str {
-    if (algo === "SHA1") {
+    if (algo == "SHA1") {
         return "sha1";
     }
-    if (algo === "SHA256") {
+    if (algo == "SHA256") {
         return "sha256";
     }
-    if (algo === "SHA512") {
+    if (algo == "SHA512") {
         return "sha512";
     }
     throw new RangeError("Totp: unsupported algorithm '" + algo + "'");

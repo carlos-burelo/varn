@@ -147,7 +147,7 @@ await describe("296 error model", async () => {
     await it("errors chain their cause", async () => {
         const cause = new ParseError("unexpected token", 3);
         const wrapped = new DecodeError("$.user.age", "age is not a number", cause);
-        expect(wrapped.cause !== null).toBe(true);
+        expect(wrapped.cause != null).toBe(true);
         expect((wrapped.cause as ParseError).position).toBe(3);
         expect(wrapped.path).toBe("$.user.age");
     });

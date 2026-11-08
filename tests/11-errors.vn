@@ -3,7 +3,7 @@ import { describe, it, expect } from "std:test";
 let finallyRan = false;
 function safeDivide(a: int, b: int): float {
     try {
-        if (b === 0) throw new RangeError("division by zero");
+        if (b == 0) throw new RangeError("division by zero");
         return (a as float) / (b as float);
     } catch (e) {
         return -1;
@@ -114,7 +114,7 @@ await describe("11 Errors", async () => {
         expect(modCaught).toBeTruthy();
         expect(modMsg).toBe("modulo by zero");
         expect(divideOrDefault(10, 0)).toBe(-1);
-        expect(10.0 / 0.0 === Infinity).toBeTruthy();
+        expect(10.0 / 0.0 == Infinity).toBeTruthy();
         let nestedCaught = false;
         let nestedMsg = "";
         try {

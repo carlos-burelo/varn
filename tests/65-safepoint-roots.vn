@@ -16,9 +16,9 @@ function spRefsSurviveConcat(n: int): int {
   let hits = 0
   for (let i = 0; i < n; i = i + 1) {
     last = `item-${i}`
-    if (keep === "anchor-string-long-enough-to-be-heap") { hits = hits + 1 }
+    if (keep == "anchor-string-long-enough-to-be-heap") { hits = hits + 1 }
   }
-  if (last === `item-${(n - 1)}`) { hits = hits + 1 }
+  if (last == `item-${(n - 1)}`) { hits = hits + 1 }
   return hits
 }
 
@@ -32,7 +32,7 @@ function spIntsExactAcrossGc(n: int): int {
     s = `x${i}`
     acc = acc + (i % 7)
   }
-  if (s === "") { return -1 }
+  if (s == "") { return -1 }
   return acc
 }
 
@@ -54,7 +54,7 @@ function spNested(outer: int, inner: int): int {
   for (let i = 0; i < outer; i = i + 1) {
     let local = ""
     for (let j = 0; j < inner; j = j + 1) { local = `${tag}${j}`}
-    if (local === `${tag}${(inner - 1)}`) { total = total + 1 }
+    if (local == `${tag}${(inner - 1)}`) { total = total + 1 }
   }
   return total
 }
@@ -88,7 +88,7 @@ function spRangeUnderPressure(n: int): int {
     const r = lo..hi
     total = total + r.start + r.end
   }
-  if (junk === "") { return -1 }
+  if (junk == "") { return -1 }
   return total
 }
 
@@ -101,7 +101,7 @@ function spSpreadUnderPressure(n: int): int {
     const args = [i % 3, i % 5, i % 7]
     total = total + spSum3(...args)
   }
-  if (junk === "") { return -1 }
+  if (junk == "") { return -1 }
   return total
 }
 
@@ -114,7 +114,7 @@ function spNativeOpUnderPressure(n: int): int {
     junk = `n${i}`
     acc.push(i % 11)
   }
-  if (junk === "") { return -1 }
+  if (junk == "") { return -1 }
   return acc.length + acc[0] + acc[n - 1]
 }
 
@@ -124,13 +124,13 @@ function spEnumUnderPressure(n: int): int {
   let junk = ""
   for (let i = 0; i < n; i = i + 1) {
     junk = `e${i}`
-    const v = i % 2 === 0 ? SpTag.A(i) : SpTag.B(i)
+    const v = i % 2 == 0 ? SpTag.A(i) : SpTag.B(i)
     total = total + match v {
       A(x) => 1,
       B(x) => 2,
     }
   }
-  if (junk === "") { return -1 }
+  if (junk == "") { return -1 }
   return total
 }
 
@@ -154,13 +154,13 @@ function spTryUnderPressure(n: int): int {
     const depth = i % 13
     try {
       junk = `t${i}`
-      if (i % 1000 === 999) { throw new Error("boom") }
+      if (i % 1000 == 999) { throw new Error("boom") }
       counter = counter + depth
     } catch (e) {
       caught = caught + depth
     }
   }
-  if (junk === "") { return -1 }
+  if (junk == "") { return -1 }
   return counter * 10000 + caught
 }
 const rRefs = spRefsSurviveConcat(50000)

@@ -25,7 +25,7 @@ export class Effect implements Observer {
         }
         this._queued = true;
         const scheduler = this._scheduler;
-        if (scheduler === null) {
+        if (scheduler == null) {
             enqueue(this);
         } else {
             scheduler.schedule(() => this.run());
@@ -73,7 +73,7 @@ export function effect(body: () => void, scheduler: Scheduler? = null): Effect {
     const owner = currentOwner();
     const fx = new Effect(body, scheduler);
     fx.run();
-    if (owner !== null) {
+    if (owner != null) {
         owner.onDispose(() => fx.dispose());
     }
     return fx;
@@ -81,12 +81,12 @@ export function effect(body: () => void, scheduler: Scheduler? = null): Effect {
 
 export function onCleanup(fn: () => void): void {
     const ob = currentObserver();
-    if (ob !== null) {
+    if (ob != null) {
         ob.cleanups.push(fn);
         return;
     }
     const owner = currentOwner();
-    if (owner === null) {
+    if (owner == null) {
         throw new Error("signals: onCleanup needs a running effect, computed or scope");
     }
     owner.onDispose(fn);

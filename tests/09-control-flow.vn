@@ -1,7 +1,7 @@
 import { describe, it, expect } from "std:test";
 
 function classify(n: int): str {
-    return n < 0 ? "neg" : n === 0 ? "zero" : "pos";
+    return n < 0 ? "neg" : n == 0 ? "zero" : "pos";
 }
 function firstAbove(arr: int[], threshold: int): int {
     let i = 0;
@@ -18,7 +18,7 @@ function firstAbove(arr: int[], threshold: int): int {
 function sumOdds(max: int): int {
     let total = 0;
     for (let i = 0; i <= max; i = i + 1) {
-        if (i % 2 === 0) continue;
+        if (i % 2 == 0) continue;
         total = total + i;
     }
     return total;
@@ -41,7 +41,7 @@ await describe("09 Control Flow", async () => {
         expect(forOfSum).toBe(60);
         let forOfBreak = 0;
         for (const n of [1, 2, 3, 4, 5]) {
-            if (n === 3) break;
+            if (n == 3) break;
             forOfBreak = forOfBreak + n;
         }
         expect(forOfBreak).toBe(3);

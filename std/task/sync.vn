@@ -100,13 +100,13 @@ export class WaitGroup {
 
     done(): void {
         this.add(-1);
-        if (this._counter === 0) {
+        if (this._counter == 0) {
             this._notifyWaiters();
         }
     }
 
     async wait(): Task<void> {
-        while (this._counter !== 0) {
+        while (this._counter != 0) {
             this._waiterCount = this._waiterCount + 1;
             await this._waiters.rx.receive();
             this._waiterCount = this._waiterCount - 1;

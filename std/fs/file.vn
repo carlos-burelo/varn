@@ -111,7 +111,7 @@ export class FileStream implements AsyncReader, AsyncWriter {
     async read(size?: int): Task<Bytes?> {
         let readSize = size ?? 8192;
         let b = await readFdBytesAsync$(this._fd, readSize);
-        if (b.length === 0) {
+        if (b.length == 0) {
             return null;
         }
         return b;
@@ -127,7 +127,7 @@ export class FileStream implements AsyncReader, AsyncWriter {
 
     async pumpTo(writer: AsyncWriter): Task<int> {
         let data = await readFdAllBytesAsync$(this._fd);
-        if (data.length === 0) {
+        if (data.length == 0) {
             await writer.flush();
             return 0;
         }

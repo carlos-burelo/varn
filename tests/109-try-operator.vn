@@ -72,7 +72,7 @@ await describe("109 try operator", async () => {
 
     await it("group 1 part 1b", async () => {
         let some_val = some_opt ?? -1;
-        let is_none = none_opt === null;
+        let is_none = none_opt == null;
         expect(some_val).toBe(151);
         expect(is_none).toBe(true);
         expect(suffixed_ok).toBe("test_suffix");

@@ -125,7 +125,7 @@ export class UiFrame {
 
     idOf(path: str): int {
         const known = this.ids.get(path);
-        if (known !== null) {
+        if (known != null) {
             return known;
         }
         this.lastId = this.lastId + 1;
@@ -135,7 +135,7 @@ export class UiFrame {
 
     editFor(slot: int): TextEdit {
         const known = this.edits.get(slot);
-        if (known !== null) {
+        if (known != null) {
             return known;
         }
         const fresh = new TextEdit();
@@ -167,7 +167,7 @@ export class UiFrame {
         for (let change of changes) {
             for (let h of this.handlers) {
                 const onText = h.onText;
-                if (h.id == change.id && onText !== null && this.reachable(h)) {
+                if (h.id == change.id && onText != null && this.reachable(h)) {
                     onText(change.text);
                 }
             }
@@ -179,7 +179,7 @@ export class UiFrame {
             const id = pairs[i] as int;
             for (let h of this.handlers) {
                 const onValue = h.onValue;
-                if (h.id == id && onValue !== null && this.reachable(h)) {
+                if (h.id == id && onValue != null && this.reachable(h)) {
                     onValue(pairs[i + 1]);
                 }
             }

@@ -25,7 +25,7 @@ async function connectFailure(run: () => Task<dynamic>): Task<ConnectError?> {
 await describe("288 network failures carry their cause", async () => {
     await it("a refused connection says why", async () => {
         const failure = await connectFailure(() => TcpStream.connect("127.0.0.1", 1, 1));
-        expect(failure !== null).toBeTruthy();
+        expect(failure != null).toBeTruthy();
         expect((failure as ConnectError).code).toBe("net.connect");
         expect((failure as ConnectError).host).toBe("127.0.0.1");
         expect((failure as ConnectError).port).toBe(1);
@@ -33,7 +33,7 @@ await describe("288 network failures carry their cause", async () => {
 
     await it("fetch never fabricates a response", async () => {
         const failure = await connectFailure(() => fetch("http://127.0.0.1:1/"));
-        expect(failure !== null).toBeTruthy();
+        expect(failure != null).toBeTruthy();
         expect((await messageOf(() => fetch("http://%/"))).length > 0).toBeTruthy();
     });
 

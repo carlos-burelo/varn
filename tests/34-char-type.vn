@@ -15,7 +15,7 @@ await describe("34 char type", async () => {
         const z: char = 'z'
         const excl: char = '!'
         expect(a).toBe('a')
-        expect(a !== z).toBeTruthy()
+        expect(a != z).toBeTruthy()
         expect('A'.charCodeAt()).toBe(65)
         expect(char.fromCode(65)).toBe('A')
         expect(char.fromCode(122)).toBe('z')

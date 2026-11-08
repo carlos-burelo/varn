@@ -49,7 +49,7 @@ export class Signal<T> extends Readable<T> {
 
     set(next: T): void {
         const equals = this._equals;
-        const same = equals === null ? sameValue(next, this._value) : equals(this._value, next);
+        const same = equals == null ? sameValue(next, this._value) : equals(this._value, next);
         if (same) {
             return;
         }
@@ -123,7 +123,7 @@ export class Computed<T> extends Readable<T> implements Observer {
             unlink(this);
             const next = runTracked(this, this._derive);
             const equals = this._equals;
-            const unchanged = this._cache.length > 0 && (equals === null ? sameValue(next, this._cache[0]) : equals(this._cache[0], next));
+            const unchanged = this._cache.length > 0 && (equals == null ? sameValue(next, this._cache[0]) : equals(this._cache[0], next));
             this._cache = [next];
             this._stale = false;
             if (!unchanged) {
@@ -142,7 +142,7 @@ export function signal<T>(initial: T, equals: ((a: T, b: T) => bool)? = null): S
 export function computed<T>(derive: () => T, equals: ((a: T, b: T) => bool)? = null): Computed<T> {
     const owner = currentOwner();
     const made = new Computed<T>(derive, equals);
-    if (owner !== null) {
+    if (owner != null) {
         owner.onDispose(() => made.dispose());
     }
     return made;

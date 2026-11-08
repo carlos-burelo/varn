@@ -32,7 +32,7 @@ export class UdpSocket {
     async recv(maxLen?: int): Task<UdpPacket?> {
         if (!this._isOpen) throw new ClosedError("UdpSocket is closed");
         let raw = await udpRecvFrom$(this._id, maxLen ?? 65536);
-        if (raw === null) return null;
+        if (raw == null) return null;
         let parts = raw as (Bytes, str, int);
         return {
             data: parts[0],

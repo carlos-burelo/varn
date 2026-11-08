@@ -30,7 +30,7 @@ await describe("284 async fs", async () => {
         await copyAsync(dir + "-a.txt", dir + "-c.txt");
         expect(await readTextAsync(dir + "-c.txt")).toBe("one\ntwo\nthree\n");
         const names = await readDirAsync(tempDir());
-        expect(names.indexOf("varn-284-async-c.txt") !== null).toBeTruthy();
+        expect(names.indexOf("varn-284-async-c.txt") != null).toBeTruthy();
         await removeAllAsync(dir + "-a.txt");
         await removeAllAsync(dir + "-b.bin");
         await removeAllAsync(dir + "-c.txt");

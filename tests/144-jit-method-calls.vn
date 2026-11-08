@@ -134,11 +134,11 @@ await describe("144 jit method calls", async () => {
         expect(mArea).toBe(1500 * 21 + 1500 * 23);
         expect(mText).toBe(10 + 180 + 2700 + 8000);
         expect(mStatic).toBe(2 * 4498500);
-        expect(mNumbers === 2248500 && mWords).toBe(1500 + (5 + 45 * 2 + 450 * 3 + 1000 * 4));
+        expect(mNumbers == 2248500 && mWords).toBe(1500 + (5 + 45 * 2 + 450 * 3 + 1000 * 4));
     });
 
     await it("group 1 part 2", async () => {
-        expect(mDyn === 4498500 && mcArr.length).toBe(2);
+        expect(mDyn == 4498500 && mcArr.length).toBe(2);
         expect(mCb).toBe(4498500 + 300000);
         expect(mGuard).toBe(4498500 - (7 * 428 * 429 / 2) - 429);
     });

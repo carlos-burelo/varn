@@ -13,7 +13,7 @@ function testCli(): void {
         expect(styled.includes("\x1b[31m")).toBeTruthy();;
         expect(Color.stripAnsi(styled)).toBe("critical error");;
     let isTermInteractive = Color.isInteractive();
-        expect(isTermInteractive === true || isTermInteractive === false).toBeTruthy();;
+        expect(isTermInteractive == true || isTermInteractive == false).toBeTruthy();;
 
     // 2. Table
     let table = new Table(["ID", "Name", "Role"]);

@@ -39,7 +39,7 @@ await describe("118 intersections", async () => {
         await it("group 1 part 1", async () => {
         expect(describePerson(new Person("ana", 30))).toBe("ana:30");
         expect(new Child().greet()).toBe("hi");
-        expect(both.x === 1 && both.tag === "p").toBeTruthy();
+        expect(both.x == 1 && both.tag == "p").toBeTruthy();
     });
 
     await it("group 1 part 2", async () => {

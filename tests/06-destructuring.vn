@@ -4,7 +4,7 @@ await describe("06 Destructuring", async () => {
     await it("object patterns", () => {
         const obj1 = { a: 1, b: 2, c: 3 };
         const { a, b } = obj1;
-        expect(a === 1 && b === 2).toBeTruthy();
+        expect(a == 1 && b == 2).toBeTruthy();
         const { a: renamed } = obj1;
         expect(renamed).toBe(1);
         const { name = "default", age = 0 } = { name: "Alice" };
@@ -12,21 +12,21 @@ await describe("06 Destructuring", async () => {
         expect(age).toBe(0);
         const nested = { point: { x: 10, y: 20 } };
         const { point: { x: nx, y: ny } } = nested;
-        expect(nx === 10 && ny === 20).toBeTruthy();
+        expect(nx == 10 && ny == 20).toBeTruthy();
     });
 
     await it("array patterns", () => {
         const [f1, f2, f3] = [10, 20, 30];
-        expect(f1 === 10 && f3 === 30).toBeTruthy();
+        expect(f1 == 10 && f3 == 30).toBeTruthy();
         const [skip1, _, skip3] = [100, 200, 300];
-        expect(skip1 === 100 && skip3 === 300).toBeTruthy();
+        expect(skip1 == 100 && skip3 == 300).toBeTruthy();
         const [head, ...tail] = [1, 2, 3, 4];
         expect(head).toBe(1);
         expect(tail.length).toBe(3);
         expect(tail[0]).toBe(2);
         const data = { coords: [5, 6] };
         const { coords: [cx, cy] } = data;
-        expect(cx === 5 && cy === 6).toBeTruthy();
+        expect(cx == 5 && cy == 6).toBeTruthy();
     });
 
     await it("spread and rest", () => {

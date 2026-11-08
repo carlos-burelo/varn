@@ -5,7 +5,7 @@ class Point {
     y: int
     constructor(x: int, y: int) { this.x = x; this.y = y }
     hash(): int { return this.x * 31 + this.y }
-    equals(o: Point): bool { return this.x === o.x && this.y === o.y }
+    equals(o: Point): bool { return this.x == o.x && this.y == o.y }
 }
 
 const names: Map<Point, str> = new Map()
@@ -16,7 +16,7 @@ class Collide {
     v: int
     constructor(v: int) { this.v = v }
     hash(): int { return 7 }
-    equals(o: Collide): bool { return this.v === o.v }
+    equals(o: Collide): bool { return this.v == o.v }
 }
 const c: Map<Collide, int> = new Map()
 
@@ -29,7 +29,7 @@ function churn(): bool {
     for (let i = 0; i < 2000; i = i + 1) { m.set(new Point(i % 50, 0), i) }
     let junk = 0
     for (let i = 0; i < 20000; i = i + 1) { const t = [i, i + 1]; junk = junk + t.length }
-    return m.size === 50 && m.get(new Point(49, 0)) === 1999
+    return m.size == 50 && m.get(new Point(49, 0)) == 1999
 }
 const churnOk = churn()
 await describe("134 hashable keys", async () => {
@@ -38,8 +38,8 @@ await describe("134 hashable keys", async () => {
         expect(names.get(new Point(1, 2))).toBe("a");
         expect(names.has(new Point(1, 2)) && !names.has(new Point(2, 1))).toBeTruthy();
         names.set(new Point(1, 2), "b")
-        expect(names.size === 1 && names.get(new Point(1, 2)) === "b").toBeTruthy();
-        expect(names.delete(new Point(1, 2)) && names.size === 0).toBeTruthy();
+        expect(names.size == 1 && names.get(new Point(1, 2)) == "b").toBeTruthy();
+        expect(names.delete(new Point(1, 2)) && names.size == 0).toBeTruthy();
     });
 
     await it("set dedup", async () => {

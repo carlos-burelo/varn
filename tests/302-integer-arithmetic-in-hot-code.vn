@@ -1,6 +1,6 @@
 import { describe, it, expect } from "std:test";
 function outcome(f: () => int): str {
-    try { return f().toString(); } catch (e) { return e.message.indexOf("shift") !== null ? "range" : e.message.indexOf("overflow") !== null ? "overflow" : "other:" + e.message; }
+    try { return f().toString(); } catch (e) { return e.message.indexOf("shift") != null ? "range" : e.message.indexOf("overflow") != null ? "overflow" : "other:" + e.message; }
 }
 function hot(f: () => int): str {
     let last = "";

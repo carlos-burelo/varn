@@ -195,7 +195,7 @@ export abstract class Widget {
     layout(c: Constraints): Placement {
         const key = [c.minW, c.maxW, c.minH, c.maxH, layoutEpoch];
         const cached = this.layoutValue;
-        if (cached !== null && sameKey(this.layoutKey, key)) {
+        if (cached != null && sameKey(this.layoutKey, key)) {
             return cached;
         }
         const placed = this.computeLayout(c);

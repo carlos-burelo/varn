@@ -33,7 +33,7 @@ function testHttpResponseStreamShape(): void {
     let res = new Response("first chunk\n", 200, { "Content-Type": "text/plain" });
     res.stream(reader);
     expect(res.status).toBe(200);
-    expect(res.bodyStream !== null).toBeTruthy();
+    expect(res.bodyStream != null).toBeTruthy();
 }
 
 let srvPort = 19881;

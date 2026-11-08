@@ -49,7 +49,7 @@ async function testIsolates() {
         await spawnIsolate(anonymousWorkerRef(), (spare.tx,))
     } catch (e) {
         threwAnon = true
-        expect(e.message.indexOf("must be a function reference") !== null).toBeTruthy()
+        expect(e.message.indexOf("must be a function reference") != null).toBeTruthy()
     }
     expect(threwAnon).toBeTruthy()
 
@@ -58,7 +58,7 @@ async function testIsolates() {
         await spawnIsolate(unexportedWorkerRef(), (spare.tx,))
     } catch (e) {
         threwUnexported = true
-        expect(e.message.indexOf("is not a top-level exported function") !== null).toBeTruthy()
+        expect(e.message.indexOf("is not a top-level exported function") != null).toBeTruthy()
     }
     expect(threwUnexported).toBeTruthy()
 

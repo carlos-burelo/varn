@@ -35,7 +35,7 @@ export function isEq<T>(a: T, b: T): bool {
             return false;
         }
         for (let i = 0; i < a.length; i = i + 1) {
-            if (a.slice(i, i + 1) !== b.slice(i, i + 1)) {
+            if (a.slice(i, i + 1) != b.slice(i, i + 1)) {
                 return false;
             }
         }
@@ -95,7 +95,7 @@ export class Expectation<T> {
     }
 
     toBeNull(): void {
-        if (this.actual !== null) {
+        if (this.actual != null) {
             failedCount = failedCount + 1;
             throw new AssertionError(`Expected null but received ${this.actual}`);
         }
@@ -103,7 +103,7 @@ export class Expectation<T> {
     }
 
     toBeNotNull(): void {
-        if (this.actual === null) {
+        if (this.actual == null) {
             failedCount = failedCount + 1;
             throw new AssertionError("Expected non-null value");
         }
@@ -188,7 +188,7 @@ export function assertFalse(cond: bool, label: str = "assertFalse"): void {
 }
 
 export function assertNull<T>(val: T?, msg: str = "assertNull"): void {
-    if (val !== null) {
+    if (val != null) {
         failedCount = failedCount + 1;
         throw new AssertionError("ASSERT FAIL: " + msg + " (expected null, got " + val + ")");
     }
@@ -196,7 +196,7 @@ export function assertNull<T>(val: T?, msg: str = "assertNull"): void {
 }
 
 export function assertNotNull<T>(val: T?, msg: str = "assertNotNull"): void {
-    if (val === null) {
+    if (val == null) {
         failedCount = failedCount + 1;
         throw new AssertionError("ASSERT FAIL: " + msg + " (expected non-null value)");
     }
@@ -267,7 +267,7 @@ export function summary(): void {
     print("\n════════════════════════════════════════");
     print(`PASSED: ${passedCount}`);
     print(`FAILED: ${failedCount}`);
-    if (failedCount === 0) {
+    if (failedCount == 0) {
         print("ALL TESTS PASSED");
     } else {
         print("SOME TESTS FAILED");

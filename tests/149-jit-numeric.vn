@@ -40,7 +40,7 @@ function nmDecimal(i: int): decimal {
 
 function nmChar(i: int): int {
     const c = i % 2 == 0 ? 'y' : 'n'
-    return c === 'y' ? 1 : 0
+    return c == 'y' ? 1 : 0
 }
 
 let fl = 0.0

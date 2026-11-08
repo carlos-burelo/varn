@@ -107,7 +107,7 @@ class ByteReader {
 export type MsgPackValue = int | str | bool | null | Bytes | MsgPackValue[] | { [key: str]: MsgPackValue };
 
 function encodeValue(w: ByteWriter, val: MsgPackValue): void {
-    if (val === null) {
+    if (val == null) {
         w.writeU8(0xC0);
         return;
     }
@@ -240,7 +240,7 @@ function decodeValue(r: ByteReader): MsgPackValue {
     }
 
     // Fixmap (0x80 - 0x8f)
-    if ((tag & 0xF0) === 0x80) {
+    if ((tag & 0xF0) == 0x80) {
         let len = tag & 0x0F;
         let map: { [key: str]: MsgPackValue } = {};
         for (let i = 0; i < len; i = i + 1) {
@@ -252,7 +252,7 @@ function decodeValue(r: ByteReader): MsgPackValue {
     }
 
     // Fixarray (0x90 - 0x9f)
-    if ((tag & 0xF0) === 0x90) {
+    if ((tag & 0xF0) == 0x90) {
         let len = tag & 0x0F;
         let arr: MsgPackValue[] = [];
         for (let i = 0; i < len; i = i + 1) {
@@ -262,74 +262,74 @@ function decodeValue(r: ByteReader): MsgPackValue {
     }
 
     // Fixstr (0xa0 - 0xbf)
-    if ((tag & 0xE0) === 0xA0) {
+    if ((tag & 0xE0) == 0xA0) {
         let len = tag & 0x1F;
         let b = r.readBytes(len);
         return b.toString();
     }
 
     // Null
-    if (tag === 0xC0) {
+    if (tag == 0xC0) {
         return null;
     }
 
     // Boolean
-    if (tag === 0xC2) return false;
-    if (tag === 0xC3) return true;
+    if (tag == 0xC2) return false;
+    if (tag == 0xC3) return true;
 
     // Bin 8, 16, 32
-    if (tag === 0xC4) {
+    if (tag == 0xC4) {
         let len = r.readU8();
         return r.readBytes(len);
     }
-    if (tag === 0xC5) {
+    if (tag == 0xC5) {
         let len = r.readU16();
         return r.readBytes(len);
     }
-    if (tag === 0xC6) {
+    if (tag == 0xC6) {
         let len = r.readU32();
         return r.readBytes(len);
     }
 
     // Unsigned ints
-    if (tag === 0xCC) return r.readU8();
-    if (tag === 0xCD) return r.readU16();
-    if (tag === 0xCE) return r.readU32();
-    if (tag === 0xCF) return r.readI64();
+    if (tag == 0xCC) return r.readU8();
+    if (tag == 0xCD) return r.readU16();
+    if (tag == 0xCE) return r.readU32();
+    if (tag == 0xCF) return r.readI64();
 
     // Signed ints
-    if (tag === 0xD0) {
+    if (tag == 0xD0) {
         let v = r.readU8();
         return v >= 128 ? v - 256 : v;
     }
-    if (tag === 0xD1) {
+    if (tag == 0xD1) {
         let v = r.readU16();
         return v >= 32768 ? v - 65536 : v;
     }
-    if (tag === 0xD2) {
+    if (tag == 0xD2) {
         let v = r.readU32();
         return v >= 2147483648 ? v - 4294967296 : v;
     }
-    if (tag === 0xD3) {
+    if (tag == 0xD3) {
         return r.readI64();
     }
 
     // Strings 8, 16, 32
-    if (tag === 0xD9) {
+    if (tag == 0xD9) {
         let len = r.readU8();
         return r.readBytes(len).toString();
     }
-    if (tag === 0xDA) {
+    if (tag == 0xDA) {
         let len = r.readU16();
         return r.readBytes(len).toString();
     }
-    if (tag === 0xDB) {
+    if (tag == 0xDB) {
         let len = r.readU32();
         return r.readBytes(len).toString();
     }
 
     // Array 16, 32
-    if (tag === 0xDC) {
+    if (tag == 0xDC) {
         let len = r.readU16();
         let arr: MsgPackValue[] = [];
         for (let i = 0; i < len; i = i + 1) {
@@ -337,7 +337,7 @@ function decodeValue(r: ByteReader): MsgPackValue {
         }
         return arr;
     }
-    if (tag === 0xDD) {
+    if (tag == 0xDD) {
         let len = r.readU32();
         let arr: MsgPackValue[] = [];
         for (let i = 0; i < len; i = i + 1) {
@@ -347,7 +347,7 @@ function decodeValue(r: ByteReader): MsgPackValue {
     }
 
     // Map 16, 32
-    if (tag === 0xDE) {
+    if (tag == 0xDE) {
         let len = r.readU16();
         let map: { [key: str]: MsgPackValue } = {};
         for (let i = 0; i < len; i = i + 1) {
@@ -357,7 +357,7 @@ function decodeValue(r: ByteReader): MsgPackValue {
         }
         return map;
     }
-    if (tag === 0xDF) {
+    if (tag == 0xDF) {
         let len = r.readU32();
         let map: { [key: str]: MsgPackValue } = {};
         for (let i = 0; i < len; i = i + 1) {

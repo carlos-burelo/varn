@@ -14,7 +14,7 @@ await describe("283 FileStream is asynchronous", async () => {
 
         const chunks = new FileStream(path, FileMode.Read);
         const first = await chunks.read(5);
-        expect(first !== null).toBeTruthy();
+        expect(first != null).toBeTruthy();
         expect((first as Bytes).length).toBe(5);
         const rest = await chunks.readAll();
         expect(rest.length).toBe(7);

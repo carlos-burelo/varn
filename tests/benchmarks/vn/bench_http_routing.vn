@@ -22,17 +22,17 @@ class Route {
     }
 
     match(method: str, pathSegments: str[]): { [key: str]: str }? {
-        if (this.method !== "*" && this.method !== method) {
+        if (this.method != "*" && this.method != method) {
             return null;
         }
-        if (this.segments.length !== pathSegments.length) {
+        if (this.segments.length != pathSegments.length) {
             return null;
         }
 
         // Fast check: verify literal segments match first
         for (let i = 0; i < this.segments.length; i = i + 1) {
             let seg = this.segments[i];
-            if (!seg.startsWith(":") && seg !== pathSegments[i]) {
+            if (!seg.startsWith(":") && seg != pathSegments[i]) {
                 return null;
             }
         }
@@ -67,14 +67,14 @@ class ReqContext {
         this.user = null;
 
         let qIdx = url.indexOf("?");
-        if (qIdx !== null) {
+        if (qIdx != null) {
             this.path = url.slice(0, qIdx);
             let qStr = url.slice(qIdx + 1);
             let pairs = qStr.split("&");
             for (let i = 0; i < pairs.length; i = i + 1) {
                 let p = pairs[i];
                 let eq = p.indexOf("=");
-                if (eq !== null && eq > 0) {
+                if (eq != null && eq > 0) {
                     this.query[p.slice(0, eq)] = p.slice(eq + 1);
                 } else {
                     this.query[p] = "1";
@@ -205,7 +205,7 @@ let totalBytes = 0;
 
 for (let i = 0; i < reqs.length; i = i + 1) {
     let res = router.dispatch(reqs[i]);
-    if (res.status === 200 || res.status === 201) {
+    if (res.status == 200 || res.status == 201) {
         successCount = successCount + 1;
     }
     totalBytes = totalBytes + res.body.length;

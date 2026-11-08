@@ -9,7 +9,7 @@ async function rawGet(port: int, path: str): Task<str> {
     let text = "";
     while (true) {
         const chunk = await client.read(4096);
-        if (chunk === null) {
+        if (chunk == null) {
             break
         }
         text = text + (chunk as Bytes).toString();
@@ -27,14 +27,14 @@ await describe("295 the http server sends the response headers it was given", as
 
     await it("custom headers reach the wire", async () => {
         const raw = await rawGet(19940, "/custom");
-        expect(raw.indexOf("x-test: 1") !== null).toBeTruthy();
-        expect(raw.indexOf("location: /z") !== null).toBeTruthy();
+        expect(raw.indexOf("x-test: 1") != null).toBeTruthy();
+        expect(raw.indexOf("location: /z") != null).toBeTruthy();
     });
 
     await it("json() declares application/json and not text/plain", async () => {
         const raw = await rawGet(19940, "/json");
-        expect(raw.indexOf("content-type: application/json") !== null).toBeTruthy();
-        expect(raw.indexOf("text/plain") === null).toBeTruthy();
+        expect(raw.indexOf("content-type: application/json") != null).toBeTruthy();
+        expect(raw.indexOf("text/plain") == null).toBeTruthy();
     });
 
     server.close();

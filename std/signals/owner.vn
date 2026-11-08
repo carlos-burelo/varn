@@ -55,7 +55,7 @@ export function scope(body: () => void): Scope {
     const parent = _owner;
     const created = new Scope();
     created.run(body);
-    if (parent !== null) {
+    if (parent != null) {
         parent.onDispose(() => created.dispose());
     }
     return created;

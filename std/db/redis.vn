@@ -26,11 +26,11 @@ export class Redis {
 
     private async _fill(): Task<void> {
         let chunk = await this._stream.read(4096);
-        if (chunk === null) {
+        if (chunk == null) {
             throw new ClosedError("Redis: connection closed");
         }
         let bytes = chunk as Bytes;
-        if (bytes.length === 0) {
+        if (bytes.length == 0) {
             throw new ClosedError("Redis: connection closed");
         }
         let next = Bytes.alloc(this._buf.length + bytes.length);
@@ -42,7 +42,7 @@ export class Redis {
     private async _takeLine(): Task<str> {
         while (true) {
             for (let i = 0; i + 1 < this._buf.length; i = i + 1) {
-                if (this._buf.getByte(i) === 13 && this._buf.getByte(i + 1) === 10) {
+                if (this._buf.getByte(i) == 13 && this._buf.getByte(i + 1) == 10) {
                     let line = this._buf.slice(0, i).toString();
                     this._buf = this._buf.slice(i + 2, this._buf.length);
                     return line;
@@ -63,21 +63,21 @@ export class Redis {
 
     private async _readReply(): Task<RedisValue> {
         let line = await this._takeLine();
-        if (line.length === 0) {
+        if (line.length == 0) {
             throw new ProtocolError("Redis: empty reply");
         }
         let kind = line[0];
         let rest = line.slice(1);
-        if (kind === "+") {
+        if (kind == "+") {
             return rest;
         }
-        if (kind === "-") {
+        if (kind == "-") {
             throw new StdError("Redis: " + rest);
         }
-        if (kind === ":") {
+        if (kind == ":") {
             return int.parse(rest);
         }
-        if (kind === "$") {
+        if (kind == "$") {
             let len = int.parse(rest);
             if (len < 0) {
                 return null;
@@ -85,7 +85,7 @@ export class Redis {
             let data = await this._takeBytes(len);
             return data.toString();
         }
-        if (kind === "*") {
+        if (kind == "*") {
             let count = int.parse(rest);
             if (count < 0) {
                 return null;
@@ -111,14 +111,14 @@ export class Redis {
 
     async get(key: str): Task<str?> {
         let res = await this.command(["GET", key]);
-        if (res === null) {
+        if (res == null) {
             return null;
         }
         return res as str;
     }
 
     async set(key: str, value: str, exSeconds?: int): Task<void> {
-        if (exSeconds !== null) {
+        if (exSeconds != null) {
             await this.command(["SET", key, value, "EX", (exSeconds as int).toString()]);
         } else {
             await this.command(["SET", key, value]);

@@ -24,7 +24,7 @@ await describe("05 Arrays", async () => {
         const doubled = nums.map((n) => n * 2);
         expect(doubled.length).toBe(8);
         expect(doubled[0]).toBe(6);
-        const evens = nums.filter((n) => n % 2 === 0);
+        const evens = nums.filter((n) => n % 2 == 0);
         expect(evens.length).toBe(3);
         const sum = nums.reduce((acc, n) => acc + n, 0);
         expect(sum).toBe(31);
@@ -34,8 +34,8 @@ await describe("05 Arrays", async () => {
         expect(fi).toBe(5);
         expect(nums.some((n) => n > 8)).toBeTruthy();
         expect(!nums.some((n) => n > 100)).toBeTruthy();
-        expect([2, 4, 6].every((n) => n % 2 === 0)).toBeTruthy();
-        expect(![2, 4, 5].every((n) => n % 2 === 0)).toBeTruthy();
+        expect([2, 4, 6].every((n) => n % 2 == 0)).toBeTruthy();
+        expect(![2, 4, 5].every((n) => n % 2 == 0)).toBeTruthy();
     });
 
     await it("mutation and structure", () => {
@@ -74,8 +74,8 @@ await describe("05 Arrays", async () => {
         let explicitGeneric: Array<int> = [10, 20, 30];
         let explicitBracket: int[] = explicitGeneric;
         let crossGeneric: Array<int> = explicitBracket;
-        expect(explicitBracket.length === 3 && explicitBracket[1] === 20).toBeTruthy();
-        expect(crossGeneric.length === 3 && crossGeneric[2] === 30).toBeTruthy();
+        expect(explicitBracket.length == 3 && explicitBracket[1] == 20).toBeTruthy();
+        expect(crossGeneric.length == 3 && crossGeneric[2] == 30).toBeTruthy();
         let strGenericList: Array<str> = ["a", "b", "c"];
         let strBracketList: str[] = ["x", "y", "z"];
         expect(takeBracket(strGenericList)).toBe(3);

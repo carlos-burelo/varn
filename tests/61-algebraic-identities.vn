@@ -59,8 +59,8 @@ await describe("61 algebraic identities", async () => {
         // both rules to `int`.
         const inf: float = 1.0 / 0.0
         
-        expect(mulZeroF(inf) !== 0.0).toBeTruthy()
-        expect(selfSubF(inf) !== 0.0).toBeTruthy()
+        expect(mulZeroF(inf) != 0.0).toBeTruthy()
+        expect(selfSubF(inf) != 0.0).toBeTruthy()
         expect(mulZeroF(2.5)).toBe(0.0)
         expect(selfSubF(2.5)).toBe(0.0)
         expect(mixed(3)).toBe(3.0)

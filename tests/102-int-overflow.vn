@@ -37,7 +37,7 @@ await describe("102 int overflow", async () => {
         sink = decHot(i)
         i = i + 1
         }
-        expect(sink !== 0).toBeTruthy();
+        expect(sink != 0).toBeTruthy();
         expect(overflows(() => addHot(MAX, 1))).toBeTruthy();
         expect(overflows(() => subHot(MIN, 1))).toBeTruthy();
         expect(overflows(() => mulHot(MAX, 2))).toBeTruthy();

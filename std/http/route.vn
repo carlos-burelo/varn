@@ -17,8 +17,8 @@ export class Route {
     constructor(method: HttpMethod?, pattern: str, handler: Handler) {
         this.method = method;
         this.handler = handler;
-        this.isWildcard = pattern === "*";
-        this.isStatic = !this.isWildcard && pattern.indexOf(":") === null;
+        this.isWildcard = pattern == "*";
+        this.isStatic = !this.isWildcard && pattern.indexOf(":") == null;
         this.segments = [];
         this.paramNames = {};
 
@@ -37,7 +37,7 @@ export class Route {
     }
 
     accepts(method: HttpMethod): bool {
-        return this.method === null || this.method === method;
+        return this.method == null || this.method == method;
     }
 
     match(method: HttpMethod, pathSegments: str[]): { [key: str]: str }? {
@@ -49,7 +49,7 @@ export class Route {
             return {};
         }
 
-        if (this.segments.length !== pathSegments.length) {
+        if (this.segments.length != pathSegments.length) {
             return null;
         }
 
@@ -57,12 +57,12 @@ export class Route {
         for (let i = 0; i < this.segments.length; i = i + 1) {
             let seg = this.segments[i];
             let reqSeg = pathSegments[i];
-            if (seg === ":") {
+            if (seg == ":") {
                 let paramName = this.paramNames[i];
-                if (paramName !== null) {
+                if (paramName != null) {
                     params[paramName] = reqSeg;
                 }
-            } else if (seg !== reqSeg) {
+            } else if (seg != reqSeg) {
                 return null;
             }
         }

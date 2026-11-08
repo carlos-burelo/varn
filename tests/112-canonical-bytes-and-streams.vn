@@ -97,7 +97,7 @@ async function testTcpBinaryRoundtrip(): Task<void> {
         let original = Bytes.fromBytes([0x00, 0x01, 0xFF, 0xFE, 0x80, 0x7F, 0xAB, 0xCD]);
         await client.writeAll(original);
         let received = await client.read(1024);
-        expect(received !== null).toBeTruthy();
+        expect(received != null).toBeTruthy();
         let recBytes = received as Bytes;
         expect(recBytes.length).toBe(8);
         expect(recBytes[0]).toBe(0x00);

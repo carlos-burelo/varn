@@ -5,7 +5,7 @@ export class Source {
 
     refresh(): void {
         const refresher = this.refresher;
-        if (refresher !== null) {
+        if (refresher != null) {
             refresher();
         }
     }
@@ -40,7 +40,7 @@ export function track(source: Source): void {
         return;
     }
     const ob = currentObserver();
-    if (ob === null || source.observers.includes(ob)) {
+    if (ob == null || source.observers.includes(ob)) {
         return;
     }
     source.observers.push(ob);
@@ -161,7 +161,7 @@ function flush(): void {
                 try {
                     ob.run();
                 } catch (e) {
-                    if (failure === null) {
+                    if (failure == null) {
                         failure = e as Error;
                     }
                 }
@@ -170,7 +170,7 @@ function flush(): void {
     } finally {
         _flushing = false;
     }
-    if (failure !== null) {
+    if (failure != null) {
         throw failure;
     }
 }

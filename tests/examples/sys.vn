@@ -5,7 +5,7 @@ await describe("example std:sys", async () => {
     await it("reports the platform", () => {
         let os = platform();
         expect(os.length > 0).toBe(true);
-        expect(os === "windows" || os === "linux" || os === "macos").toBe(true);
+        expect(os == "windows" || os == "linux" || os == "macos").toBe(true);
     });
 
     await it("reports cwd and argv", () => {

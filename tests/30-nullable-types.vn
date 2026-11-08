@@ -4,8 +4,8 @@ function identity(x: int?): int? {
     return x;
 }
 function first(arr: int?[]?): int? {
-    if (arr === null) return null;
-    if (arr.length === 0) return null;
+    if (arr == null) return null;
+    if (arr.length == 0) return null;
     return arr[0];
 }
 function wrap(x: int): int[]? {
@@ -48,7 +48,7 @@ await describe("30 Nullable Types", async () => {
         expect(f[0]).toBe(1);
         expect(f[1]).toBe(null);
         expect(h).toBe(null);
-        expect(i !== null).toBeTruthy();
+        expect(i != null).toBeTruthy();
         expect(l[0][0]).toBe(1);
     });
 
@@ -58,8 +58,8 @@ await describe("30 Nullable Types", async () => {
         expect(first([])).toBe(null);
         expect(first([1, null, 3])).toBe(1);
         expect(wrap(-1)).toBe(null);
-        expect(wrap(5) !== null).toBeTruthy();
+        expect(wrap(5) != null).toBeTruthy();
         expect(matrix(false)).toBe(null);
-        expect(matrix(true) !== null).toBeTruthy();
+        expect(matrix(true) != null).toBeTruthy();
     });
 });

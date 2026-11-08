@@ -1,10 +1,10 @@
 import { describe, it, expect } from "std:test";
 
 class Boom extends Error { constructor(msg: str) { super(msg) } }
-function boom(x: int): int { if (x === 2) { throw new Boom("boom") } return x }
+function boom(x: int): int { if (x == 2) { throw new Boom("boom") } return x }
 
 function raisesBoom(f: () => void): bool {
-    try { f(); return false } catch (e) { return e instanceof Boom && e.message === "boom" }
+    try { f(); return false } catch (e) { return e instanceof Boom && e.message == "boom" }
 }
 
 const byKey: Map<int, int> = new Map()

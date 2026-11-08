@@ -33,7 +33,7 @@ await describe("example std:task", async () => {
 
     await it("races and settles task sets", async () => {
         let first = await Task.race([work(5), work(6)]);
-        expect(first === 10 || first === 12).toBe(true);
+        expect(first == 10 || first == 12).toBe(true);
         let all = await Task.all([work(1), work(2)]);
         expect(all.length).toBe(2);
         let settled = await Task.allSettled([work(1), work(2)]);
@@ -117,7 +117,7 @@ await describe("example std:task", async () => {
 
     await it("race returns the fastest settlement", async () => {
         let winner = await Task.race([work(5), work(1)]);
-        expect(winner === 10 || winner === 2).toBe(true);
+        expect(winner == 10 || winner == 2).toBe(true);
     });
 
     await it("race rejects when the fastest rejects", async () => {

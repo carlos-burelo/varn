@@ -15,12 +15,12 @@ function frame(first: int, payload: Bytes, masked: bool = true, lengthBytes: int
     const size = payload.length;
     let head: int[] = [first];
     const maskBit = masked ? 128 : 0;
-    if (lengthBytes === 8) {
+    if (lengthBytes == 8) {
         head.push(maskBit + 127);
         for (let shift = 7; shift >= 0; shift = shift - 1) {
             head.push(shift > 3 ? 0 : (size / (256 ** shift)) % 256);
         }
-    } else if (lengthBytes === 2) {
+    } else if (lengthBytes == 2) {
         head.push(maskBit + 126);
         head.push(size / 256);
         head.push(size % 256);
@@ -40,9 +40,9 @@ function frame(first: int, payload: Bytes, masked: bool = true, lengthBytes: int
 
 async function readUntilHeadEnd(conn: TcpStream): Task<str> {
     let text = "";
-    while (text.indexOf("\r\n\r\n") === null) {
+    while (text.indexOf("\r\n\r\n") == null) {
         const chunk = await conn.read(1024);
-        if (chunk === null) {
+        if (chunk == null) {
             return text
         }
         text = text + (chunk as Bytes).toString();

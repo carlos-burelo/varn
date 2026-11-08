@@ -48,7 +48,7 @@ await describe("example std:error", async () => {
     await it("errors chain their cause", () => {
         let cause = new ParseError("unexpected token", 3);
         let wrapped = new DecodeError("$.user.age", "age is not a number", cause);
-        expect(wrapped.cause === cause).toBe(true);
+        expect(wrapped.cause == cause).toBe(true);
         expect(wrapped.path).toBe("$.user.age");
         expect(wrapped instanceof ParseError).toBe(true);
     });
