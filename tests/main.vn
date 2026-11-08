@@ -332,6 +332,7 @@ import "./340-is-tests-identity.vn"
 import "./341-map-and-set-keys.vn"
 import "./342-record-optional-fields.vn"
 import "./343-extension-targets.vn"
+import "./344-collection-constructors.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

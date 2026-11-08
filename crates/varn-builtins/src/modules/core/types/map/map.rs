@@ -1,6 +1,6 @@
 use varn_macros::varn_contract;
 use varn_types::value::MapRef;
-use varn_types::{NativeCtx, NativeError, VmValue};
+use varn_types::{NativeCtx, NativeError, VmValue, VnArray};
 
 pub struct Map;
 
@@ -13,8 +13,26 @@ varn_contract! {
     class: "Map",
     contract: "src/modules/core/types/map/map.vn",
     impl Map {
-        fn constructor(ctx: &mut dyn NativeCtx, _this: VmValue) -> VmValue {
-            ctx.alloc_map(Vec::new())
+        fn constructor(ctx: &mut dyn NativeCtx, _this: VmValue, entries: Option<VnArray>) -> VmValue {
+            let map = ctx.alloc_map(Vec::new());
+            let (Some(entries), Some(target)) = (entries, ctx.as_map(map)) else {
+                return map;
+            };
+            for index in 0..entries.len(ctx) {
+                let Some(entry) = entries.get(ctx, index) else {
+                    continue;
+                };
+                let (Some(key), Some(value)) = (ctx.array_get(entry, 0), ctx.array_get(entry, 1)) else {
+                    continue;
+                };
+                let Ok(key) = ctx.map_key(key) else {
+                    continue;
+                };
+                target.write().insert(key, value);
+                ctx.collection_write_barrier(map, key.0);
+                ctx.collection_write_barrier(map, value);
+            }
+            map
         }
 
         fn get(ctx: &mut dyn NativeCtx, this: VmValue, key: VmValue) -> Result<Option<VmValue>, NativeError> {

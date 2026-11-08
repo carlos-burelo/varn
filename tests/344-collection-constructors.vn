@@ -1,0 +1,37 @@
+import { describe, it, expect } from "std:test";
+
+await describe("344 collection constructors", async () => {
+    await it("a Map is built from entries and the last duplicate wins", () => {
+        const letters = new Map([("a", 1), ("b", 2), ("a", 3)])
+        const typed: Map<str, int> = letters
+        expect(typed.size).toBe(2)
+        expect(typed.get("a")).toBe(3)
+        expect(typed.get("b")).toBe(2)
+    })
+
+    await it("a Map keeps the insertion order of its entries", () => {
+        const ordered = new Map([("z", 1), ("a", 2), ("m", 3)])
+        expect(ordered.keys().join(",")).toBe("z,a,m")
+    })
+
+    await it("a Set is built from items without duplicates", () => {
+        const numbers = new Set([3, 1, 3, 2, 1])
+        const typed: Set<int> = numbers
+        expect(typed.size).toBe(3)
+        expect(typed.has(2)).toBe(true)
+        expect(typed.values().join(",")).toBe("3,1,2")
+    })
+
+    await it("a structural key given in the entries is found by value", () => {
+        const grid = new Map([((1, 2), "a"), ((3, 4), "b")])
+        expect(grid.get((3, 4))).toBe("b")
+        expect(grid.get((9, 9))).toBe(null)
+    })
+
+    await it("the constructors without arguments stay empty", () => {
+        const none = new Map<str, int>()
+        const nothing = new Set<int>()
+        expect(none.size).toBe(0)
+        expect(nothing.size).toBe(0)
+    })
+})

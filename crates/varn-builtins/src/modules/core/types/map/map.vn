@@ -4,7 +4,7 @@ import { Hashable } from "core:types/hashable";
  * Hash map from keys `K` to values `V`.
  */
 export declare class Map<K extends Hashable, V> {
-    constructor();
+    constructor(entries?: (K, V)[]);
     @throws(TypeError) get(key: K): V?;
     @throws(TypeError) set(key: K, value: V): void;
     @throws(TypeError) has(key: K): bool;

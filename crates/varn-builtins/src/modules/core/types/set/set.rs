@@ -1,6 +1,6 @@
 use varn_macros::varn_contract;
 use varn_types::value::SetRef;
-use varn_types::{NativeCtx, NativeError, VmValue};
+use varn_types::{NativeCtx, NativeError, VmValue, VnArray};
 
 pub struct Set;
 
@@ -13,8 +13,22 @@ varn_contract! {
     class: "Set",
     contract: "src/modules/core/types/set/set.vn",
     impl Set {
-        fn constructor(ctx: &mut dyn NativeCtx, _this: VmValue) -> VmValue {
-            ctx.alloc_set(Vec::new())
+        fn constructor(ctx: &mut dyn NativeCtx, _this: VmValue, items: Option<VnArray>) -> VmValue {
+            let set = ctx.alloc_set(Vec::new());
+            let (Some(items), Some(target)) = (items, ctx.as_set(set)) else {
+                return set;
+            };
+            for index in 0..items.len(ctx) {
+                let Some(item) = items.get(ctx, index) else {
+                    continue;
+                };
+                let Ok(key) = ctx.map_key(item) else {
+                    continue;
+                };
+                target.write().insert(key);
+                ctx.collection_write_barrier(set, key.0);
+            }
+            set
         }
 
         fn add(ctx: &mut dyn NativeCtx, this: VmValue, value: VmValue) -> Result<(), NativeError> {

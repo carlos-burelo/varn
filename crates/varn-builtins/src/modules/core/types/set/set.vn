@@ -4,7 +4,7 @@ import { Hashable } from "core:types/hashable";
  * Hash set of distinct values `T`.
  */
 export declare class Set<T extends Hashable> {
-    constructor();
+    constructor(items?: T[]);
     @throws(TypeError) add(value: T): void;
     @throws(TypeError) has(value: T): bool;
     @throws(TypeError) delete(value: T): bool;
