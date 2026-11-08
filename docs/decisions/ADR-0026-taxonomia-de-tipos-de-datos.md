@@ -10,7 +10,7 @@ El sistema de tipos conflate naturalezas distintas bajo un mismo símbolo, y cad
 - El record es una bolsa mutable con identidad; la tupla y el struct son valores inmutables. Tres productos con tres semánticas.
 - `Map<float,V>`, `Map<{x:int},V>` y `Map<Clase,V>` compilan sin restricción de clave; la VM decide en runtime cómo hashear (`varn-vm/src/exec/hashable_keys.rs`): una decisión dinámica sobre un hecho estático (Leyes 6 y 17).
 - Los accesos a miembros de records e interfaces van por nombre (`Resolution::ByName`, `DynReason::{Shape, Interface}`): medido 2,5× más lento que un slot fijo.
-- La invariancia se aproxima con compatibilidad en ambos sentidos (`arrays::same_element`), que falla cuando dos tipos son asignables en una sola dirección.
+- La invariancia se decide en ocho sitios con `arrays::same_element` en lugar de usar una única relación de equivalencia (§4).
 - Hay dos o tres formas de decir lo mismo: `==` y `===`, `switch` y `match`, `instanceof` e `is`, `{[k:str]:V}` y `Map<str,V>`, spread con sobrescritura y `with`.
 
 ## 2. Principio
@@ -48,7 +48,7 @@ Lecciones de otros lenguajes que sostienen la decisión:
 
 Más los primitivos (`int`, `float`, `decimal`, `bigint`, `bool`, `char`, `str`, `null`).
 
-Todos los productos comparten semántica: inmutables, `==` y hash estructurales, `with`, desestructuración, patrón en `match`. Solo difieren en cómo se nombran:
+Todos los productos comparten semántica: inmutables, `with`, desestructuración, patrón en `match`. Son **tipo valor**, con `==` estructural, solo si todos sus miembros lo son: un primitivo, o una tupla, record, struct o enum cuyos miembros (payloads) son tipo valor. Un producto que contiene un array, un Map, un Set o una clase no es tipo valor, y `==` sobre él es `VN3010`. Solo difieren en cómo se nombran:
 
 - **Tupla**: posiciones, anónima, estructural por aridad y elementos.
 - **Record**: nombres de campo, anónimo, **estructural y cerrado**. Dos records son el mismo tipo si tienen exactamente los mismos campos con tipos idénticos. Sin subtipado por ancho ni por profundidad. Un record no tiene métodos propios; el comportamiento va en `extension`.
@@ -56,7 +56,7 @@ Todos los productos comparten semántica: inmutables, `==` y hash estructurales,
 
 Layout canónico de record y tupla: campos en orden alfabético / posicional (Ley 4), **decidido en el backend** al fijar la forma (etapa 6), no en el id del tipo: ordenar los campos en el tipo cambiaba el texto de los mensajes. La comprobación de tipos de un record es independiente del orden. Todo record con los mismos campos comparte forma y offsets. Al ser inmutable, su representación (inline o en heap) es una decisión del compilador y se comparte sin copiar.
 
-Un record es asignable a otro que **solo añade campos opcionales** (`{ retries: 3 }` donde se pide `{ retries: int; verbose?: bool }`). No se pierde información; el TIR deberá insertar la copia a la forma canónica del destino (obligación de la etapa 6).
+Un **literal** de record puede omitir los campos opcionales del tipo esperado (`{ retries: 3 }` donde se pide `{ retries: int; verbose?: bool }`). Es una regla del literal, que se comprueba contra el tipo esperado, y no de la asignabilidad entre records: dos tipos record son asignables solo si tienen los mismos campos con la misma opcionalidad y tipos equivalentes, en cualquier orden. Una variable `{ retries: int }` no pasa a `{ retries: int; verbose?: bool }`. No hay conversión ni copia implícita (§4.3, Ley 17).
 
 `x?: T` en un record es un campo **omisible en el literal** (vale `null`). `x: T?` es un campo obligatorio que puede valer `null`. Son dos obligaciones distintas, no dos formas de lo mismo.
 
@@ -87,15 +87,16 @@ Capacidad estática calculada una sola vez por el checker y transportada por el 
 
 | Hashable | No Hashable |
 |---|---|
-| `int`, `bool`, `char`, `str`, `bigint`, `decimal`, enums | `float` (NaN ≠ NaN, `0.0` ≡ `-0.0`) |
-| tuplas, records y structs cuyos miembros son Hashable | arrays, Map, Set (contenido mutable) |
+| `int`, `bool`, `char`, `str`, `bigint`, `decimal` | `float` (NaN ≠ NaN, `0.0` ≡ `-0.0`) |
+| tuplas, structs y enums cuyos miembros (payloads) son Hashable | arrays, Map, Set (contenido mutable) |
 | **clases, por identidad** | funciones |
+| | records, hasta que la etapa 6 les dé forma canónica |
 
-Una clase como clave es segura porque la identidad no cambia al mutar el objeto. `Map<float, V>`, `Map<T[], V>` y similares son un error de compilación con diagnóstico que indica la alternativa. No hay `IdentityMap`.
+Un enum es Hashable solo si lo son todos los payloads de todas sus variantes: `Result<int, str>` lo es y `Result<float, str>` no. Una clase como clave es segura porque la identidad no cambia al mutar el objeto, y su igualdad es `sameValue`, la misma identidad con la que es clave; sus métodos `hash` y `equals` no intervienen. `Map<float, V>`, `Map<T[], V>` y similares son un error de compilación (`VN3037`) con diagnóstico que indica la alternativa. El código genérico escribe `K extends Hashable`. No hay `IdentityMap`.
 
 ## 4. Relaciones entre tipos (una por pregunta)
 
-1. **Equivalencia**: dos tipos son equivalentes si cada uno es asignable al otro. Se usa para invariancia (`same_element`). Al ser record e interfaz tipos distintos, la equivalencia ya no confunde un record con una interfaz del mismo contenido; no hace falta una "identidad" aparte.
+1. **Equivalencia**: dos tipos son equivalentes si cada uno es asignable al otro. Es la única relación que decide la invariancia, y se define una vez. Con records cerrados y sin conversiones implícitas coincide con la identidad de tipo. Al ser record e interfaz tipos distintos, no confunde un record con una interfaz del mismo contenido.
 2. **Subtipado / asignabilidad**: reglas por naturaleza (§3). Una clase, struct o interfaz **no** es asignable a un record; un record sí lo es a una interfaz que cumpla.
 3. **Conversión**: solo explícita (`as`). `dynamic` solo sale con `as T` y comprobación en runtime. Sin coerciones implícitas (Ley 17).
 
@@ -228,7 +229,9 @@ import { a } from "std:test"    export    namespace N { }
 | mutación de campo de record | `with`, o una `class` si hace falta estado mutable |
 | `TypeKind::Object` unificado | `Record` e `Interface`, cada uno con su payload |
 | `DynReason::{Shape, Interface}`, `Resolution::ByName` para estos casos | forma canónica y selector |
-| `arrays::same_element` como mecanismo de invariancia | identidad de tipo |
+| `arrays::same_element` repetido en ocho sitios | una única función de equivalencia (§4.1) |
+| `Hashable { hash(): int }` de `core:capabilities` y el despacho de `hash`/`equals` en la VM | `Hashable` calculado por el compilador (§3.4) |
+| un record asignable a otro por añadir campos opcionales | omisión de campos opcionales solo en el literal (§3.1) |
 | hashing dinámico por inspección en la VM | `Hashable` estático |
 | aceptación clase / struct / interfaz → record | error de compilación |
 
@@ -261,4 +264,4 @@ import { a } from "std:test"    export    namespace N { }
 
 - Que `extension … on { x: int }` sea legal sobre un record no se ha verificado en el parser actual.
 - Que eliminar `switch`, `instanceof` y `typeof` valor no pierda ningún uso que `match` e `is` no cubran.
-- `==` sobre clases: hoy es `VN3010` (se usa `sameValue`). Se mantiene; se reconsidera si choca con `Hashable` por identidad.
+- `==` sobre clases es `VN3010`, y queda así: la igualdad de una clase es `sameValue` (identidad), la misma que la hace clave. Una igualdad de valor propia de una clase es un método (`Equatable<T>` de `core:capabilities`), nunca `==`.
