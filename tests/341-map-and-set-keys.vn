@@ -2,6 +2,7 @@ import { describe, it, expect } from "std:test";
 
 class Account { id: int = 0 }
 enum Level { Low, High }
+enum Tagged { Id(n: int), Name(s: str) }
 struct Point { x: int; y: int }
 struct Labeled<T> { label: str; value: T }
 
@@ -48,6 +49,20 @@ await describe("341 map and set keys", async () => {
         expect(byTuple.get((1, "a"))).toBe(10)
         expect(byStruct.get(new Point(1, 2))).toBe(30)
         expect(byLabeled.size).toBe(1)
+    })
+
+    await it("enums whose payloads are keys are keys", () => {
+        const byTag = new Map<Tagged, int>()
+        byTag.set(Tagged.Id(1), 10)
+        byTag.set(Tagged.Name("a"), 20)
+        expect(byTag.get(Tagged.Id(1))).toBe(10)
+        expect(byTag.get(Tagged.Name("a"))).toBe(20)
+        expect(byTag.get(Tagged.Id(2))).toBe(null)
+        const outcomes = new Set<Result<int, str>>()
+        outcomes.add(Result.Ok(1))
+        outcomes.add(Result.Ok(1))
+        outcomes.add(Result.Err("x"))
+        expect(outcomes.size).toBe(2)
     })
 
     await it("a generic key that declares Hashable is a key", () => {

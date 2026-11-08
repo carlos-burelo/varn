@@ -1,7 +1,7 @@
 use super::resolve::resolve_atom;
 use crate::bind::BindView;
 use crate::symbol::SymbolKind;
-use crate::types::{CheckerTyTable, ClassMemberKind, TyListId, Type, TypeContext};
+use crate::types::{CheckerTyTable, ClassMemberInfo, ClassMemberKind, TyListId, Type, TypeContext};
 use rustc_hash::FxHashSet;
 use varn_core::{Atom, LangConstraint, LangPrimitive, TypeKind};
 
@@ -38,21 +38,22 @@ const fn primitive_is_hashable(primitive: LangPrimitive) -> bool {
 fn hashable_in(
     ty: &Type,
     bind: Option<&BindView>,
-    visiting: &mut FxHashSet<Type>,
+    visiting: &mut FxHashSet<(usize, Type)>,
     table: &CheckerTyTable,
 ) -> bool {
-    if !visiting.insert(*ty) {
+    let visit = (std::ptr::from_ref(table) as usize, *ty);
+    if !visiting.insert(visit) {
         return true;
     }
     let result = hashable_kind(ty, bind, visiting, table);
-    visiting.remove(ty);
+    visiting.remove(&visit);
     result
 }
 
 fn all_hashable(
     list: TyListId,
     bind: Option<&BindView>,
-    visiting: &mut FxHashSet<Type>,
+    visiting: &mut FxHashSet<(usize, Type)>,
     table: &CheckerTyTable,
 ) -> bool {
     table
@@ -64,13 +65,21 @@ fn all_hashable(
 fn hashable_kind(
     ty: &Type,
     bind: Option<&BindView>,
-    visiting: &mut FxHashSet<Type>,
+    visiting: &mut FxHashSet<(usize, Type)>,
     table: &CheckerTyTable,
 ) -> bool {
     match table.get(ty.0) {
         TypeKind::Primitive(primitive) => primitive_is_hashable(primitive),
         TypeKind::Literal(literal) => primitive_is_hashable(literal.base()),
-        TypeKind::TemplateLiteral(_) | TypeKind::EnumVariant { .. } => true,
+        TypeKind::TemplateLiteral(_) => true,
+        TypeKind::EnumVariant {
+            type_args,
+            payload_ty,
+            ..
+        } => {
+            all_hashable(type_args, bind, visiting, table)
+                && hashable_in(&Type::resolved(payload_ty), bind, visiting, table)
+        }
         TypeKind::Tuple(list) | TypeKind::Union(list) | TypeKind::Intersection(list) => {
             all_hashable(list, bind, visiting, table)
         }
@@ -105,7 +114,7 @@ fn nominal_is_hashable(
     origin: Option<Atom>,
     args: &[Type],
     bind: Option<&BindView>,
-    visiting: &mut FxHashSet<Type>,
+    visiting: &mut FxHashSet<(usize, Type)>,
     table: &CheckerTyTable,
 ) -> bool {
     if varn_core::BuiltinType::identify(name, origin).is_some()
@@ -128,35 +137,69 @@ fn nominal_is_hashable(
                 || hashable_in(&bound, Some(bind), visiting, table)
         });
     }
-    if bind.get_enum_members(&name_str, origin_str).is_some() {
-        return true;
+    let owner = bind.foreign(origin_str);
+    let owner_view = owner
+        .as_ref()
+        .map(|owning_bind| BindView::new(owning_bind, bind.resolver));
+    let member_view = owner_view.as_ref().unwrap_or(bind);
+    let member_table: &CheckerTyTable = owner
+        .as_ref()
+        .map_or(table, |owning_bind| &*owning_bind.ty_table);
+
+    let member_types: Vec<Type> =
+        if let Some(variants) = member_view.get_enum_members(&name_str, origin_str) {
+            variants
+                .iter()
+                .filter(|variant| variant.kind == ClassMemberKind::Property)
+                .flat_map(|variant| variant_payload_types(variant, member_table))
+                .collect()
+        } else if let Some(members) = member_view.get_class_members(&name_str, origin_str) {
+            let is_struct = member_view
+                .class_entry(&name_str, origin_str)
+                .is_some_and(|entry| entry.is_struct);
+            if !is_struct {
+                return true;
+            }
+            members
+                .iter()
+                .filter(|member| !member.is_static && member.kind == ClassMemberKind::Property)
+                .map(|member| member.ty)
+                .collect()
+        } else {
+            return member_view
+                .get_interface_members(&name_str, origin_str)
+                .is_none();
+        };
+    if !args
+        .iter()
+        .all(|arg| hashable_in(arg, Some(bind), visiting, table))
+    {
+        return false;
     }
-    let Some(members) = bind.get_class_members(&name_str, origin_str) else {
-        return bind.get_interface_members(&name_str, origin_str).is_none();
-    };
-    let is_struct = bind
-        .class_entry(&name_str, origin_str)
-        .is_some_and(|entry| entry.is_struct);
-    if !is_struct {
-        return true;
-    }
-    let params = bind
+    let params = member_view
         .type_param_names(&name_str, origin_str)
         .unwrap_or_default();
     let names_a_parameter = |member_ty: &Type| {
-        let TypeKind::Named(member_name, None) = table.get(member_ty.0) else {
+        let TypeKind::Named(member_name, None) = member_table.get(member_ty.0) else {
             return false;
         };
-        resolve_atom(Some(bind), member_name)
+        resolve_atom(Some(member_view), member_name)
             .is_some_and(|text| params.iter().any(|param| &**param == text.as_str()))
     };
-    args.iter()
-        .all(|arg| hashable_in(arg, Some(bind), visiting, table))
-        && members
-            .iter()
-            .filter(|member| !member.is_static && member.kind == ClassMemberKind::Property)
-            .all(|member| {
-                names_a_parameter(&member.ty)
-                    || hashable_in(&member.ty, Some(bind), visiting, table)
-            })
+    member_types.iter().all(|member_ty| {
+        names_a_parameter(member_ty)
+            || hashable_in(member_ty, Some(member_view), visiting, member_table)
+    })
+}
+
+fn variant_payload_types(variant: &ClassMemberInfo, table: &CheckerTyTable) -> Vec<Type> {
+    let TypeKind::Fn(constructor) = table.get(variant.ty.0) else {
+        return Vec::new();
+    };
+    table
+        .get_function(constructor)
+        .params
+        .iter()
+        .map(|param| Type::resolved(param.ty))
+        .collect()
 }

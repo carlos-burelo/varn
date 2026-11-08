@@ -87,7 +87,7 @@ impl<'r> BindView<'r> {
         )
     }
 
-    fn foreign(&self, origin: Option<&str>) -> Option<Arc<BindResult>> {
+    pub(crate) fn foreign(&self, origin: Option<&str>) -> Option<Arc<BindResult>> {
         let origin = origin?;
         if origin == self.bind.source_file.as_ref() {
             return None;
