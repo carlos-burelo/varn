@@ -165,7 +165,7 @@ function benchEquality(): number {
     while (r < 200) {
         let j = 0;
         while (j < 1000) {
-            if (items[j] == "key50") {
+            if (items[j] === "key50") {
                 count = count + 1;
             }
             j = j + 1;

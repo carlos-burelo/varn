@@ -2,7 +2,7 @@
 
 function parseCSV(text: string): any[] {
     const lines = text.split("\n");
-    if (lines.length == 0) return [];
+    if (lines.length === 0) return [];
     
     const headerLine = lines[0];
     if (!headerLine) return [];
@@ -17,15 +17,15 @@ function parseCSV(text: string): any[] {
         for (let j = 0; j < headers.length; j++) {
             const h = headers[j];
             const val = cols[j];
-            if (val == undefined) {
+            if (val === undefined) {
                 obj[h] = null;
-            } else if (val == "true") {
+            } else if (val === "true") {
                 obj[h] = true;
-            } else if (val == "false") {
+            } else if (val === "false") {
                 obj[h] = false;
             } else {
                 const num = Number(val);
-                if (!isNaN(num) && val.trim() != "") {
+                if (!isNaN(num) && val.trim() !== "") {
                     obj[h] = num;
                 } else {
                     obj[h] = val;
@@ -38,7 +38,7 @@ function parseCSV(text: string): any[] {
 }
 
 function stringifyCSV(rows: any[]): string {
-    if (rows.length == 0) return "";
+    if (rows.length === 0) return "";
     const headers = Object.keys(rows[0]);
     const lines: string[] = [headers.join(",")];
     
@@ -48,7 +48,7 @@ function stringifyCSV(rows: any[]): string {
         for (let j = 0; j < headers.length; j++) {
             const h = headers[j];
             const v = row[h];
-            cells.push(v == null || v == undefined ? "" : String(v));
+            cells.push(v === null || v === undefined ? "" : String(v));
         }
         lines.push(cells.join(","));
     }
@@ -80,7 +80,7 @@ let totalRevenue = 0.0;
 
 for (let i = 0; i < parsed.length; i++) {
     const row = parsed[i];
-    if (row.status == "COMPLETED") {
+    if (row.status === "COMPLETED") {
         const lineTotal = Number(row.quantity) * Number(row.unitPrice);
         totalRevenue += lineTotal;
 
