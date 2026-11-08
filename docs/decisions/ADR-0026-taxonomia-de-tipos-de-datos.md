@@ -1,6 +1,6 @@
 # ADR-0026 — Taxonomía de los tipos de datos
 
-Estado: APROBADO EN DISEÑO (2026-11-07). Implementación pendiente, por etapas (§8).
+Estado: APROBADO EN DISEÑO (2026-11-07). Etapas 1 y 2 implementadas; 3 a 8 pendientes (§8).
 
 ## 1. Problema
 
@@ -54,7 +54,9 @@ Todos los productos comparten semántica: inmutables, `==` y hash estructurales,
 - **Record**: nombres de campo, anónimo, **estructural y cerrado**. Dos records son el mismo tipo si tienen exactamente los mismos campos con tipos idénticos. Sin subtipado por ancho ni por profundidad. Un record no tiene métodos propios; el comportamiento va en `extension`.
 - **Struct**: nombrado, nominal, puede tener métodos, genéricos e `implements`.
 
-Layout canónico de record y tupla: campos en orden alfabético / posicional (Ley 4). Todo record con los mismos campos comparte forma y offsets. Al ser inmutable, su representación (inline o en heap) es una decisión del compilador y se comparte sin copiar.
+Layout canónico de record y tupla: campos en orden alfabético / posicional (Ley 4), **decidido en el backend** al fijar la forma (etapa 6), no en el id del tipo: ordenar los campos en el tipo cambiaba el texto de los mensajes. La comprobación de tipos de un record es independiente del orden. Todo record con los mismos campos comparte forma y offsets. Al ser inmutable, su representación (inline o en heap) es una decisión del compilador y se comparte sin copiar.
+
+Un record es asignable a otro que **solo añade campos opcionales** (`{ retries: 3 }` donde se pide `{ retries: int; verbose?: bool }`). No se pierde información; el TIR deberá insertar la copia a la forma canónica del destino (obligación de la etapa 6).
 
 `x?: T` en un record es un campo **omisible en el literal** (vale `null`). `x: T?` es un campo obligatorio que puede valer `null`. Son dos obligaciones distintas, no dos formas de lo mismo.
 
@@ -72,6 +74,8 @@ Vistas de solo lectura (`readonly T[]`, `ReadonlyMap<K,V>`, `ReadonlySet<T>`): c
 ### 3.3 Contrato
 
 **Interfaz**: contrato estructural, sin instancias. La satisfacen clases, structs y records con los miembros pedidos, sin `implements` (`implements` queda como comprobación opcional en la declaración). Una interfaz genérica instanciada **sigue siendo interfaz**.
+
+Una propiedad de interfaz es de **solo lectura salvo que se declare `mut`**. Es un contrato de lo que el consumidor puede hacer: sin `mut`, un miembro más estrecho en el implementador (un campo `Dog` donde la interfaz pide `Animal`) es seguro y se acepta (covarianza); con `mut` el consumidor puede escribir, y la propiedad es invariante. `readonly` dentro de una `interface` es un error; `mut` sobre un método también.
 
 Acceso a un miembro de interfaz: selector estable (hash de nombre y firma), tabla por clase y caché en línea. La lectura sale tipada, porque el tipo del miembro es el mismo para todo implementador.
 
@@ -91,13 +95,15 @@ Una clase como clave es segura porque la identidad no cambia al mutar el objeto.
 
 ## 4. Relaciones entre tipos (una por pregunta)
 
-1. **Identidad**: igualdad del id canónico del tipo. Se usa para invariancia. Reemplaza a `same_element`.
+1. **Equivalencia**: dos tipos son equivalentes si cada uno es asignable al otro. Se usa para invariancia (`same_element`). Al ser record e interfaz tipos distintos, la equivalencia ya no confunde un record con una interfaz del mismo contenido; no hace falta una "identidad" aparte.
 2. **Subtipado / asignabilidad**: reglas por naturaleza (§3). Una clase, struct o interfaz **no** es asignable a un record; un record sí lo es a una interfaz que cumpla.
 3. **Conversión**: solo explícita (`as`). `dynamic` solo sale con `as T` y comprobación en runtime. Sin coerciones implícitas (Ley 17).
 
 Un literal se **comprueba contra el tipo esperado** (propagación bidireccional) en lugar de inferirse y compararse después.
 
-Varianza **declarada** en el parámetro de tipo (`out T`, `in T`) y comprobada en la definición.
+Varianza **declarada** en el parámetro de tipo (`out T`, `in T`); sin anotación el parámetro es **invariante**. El binder comprueba cada declaración contra el uso real (`VN4118`); un argumento genérico o una clase base cuenta con la varianza declarada de su posición. La varianza ya no se infiere del cuerpo.
+
+Una **construcción de variante** de un enum (`Opt.None`) cuyos argumentos de tipo no se pueden resolver (`never`) toma esos argumentos del tipo esperado del mismo enum; un valor ya guardado no se ensancha.
 
 Los productores de records (literales, `CONFORM`/`DECODE` del borde dinámico, natives con retorno record) entregan siempre la forma canónica.
 
@@ -179,7 +185,8 @@ for (const e of s) { ... }
 
 ### 5.5 Contratos y extensiones
 ```
-interface Named { readonly name: str }
+interface Named { name: str }                                         ✎ solo lectura por defecto
+interface Slot { mut name: str }                                    ✚ escribible a través de la interfaz
 interface Printable { print(): str }
 interface Source<out T> { next(): T? }                              ✚
 interface Sink<in T> { put(x: T): void }                            ✚
@@ -233,8 +240,8 @@ import { a } from "std:test"    export    namespace N { }
 
 ## 8. Plan por etapas (cada una verde en `tests/main.vn`, un commit atómico por cambio)
 
-1. **Cimiento de tipos** (`varn-core`, `varn-sem`): `Record` e `Interface` como variantes con payload propio; la expansión genérica de una interfaz conserva la naturaleza; identidad canónica por naturaleza.
-2. **Reglas del checker**: asignabilidad de §3 y §4; literal contra el tipo esperado; `same_element` → identidad; varianza `out`/`in`. Un test negativo por cada prohibición. Arreglar `std` y tests rotos (Ley 18).
+1. **HECHA** (`562fabc7`). **Cimiento de tipos**: `Record` e `Interface` como variantes; la expansión genérica de una interfaz conserva la naturaleza.
+2. **HECHA** (`6ffc2d08`..`56af75d0`). **Reglas del checker**: asignabilidad de §3 y §4; tipado esperado de `??`/`||` y de variantes; propiedades de interfaz de solo lectura con `mut`; varianza `out`/`in` declarada (`VN4118`). Un test negativo por cada prohibición; `std` y tests adaptados.
 3. **Record inmutable**: error al mutar un campo de record; `with` sobre record; spread sin sobrescritura; separadores en tipos; migración de `std` y tests.
 4. **Eliminaciones léxicas**: `===`/`!==`, `switch`, `instanceof`, `typeof` como valor, dict `{[k:str]:V}` → `Map<str,V>`. Primero verificar en el corpus que `match` e `is` cubren todo uso.
 5. **Hashable estático** para Map y Set; borrar el hashing dinámico de la VM; `new Map(entradas)` / `new Set(elementos)`; `readonly T[]` y las vistas.
