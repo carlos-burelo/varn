@@ -119,6 +119,7 @@ pub static KEYWORDS: &[KwEntry] = &[
     kw(TokenKind::Override),
     kw(TokenKind::Readonly),
     kw(TokenKind::Mut),
+    kw(TokenKind::Out),
     kw(TokenKind::Declare),
     kw(TokenKind::Native),
     kw(TokenKind::Extends),

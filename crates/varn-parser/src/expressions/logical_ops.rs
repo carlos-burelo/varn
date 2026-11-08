@@ -142,6 +142,7 @@ pub(crate) fn token_to_logical_op(kind: TokenKind) -> Option<LogicalOp> {
         | TokenKind::Override
         | TokenKind::Readonly
         | TokenKind::Mut
+        | TokenKind::Out
         | TokenKind::Declare
         | TokenKind::Native
         | TokenKind::Extends

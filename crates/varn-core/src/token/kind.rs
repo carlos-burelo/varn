@@ -171,11 +171,13 @@ pub enum TokenKind {
     RawStr = 160,
 
     Mut = 161,
+
+    Out = 162,
 }
 
 impl TokenKind {
     pub fn from_u32(v: u32) -> Self {
-        if v <= 161 {
+        if v <= 162 {
             unsafe { std::mem::transmute::<u32, TokenKind>(v) }
         } else {
             TokenKind::Dynamic

@@ -232,6 +232,7 @@ pub fn parse_enum_decl(s: &mut TokenStream) -> PResult<EnumDecl> {
                     | TokenKind::Override
                     | TokenKind::Readonly
                     | TokenKind::Mut
+                    | TokenKind::Out
                     | TokenKind::Declare
                     | TokenKind::Native
                     | TokenKind::Extends

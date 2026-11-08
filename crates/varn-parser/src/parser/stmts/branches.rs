@@ -227,6 +227,7 @@ pub(super) fn parse_for_stmt(s: &mut TokenStream) -> PResult<StmtId> {
             | TokenKind::Override
             | TokenKind::Readonly
             | TokenKind::Mut
+            | TokenKind::Out
             | TokenKind::Declare
             | TokenKind::Native
             | TokenKind::Extends

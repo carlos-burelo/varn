@@ -36,6 +36,7 @@ impl<'r> super::super::Binder<'r> {
         ));
         sym.doc = e.doc.as_ref().map(|s| self.intern_local(s.as_str()));
         sym.type_params = e.type_params.iter().map(|t| t.name).collect();
+        sym.type_param_variances = e.type_params.iter().map(|t| t.variance).collect();
         sym.type_param_constraints = e
             .type_params
             .iter()

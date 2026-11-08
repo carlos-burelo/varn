@@ -298,6 +298,7 @@ impl Parser {
                 | TokenKind::Override
                 | TokenKind::Readonly
                 | TokenKind::Mut
+                | TokenKind::Out
                 | TokenKind::Declare
                 | TokenKind::Native
                 | TokenKind::Extends

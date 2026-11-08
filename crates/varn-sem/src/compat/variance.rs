@@ -22,17 +22,18 @@ fn flip(p: Pol) -> Pol {
     }
 }
 
-#[derive(Clone, Copy, Default)]
-struct Uses {
-    ins: bool,
-    outs: bool,
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+pub struct ParamUses {
+    pub ins: bool,
+    pub outs: bool,
 }
 
 struct Ctx<'a> {
     params: &'a [Arc<str>],
-    uses: Vec<Uses>,
+    uses: Vec<ParamUses>,
     table: &'a CheckerTyTable,
     interner: &'a AtomInterner,
+    declared: &'a rustc_hash::FxHashMap<Arc<str>, Vec<Variance>>,
 }
 
 fn resolve_name(ctx: &Ctx, atom: Atom) -> Option<String> {
@@ -87,9 +88,15 @@ fn walk(ctx: &mut Ctx, id: crate::types::CheckerTyId, pol: Pol, shadow: &[String
                 walk(ctx, *id, pol, shadow);
             }
         }
-        TypeKind::Generic(_, args, _) => {
-            for id in table.get_list(args) {
-                walk_both(ctx, *id, shadow);
+        TypeKind::Generic(name, args, _) => {
+            let positions =
+                resolve_name(ctx, name).and_then(|n| ctx.declared.get(n.as_str()).cloned());
+            for (i, id) in table.get_list(args).iter().enumerate() {
+                match positions.as_ref().and_then(|list| list.get(i)) {
+                    Some(Variance::Covariant) => walk(ctx, *id, pol, shadow),
+                    Some(Variance::Contravariant) => walk(ctx, *id, flip(pol), shadow),
+                    Some(Variance::Invariant) | None => walk_both(ctx, *id, shadow),
+                }
             }
         }
         TypeKind::Record(mid) | TypeKind::Interface(mid) => {
@@ -176,15 +183,17 @@ fn walk(ctx: &mut Ctx, id: crate::types::CheckerTyId, pol: Pol, shadow: &[String
 pub fn measure_params(
     params: &[Arc<str>],
     members: &[ClassMemberInfo],
-    bases: &[Type],
+    bases: &[(Type, Variance)],
     table: &CheckerTyTable,
     interner: &AtomInterner,
-) -> Vec<Variance> {
+    declared: &rustc_hash::FxHashMap<Arc<str>, Vec<Variance>>,
+) -> Vec<ParamUses> {
     let mut ctx = Ctx {
         params,
-        uses: vec![Uses::default(); params.len()],
+        uses: vec![ParamUses::default(); params.len()],
         table,
         interner,
+        declared,
     };
     for m in members {
         match m.kind {
@@ -237,15 +246,12 @@ pub fn measure_params(
             }
         }
     }
-    for t in bases {
-        walk_both(&mut ctx, t.0, &[]);
+    for (t, variance) in bases {
+        match variance {
+            Variance::Covariant => walk(&mut ctx, t.0, Pol::Out, &[]),
+            Variance::Contravariant => walk(&mut ctx, t.0, Pol::In, &[]),
+            Variance::Invariant => walk_both(&mut ctx, t.0, &[]),
+        }
     }
     ctx.uses
-        .iter()
-        .map(|u| match (u.ins, u.outs) {
-            (true, true) => Variance::Invariant,
-            (true, false) => Variance::Contravariant,
-            _ => Variance::Covariant,
-        })
-        .collect()
 }

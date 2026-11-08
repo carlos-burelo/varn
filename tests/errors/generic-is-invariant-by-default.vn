@@ -1,0 +1,9 @@
+// expect: error[VN3001]
+class Animal {}
+class Dog extends Animal {}
+class Cell<T> {
+    value: T
+    constructor(value: T) { this.value = value }
+}
+function take(c: Cell<Animal>): void {}
+take(new Cell<Dog>(new Dog()))

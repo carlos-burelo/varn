@@ -32,8 +32,15 @@ impl TypeNode {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum DeclaredVariance {
+    Out,
+    In,
+}
+
 #[derive(Clone, Debug)]
 pub struct TypeParam {
+    pub variance: Option<DeclaredVariance>,
     pub name: Atom,
     pub constraint: Option<TypeNode>,
     pub default: Option<TypeNode>,

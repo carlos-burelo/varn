@@ -310,6 +310,7 @@ pub(super) fn try_parse_decl_stmt_mode(
         | TokenKind::Override
         | TokenKind::Readonly
         | TokenKind::Mut
+        | TokenKind::Out
         | TokenKind::Declare
         | TokenKind::Native
         | TokenKind::Extends

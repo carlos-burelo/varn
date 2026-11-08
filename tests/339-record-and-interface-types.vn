@@ -72,3 +72,50 @@ await describe("339 read-only and mut interface members", async () => {
         expect(kennel.pet.name).toBe("dog")
     })
 })
+
+interface Source<out T> { next(): T? }
+interface Sink<in T> { put(x: T): void }
+
+class Counter implements Source<Dog> {
+    next(): Dog? { return new Dog() }
+}
+
+class Log implements Sink<Animal> {
+    seen: int = 0
+    put(x: Animal): void { this.seen = this.seen + 1 }
+}
+
+function pull(s: Source<Animal>): str { return (s.next() ?? new Animal()).name }
+function push(s: Sink<Dog>): void { s.put(new Dog()) }
+function widen(): Result<Animal, Error> {
+    const ok: Result<Dog, Error> = Result.Ok(new Dog())
+    return ok
+}
+
+await describe("339 declared variance", async () => {
+    await it("an out parameter is covariant", () => {
+        expect(pull(new Counter())).toBe("dog")
+        expect(widen().isOk()).toBe(true)
+    })
+
+    await it("an in parameter is contravariant", () => {
+        const log = new Log()
+        push(log)
+        expect(log.seen).toBe(1)
+    })
+})
+
+enum Opt<T> { Some(T), None }
+function noneOf(): Opt<int> { return Opt.None }
+function someOf(): Opt<int> { return Opt.Some(1) }
+function pickOpt(flag: bool): Opt<int> { return flag ? Opt.Some(1) : Opt.None }
+
+await describe("339 variants take their arguments from the expected type", async () => {
+    await it("an invariant generic enum is built from its context", () => {
+        const none: Opt<int> = Opt.None
+        expect(noneOf() == Opt.None).toBe(true)
+        expect(none == Opt.None).toBe(true)
+        expect(someOf() == Opt.Some(1)).toBe(true)
+        expect(pickOpt(false) == Opt.None).toBe(true)
+    })
+})

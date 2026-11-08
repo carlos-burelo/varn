@@ -2,7 +2,7 @@
  * The outcome of an operation that can fail, as a closed sum: `try` unwraps
  * an `Ok` or returns the `Err` to the caller.
  */
-export enum Result<T, E> {
+export enum Result<out T, out E> {
     Ok(value: T),
     Err(error: E);
 

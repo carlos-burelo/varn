@@ -177,6 +177,7 @@ pub fn parse_new_callee_expr(s: &mut TokenStream) -> PResult<ExprId> {
             | TokenKind::Override
             | TokenKind::Readonly
             | TokenKind::Mut
+            | TokenKind::Out
             | TokenKind::Declare
             | TokenKind::Native
             | TokenKind::Extends

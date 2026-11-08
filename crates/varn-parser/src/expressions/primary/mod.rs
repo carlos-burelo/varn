@@ -293,6 +293,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> PResult<ExprId> {
         | TokenKind::Override
         | TokenKind::Readonly
         | TokenKind::Mut
+        | TokenKind::Out
         | TokenKind::Declare
         | TokenKind::Native
         | TokenKind::Extends

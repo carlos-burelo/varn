@@ -115,6 +115,7 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> PResult<TypeNode> {
                     .map(|ty| {
                         let ty_range = *ty.range();
                         TypeParam {
+                            variance: None,
                             name: s
                                 .interner
                                 .intern(varn_core::TokenKind::Placeholder.as_str()),
@@ -140,6 +141,7 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> PResult<TypeNode> {
                     full_range,
                     TypeKind::Fn((
                         vec![TypeParam {
+                            variance: None,
                             name: underscore,
                             constraint: Some(first),
                             default: None,
@@ -241,6 +243,7 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> PResult<TypeNode> {
         | TokenKind::Abstract
         | TokenKind::Readonly
         | TokenKind::Mut
+        | TokenKind::Out
         | TokenKind::Native
         | TokenKind::Constructor
         | TokenKind::Destructor => {

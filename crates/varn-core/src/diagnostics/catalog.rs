@@ -89,6 +89,7 @@ pub enum ErrorCode {
     ThisOutsideInstance = 4115,
     IncompatibleOverride = 4116,
     InterfaceNotSatisfied = 4117,
+    VarianceViolation = 4118,
 
     CapabilityViolation = 4302,
 
@@ -163,6 +164,7 @@ impl ErrorCode {
             ErrorCode::InvalidFinallyExit => "invalid-finally-exit",
             ErrorCode::IncompatibleOverride => "incompatible-override",
             ErrorCode::InterfaceNotSatisfied => "interface-not-satisfied",
+            ErrorCode::VarianceViolation => "variance-violation",
 
             ErrorCode::MissingOverride => "missing-override",
             ErrorCode::SpuriousOverride => "spurious-override",

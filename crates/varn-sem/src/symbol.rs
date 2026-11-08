@@ -79,6 +79,7 @@ pub struct Symbol {
     pub type_params: Vec<Atom>,
     pub type_param_constraints: Vec<Option<Type>>,
     pub type_param_defaults: Vec<Option<Type>>,
+    pub type_param_variances: Vec<Option<varn_core::ast::DeclaredVariance>>,
     pub decorated: bool,
     pub offset: u32,
     #[serde(skip)]
@@ -127,6 +128,7 @@ impl Symbol {
             type_params: Vec::new(),
             type_param_constraints: Vec::new(),
             type_param_defaults: Vec::new(),
+            type_param_variances: Vec::new(),
             decorated: false,
             offset: 0,
             full_range: SourceRange::default(),

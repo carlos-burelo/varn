@@ -190,6 +190,7 @@ fn parse_num_lexeme(kind: varn_core::TokenKind, lexeme: &str) -> Option<varn_cor
         | TokenKind::Override
         | TokenKind::Readonly
         | TokenKind::Mut
+        | TokenKind::Out
         | TokenKind::Declare
         | TokenKind::Native
         | TokenKind::Extends

@@ -3,7 +3,7 @@
  * to its next `yield` and returns the value, or `null` once it finishes. A
  * generator therefore cannot yield `null`.
  */
-export declare class Generator<T> {
+export declare class Generator<out T> {
     @throws(Error) next(): T?;
     @throws(Error) close(): void;
 }
@@ -13,7 +13,7 @@ export declare class Generator<T> {
  * the scheduler until its next `yield`, and the caller awaits that result
  * without blocking whatever it waits on.
  */
-export declare class AsyncGenerator<T> {
+export declare class AsyncGenerator<out T> {
     next(): Task<T?>;
     close(): Task<void>;
 }
@@ -22,28 +22,28 @@ export declare class AsyncGenerator<T> {
  * A source of values pulled one at a time: the value until it is exhausted,
  * then `null`.
  */
-export interface Iterator<T> {
+export interface Iterator<out T> {
     next(): T?;
 }
 
 /**
  * Something `for-of` can walk: it hands out a fresh `Iterator<T>`.
  */
-export interface Iterable<T> {
+export interface Iterable<out T> {
     iter(): Iterator<T>;
 }
 
 /**
  * An `Iterator<T>` whose next value may take time to arrive.
  */
-export interface AsyncIterator<T> {
+export interface AsyncIterator<out T> {
     next(): Task<T?>;
 }
 
 /**
  * Handle to a spawned task: poll it, await it or cancel it.
  */
-export interface TaskHandle<T> {
+export interface TaskHandle<out T> {
     isCompleted(): bool;
     await(): T;
     cancel(): void;
@@ -53,5 +53,5 @@ export interface TaskHandle<T> {
  * An asynchronous computation that settles with a `T`; `await` suspends
  * until it does, without blocking the scheduler.
  */
-export interface Task<T> {
+export interface Task<out T> {
 }

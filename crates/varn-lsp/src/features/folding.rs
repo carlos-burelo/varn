@@ -210,6 +210,7 @@ pub fn fold_tokens(tokens: &[TokenRecord]) -> Vec<FoldingRange> {
             | TokenKind::Override
             | TokenKind::Readonly
             | TokenKind::Mut
+            | TokenKind::Out
             | TokenKind::Declare
             | TokenKind::Native
             | TokenKind::Extends

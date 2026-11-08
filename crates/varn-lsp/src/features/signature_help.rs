@@ -174,6 +174,7 @@ pub fn build_signature_help(state: &DocumentState, line: u32, col: u32) -> Optio
             | TokenKind::Override
             | TokenKind::Readonly
             | TokenKind::Mut
+            | TokenKind::Out
             | TokenKind::Declare
             | TokenKind::Native
             | TokenKind::Extends

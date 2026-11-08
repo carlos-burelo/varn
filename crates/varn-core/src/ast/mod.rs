@@ -34,4 +34,4 @@ pub use pattern::{
     SequenceRest, VariantPayload,
 };
 pub use stmt::{CatchClause, ForInit, StmtKind, SwitchCase, VarDeclarator, VariableDecl};
-pub use types::{AstTypeKind, Decorator, TypeNode, TypeParam};
+pub use types::{AstTypeKind, DeclaredVariance, Decorator, TypeNode, TypeParam};

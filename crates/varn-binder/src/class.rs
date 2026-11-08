@@ -21,6 +21,7 @@ impl<'r> super::Binder<'r> {
         sym.offset = c.range.start.offset;
         sym.doc = c.doc.as_ref().map(|s| self.intern_local(s.as_str()));
         sym.type_params = c.type_params.iter().map(|t| t.name).collect();
+        sym.type_param_variances = c.type_params.iter().map(|t| t.variance).collect();
         sym.type_param_constraints = c
             .type_params
             .iter()

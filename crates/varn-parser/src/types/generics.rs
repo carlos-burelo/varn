@@ -21,6 +21,7 @@ pub fn parse_type_params(s: &mut TokenStream) -> PResult<Vec<varn_core::ast::Typ
     let mut params = vec![];
     while !s.check(TokenKind::RAngle) && !s.is_eof() {
         let range = s.range();
+        let variance = parse_declared_variance(s);
         let name = s.expect_id()?;
         let constraint = if s.eat(TokenKind::Extends) {
             Some(super::combinators::parse_union_type(s)?)
@@ -34,6 +35,7 @@ pub fn parse_type_params(s: &mut TokenStream) -> PResult<Vec<varn_core::ast::Typ
         };
         let full_range = s.span_from(range);
         params.push(varn_core::ast::TypeParam {
+            variance,
             name,
             constraint,
             default,
@@ -66,6 +68,7 @@ pub(crate) fn parse_fn_type_params(s: &mut TokenStream) -> PResult<Vec<varn_core
         let ty = super::entry::parse_type(s)?;
         let full_range = s.span_from(prange);
         params.push(varn_core::ast::TypeParam {
+            variance: None,
             name,
             constraint: Some(ty),
             default: None,
@@ -77,4 +80,15 @@ pub(crate) fn parse_fn_type_params(s: &mut TokenStream) -> PResult<Vec<varn_core
         }
     }
     Ok(params)
+}
+
+fn parse_declared_variance(s: &mut TokenStream) -> Option<varn_core::ast::DeclaredVariance> {
+    let names_a_parameter = matches!(s.peek_kind(1), TokenKind::Identifier);
+    let variance = match s.kind() {
+        TokenKind::Out if names_a_parameter => varn_core::ast::DeclaredVariance::Out,
+        TokenKind::In if names_a_parameter => varn_core::ast::DeclaredVariance::In,
+        _ => return None,
+    };
+    s.advance();
+    Some(variance)
 }

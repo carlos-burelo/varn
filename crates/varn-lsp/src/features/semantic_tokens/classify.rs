@@ -41,7 +41,7 @@ pub fn resolve_token(
         | On | If | Else | Switch | Case | Default | While | For | Do | Break | Continue
         | Return | Throw | Try | Catch | Finally | Using | With | Import | Export | From | As
         | Async | Await | Yield | New | Super | Delete | Typeof | Instanceof | In | Of | Is
-        | Public | Private | Protected | Static | Abstract | Override | Readonly | Mut
+        | Public | Private | Protected | Static | Abstract | Override | Readonly | Mut | Out
         | Declare | Native | Extends | Implements | Get | Set | Constructor | Destructor
         | Match | At | Hash | Backslash | Dollar | Backtick | Newline | Whitespace | DocComment
         | Placeholder | Spawn | Parallel | Start | RawStr => {}

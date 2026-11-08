@@ -184,6 +184,7 @@ pub(super) fn parse_var_decl_with_declare(
         | TokenKind::Override
         | TokenKind::Readonly
         | TokenKind::Mut
+        | TokenKind::Out
         | TokenKind::Declare
         | TokenKind::Native
         | TokenKind::Extends

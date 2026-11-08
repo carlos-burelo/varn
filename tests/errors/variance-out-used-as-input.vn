@@ -1,0 +1,6 @@
+// expect: error[VN4118]
+class Cell<out T> {
+    value: T
+    constructor(value: T) { this.value = value }
+    set(v: T): void { this.value = v }
+}

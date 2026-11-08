@@ -2,7 +2,7 @@ import { Observer, Source, changed, invalidate, notifyObservers, runTracked, tra
 import { currentOwner } from "std:signals/owner";
 import { Effect, effect } from "std:signals/effect";
 
-export abstract class Readable<T> {
+export abstract class Readable<out T> {
     abstract get value(): T;
     abstract peek(): T;
 

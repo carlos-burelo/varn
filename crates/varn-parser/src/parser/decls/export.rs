@@ -194,6 +194,7 @@ pub fn parse_export_decl(s: &mut TokenStream, decorators: Vec<Decorator>) -> PRe
             | TokenKind::Override
             | TokenKind::Readonly
             | TokenKind::Mut
+            | TokenKind::Out
             | TokenKind::Declare
             | TokenKind::Native
             | TokenKind::Extends

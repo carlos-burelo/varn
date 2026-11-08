@@ -211,6 +211,7 @@ fn parse_match_pattern(s: &mut TokenStream) -> PResult<MatchPattern> {
         | TokenKind::Override
         | TokenKind::Readonly
         | TokenKind::Mut
+        | TokenKind::Out
         | TokenKind::Declare
         | TokenKind::Native
         | TokenKind::Extends

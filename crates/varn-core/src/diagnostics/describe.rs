@@ -85,6 +85,7 @@ impl ErrorCode {
         ErrorCode::ThisOutsideInstance,
         ErrorCode::IncompatibleOverride,
         ErrorCode::InterfaceNotSatisfied,
+        ErrorCode::VarianceViolation,
         ErrorCode::CapabilityViolation,
         ErrorCode::InvalidDecoratorSignature,
         ErrorCode::CompilationInternalError,
@@ -181,6 +182,7 @@ impl ErrorCode {
             | ErrorCode::ThisOutsideInstance
             | ErrorCode::IncompatibleOverride
             | ErrorCode::InterfaceNotSatisfied
+            | ErrorCode::VarianceViolation
             | ErrorCode::CapabilityViolation
             | ErrorCode::InvalidDecoratorSignature
             | ErrorCode::CompilationInternalError => DiagnosticKind::Error,
@@ -271,6 +273,7 @@ impl ErrorCode {
             ErrorCode::ThisOutsideInstance => "`this` is only valid inside a class, enum or extension.",
             ErrorCode::IncompatibleOverride => "An override changes the member signature in an incompatible way.",
             ErrorCode::InterfaceNotSatisfied => "A class declares an interface it does not fully implement.",
+            ErrorCode::VarianceViolation => "A type parameter is declared `out` or `in` but is used in a position that breaks that promise.",
             ErrorCode::CapabilityViolation => "The code uses a capability the program was not granted.",
             ErrorCode::InvalidDecoratorSignature => "A decorator function does not have the signature its target requires.",
             ErrorCode::CompilationInternalError => "The compiler failed without a user-facing cause: this is a bug in Varn.",

@@ -75,6 +75,7 @@ keywords! {
     Override => "override",
     Readonly => "readonly",
     Mut => "mut",
+    Out => "out",
     Declare => "declare",
     Native => "native",
     Extends => "extends",
