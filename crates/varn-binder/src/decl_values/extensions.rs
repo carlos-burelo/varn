@@ -1,4 +1,3 @@
-use super::type_node_to_name;
 use std::sync::Arc;
 use varn_core::ast::{ExtensionDecl, ExtensionMember};
 use varn_sem::scope::ScopeKind;
@@ -7,9 +6,23 @@ use varn_sem::types::Type;
 
 impl<'r> super::super::Binder<'r> {
     pub(crate) fn bind_extension(&mut self, e: &ExtensionDecl) {
-        let type_name = type_node_to_name(&e.target, &self.interner);
-
         let receiver_ty = self.resolve_type(&e.target);
+        let Some(type_name) = receiver_ty.extension_key(&self.ty_table, &|atom| {
+            self.interner
+                .try_resolve(atom)
+                .or_else(|| self.ty_table.name(atom))
+                .map(Arc::from)
+        }) else {
+            self.emit(
+                varn_core::Diagnostic::error(
+                    varn_core::ErrorCode::InvalidTypeOperator,
+                    "an extension can only target a named type, a primitive, an array, a tuple or a record",
+                )
+                .with_range(e.target.range),
+            );
+            return;
+        };
+        let type_name = type_name.to_string();
 
         if let Some(id) = e.id {
             let line = e.range.start.line;
@@ -23,8 +36,8 @@ impl<'r> super::super::Binder<'r> {
         for member in &e.members {
             match member {
                 ExtensionMember::Method(method) => {
-                    let mangled =
-                        format!("__ext_{}_{}", type_name, self.interner.resolve(method.id));
+                    let mangled = varn_core::extension_names::ExtensionKind::Method
+                        .mangled(&type_name, self.interner.resolve(method.id));
                     let mut param_types: Vec<varn_sem::types::FunctionParam> =
                         vec![varn_sem::types::FunctionParam {
                             name: Some(Arc::from(varn_core::TokenKind::This.as_str())),
@@ -104,7 +117,8 @@ impl<'r> super::super::Binder<'r> {
                     ..
                 } => {
                     let key_str = self.interner.resolve(*key).to_string();
-                    let mangled = format!("__extget_{type_name}_{}", key_str);
+                    let mangled = varn_core::extension_names::ExtensionKind::Getter
+                        .mangled(&type_name, &key_str);
                     let ret_ty = match return_type {
                         Some(rt) => self.resolve_type(rt),
                         None => {
@@ -155,7 +169,8 @@ impl<'r> super::super::Binder<'r> {
                     ..
                 } => {
                     let key_str = self.interner.resolve(*key).to_string();
-                    let mangled = format!("__extset_{type_name}_{}", key_str);
+                    let mangled = varn_core::extension_names::ExtensionKind::Setter
+                        .mangled(&type_name, &key_str);
                     let param_ty = self.param_type(param, crate::ParamSite::Declared);
                     let fn_type = Type::fn_(
                         varn_sem::types::FunctionType {

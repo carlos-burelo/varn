@@ -263,14 +263,11 @@ impl<'r> Checker<'r> {
                 .any(|m| m.name() == key),
 
             TypeKind::Tuple(_) => key == varn_core::MemberKey::Length.as_str(),
-            TypeKind::Array(_) => {
-                if let Some(b) = &bind.core
-                    && let Some(members) = b.class_members.get(varn_core::BuiltinType::Array.name())
-                {
-                    return members.members.iter().any(|m| m.name.as_ref() == key);
-                }
-                false
-            }
+            TypeKind::Array(_) => bind
+                .core
+                .as_ref()
+                .and_then(|b| b.class_members.get(varn_core::BuiltinType::Array.name()))
+                .is_some_and(|members| members.members.iter().any(|m| m.name.as_ref() == key)),
             TypeKind::Union(list) => {
                 let ids = self.ty_table.get_list(list).to_vec();
                 ids.iter()

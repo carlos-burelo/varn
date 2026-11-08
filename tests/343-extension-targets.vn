@@ -1,0 +1,39 @@
+import { describe, it, expect } from "std:test";
+
+extension Geometry on { x: int; y: int } {
+    norm(): int { return this.x * this.x + this.y * this.y }
+}
+
+extension Sum on int[] {
+    total(): int {
+        let sum = 0
+        for (const value of this) { sum = sum + value }
+        return sum
+    }
+}
+
+extension Swap on (int, str) {
+    flip(): (str, int) { return (this[1], this[0]) }
+}
+
+await describe("343 extension targets", async () => {
+    await it("an extension on a record applies to every field order", () => {
+        const first: { x: int; y: int } = { x: 3, y: 4 }
+        const second: { y: int; x: int } = { y: 12, x: 5 }
+        expect(first.norm()).toBe(25)
+        expect(second.norm()).toBe(169)
+    })
+
+    await it("an extension on an array applies to that element type", () => {
+        const values: int[] = [1, 2, 3]
+        expect(values.total()).toBe(6)
+        expect([4, 5].total()).toBe(9)
+    })
+
+    await it("an extension on a tuple applies to that shape", () => {
+        const pair: (int, str) = (7, "a")
+        const flipped = pair.flip()
+        expect(flipped[0]).toBe("a")
+        expect(flipped[1]).toBe(7)
+    })
+})

@@ -8,6 +8,7 @@ pub mod diagnostics;
 pub mod doc;
 pub mod env;
 pub mod errors;
+pub mod extension_names;
 pub mod ffi_kind;
 pub mod fingerprint;
 pub mod fmt;

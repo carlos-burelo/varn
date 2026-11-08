@@ -93,6 +93,7 @@ pub(super) fn collect_declared(
     program: &Program,
     ast_arena: &AstArena,
     interner: &AtomInterner,
+    bind: &BindResult,
 ) -> FxHashSet<Arc<str>> {
     let mut declared: FxHashSet<Arc<str>> = FxHashSet::default();
     for &stmt in &program.body {
@@ -108,7 +109,14 @@ pub(super) fn collect_declared(
             }
         }
     }
-    collect_extension_names(program, ast_arena, &mut declared, interner);
+    collect_extension_names(
+        program,
+        ast_arena,
+        &mut declared,
+        interner,
+        &bind.annotation_types,
+        &bind.ty_table,
+    );
     declared
 }
 

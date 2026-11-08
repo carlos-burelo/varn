@@ -307,29 +307,5 @@ pub(crate) fn extension_type_name(
     table: &varn_sem::types::CheckerTyTable,
     bind: &BindResult,
 ) -> Option<std::sync::Arc<str>> {
-    match table.get(ty.0) {
-        TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => {
-            Some(checker.resolve_bind_atom(bind, n))
-        }
-        k @ (TypeKind::Primitive(_) | TypeKind::Literal(_)) => {
-            k.lang_name().map(std::sync::Arc::from)
-        }
-        TypeKind::This
-        | TypeKind::Array(_)
-        | TypeKind::Union(_)
-        | TypeKind::Intersection(_)
-        | TypeKind::Tuple(_)
-        | TypeKind::TemplateLiteral(_)
-        | TypeKind::Fn(_)
-        | TypeKind::Record(_)
-        | TypeKind::Interface(_)
-        | TypeKind::Typeof(_)
-        | TypeKind::KeyOf(_)
-        | TypeKind::IndexedAccess { .. }
-        | TypeKind::Mapped { .. }
-        | TypeKind::Conditional { .. }
-        | TypeKind::Infer(_)
-        | TypeKind::EnumVariant { .. }
-        | TypeKind::TypePredicate { .. } => None,
-    }
+    ty.extension_key(table, &|atom| Some(checker.resolve_bind_atom(bind, atom)))
 }

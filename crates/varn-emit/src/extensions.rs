@@ -5,6 +5,7 @@ use super::module_ctx::MCtx;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 use varn_core::ast::{AstArena, AstId, Decl, Program, StmtId, StmtKind};
+use varn_core::extension_names::ExtensionKind;
 use varn_core::AtomInterner;
 use varn_sem::output::TypeEntry;
 use varn_tir::{BackendTy, DynReason, Signature, TirFunction, TyTable};
@@ -14,6 +15,8 @@ pub(super) fn collect_extension_names(
     ast_arena: &AstArena,
     out: &mut FxHashSet<Arc<str>>,
     interner: &AtomInterner,
+    annotation_types: &FxHashMap<AstId, varn_sem::types::Type>,
+    table: &varn_sem::types::CheckerTyTable,
 ) {
     use varn_core::ast::ExtensionMember;
     for &stmt in &program.body {
@@ -23,19 +26,20 @@ pub(super) fn collect_extension_names(
         let Decl::Extension(ext) = d.as_ref() else {
             continue;
         };
-        let Some(label) = extension_target_label(&ext.target, interner) else {
+        let Some(label) = extension_target_label(&ext.target, annotation_types, table, interner)
+        else {
             continue;
         };
         for member in &ext.members {
             let name: Arc<str> = match member {
                 ExtensionMember::Method(f) => {
-                    Arc::from(format!("__ext_{label}_{}", interner.resolve(f.id)))
+                    Arc::from(ExtensionKind::Method.mangled(&label, interner.resolve(f.id)))
                 }
                 ExtensionMember::Getter { key, .. } => {
-                    Arc::from(format!("__extget_{label}_{}", interner.resolve(*key)))
+                    Arc::from(ExtensionKind::Getter.mangled(&label, interner.resolve(*key)))
                 }
                 ExtensionMember::Setter { key, .. } => {
-                    Arc::from(format!("__extset_{label}_{}", interner.resolve(*key)))
+                    Arc::from(ExtensionKind::Setter.mangled(&label, interner.resolve(*key)))
                 }
             };
             out.insert(name);
@@ -44,32 +48,19 @@ pub(super) fn collect_extension_names(
 }
 
 pub(super) fn extension_target_label(
-    t: &varn_core::ast::types::TypeNode,
+    target: &varn_core::ast::types::TypeNode,
+    annotation_types: &FxHashMap<AstId, varn_sem::types::Type>,
+    table: &varn_sem::types::CheckerTyTable,
     interner: &AtomInterner,
 ) -> Option<Arc<str>> {
-    use varn_core::TypeKind;
-    match &t.kind {
-        TypeKind::Named(n, _) => Some(Arc::from(interner.resolve(*n))),
-        TypeKind::Generic(n, _, _) => Some(Arc::from(interner.resolve(*n))),
-        k @ (TypeKind::Primitive(_) | TypeKind::Literal(_)) => k.lang_name().map(Arc::from),
-        TypeKind::Array(_) => Some(Arc::from(varn_core::BuiltinType::Array.name())),
-        TypeKind::This
-        | TypeKind::Union(_)
-        | TypeKind::Intersection(_)
-        | TypeKind::Tuple(_)
-        | TypeKind::TemplateLiteral(_)
-        | TypeKind::Fn(_)
-        | TypeKind::Record(_)
-        | TypeKind::Interface(_)
-        | TypeKind::Typeof(_)
-        | TypeKind::KeyOf(_)
-        | TypeKind::IndexedAccess { .. }
-        | TypeKind::Mapped { .. }
-        | TypeKind::Conditional { .. }
-        | TypeKind::Infer(_)
-        | TypeKind::EnumVariant { .. }
-        | TypeKind::TypePredicate { .. } => None,
-    }
+    annotation_types
+        .get(&target.id)?
+        .extension_key(table, &|atom| {
+            interner
+                .try_resolve(atom)
+                .or_else(|| table.name(atom))
+                .map(Arc::from)
+        })
 }
 
 pub(super) fn emit_extensions(
@@ -89,7 +80,12 @@ pub(super) fn emit_extensions(
         let Decl::Extension(ext) = d.as_ref() else {
             continue;
         };
-        let Some(label) = extension_target_label(&ext.target, ctx.interner) else {
+        let Some(label) = extension_target_label(
+            &ext.target,
+            ctx.annotation_types,
+            ctx.checker_table,
+            ctx.interner,
+        ) else {
             continue;
         };
         let recv_ty = ctx
@@ -125,7 +121,7 @@ pub(super) fn emit_extensions(
         for member in &ext.members {
             let (mangled, params, body): (Arc<str>, Vec<Arc<str>>, StmtId) = match member {
                 ExtensionMember::Method(f) => (
-                    Arc::from(format!("__ext_{label}_{}", ctx.interner.resolve(f.id))),
+                    Arc::from(ExtensionKind::Method.mangled(&label, ctx.interner.resolve(f.id))),
                     f.params
                         .iter()
                         .map(|p| param_name(p, ctx.interner))
@@ -133,14 +129,14 @@ pub(super) fn emit_extensions(
                     f.body,
                 ),
                 ExtensionMember::Getter { key, body, .. } => (
-                    Arc::from(format!("__extget_{label}_{}", ctx.interner.resolve(*key))),
+                    Arc::from(ExtensionKind::Getter.mangled(&label, ctx.interner.resolve(*key))),
                     vec![],
                     *body,
                 ),
                 ExtensionMember::Setter {
                     key, param, body, ..
                 } => (
-                    Arc::from(format!("__extset_{label}_{}", ctx.interner.resolve(*key))),
+                    Arc::from(ExtensionKind::Setter.mangled(&label, ctx.interner.resolve(*key))),
                     vec![param_name(param, ctx.interner)],
                     *body,
                 ),

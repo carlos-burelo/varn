@@ -1,0 +1,4 @@
+// expect: error[VN3010]
+extension Either on int | str {
+    show(): str { return "x" }
+}

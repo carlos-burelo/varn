@@ -51,7 +51,7 @@ pub fn emit_module(
         names,
     } = tables::build(bind, desugar, &mut types);
 
-    let mut declared = module_globals::collect_declared(program, ast_arena, interner);
+    let mut declared = module_globals::collect_declared(program, ast_arena, interner, bind);
     let prelude = prelude::prelude_imports(&program.filename, &declared, ast_arena, interner);
     for import in &prelude {
         declared.extend(import.specs.iter().map(|spec| spec.local.clone()));
