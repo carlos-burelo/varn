@@ -1,6 +1,6 @@
 # ADR-0026 — Taxonomía de los tipos de datos
 
-Estado: APROBADO EN DISEÑO (2026-11-07). Etapas 1, 2 y 3 implementadas; la 4 salvo el diccionario; 5 a 8 pendientes (§8).
+Estado: APROBADO EN DISEÑO (2026-11-07). Etapas 1, 2 y 3 implementadas; la 4 salvo el diccionario; la 5 en parte (restricción `Keyable`, sin records); 6 a 8 pendientes (§8).
 
 ## 1. Problema
 
@@ -244,7 +244,7 @@ import { a } from "std:test"    export    namespace N { }
 2. **HECHA** (`6ffc2d08`..`56af75d0`). **Reglas del checker**: asignabilidad de §3 y §4; tipado esperado de `??`/`||` y de variantes; propiedades de interfaz de solo lectura con `mut`; varianza `out`/`in` declarada (`VN4118`). Un test negativo por cada prohibición; `std` y tests adaptados.
 3. **HECHA** (`91558975`, `e61c69ce`, `5c78dc2e`). **Record inmutable**: error al mutar un campo de record (`VN3005`); un literal no repite un campo (`VN3035`); separadores `;` en tipos. Medido antes: 7 sitios en 3 tests y 1 en `std`.
 4. **HECHA salvo el diccionario**. `===`/`!==` (859 usos migrados), `instanceof` → `is` (93), `typeof` valor → `x::type` (58), `switch` → `match` (1 test). Por el camino: `is` ya no responde «verdadero» a tipos que no sabe probar (`VN3036`) y `continue` dentro de un `match` ya ejecuta el paso del `for`. Pendiente: dict `{[k:str]:V}` → `Map<str,V>` (130 usos).
-5. **Hashable estático** para Map y Set; borrar el hashing dinámico de la VM; `new Map(entradas)` / `new Set(elementos)`; `readonly T[]` y las vistas.
+5. **PARCIAL** (`ed009cb0`..`2a9d95ca`). **Clave estática para Map y Set**: la restricción intrínseca se llama `Keyable`, no `Hashable`, porque `core:capabilities` ya declara `Hashable { hash(): int }` y la VM invoca esos métodos. `Map<K extends Keyable, V>` y `Set<T extends Keyable>` rechazan con `VN3037` lo que no lo es; el código genérico escribe `K extends Keyable`. Son Keyable: `int`, `bool`, `char`, `str`, `bigint`, `decimal`, enums, clases y tuplas o structs de ellos. **Los records no lo son todavía**: la VM los compara y hashea por identidad, y pasan a Keyable cuando la etapa 6 les dé forma canónica. Pendiente: borrar `hashable_keys.rs` de la VM, `new Map(entradas)` / `new Set(elementos)`, `readonly T[]` y las vistas.
 6. **TIR y emisor**: forma canónica del record, `Resolution::ShapeSlot`, selector de interfaz; borrar `ByName` y `DynReason::{Shape, Interface}`.
 7. **Borde dinámico**: `CONFORM`/`DECODE` y natives entregan forma canónica.
 8. **Extensiones sobre records.**
