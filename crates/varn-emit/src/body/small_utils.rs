@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use varn_core::ast::operators::BinaryOp;
-use varn_core::ast::{AstArena, ExprId, Pattern, PropKey, StmtId, StmtKind};
+use varn_core::ast::{AstArena, ExprId, ExprKind, MatchBody, Pattern, PropKey, StmtId, StmtKind};
 use varn_core::AtomInterner;
 use varn_tir::{BackendTy, Resolution, Span, TirBinOp, TirExpr, TirExprKind};
 
@@ -105,54 +105,76 @@ pub(super) fn bin_op(op: BinaryOp) -> Option<TirBinOp> {
 }
 
 pub(super) fn has_continue(ast_arena: &AstArena, stmt: StmtId) -> bool {
-    fn check(ast_arena: &AstArena, stmt: StmtId, in_nested_loop: bool) -> bool {
-        match &ast_arena.stmt(stmt).kind {
-            StmtKind::Continue { label } => {
-                if in_nested_loop {
-                    label.is_some()
-                } else {
-                    true
-                }
+    has_continue_in(ast_arena, stmt, false)
+}
+
+fn has_continue_in(ast_arena: &AstArena, stmt: StmtId, in_nested_loop: bool) -> bool {
+    match &ast_arena.stmt(stmt).kind {
+        StmtKind::Continue { label } => {
+            if in_nested_loop {
+                label.is_some()
+            } else {
+                true
             }
-            StmtKind::Block { stmts } => stmts.iter().any(|&s| check(ast_arena, s, in_nested_loop)),
-            StmtKind::If {
-                consequent,
-                alternate,
-                ..
-            } => {
-                check(ast_arena, *consequent, in_nested_loop)
-                    || alternate.is_some_and(|a| check(ast_arena, a, in_nested_loop))
-            }
-            StmtKind::Switch { cases, .. } => cases
-                .iter()
-                .any(|c| c.body.iter().any(|&s| check(ast_arena, s, in_nested_loop))),
-            StmtKind::Try {
-                block,
-                catches,
-                finally,
-            } => {
-                check(ast_arena, *block, in_nested_loop)
-                    || catches
-                        .iter()
-                        .any(|c| check(ast_arena, c.body, in_nested_loop))
-                    || finally.is_some_and(|f| check(ast_arena, f, in_nested_loop))
-            }
-            StmtKind::Labeled { body, .. } => check(ast_arena, *body, in_nested_loop),
-            StmtKind::While { body, .. }
-            | StmtKind::DoWhile { body, .. }
-            | StmtKind::For { body, .. }
-            | StmtKind::ForIn { body, .. }
-            | StmtKind::ForOf { body, .. } => check(ast_arena, *body, true),
-            StmtKind::Empty
-            | StmtKind::Expr { .. }
-            | StmtKind::Decl(_)
-            | StmtKind::Error
-            | StmtKind::Return { .. }
-            | StmtKind::Break { .. }
-            | StmtKind::Throw { .. }
-            | StmtKind::Using { .. }
-            | StmtKind::Debugger => false,
         }
+        StmtKind::Block { stmts } => stmts
+            .iter()
+            .any(|&s| has_continue_in(ast_arena, s, in_nested_loop)),
+        StmtKind::If {
+            consequent,
+            alternate,
+            ..
+        } => {
+            has_continue_in(ast_arena, *consequent, in_nested_loop)
+                || alternate.is_some_and(|a| has_continue_in(ast_arena, a, in_nested_loop))
+        }
+        StmtKind::Switch { cases, .. } => cases.iter().any(|c| {
+            c.body
+                .iter()
+                .any(|&s| has_continue_in(ast_arena, s, in_nested_loop))
+        }),
+        StmtKind::Try {
+            block,
+            catches,
+            finally,
+        } => {
+            has_continue_in(ast_arena, *block, in_nested_loop)
+                || catches
+                    .iter()
+                    .any(|c| has_continue_in(ast_arena, c.body, in_nested_loop))
+                || finally.is_some_and(|f| has_continue_in(ast_arena, f, in_nested_loop))
+        }
+        StmtKind::Labeled { body, .. } => has_continue_in(ast_arena, *body, in_nested_loop),
+        StmtKind::While { body, .. }
+        | StmtKind::DoWhile { body, .. }
+        | StmtKind::For { body, .. }
+        | StmtKind::ForIn { body, .. }
+        | StmtKind::ForOf { body, .. } => has_continue_in(ast_arena, *body, true),
+        StmtKind::Expr { expression } => {
+            expression_has_continue(ast_arena, *expression, in_nested_loop)
+        }
+        StmtKind::Empty
+        | StmtKind::Decl(_)
+        | StmtKind::Error
+        | StmtKind::Return { .. }
+        | StmtKind::Break { .. }
+        | StmtKind::Throw { .. }
+        | StmtKind::Using { .. }
+        | StmtKind::Debugger => false,
     }
-    check(ast_arena, stmt, false)
+}
+
+fn expression_has_continue(ast_arena: &AstArena, expr: ExprId, in_nested_loop: bool) -> bool {
+    match &ast_arena.expr(expr).kind {
+        ExprKind::Paren { expression } => {
+            expression_has_continue(ast_arena, *expression, in_nested_loop)
+        }
+        ExprKind::Match { cases, .. } => cases.iter().any(|case| match &case.body {
+            MatchBody::Block(stmt) => has_continue_in(ast_arena, *stmt, in_nested_loop),
+            MatchBody::Expr(expression) => {
+                expression_has_continue(ast_arena, *expression, in_nested_loop)
+            }
+        }),
+        _ => false,
+    }
 }
