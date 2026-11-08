@@ -8,6 +8,7 @@ mod control;
 mod destructure_assign;
 mod dynamic_use;
 mod exhaustiveness;
+mod is_target;
 mod match_arm;
 pub(crate) mod member_index;
 mod member_side;
@@ -110,7 +111,13 @@ impl<'r> Checker<'r> {
                 self.check_expr(rec, *expression, bind);
                 self.check_as_cast(rec, expr, *expression, type_ann, range, bind)
             }
-            ExprKind::Is { expression, .. } => self.check_expr(rec, *expression, bind),
+            ExprKind::Is {
+                expression,
+                type_ann,
+            } => {
+                self.check_expr(rec, *expression, bind);
+                self.check_is_target(type_ann, range, bind)
+            }
             ExprKind::Satisfies {
                 expression,
                 type_ann,

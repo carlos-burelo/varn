@@ -328,6 +328,7 @@ import "./336-edge-repairs.vn"
 import "./337-destructuring-assignment.vn"
 import "./338-match-patterns.vn"
 import "./339-record-and-interface-types.vn"
+import "./340-is-tests-identity.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

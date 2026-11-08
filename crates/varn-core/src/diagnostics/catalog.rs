@@ -51,6 +51,7 @@ pub enum ErrorCode {
     DynamicNeedsCast = 3033,
     AwaitHasNoEffect = 3034,
     DuplicateRecordField = 3035,
+    IsNeedsRuntimeType = 3036,
 
     TypeArgInferenceFailed = 3201,
     ConstraintViolation = 3202,
@@ -197,6 +198,7 @@ impl ErrorCode {
             ErrorCode::DynamicNeedsCast => "dynamic-needs-cast",
             ErrorCode::AwaitHasNoEffect => "await-has-no-effect",
             ErrorCode::DuplicateRecordField => "duplicate-record-field",
+            ErrorCode::IsNeedsRuntimeType => "is-needs-runtime-type",
             ErrorCode::NotIterable => "not-iterable",
         }
     }

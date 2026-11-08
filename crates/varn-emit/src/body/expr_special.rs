@@ -100,8 +100,11 @@ impl<'a> FnEmitter<'a> {
                         span,
                     });
                 }
+                if let Some(name) = self.builtin_tag(type_ann) {
+                    return Some(tag(name));
+                }
                 let res = self.resolve_name(written);
-                if matches!(res, Resolution::GlobalSlot(_)) {
+                if matches!(res, Resolution::GlobalSlot(_) | Resolution::NativeGlobal(_)) {
                     return Some(TirExpr {
                         kind: TirExprKind::Binary {
                             op: TirBinOp::Instanceof,
@@ -118,7 +121,7 @@ impl<'a> FnEmitter<'a> {
                         span,
                     });
                 }
-                self.builtin_tag(type_ann).map(tag)
+                None
             }
             varn_core::TypeKind::Union(members) => {
                 let mut any = TirExpr {

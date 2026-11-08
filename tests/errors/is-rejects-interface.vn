@@ -1,0 +1,3 @@
+// expect: error[VN3036]
+interface Named { name: str }
+function test(v: dynamic): bool { return v is Named }

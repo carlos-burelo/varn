@@ -51,6 +51,7 @@ impl ErrorCode {
         ErrorCode::DynamicNeedsCast,
         ErrorCode::AwaitHasNoEffect,
         ErrorCode::DuplicateRecordField,
+        ErrorCode::IsNeedsRuntimeType,
         ErrorCode::TypeArgInferenceFailed,
         ErrorCode::ConstraintViolation,
         ErrorCode::WrongTypeArgCount,
@@ -107,6 +108,7 @@ impl ErrorCode {
             ErrorCode::UnterminatedString
             | ErrorCode::InvalidNumericLiteral
             | ErrorCode::DuplicateRecordField
+            | ErrorCode::IsNeedsRuntimeType
             | ErrorCode::UnknownCharacter
             | ErrorCode::UnterminatedTemplate
             | ErrorCode::UnterminatedRegex
@@ -241,6 +243,7 @@ impl ErrorCode {
             ErrorCode::DynamicNeedsCast => "A value of type `dynamic` is used without first casting it with `as T`.",
             ErrorCode::AwaitHasNoEffect => "`await` is applied to a value that is not a Task, so it does nothing.",
             ErrorCode::DuplicateRecordField => "A record literal gives the same field more than once, by repeating it or by spreading a record that already has it.",
+            ErrorCode::IsNeedsRuntimeType => "The `is` operator was given an interface or a record, which have no identity at run time to test.",
             ErrorCode::TypeArgInferenceFailed => "The type arguments of a call could not be inferred.",
             ErrorCode::ConstraintViolation => "A type argument does not satisfy the constraint of its type parameter.",
             ErrorCode::WrongTypeArgCount => "A generic is given more or fewer type arguments than it declares.",
