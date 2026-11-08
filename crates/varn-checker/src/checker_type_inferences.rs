@@ -131,11 +131,26 @@ pub(crate) fn collect_type_inferences(
                 );
             }
         }
+        TypeKind::Tuple(e_elems) => {
+            if let TypeKind::Tuple(a_elems) = table.get(actual.0) {
+                let e_ids = table.get_list(e_elems).to_vec();
+                let a_ids = table.get_list(a_elems).to_vec();
+                for (ea, aa) in e_ids.iter().zip(a_ids.iter()) {
+                    collect_type_inferences(
+                        &Type::resolved(*ea),
+                        &Type::resolved(*aa),
+                        params,
+                        out,
+                        table,
+                        interner,
+                    );
+                }
+            }
+        }
         TypeKind::Primitive(_)
         | TypeKind::Literal(_)
         | TypeKind::This
         | TypeKind::Intersection(_)
-        | TypeKind::Tuple(_)
         | TypeKind::Named(..)
         | TypeKind::TemplateLiteral(_)
         | TypeKind::Record(_)
