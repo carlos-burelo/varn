@@ -44,7 +44,7 @@ impl Checker<'_> {
             ExprKind::Paren { expression } => {
                 return self.literal_fits(rec, target, *expression, bind, depth + 1)
             }
-            ExprKind::Array { .. } | ExprKind::Object { .. } => expr,
+            ExprKind::Array { .. } | ExprKind::Object { .. } | ExprKind::Tuple { .. } => expr,
             ExprKind::IntLiteral { .. }
             | ExprKind::FloatLiteral { .. }
             | ExprKind::BigIntLiteral { .. }
@@ -60,7 +60,6 @@ impl Checker<'_> {
             | ExprKind::This
             | ExprKind::ImportMeta(_)
             | ExprKind::Super
-            | ExprKind::Tuple { .. }
             | ExprKind::Unary { .. }
             | ExprKind::Update { .. }
             | ExprKind::Binary { .. }
@@ -168,6 +167,22 @@ impl Checker<'_> {
                     ArrayEl::Hole => true,
                 });
             }
+        }
+        if let ExprKind::Tuple { elements } = &arena.expr(literal).kind {
+            let TypeKind::Tuple(list) = shape_kind else {
+                return false;
+            };
+            let slots: Vec<Type> = self
+                .ty_table
+                .get_list(list)
+                .iter()
+                .map(|id| Type::resolved(*id))
+                .collect();
+            return slots.len() == elements.len()
+                && elements
+                    .iter()
+                    .zip(&slots)
+                    .all(|(element, slot)| self.part_fits(rec, slot, *element, bind, depth));
         }
         if let (ExprKind::Object { properties }, TypeKind::Record(mid) | TypeKind::Interface(mid)) =
             (&arena.expr(literal).kind, shape_kind)
