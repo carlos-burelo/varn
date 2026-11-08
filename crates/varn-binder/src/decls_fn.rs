@@ -76,6 +76,8 @@ impl<'r> Binder<'r> {
             let name_rc: Arc<str> = Arc::from(self.interner.resolve(tp.name));
             let tp_ty = Type::named(name_rc, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
             let mut sym = Symbol::new(SymbolKind::TypeParameter, tp.name, line).with_type(tp_ty);
+            sym.type_param_constraints =
+                vec![tp.constraint.as_ref().map(|bound| self.resolve_type(bound))];
             sym.col = tp.range.start.column;
             sym.offset = tp.range.start.offset;
             self.define(tp.name, sym);
