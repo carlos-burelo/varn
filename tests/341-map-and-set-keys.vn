@@ -1,0 +1,59 @@
+import { describe, it, expect } from "std:test";
+
+class Account { id: int = 0 }
+enum Level { Low, High }
+struct Point { x: int; y: int }
+struct Labeled<T> { label: str; value: T }
+
+type Index<K extends Keyable> = Map<K, int>
+
+function counter<K extends Keyable>(keys: K[]): Map<K, int> {
+    const counts = new Map<K, int>()
+    for (const key of keys) {
+        counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+    return counts
+}
+
+await describe("341 map and set keys", async () => {
+    await it("scalars, enums and classes are keys", () => {
+        const byInt = new Map<int, str>()
+        byInt.set(1, "one")
+        const byStr = new Map<str, int>()
+        byStr.set("a", 1)
+        const byBool = new Map<bool, int>()
+        byBool.set(true, 1)
+        const byChar = new Map<char, int>()
+        byChar.set('a', 1)
+        const byLevel = new Map<Level, int>()
+        byLevel.set(Level.High, 2)
+        const account = new Account()
+        const byAccount = new Map<Account, int>()
+        byAccount.set(account, 3)
+        expect(byInt.get(1)).toBe("one")
+        expect(byStr.get("a")).toBe(1)
+        expect(byBool.get(true)).toBe(1)
+        expect(byChar.get('a')).toBe(1)
+        expect(byLevel.get(Level.High)).toBe(2)
+        expect(byAccount.get(account)).toBe(3)
+    })
+
+    await it("tuples and structs of keys are keys", () => {
+        const byTuple = new Map<(int, str), int>()
+        byTuple.set((1, "a"), 10)
+        const byStruct = new Map<Point, int>()
+        byStruct.set(new Point(1, 2), 30)
+        const byLabeled = new Set<Labeled<int>>()
+        byLabeled.add(new Labeled("n", 4))
+        expect(byTuple.get((1, "a"))).toBe(10)
+        expect(byStruct.get(new Point(1, 2))).toBe(30)
+        expect(byLabeled.size).toBe(1)
+    })
+
+    await it("a generic key that declares Keyable is a key", () => {
+        const counts = counter(["a", "b", "a"])
+        const keyed: Index<str> = counts
+        expect(keyed.get("a")).toBe(2)
+        expect(keyed.get("b")).toBe(1)
+    })
+})

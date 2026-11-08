@@ -1,0 +1,2 @@
+// expect: error[VN3037]
+const points: Set<{ x: int; y: int }> = new Set()

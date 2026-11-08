@@ -1,5 +1,5 @@
 use super::{CheckerTyTable, Type};
-use varn_core::{BuiltinType, CoreSum, RuntimeErrorKind, TypeKind};
+use varn_core::{BuiltinType, CoreSum, LangConstraint, RuntimeErrorKind, TypeKind};
 
 impl Type {
     pub fn builtin(b: BuiltinType, args: Vec<Type>, table: &mut CheckerTyTable) -> Self {
@@ -84,6 +84,13 @@ impl Type {
             .map(|&id| Type::resolved(id))
             .collect();
         Some((sum, args))
+    }
+
+    pub fn lang_constraint(&self, table: &CheckerTyTable) -> Option<LangConstraint> {
+        let TypeKind::Named(name, origin) = table.get(self.0) else {
+            return None;
+        };
+        LangConstraint::identify(name, origin)
     }
 
     pub fn core_error(kind: RuntimeErrorKind, table: &mut CheckerTyTable) -> Self {

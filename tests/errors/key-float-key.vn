@@ -1,0 +1,2 @@
+// expect: error[VN3037]
+const prices = new Map<float, str>()

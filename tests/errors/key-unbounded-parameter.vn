@@ -1,0 +1,4 @@
+// expect: error[VN3037]
+function index<K>(keys: K[]): Map<K, int> {
+    return new Map()
+}

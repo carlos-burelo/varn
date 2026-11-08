@@ -215,6 +215,17 @@ impl TypeContext for BindView<'_> {
         Some(self.bind.arena.get(id).kind)
     }
 
+    fn type_param_constraint(&self, name: &str) -> Option<Type> {
+        let scope = self.bind.scopes.get(self.scope);
+        let atom = self.bind.interner.get(name)?;
+        let id = scope.resolve(atom, &self.bind.scopes)?;
+        let symbol = self.bind.arena.get(id);
+        if symbol.kind != crate::symbol::SymbolKind::TypeParameter {
+            return None;
+        }
+        symbol.type_param_constraints.first().copied().flatten()
+    }
+
     fn source_file(&self) -> Option<&str> {
         Some(self.bind.source_file.as_ref())
     }

@@ -48,7 +48,9 @@ pub use diagnostics::{
 };
 pub use kinds::TypeKind;
 pub use kinds::TypeLiteral;
-pub use lang_type::{is_lang_type, BuiltinType, CoreSum, LangPrimitive, TYPE_ALIASES_MODULE};
+pub use lang_type::{
+    is_lang_type, BuiltinType, CoreSum, LangConstraint, LangPrimitive, TYPE_ALIASES_MODULE,
+};
 pub use opcode::OpCode;
 pub use source::{SourceLocation, SourceRange};
 

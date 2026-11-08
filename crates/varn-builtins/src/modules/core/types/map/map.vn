@@ -1,7 +1,9 @@
+import { Keyable } from "core:types/keyable";
+
 /**
  * Hash map from keys `K` to values `V`.
  */
-export declare class Map<K, V> {
+export declare class Map<K extends Keyable, V> {
     constructor();
     @throws(TypeError) get(key: K): V?;
     @throws(TypeError) set(key: K, value: V): void;

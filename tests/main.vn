@@ -329,6 +329,7 @@ import "./337-destructuring-assignment.vn"
 import "./338-match-patterns.vn"
 import "./339-record-and-interface-types.vn"
 import "./340-is-tests-identity.vn"
+import "./341-map-and-set-keys.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

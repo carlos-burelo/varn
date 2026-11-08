@@ -1,5 +1,6 @@
 use super::arrays::array_arms;
 use super::generics::generic_arms;
+use super::keyable::constraint_shortcut;
 use super::nominal::{class_value_arm, nominal_arms};
 use super::objects::{object_arm, record_arm};
 use super::scalar::{is_simple_type, simple_types_compatible, t};
@@ -45,6 +46,9 @@ pub fn types_compatible_with_cache(
     if let Some(fits) = unknown_shortcut(declared, inferred) {
         return fits;
     }
+    if let Some(fits) = constraint_shortcut(declared, inferred, bind, table) {
+        return fits;
+    }
     if declared == inferred {
         return true;
     }
@@ -72,6 +76,9 @@ pub(super) fn types_compatible_impl(
         return true;
     }
     if let Some(fits) = unknown_shortcut(declared, inferred) {
+        return fits;
+    }
+    if let Some(fits) = constraint_shortcut(declared, inferred, bind, table) {
         return fits;
     }
     if declared == inferred {

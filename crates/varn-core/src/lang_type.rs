@@ -252,6 +252,34 @@ impl CoreSum {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum LangConstraint {
+    Keyable,
+}
+
+impl LangConstraint {
+    pub const ALL: [Self; 1] = [Self::Keyable];
+
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Keyable => "Keyable",
+        }
+    }
+
+    pub const fn module(self) -> &'static str {
+        match self {
+            Self::Keyable => "core:types/keyable",
+        }
+    }
+
+    pub fn identify(name: Atom, origin: Option<Atom>) -> Option<Self> {
+        let origin = origin?;
+        Self::ALL
+            .into_iter()
+            .find(|c| Atom::of_const(c.name()) == name && Atom::of_const(c.module()) == origin)
+    }
+}
+
 pub fn is_lang_type(name: Atom, origin: Option<Atom>) -> bool {
     LangPrimitive::identify(name, origin).is_some() || BuiltinType::identify(name, origin).is_some()
 }

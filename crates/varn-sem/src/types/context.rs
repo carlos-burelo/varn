@@ -41,6 +41,9 @@ pub trait TypeContext {
     fn symbol_kind(&self, _name: &str) -> Option<crate::symbol::SymbolKind> {
         None
     }
+    fn type_param_constraint(&self, _name: &str) -> Option<Type> {
+        None
+    }
     fn source_file(&self) -> Option<&str>;
 
     fn get_alias_node(&self, _name: &str) -> Option<(Vec<String>, varn_core::ast::TypeNode)> {

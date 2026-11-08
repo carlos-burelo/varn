@@ -70,6 +70,7 @@ pub(super) fn run_pass(
 ) {
     profile::timed(&mut profile.check_stmts, || {
         checker.check_stmts(rec, &program.body, bind);
+        checker.check_generic_type_uses(bind);
         checker.check_definite_assignment(program, bind);
     });
 

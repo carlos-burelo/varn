@@ -1,0 +1,2 @@
+// expect: error[VN3037]
+const seen: Map<int[], bool> = new Map()
