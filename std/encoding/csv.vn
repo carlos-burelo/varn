@@ -9,7 +9,7 @@ export interface CsvOptions {
 }
 
 export namespace Csv {
-    export function parse<T = { [key: str]: CsvValue }>(text: str, options?: CsvOptions): T[] {
+    export function parse<T = Map<str, CsvValue>>(text: str, options?: CsvOptions): T[] {
         let delim = ",";
         let hasHeader = true;
         let trim = true;

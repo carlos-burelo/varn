@@ -48,13 +48,13 @@ async function fetchFails(port: int, script: str): Task<bool> {
 
 await describe("323 http refuses hostile input", async () => {
     const server = new HttpServer();
-    server.post("/echo", async (req: Request) => new Response(req.text(), 200, {}));
-    server.get("/hello", async (req: Request) => new Response("hello", 200, {}));
-    server.get("/inject", async (req: Request) => new Response("x", 200, { "X-A": "ok\r\nSet-Cookie: pwn=1" }));
-    server.get("/inject-name", async (req: Request) => new Response("x", 200, { "X-A\r\nX-B": "v" }));
-    server.get("/cookie", async (req: Request) => new Response("x", 200, {}).setCookie("a", "b; Domain=evil.example"));
+    server.post("/echo", async (req: Request) => new Response(req.text(), 200));
+    server.get("/hello", async (req: Request) => new Response("hello", 200));
+    server.get("/inject", async (req: Request) => new Response("x", 200, new Map<str, str>([("X-A", "ok\r\nSet-Cookie: pwn=1")])));
+    server.get("/inject-name", async (req: Request) => new Response("x", 200, new Map<str, str>([("X-A\r\nX-B", "v")])));
+    server.get("/cookie", async (req: Request) => new Response("x", 200).setCookie("a", "b; Domain=evil.example"));
     server.get("/status-text", async (req: Request) => {
-        const res = new Response("x", 200, {});
+        const res = new Response("x", 200);
         res.statusText = "OK\r\nX-Evil: 1";
         return res;
     });

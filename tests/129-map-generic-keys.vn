@@ -12,7 +12,7 @@ letters.set('a', 1)
 let keySum = 0
 const counts: Map<int, int> = new Map()
 
-const index: { [key: str]: int } = { a: 1 }
+const index = new Map<str, int>([("a", 1)])
 await describe("129 map generic keys", async () => {
         await it("group 1 part 1", async () => {
         byId.set(1, "one")

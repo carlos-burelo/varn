@@ -7,7 +7,7 @@ import { isIP, isIPv4, isIPv6, encodeURIComponent, decodeURIComponent } from "st
 async function runHttpVerification() {
     let live = new HttpServer();
     live.get("/", async (req: Request) => json({ ok: true }));
-    live.post("/api", async (req: Request) => new Response(req.text(), 200, {}));
+    live.post("/api", async (req: Request) => new Response(req.text(), 200));
     live.listen(19881);
     await delay(150);
 
@@ -17,13 +17,13 @@ async function runHttpVerification() {
     expect(getRes.text().indexOf('"ok":true') != null).toBeTruthy();
 
     // 2. Test Client: Fetch POST with body & headers
-    let postRes = await fetch("http://127.0.0.1:19881/api", { method: HttpMethod.POST, headers: { "Content-Type": "application/json" }, body: '{"message":"hello"}' });
+    let postRes = await fetch("http://127.0.0.1:19881/api", { method: HttpMethod.POST, headers: new Map<str, str>([("Content-Type", "application/json")]), body: '{"message":"hello"}' });
     expect(postRes.status).toBe(200);
     expect(postRes.text()).toBe('{"message":"hello"}');
     live.close();
 
     // 3. Web Standard Headers
-    let hdrs = new Headers({ "Content-Type": "application/json", "X-Varn-Engine": "v1" });
+    let hdrs = new Headers(new Map<str, str>([("Content-Type", "application/json"), ("X-Varn-Engine", "v1")]));
     expect(hdrs.get("content-type")).toBe("application/json");
     expect(hdrs.has("x-varn-engine")).toBe(true);
     hdrs.set("Authorization", "Bearer token123");
@@ -34,7 +34,7 @@ async function runHttpVerification() {
     // 4. Web Standard Request & Response
     let req = new Request("http://localhost:8080/api/users", {
         method: HttpMethod.POST,
-        headers: { "Accept": "application/json" },
+        headers: new Map<str, str>([("Accept", "application/json")]),
         body: '{"name":"Varn"}'
     });
     expect(req.method).toBe(HttpMethod.POST);
@@ -64,7 +64,7 @@ async function runHttpVerification() {
         return json({ created: true });
     })
     .get("/api/v1/users/:id", async (req: Request) => {
-        return new Response("<h1>User Profile</h1>", 200, { "Content-Type": "text/html" });
+        return new Response("<h1>User Profile</h1>", 200, new Map<str, str>([("Content-Type", "text/html")]));
     });
 
     // 6. Net helpers from std:net

@@ -6,16 +6,16 @@ function gcChurn(n: int): int {
     return junk.length;
 }
 
-function buildMaps(n: int): { [key: str]: int }[] {
-    let out: { [key: str]: int }[] = [];
+function buildMaps(n: int): Map<str, int>[] {
+    let out: Map<str, int>[] = [];
     for (let i = 0; i < n; i = i + 1) {
-        out.push({ "alpha": i, "beta": i * 2, "gamma": i * 3 });
+        out.push(new Map([("alpha", i), ("beta", i * 2), ("gamma", i * 3)]));
     }
     return out;
 }
 
 function fillByIndex(n: int): int {
-    let m: { [key: str]: int } = {};
+    const m = new Map<str, int>();
     for (let i = 0; i < n; i = i + 1) { m[`slot-${(i % 40)}`] = i; }
     let total = 0;
     for (let i = 0; i < 40; i = i + 1) { total = total + (m[`slot-${i}`] as int); }
@@ -23,7 +23,7 @@ function fillByIndex(n: int): int {
 }
 
 await describe("160 Map/Set representation", async () => {
-    await it("literal maps keep their values across GC", () => {
+    await it("maps built from entries keep their values across GC", () => {
         const maps = buildMaps(50000);
         gcChurn(300000);
         let sum = 0;
@@ -70,7 +70,7 @@ await describe("160 Map/Set representation", async () => {
     });
 
     await it("runtime-built keys find literal entries", () => {
-        let m: { [key: str]: str } = { "authorization": "Bearer t", "content-type": "json" };
+        const m = new Map([("authorization", "Bearer t"), ("content-type", "json")]);
         let suffixes = ["type", "length"];
         let hits = 0;
         for (let i = 0; i < 20000; i = i + 1) {

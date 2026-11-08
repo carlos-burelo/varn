@@ -20,7 +20,7 @@ async function rawGet(port: int, path: str): Task<str> {
 
 await describe("295 the http server sends the response headers it was given", async () => {
     const server = new HttpServer();
-    server.get("/custom", async (req: Request) => new Response("x", 200, { "X-Test": "1", "Location": "/z" }));
+    server.get("/custom", async (req: Request) => new Response("x", 200, new Map<str, str>([("X-Test", "1"), ("Location", "/z")])));
     server.get("/json", async (req: Request) => json({ ok: true }));
     server.listen(19940);
     await delay(150);

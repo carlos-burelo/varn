@@ -74,7 +74,7 @@ await describe("31 stdlib migration test", async () => {
         expect(json_str.length > 0).toBeTruthy()
         expect(json_str.includes("Varn")).toBeTruthy()
         
-        let back = Json.parse<{ [k: str]: JsonValue }>(json_str);
+        let back = Json.parse<Map<str, JsonValue>>(json_str);
         expect(back["name"]).toBe("Varn")
         expect(back["version"]).toBe(1)
         

@@ -75,7 +75,7 @@ function callMethods(a: Acc, i: int): int {
 }
 function callValues(f: (n: int?) => int, i: int): int { return f(i) + f(null) }
 function imported(init: dynamic): str {
-    try { const h = new Headers(init as { [key: str]: str }?); return h.get("a") ?? "absent" } catch (e) { return (e as Error).name }
+    try { const h = new Headers(init as Map<str, str>?); return h.get("a") ?? "absent" } catch (e) { return (e as Error).name }
 }
 function build(i: int): int { return new Acc(i).total + new Pt(i).x + (new Pt(i, 3).y ?? 0) }
 
@@ -118,11 +118,13 @@ await describe("188 call shape and optional parameters", async () => {
     })
 
     await it("an imported class brings its constructor signature", () => {
-        for (let i = 0; i < 300; i = i + 1) { imported({ a: "1" }) }
-        expect(imported({ a: "1" })).toBe("1")
-        expect(imported({})).toBe("absent")
+        const given = new Map([("a", "1")])
+        for (let i = 0; i < 300; i = i + 1) { imported(given) }
+        expect(imported(given)).toBe("1")
+        expect(imported(new Map<str, str>())).toBe("absent")
         expect(imported(null)).toBe("absent")
         expect(imported(5)).toBe("TypeError")
+        expect(imported({ a: "1" })).toBe("TypeError")
         expect(new Headers().get("a")).toBe(null)
     })
 

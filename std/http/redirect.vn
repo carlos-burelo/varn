@@ -43,12 +43,12 @@ export function redirectedMethod(status: int, method: HttpMethod): HttpMethod {
 }
 
 export function redirectedHeaders(
-    headers: { [key: str]: str },
+    headers: Map<str, str>,
     dropBody: bool,
     crossOrigin: bool
-): { [key: str]: str } {
-    const out: { [key: str]: str } = {};
-    for (let key in headers) {
+): Map<str, str> {
+    const out = new Map<str, str>();
+    for (const (key, value) of headers) {
         const lower = key.toLowerCase();
         if (lower == "host") {
             continue;
@@ -59,10 +59,7 @@ export function redirectedHeaders(
         if (crossOrigin && CREDENTIAL_HEADERS.includes(lower)) {
             continue;
         }
-        const value = headers[key];
-        if (value != null) {
-            out[key] = value;
-        }
+        out.set(key, value);
     }
     return out;
 }

@@ -1,7 +1,7 @@
 import { LogLevel } from "std:log/level";
 import { writeln } from "std:io";
 import { now, toISOString } from "std:time";
-import { Json, JsonValue } from "std:encoding";
+import { Json } from "std:encoding";
 import { Color } from "std:cli/color";
 
 export class Logger {
@@ -54,7 +54,7 @@ export class Logger {
         return new Logger(childName, this._minLevel, this._jsonOutput, this._useColors, this._sink);
     }
 
-    log(level: LogLevel, message: str, meta?: { [key: str]: JsonValue }): void {
+    log<T = null>(level: LogLevel, message: str, meta?: T): void {
         if (this._levelPriority(level) < this._levelPriority(this._minLevel)) {
             return;
         }
@@ -64,16 +64,22 @@ export class Logger {
 
         let outputLine: str = "";
         if (this._jsonOutput) {
-            let record: { [key: str]: JsonValue } = {
-                "timestamp": timestampStr,
-                "level": levelTag,
-                "target": this._name,
-                "message": message
-            };
             if (meta != null) {
-                record["meta"] = meta;
+                outputLine = Json.stringify({
+                    timestamp: timestampStr,
+                    level: levelTag,
+                    target: this._name,
+                    message: message,
+                    meta: meta
+                });
+            } else {
+                outputLine = Json.stringify({
+                    timestamp: timestampStr,
+                    level: levelTag,
+                    target: this._name,
+                    message: message
+                });
             }
-            outputLine = Json.stringify(record);
         } else {
             let tagStr = levelTag;
             if (this._useColors) {
@@ -94,23 +100,23 @@ export class Logger {
         }
     }
 
-    trace(message: str, meta?: { [key: str]: JsonValue }): void {
+    trace<T = null>(message: str, meta?: T): void {
         this.log(LogLevel.Trace, message, meta);
     }
 
-    debug(message: str, meta?: { [key: str]: JsonValue }): void {
+    debug<T = null>(message: str, meta?: T): void {
         this.log(LogLevel.Debug, message, meta);
     }
 
-    info(message: str, meta?: { [key: str]: JsonValue }): void {
+    info<T = null>(message: str, meta?: T): void {
         this.log(LogLevel.Info, message, meta);
     }
 
-    warn(message: str, meta?: { [key: str]: JsonValue }): void {
+    warn<T = null>(message: str, meta?: T): void {
         this.log(LogLevel.Warn, message, meta);
     }
 
-    error(message: str, meta?: { [key: str]: JsonValue }): void {
+    error<T = null>(message: str, meta?: T): void {
         this.log(LogLevel.Error, message, meta);
     }
 

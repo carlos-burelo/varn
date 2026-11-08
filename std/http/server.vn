@@ -18,13 +18,13 @@ const ALL_METHODS: HttpMethod[] = [
     HttpMethod.TRACE
 ];
 
-type Matched = { handler: Handler; params: { [key: str]: str } };
+type Matched = { handler: Handler; params: Map<str, str> };
 
 export class HttpServer {
     private _port: int = 0;
     private _listenerId: int = -1;
     private _isListening: bool = false;
-    private _staticRoutes: { [key: str]: Route[] } = {};
+    private _staticRoutes: Map<str, Route[]> = new Map<str, Route[]>();
     private _dynamicRoutes: Route[] = [];
     private _middlewares: Middleware[] = [];
     private _fetchHandler: Handler? = null;
@@ -32,7 +32,7 @@ export class HttpServer {
     private _readTimeoutMs: int = 30000;
 
     constructor(fetchHandler?: Handler) {
-        this._staticRoutes = {};
+        this._staticRoutes = new Map<str, Route[]>();
         this._dynamicRoutes = [];
         this._middlewares = [];
         this._maxContentLength = 10485760;
@@ -57,9 +57,9 @@ export class HttpServer {
     route(method: HttpMethod?, pattern: str, handler: Handler): HttpServer {
         let route = new Route(method, pattern, handler);
         if (route.isStatic) {
-            let bucket = this._staticRoutes[pattern];
+            let bucket = this._staticRoutes.get(pattern);
             if (bucket == null) {
-                this._staticRoutes[pattern] = [route];
+                this._staticRoutes.set(pattern, [route]);
             } else {
                 bucket.push(route);
             }
@@ -176,12 +176,12 @@ export class HttpServer {
             await this._sendChunked(connId, responseObj, stream);
             return;
         }
-        let hdrs = responseObj.headers.toObject();
+        let hdrs = responseObj.headers.toMap();
         await sendHttpResponse$(connId, responseObj.status, responseObj.statusText, hdrs, responseObj.body, responseObj.cookies);
     }
 
     private async _sendChunked(connId: int, responseObj: Response, reader: AsyncReader): Task<void> {
-        await sendHttpHead$(connId, responseObj.status, responseObj.statusText, responseObj.headers.toObject(), responseObj.cookies);
+        await sendHttpHead$(connId, responseObj.status, responseObj.statusText, responseObj.headers.toMap(), responseObj.cookies);
         let reading = true;
         while (reading) {
             let chunk = await reader.read(8192);
@@ -200,11 +200,11 @@ export class HttpServer {
     }
 
     private _match(method: HttpMethod, pathOnly: str): Matched? {
-        let bucket = this._staticRoutes[pathOnly];
+        let bucket = this._staticRoutes.get(pathOnly);
         if (bucket != null) {
             for (let route of bucket) {
                 if (route.accepts(method)) {
-                    return { handler: route.handler, params: {} };
+                    return { handler: route.handler, params: new Map<str, str>() };
                 }
             }
         }
@@ -219,7 +219,7 @@ export class HttpServer {
         }
         let fallback = this._fetchHandler;
         if (fallback != null) {
-            return { handler: fallback, params: {} };
+            return { handler: fallback, params: new Map<str, str>() };
         }
         return null;
     }
@@ -239,20 +239,20 @@ export class HttpServer {
         reqObj.path = pathOnly;
         reqObj.payload = rawReq.payload;
 
-        let queryObj: { [key: str]: str } = {};
+        const queryMap = new Map<str, str>();
         if (queryStr.length > 0) {
             let pairs = queryStr.split("&");
             for (let i = 0; i < pairs.length; i = i + 1) {
                 let pair = pairs[i];
                 let eqIdx = pair.indexOf("=");
                 if (eqIdx != null && eqIdx > 0) {
-                    queryObj[pair.slice(0, eqIdx)] = pair.slice(eqIdx + 1);
+                    queryMap.set(pair.slice(0, eqIdx), pair.slice(eqIdx + 1));
                 } else {
-                    queryObj[pair] = "true";
+                    queryMap.set(pair, "true");
                 }
             }
         }
-        reqObj.query = queryObj;
+        reqObj.query = queryMap;
         if (matched != null) {
             reqObj.params = matched.params;
         }
@@ -276,7 +276,7 @@ export class HttpServer {
         if (finalResp != null) {
             await self._sendWebResponse(connId, finalResp);
         } else {
-            let notFoundHeaders: { [key: str]: str } = { "Content-Type": "text/plain" };
+            let notFoundHeaders = new Map<str, str>([("Content-Type", "text/plain")]);
             await sendHttpResponse$(connId, 404, "Not Found", notFoundHeaders, "Not Found", []);
         }
     }
@@ -289,11 +289,11 @@ export class HttpServer {
             try {
                 rawReq = await Task.timeout(readHttpRequest(wire, this._maxContentLength), this._readTimeoutMs);
             } catch (err: TimeoutError) {
-                let errHeaders: { [key: str]: str } = { "Content-Type": "text/plain", "Connection": "close" };
+                let errHeaders = new Map<str, str>([("Content-Type", "text/plain"), ("Connection", "close")]);
                 await this._sendBestEffort(connId, 408, "Request Timeout", errHeaders, "Request Timeout");
                 break;
             } catch (err: HttpRejection) {
-                let errHeaders: { [key: str]: str } = { "Content-Type": "text/plain", "Connection": "close" };
+                let errHeaders = new Map<str, str>([("Content-Type", "text/plain"), ("Connection", "close")]);
                 await this._sendBestEffort(connId, err.status, err.reason, errHeaders, err.reason);
                 break;
             } catch (err) {
@@ -302,20 +302,20 @@ export class HttpServer {
             if (rawReq == null) {
                 break;
             }
-            let connHdr = rawReq.headers["connection"];
+            let connHdr = rawReq.headers.get("connection");
             if (connHdr != null && connHdr.toLowerCase() == "close") {
                 keepAlive = false;
             }
             let method = rawReq.method;
             if (method == null) {
-                let errHeaders: { [key: str]: str } = { "Content-Type": "text/plain", "Connection": "close" };
+                let errHeaders = new Map<str, str>([("Content-Type", "text/plain"), ("Connection", "close")]);
                 await sendHttpResponse$(connId, 501, "Not Implemented", errHeaders, "Not Implemented", []);
                 break;
             }
             try {
                 await this._respond(connId, rawReq, method);
             } catch (err) {
-                let errHeaders: { [key: str]: str } = { "Content-Type": "text/plain", "Connection": "close" };
+                let errHeaders = new Map<str, str>([("Content-Type", "text/plain"), ("Connection", "close")]);
                 await this._sendBestEffort(connId, 500, "Internal Server Error", errHeaders, "Internal Server Error");
                 break;
             }
@@ -323,7 +323,7 @@ export class HttpServer {
         tcpClose$(connId);
     }
 
-    private async _sendBestEffort(connId: int, status: int, statusText: str, headers: { [key: str]: str }, body: str): Task<void> {
+    private async _sendBestEffort(connId: int, status: int, statusText: str, headers: Map<str, str>, body: str): Task<void> {
         try {
             await sendHttpResponse$(connId, status, statusText, headers, body, []);
         } catch (err) {

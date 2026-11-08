@@ -91,26 +91,24 @@ function testMsgPackStructured(): void {
         expect(listDec[4]).toBe(true);;
 
     // Objects / Maps
-    let user: MsgPackValue = {
-        name: "Alice",
-        age: 30,
-        active: true,
-        skills: ["systems", "compilers"],
-        meta: {
-            tier: 1
-        }
-    };
+    let user: MsgPackValue = new Map<str, MsgPackValue>([
+        ("name", "Alice"),
+        ("age", 30),
+        ("active", true),
+        ("skills", ["systems", "compilers"]),
+        ("meta", new Map<str, MsgPackValue>([("tier", 1)]))
+    ]);
 
     let userEnc = MsgPack.encode(user);
-    let userDec = MsgPack.decode(userEnc) as { [key: str]: MsgPackValue };
-        expect(userDec["name"]).toBe("Alice");;
-        expect(userDec["age"]).toBe(30);;
-        expect(userDec["active"]).toBe(true);;
-        let skills = userDec["skills"] as str[];
+    let userDec = MsgPack.decode(userEnc) as Map<str, MsgPackValue>;
+        expect(userDec.get("name")).toBe("Alice");;
+        expect(userDec.get("age")).toBe(30);;
+        expect(userDec.get("active")).toBe(true);;
+        let skills = userDec.get("skills") as str[];
         expect(skills.length).toBe(2);;
         expect(skills[0]).toBe("systems");;
         expect(skills[1]).toBe("compilers");;
-        expect((userDec["meta"] as { [key: str]: int })["tier"]).toBe(1);;
+        expect((userDec.get("meta") as Map<str, MsgPackValue>).get("tier")).toBe(1);;
 
 }
 await describe("115 crypto kdf and msgpack", async () => {

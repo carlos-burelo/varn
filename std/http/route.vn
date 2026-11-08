@@ -9,7 +9,7 @@ export type Middleware = (req: Request, next: Next) => Task<Response?>;
 export class Route {
     method: HttpMethod?;
     segments: str[];
-    paramNames: { [key: int]: str };
+    paramNames: Map<int, str>;
     isWildcard: bool;
     isStatic: bool;
     handler: Handler;
@@ -20,7 +20,7 @@ export class Route {
         this.isWildcard = pattern == "*";
         this.isStatic = !this.isWildcard && pattern.indexOf(":") == null;
         this.segments = [];
-        this.paramNames = {};
+        this.paramNames = new Map<int, str>();
 
         if (!this.isWildcard) {
             let segs = pattern.split("/");
@@ -28,7 +28,7 @@ export class Route {
                 let s = segs[i];
                 if (s.startsWith(":")) {
                     this.segments.push(":");
-                    this.paramNames[i] = s.slice(1);
+                    this.paramNames.set(i, s.slice(1));
                 } else {
                     this.segments.push(s);
                 }
@@ -40,27 +40,27 @@ export class Route {
         return this.method == null || this.method == method;
     }
 
-    match(method: HttpMethod, pathSegments: str[]): { [key: str]: str }? {
+    match(method: HttpMethod, pathSegments: str[]): Map<str, str>? {
         if (!this.accepts(method)) {
             return null;
         }
 
         if (this.isWildcard) {
-            return {};
+            return new Map<str, str>();
         }
 
         if (this.segments.length != pathSegments.length) {
             return null;
         }
 
-        let params: { [key: str]: str } = {};
+        const params = new Map<str, str>();
         for (let i = 0; i < this.segments.length; i = i + 1) {
             let seg = this.segments[i];
             let reqSeg = pathSegments[i];
             if (seg == ":") {
-                let paramName = this.paramNames[i];
+                let paramName = this.paramNames.get(i);
                 if (paramName != null) {
-                    params[paramName] = reqSeg;
+                    params.set(paramName, reqSeg);
                 }
             } else if (seg != reqSeg) {
                 return null;

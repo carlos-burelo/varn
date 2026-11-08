@@ -20,7 +20,7 @@ function pipe<A>(val: A, fns: ((A) => A)[]): A {
 
 // ── memoize: closure capturing cache ─────────────────────────────
 function memoize<A, B>(f: (A) => B): (A) => B {
-    const cache: { [key: str]: B } = {}
+    const cache = new Map<str, B>()
     return (arg: A) => {
         const key = "" + arg
         const hit = cache[key]

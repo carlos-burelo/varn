@@ -21,7 +21,7 @@ class Route {
         }
     }
 
-    match(method: str, pathSegments: str[]): { [key: str]: str }? {
+    match(method: str, pathSegments: str[]): Map<str, str>? {
         if (this.method != "*" && this.method != method) {
             return null;
         }
@@ -37,7 +37,7 @@ class Route {
             }
         }
 
-        let params: { [key: str]: str } = {};
+        const params = new Map<str, str>();
         for (let i = 0; i < this.segments.length; i = i + 1) {
             let seg = this.segments[i];
             if (seg.startsWith(":")) {
@@ -53,17 +53,17 @@ class ReqContext {
     method: str;
     url: str;
     path: str;
-    headers: { [key: str]: str };
-    params: { [key: str]: str };
-    query: { [key: str]: str };
+    headers: Map<str, str>;
+    params: Map<str, str>;
+    query: Map<str, str>;
     user: str?;
 
-    constructor(method: str, url: str, headers: { [key: str]: str }) {
+    constructor(method: str, url: str, headers: Map<str, str>) {
         this.method = method;
         this.url = url;
         this.headers = headers;
-        this.params = {};
-        this.query = {};
+        this.params = new Map<str, str>();
+        this.query = new Map<str, str>();
         this.user = null;
 
         let qIdx = url.indexOf("?");
@@ -88,10 +88,10 @@ class ReqContext {
 
 class ResContext {
     status: int;
-    headers: { [key: str]: str };
+    headers: Map<str, str>;
     body: str;
 
-    constructor(status: int, body: str, headers: { [key: str]: str }) {
+    constructor(status: int, body: str, headers: Map<str, str>) {
         this.status = status;
         this.body = body;
         this.headers = headers;
@@ -113,7 +113,7 @@ class Router {
         // 1. Auth Middleware
         let auth = req.headers["authorization"];
         if (auth == null || !auth.startsWith("Bearer ")) {
-            return new ResContext(401, Json.stringify({ error: "Unauthorized" }), { "Content-Type": "application/json" });
+            return new ResContext(401, Json.stringify({ error: "Unauthorized" }), new Map([("Content-Type", "application/json")]));
         }
         req.user = "user_" + auth.slice(7, 12);
 
@@ -137,18 +137,18 @@ class Router {
             }
         }
 
-        return new ResContext(404, Json.stringify({ error: "Not Found" }), { "Content-Type": "application/json" });
+        return new ResContext(404, Json.stringify({ error: "Not Found" }), new Map([("Content-Type", "application/json")]));
     }
 }
 
 // Setup 20 Production REST Routes
 let router = new Router();
 
-function jsonRes(status: int, data: dynamic): ResContext {
-    return new ResContext(status, Json.stringify(data), {
-        "Content-Type": "application/json",
-        "X-Powered-By": "Varn-Native-Router"
-    });
+function jsonRes<T>(status: int, data: T): ResContext {
+    return new ResContext(status, Json.stringify(data), new Map([
+        ("Content-Type", "application/json"),
+        ("X-Powered-By", "Varn-Native-Router")
+    ]));
 }
 
 router.add("GET", "/api/v1/health", (req: ReqContext) => jsonRes(200, { status: "OK", uptime: 3600 }));
@@ -191,11 +191,11 @@ let methods = ["GET", "GET", "GET", "GET", "GET", "GET", "GET", "DELETE", "GET",
 let reqs: ReqContext[] = [];
 for (let i = 0; i < 100000; i = i + 1) {
     let idx = i % 10;
-    let hdrs: { [key: str]: str } = {
-        "authorization": `Bearer token_secret_${(i % 1000)}`,
-        "content-type": "application/json",
-        "user-agent": "VarnBench/1.0"
-    };
+    const hdrs = new Map([
+        ("authorization", `Bearer token_secret_${(i % 1000)}`),
+        ("content-type", "application/json"),
+        ("user-agent", "VarnBench/1.0")
+    ]);
     reqs.push(new ReqContext(methods[idx], samplePaths[idx], hdrs));
 }
 

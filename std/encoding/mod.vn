@@ -4,5 +4,5 @@ export { Base64 } from "std:encoding/base64";
 export { Base32 } from "std:encoding/base32";
 export { Hex } from "std:encoding/hex";
 export { Html } from "std:encoding/html";
-export { Toml } from "std:encoding/toml";
+export { Toml, TomlValue } from "std:encoding/toml";
 export { MsgPack, MsgPackValue } from "std:encoding/msgpack";

@@ -28,7 +28,7 @@ function testHttpServerAndClientApis(): void {
         expect(res.status).toBe(200);;
         expect(res.ok).toBeTruthy();;
         expect(res.statusText).toBe("OK");;
-    let parsedJson = res.json() as { [key: str]: JsonValue };
+    let parsedJson = res.json() as Map<str, JsonValue>;
         expect(parsedJson["message"]).toBe("Success");;
 
     let errRes = new Response("boom", 404);

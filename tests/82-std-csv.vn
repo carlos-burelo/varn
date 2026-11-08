@@ -31,7 +31,7 @@ let serializedMatrix = Csv.stringify(matrix);
 let roundtripMatrix = Csv.parse<CsvValue[]>(serializedMatrix, { hasHeader: false });
 
 // 8. JSON Namespace validation (Json.parse, Json.stringify)
-let jsonObj = Json.parse<{ [key: str]: JsonValue }>("{\"message\": \"hello\", \"status\": 200}");
+let jsonObj = Json.parse<Map<str, JsonValue>>("{\"message\": \"hello\", \"status\": 200}");
 let jsonStr = Json.stringify(jsonObj);
 
 // 9. Generic Typed Json.parse<T> & Csv.parse<T>

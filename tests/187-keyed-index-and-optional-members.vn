@@ -10,7 +10,7 @@ function tally(words: str[]): Map<str, int> {
 function lookup(seen: Map<str, int>, key: str): int { return seen[key] ?? -1 }
 function ensure(seen: Map<str, int>, key: str): int { seen[key] ??= 10; return seen[key]! }
 function maybe(seen: Map<str, int>, key: str): int? { return seen[key] }
-function dictRead(d: { [key: str]: str }, key: str): str { return d[key] ?? "missing" }
+function entryRead(d: Map<str, str>, key: str): str { return d[key] ?? "missing" }
 
 function makePart(tag: str?): Part { return { name: "p", tag: tag } }
 function tagOf(p: Part): str { return p.tag ?? "none" }
@@ -20,11 +20,9 @@ function describeValue(value: str | str[] | null): int {
     if (value == null) { return -1 }
     if (value is str[]) { return value.length } else { return size(value) }
 }
-function afterContinue(q: { [key: str]: str | str[] }): int {
+function afterContinue(q: Map<str, str | str[]>): int {
     let n = 0
-    for (const key in q) {
-        const value = q[key]
-        if (value == null) { continue }
+    for (const (key, value) of q) {
         if (value is str[]) {
             for (const item of value) { n = n + size(item) }
         } else {
@@ -68,10 +66,10 @@ await describe("187 keyed index and optional members", async () => {
         expect(seen.size).toBe(2)
     })
 
-    await it("an index signature behaves like a map", () => {
-        const d: { [key: str]: str } = { x: "1" }
-        expect(dictRead(d, "x")).toBe("1")
-        expect(dictRead(d, "nope")).toBe("missing")
+    await it("a map built from entries reads a missing key as null", () => {
+        const d = new Map([("x", "1")])
+        expect(entryRead(d, "x")).toBe("1")
+        expect(entryRead(d, "nope")).toBe("missing")
     })
 
     await it("an optional member accepts null and reads as nullable", () => {
@@ -87,7 +85,7 @@ await describe("187 keyed index and optional members", async () => {
         expect(describeValue(null)).toBe(-1)
         expect(describeValue("abc")).toBe(3)
         expect(describeValue(["a", "b"])).toBe(2)
-        expect(afterContinue({ a: "xx", b: ["y", "zzz"] })).toBe(6)
+        expect(afterContinue(new Map<str, str | str[]>([("a", "xx"), ("b", ["y", "zzz"])]))).toBe(6)
         expect(parenthesised("four")).toBe(4)
         expect(parenthesised(null)).toBe(0)
     })

@@ -1,57 +1,39 @@
 export class Headers {
-    private _map: { [key: str]: str } = {};
+    private _map: Map<str, str> = new Map<str, str>();
 
-    constructor(init: { [key: str]: str } = {}) {
-        this._map = {};
-        for (let k in init) {
-            this.set(k, init[k]!);
+    constructor(init: Map<str, str> = new Map<str, str>()) {
+        for (const (name, value) of init) {
+            this.set(name, value);
         }
     }
 
     get(name: str): str? {
-        let key = name.toLowerCase();
-        return this._map[key];
+        return this._map.get(name.toLowerCase());
     }
 
     set(name: str, value: str): void {
-        let key = name.toLowerCase();
-        this._map[key] = value;
+        this._map.set(name.toLowerCase(), value);
     }
 
     has(name: str): bool {
-        let key = name.toLowerCase();
-        return this._map[key] != null;
+        return this._map.has(name.toLowerCase());
     }
 
     delete(name: str): void {
-        let key = name.toLowerCase();
-        let newMap: { [key: str]: str } = {};
-        for (let k in this._map) {
-            if (k != key) {
-                newMap[k] = this._map[k]!;
-            }
-        }
-        this._map = newMap;
+        this._map.delete(name.toLowerCase());
     }
 
     append(name: str, value: str): void {
-        let key = name.toLowerCase();
-        let existing = this._map[key];
+        const key = name.toLowerCase();
+        const existing = this._map.get(key);
         if (existing != null) {
-            this._map[key] = existing + ", " + value;
+            this._map.set(key, existing + ", " + value);
         } else {
-            this._map[key] = value;
+            this._map.set(key, value);
         }
     }
 
-    toObject(): { [key: str]: str } {
-        let result: { [key: str]: str } = {};
-        for (let k in this._map) {
-            let v = this._map[k];
-            if (v != null) {
-                result[k] = v;
-            }
-        }
-        return result;
+    toMap(): Map<str, str> {
+        return new Map<str, str>(this._map.entries());
     }
 }

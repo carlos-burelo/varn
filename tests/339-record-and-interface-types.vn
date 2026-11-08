@@ -44,8 +44,8 @@ await describe("339 record and interface types", async () => {
     })
 
     await it("the right side of ?? is typed by the left", () => {
-        const given: { [key: str]: str }? = null
-        const headers = given ?? {}
+        const given: Map<str, str>? = null
+        const headers: Map<str, str> = given ?? new Map()
         expect(headers["x"]).toBe(null)
     })
 })

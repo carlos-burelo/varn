@@ -42,10 +42,10 @@ pub(super) fn encode_head(
     }
     let mut fields: Vec<(String, String)> = Vec::new();
     if !headers.is_null() {
-        let mut collected: Vec<(String, VmValue)> = Vec::new();
-        ctx.object_for_each(headers, &mut |key, value| collected.push((key.to_owned(), value)));
-        for (name, value) in collected {
-            let Some(text) = ctx.str_owned(value) else {
+        let mut collected: Vec<(VmValue, VmValue)> = Vec::new();
+        ctx.map_for_each(headers, &mut |key, value| collected.push((key, value)));
+        for (key, value) in collected {
+            let (Some(name), Some(text)) = (ctx.str_owned(key), ctx.str_owned(value)) else {
                 continue;
             };
             if !is_token(&name) {

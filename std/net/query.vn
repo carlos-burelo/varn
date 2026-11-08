@@ -11,16 +11,13 @@ function trimPrefixQ(s: str): str {
 }
 
 export class Query {
-    private buckets: { [key: str]: str[] } = {};
+    private buckets: Map<str, str[]> = new Map<str, str[]>();
 
-    constructor(init?: str | { [key: str]: str | str[] }) {
-        this.buckets = {};
+    constructor(init?: str | Map<str, str | str[]>) {
         if (init is str) {
             this._parse(init);
         } else if (init != null) {
-            const pairs = init as { [key: str]: str | str[] };
-            for (const key in pairs) {
-                const value = pairs[key]!;
+            for (const (key, value) of init as Map<str, str | str[]>) {
                 if (value is str[]) {
                     for (const item of value) {
                         this.append(key, item);
@@ -56,12 +53,12 @@ export class Query {
         return new Query(s);
     }
 
-    static fromObject(q: { [key: str]: str | str[] }): Query {
+    static fromMap(q: Map<str, str | str[]>): Query {
         return new Query(q);
     }
 
     get(key: str): str? {
-        const bucket = this.buckets[key];
+        const bucket = this.buckets.get(key);
         if (bucket == null || bucket.length == 0) {
             return null;
         }
@@ -69,7 +66,7 @@ export class Query {
     }
 
     getAll(key: str): str[] {
-        const bucket = this.buckets[key];
+        const bucket = this.buckets.get(key);
         if (bucket == null) {
             return [];
         }
@@ -77,44 +74,33 @@ export class Query {
     }
 
     set(key: str, value: str): void {
-        this.buckets[key] = [value];
+        this.buckets.set(key, [value]);
     }
 
     append(key: str, value: str): void {
-        const bucket = this.buckets[key];
+        const bucket = this.buckets.get(key);
         if (bucket == null) {
-            this.buckets[key] = [value];
+            this.buckets.set(key, [value]);
         } else {
             bucket.push(value);
         }
     }
 
     has(key: str): bool {
-        return this.buckets[key] != null;
+        return this.buckets.has(key);
     }
 
     delete(key: str): void {
-        let newValues: { [key: str]: str[] } = {};
-        for (const k in this.buckets) {
-            if (k != key) {
-                newValues[k] = this.buckets[k]!;
-            }
-        }
-        this.buckets = newValues;
+        this.buckets.delete(key);
     }
 
     keys(): str[] {
-        let res: str[] = [];
-        for (const key in this.buckets) {
-            res.push(key);
-        }
-        return res;
+        return this.buckets.keys();
     }
 
     values(): str[] {
         let res: str[] = [];
-        for (const key in this.buckets) {
-            const bucket = this.buckets[key]!;
+        for (const (key, bucket) of this.buckets) {
             for (const val of bucket) {
                 res.push(val);
             }
@@ -124,8 +110,7 @@ export class Query {
 
     entries(): (str, str)[] {
         let res: (str, str)[] = [];
-        for (const key in this.buckets) {
-            const bucket = this.buckets[key]!;
+        for (const (key, bucket) of this.buckets) {
             for (const val of bucket) {
                 res.push((key, val));
             }
@@ -133,15 +118,14 @@ export class Query {
         return res;
     }
 
-    toObject(): { [key: str]: str[] } {
+    toMap(): Map<str, str[]> {
         return this.buckets;
     }
 
     toString(): str {
         const parts: str[] = [];
-        for (const key in this.buckets) {
+        for (const (key, bucket) of this.buckets) {
             const encodedKey = encodeURIComponent$(key);
-            const bucket = this.buckets[key]!;
             for (const value of bucket) {
                 parts.push(encodedKey + "=" + encodeURIComponent$(value));
             }

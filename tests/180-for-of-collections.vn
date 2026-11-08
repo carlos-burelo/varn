@@ -60,8 +60,8 @@ await describe("180 for-of over collections", async () => {
         expect(slots).toBe(3)
     })
 
-    await it("an index signature iterates like the Map it is", () => {
-        const dict: { [k: str]: int } = { x: 1, y: 2 }
+    await it("a map built from entries iterates over its entries", () => {
+        const dict = new Map([("x", 1), ("y", 2)])
         let total = 0
         for (const (k, v) of dict) { total = total + v }
         expect(total).toBe(3)

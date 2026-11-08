@@ -37,7 +37,7 @@ pub fn parse_http_request(ctx: &mut dyn NativeCtx, raw: &str) -> Result<Option<V
     };
 
     let mut seen_singletons: Vec<String> = Vec::new();
-    let headers_obj = ctx.alloc_object();
+    let mut header_pairs: Vec<(VmValue, VmValue)> = Vec::new();
     for header in req.headers.iter() {
         let name = header.name.to_lowercase();
         if SINGLETON_HEADERS.contains(&name.as_str()) {
@@ -48,8 +48,10 @@ pub fn parse_http_request(ctx: &mut dyn NativeCtx, raw: &str) -> Result<Option<V
         }
         let value = String::from_utf8_lossy(header.value);
         let val_nv = ctx.alloc_str(value.as_ref());
-        ctx.set_field(headers_obj, &name, val_nv);
+        let name_nv = ctx.alloc_str(&name);
+        header_pairs.push((name_nv, val_nv));
     }
+    let headers_obj = ctx.alloc_map(header_pairs);
 
     let method = match req.method.and_then(HttpMethod::of) {
         Some(m) => m.to_value(ctx)?,

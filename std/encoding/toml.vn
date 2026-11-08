@@ -49,7 +49,7 @@ function parseFloating(text: str): float {
     return wholeVal + (fractionVal / divisor);
 }
 
-export type TomlValue = bool | int | float | str | TomlValue[] | { [key: str]: TomlValue };
+export type TomlValue = bool | int | float | str | TomlValue[] | Map<str, TomlValue>;
 
 function parseTomlValue(valueText: str): TomlValue {
     let raw = trimWhitespace(valueText);
@@ -107,8 +107,8 @@ function formatTomlValue(val: TomlValue): str {
 }
 
 export namespace Toml {
-    export function parse(content: str): { [key: str]: TomlValue } {
-        let root: { [key: str]: TomlValue } = {};
+    export function parse(content: str): Map<str, TomlValue> {
+        const root = new Map<str, TomlValue>();
         let currentSection = root;
         let lines = content.split("\n");
 
@@ -119,8 +119,8 @@ export namespace Toml {
             }
             if (line.startsWith("[") && line.endsWith("]")) {
                 let sectionName = line.slice(1, line.length - 1);
-                let sectionObj: { [key: str]: TomlValue } = {};
-                root[sectionName] = sectionObj;
+                const sectionObj = new Map<str, TomlValue>();
+                root.set(sectionName, sectionObj);
                 currentSection = sectionObj;
                 continue;
             }
@@ -129,13 +129,13 @@ export namespace Toml {
                 let key = trimWhitespace(line.slice(0, equalsIndex));
                 let rawVal = line.slice(equalsIndex + 1);
                 let parsedVal = parseTomlValue(rawVal);
-                currentSection[key] = parsedVal;
+                currentSection.set(key, parsedVal);
             }
         }
         return root;
     }
 
-    export function tryParse(content: str): { [key: str]: TomlValue }? {
+    export function tryParse(content: str): Map<str, TomlValue>? {
         try {
             return parse(content);
         } catch {
@@ -143,17 +143,14 @@ export namespace Toml {
         }
     }
 
-    export function stringify(value: { [key: str]: TomlValue }): str {
+    export function stringify(value: Map<str, TomlValue>): str {
         let lines: str[] = [];
         let sectionKeys: str[] = [];
-        let keys = value::keys();
 
-        for (let i = 0; i < keys.length; i = i + 1) {
-            let key = keys[i];
-            let val = value[key];
-            if (val != null && (val::type == "Object" || val::type == "Map")) {
+        for (const (key, val) of value) {
+            if (val::type == "Map") {
                 sectionKeys.push(key);
-            } else if (val != null) {
+            } else {
                 lines.push(key + " = " + formatTomlValue(val));
             }
         }
@@ -164,14 +161,9 @@ export namespace Toml {
                 lines.push("");
             }
             lines.push("[" + sectionName + "]");
-            let sectionObj = value[sectionName] as { [key: str]: TomlValue };
-            let subKeys = sectionObj::keys();
-            for (let j = 0; j < subKeys.length; j = j + 1) {
-                let subKey = subKeys[j];
-                let subVal = sectionObj[subKey];
-                if (subVal != null) {
-                    lines.push(subKey + " = " + formatTomlValue(subVal));
-                }
+            const sectionObj = value.get(sectionName) as Map<str, TomlValue>;
+            for (const (subKey, subVal) of sectionObj) {
+                lines.push(subKey + " = " + formatTomlValue(subVal));
             }
         }
 

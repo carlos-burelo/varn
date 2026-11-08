@@ -5,7 +5,7 @@ import { Task } from "std:task";
 import { Response, RawResponse, RequestInit, readHttpResponse } from "std:http/core";
 import { isRedirect, sameOrigin, resolveLocation, redirectedMethod, redirectedHeaders } from "std:http/redirect";
 
-async function doFetch(connId: int, parsedUrl: Url, method: HttpMethod, headers: { [key: str]: str }, body: str): Task<Response> {
+async function doFetch(connId: int, parsedUrl: Url, method: HttpMethod, headers: Map<str, str>, body: str): Task<Response> {
     let target = parsedUrl.path;
     const queryStr = parsedUrl.query.toString();
     if (queryStr.length > 0) {
@@ -18,8 +18,8 @@ async function doFetch(connId: int, parsedUrl: Url, method: HttpMethod, headers:
 
     let hasHost = false;
     let hasConnection = false;
-    for (let key in headers) {
-        if (!isHttpToken$(key) || !isHttpFieldValue$(headers[key]!)) {
+    for (const (key, value) of headers) {
+        if (!isHttpToken$(key) || !isHttpFieldValue$(value)) {
             throw new TypeError(`invalid HTTP header '${key}'`);
         }
         const lower = key.toLowerCase();
@@ -41,12 +41,12 @@ async function doFetch(connId: int, parsedUrl: Url, method: HttpMethod, headers:
         requestStr = requestStr + "Content-Length: " + Bytes.fromString(body).length.toString() + "\r\n";
     }
 
-    for (let key in headers) {
+    for (const (key, value) of headers) {
         const lower = key.toLowerCase();
         if (lower == "content-length" || lower == "transfer-encoding") {
             continue;
         }
-        requestStr = `${requestStr}${key}: ${headers[key]}\r\n`;
+        requestStr = `${requestStr}${key}: ${value}\r\n`;
     }
 
     requestStr = requestStr + "\r\n";
@@ -89,7 +89,7 @@ class FetchState {
     connId: int = -1;
 }
 
-async function fetchOnce(url: str, method: HttpMethod, headers: { [key: str]: str }, body: str, ca: str?, identity: str?, state: FetchState): Task<Response> {
+async function fetchOnce(url: str, method: HttpMethod, headers: Map<str, str>, body: str, ca: str?, identity: str?, state: FetchState): Task<Response> {
     const parsedUrl = Url.parse(url);
     const host = parsedUrl.host;
 
@@ -116,7 +116,7 @@ async function fetchFollowing(url: str, init: RequestInit, state: FetchState): T
     let current = url;
     let method = init.method ?? HttpMethod.GET;
     let body = init.body ?? "";
-    let headers = init.headers ?? {};
+    let headers = init.headers ?? new Map<str, str>();
     let hops = 0;
     while (true) {
         const response = await fetchOnce(current, method, headers, body, init.ca, init.identity, state);
@@ -158,22 +158,22 @@ export async function fetch(url: str, init: RequestInit = {}): Task<Response> {
     }
 }
 
-export async function get(url: str, headers: { [key: str]: str } = {}): Task<Response> {
+export async function get(url: str, headers: Map<str, str> = new Map<str, str>()): Task<Response> {
     return await fetch(url, { method: HttpMethod.GET, headers: headers });
 }
 
-export async function post(url: str, body: str = "", headers: { [key: str]: str } = {}): Task<Response> {
+export async function post(url: str, body: str = "", headers: Map<str, str> = new Map<str, str>()): Task<Response> {
     return await fetch(url, { method: HttpMethod.POST, headers: headers, body: body });
 }
 
-export async function put(url: str, body: str = "", headers: { [key: str]: str } = {}): Task<Response> {
+export async function put(url: str, body: str = "", headers: Map<str, str> = new Map<str, str>()): Task<Response> {
     return await fetch(url, { method: HttpMethod.PUT, headers: headers, body: body });
 }
 
-export async function patch(url: str, body: str = "", headers: { [key: str]: str } = {}): Task<Response> {
+export async function patch(url: str, body: str = "", headers: Map<str, str> = new Map<str, str>()): Task<Response> {
     return await fetch(url, { method: HttpMethod.PATCH, headers: headers, body: body });
 }
 
-export async function del(url: str, headers: { [key: str]: str } = {}): Task<Response> {
+export async function del(url: str, headers: Map<str, str> = new Map<str, str>()): Task<Response> {
     return await fetch(url, { method: HttpMethod.DELETE, headers: headers });
 }

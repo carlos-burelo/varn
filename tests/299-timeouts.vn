@@ -32,7 +32,7 @@ await describe("299 timeouts", async () => {
     await it("the server answers 408 and closes a connection that never finishes its request", async () => {
         const server = new HttpServer();
         server.readTimeout(100);
-        server.get("/hello", async (req: Request) => new Response("hello", 200, {}));
+        server.get("/hello", async (req: Request) => new Response("hello", 200));
         server.listen(18931);
         await delay(150);
 
@@ -54,9 +54,9 @@ await describe("299 timeouts", async () => {
         const server = new HttpServer();
         server.get("/slow", async (req: Request) => {
             await delay(600);
-            return new Response("late", 200, {});
+            return new Response("late", 200);
         });
-        server.get("/quick", async (req: Request) => new Response("on time", 200, {}));
+        server.get("/quick", async (req: Request) => new Response("on time", 200));
         server.listen(18932);
         await delay(150);
 

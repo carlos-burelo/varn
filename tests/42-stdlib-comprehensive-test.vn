@@ -49,7 +49,7 @@ async function runComprehensiveTest(): Task<void> {
 
     // 4. std:json
     let serialized = Json.stringify({ test: "json", value: 123 });
-    let parsed = Json.parse<{ [k: str]: JsonValue }>(serialized);
+    let parsed = Json.parse<Map<str, JsonValue>>(serialized);
     expect(parsed["test"]).toBe("json");
     expect(parsed["value"]).toBe(123);
 
@@ -127,7 +127,7 @@ async function runComprehensiveTest(): Task<void> {
 
     // 12. std:http
     let httpServer = new HttpServer();
-    httpServer.get("/", async (req: Request) => new Response("hello from 42", 200, {}));
+    httpServer.get("/", async (req: Request) => new Response("hello from 42", 200));
     httpServer.listen(19882);
     await delay(150);
     let clientRes = await fetch("http://127.0.0.1:19882/");
@@ -210,7 +210,7 @@ async function runComprehensiveTest(): Task<void> {
     let readonlyVar: Readonly<{ a: bool }> = { a: true };
     let requiredVar: Required<{ x?: int; y?: str }> = { x: 10, y: "yes" };
     let mutableVar: Mutable<{ readonly a: bool }> = { a: false };
-    let recordVar: { [key: str]: int } = { "tested": 100 };
+    let recordVar = new Map([("tested", 100)]);
 
     expect(partialVar.x).toBe(42);
     expect(readonlyVar.a).toBe(true);

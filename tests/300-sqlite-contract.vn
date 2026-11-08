@@ -25,14 +25,14 @@ await describe("300 sqlite contract", async () => {
         const row = db.get("SELECT name, id, weight, photo FROM pet WHERE id = ?", 7);
         expect(row != null).toBe(true);
         let order = "";
-        for (let column in row!) {
+        for (const (column, value) of row!) {
             order = order + (order.length == 0 ? "" : ",") + column;
         }
         expect(order).toBe("name,id,weight,photo");
-        expect(row!["name"]).toBe("rex");
-        expect(row!["id"]).toBe(7);
-        expect(row!["weight"]).toBe(2.5);
-        expect(row!["photo"] == null).toBe(true);
+        expect(row!.get("name")).toBe("rex");
+        expect(row!.get("id")).toBe(7);
+        expect(row!.get("weight")).toBe(2.5);
+        expect(row!.get("photo") == null).toBe(true);
         db.close();
     });
 
@@ -40,7 +40,7 @@ await describe("300 sqlite contract", async () => {
         const db = seeded();
         db.exec("INSERT INTO pet (id, name, photo) VALUES (?, ?, ?)", 1, "rex", Bytes.fromString("png!"));
         const row = db.get("SELECT photo FROM pet WHERE id = 1");
-        expect((row!["photo"] as Bytes).toString()).toBe("png!");
+        expect((row!.get("photo") as Bytes).toString()).toBe("png!");
         db.close();
     });
 
@@ -48,8 +48,8 @@ await describe("300 sqlite contract", async () => {
         const db = seeded();
         db.exec("INSERT INTO pet (id, name, owner_id) VALUES (?, ?, ?)", 1, "rex", 1);
         const row = db.get("SELECT ? AS yes, ? AS no", true, false);
-        expect(row!["yes"]).toBe(1);
-        expect(row!["no"]).toBe(0);
+        expect(row!.get("yes")).toBe(1);
+        expect(row!.get("no")).toBe(0);
         db.close();
     });
 
@@ -142,7 +142,7 @@ await describe("300 sqlite contract", async () => {
         expect(await db.execAsync("INSERT INTO pet (id, name) VALUES (?, ?)", 1, "rex")).toBe(1);
         const rows = await db.allAsync("SELECT name FROM pet");
         expect(rows.length).toBe(1);
-        expect(rows[0]["name"]).toBe("rex");
+        expect(rows[0].get("name")).toBe("rex");
         expect((await db.getAsync("SELECT name FROM pet WHERE id = ?", 1))!["name"]).toBe("rex");
         expect((await db.getAsync("SELECT name FROM pet WHERE id = ?", 9)) == null).toBe(true);
         let code = "";

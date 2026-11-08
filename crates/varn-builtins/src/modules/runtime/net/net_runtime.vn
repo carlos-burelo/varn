@@ -15,7 +15,7 @@ export declare enum HttpMethod {
 export interface HttpRequestHead {
     method: HttpMethod?;
     path: str;
-    headers: { [key: str]: str };
+    headers: Map<str, str>;
     body: str;
 }
 
@@ -38,8 +38,8 @@ export declare function parseHttpRequest$(raw: str): HttpRequestHead?;
 export declare function httpMethodName$(method: HttpMethod): str;
 export declare function isHttpToken$(name: str): bool;
 export declare function isHttpFieldValue$(value: str): bool;
-@throws(TypeError, RangeError) export declare function sendHttpResponse$(connId: int, status: int, statusText: str, headers: { [key: str]: str }, body: str, cookies: str[]): TaskHandle<int>;
-@throws(TypeError, RangeError) export declare function sendHttpHead$(connId: int, status: int, statusText: str, headers: { [key: str]: str }, cookies: str[]): TaskHandle<int>;
+@throws(TypeError, RangeError) export declare function sendHttpResponse$(connId: int, status: int, statusText: str, headers: Map<str, str>, body: str, cookies: str[]): TaskHandle<int>;
+@throws(TypeError, RangeError) export declare function sendHttpHead$(connId: int, status: int, statusText: str, headers: Map<str, str>, cookies: str[]): TaskHandle<int>;
 
 export declare function udpBind$(host: str, port: int): int;
 export declare function udpSendTo$(socketId: int, host: str, port: int, data: Bytes | str): int;

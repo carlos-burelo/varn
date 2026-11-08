@@ -104,7 +104,7 @@ class ByteReader {
     }
 }
 
-export type MsgPackValue = int | str | bool | null | Bytes | MsgPackValue[] | { [key: str]: MsgPackValue };
+export type MsgPackValue = int | str | bool | null | Bytes | MsgPackValue[] | Map<str, MsgPackValue>;
 
 function encodeValue(w: ByteWriter, val: MsgPackValue): void {
     if (val == null) {
@@ -203,12 +203,8 @@ function encodeValue(w: ByteWriter, val: MsgPackValue): void {
     }
 
     {
-        let obj = val as { [key: str]: MsgPackValue };
-        let keys: str[] = [];
-        for (let k in obj) {
-            keys.push(k);
-        }
-        let len = keys.length;
+        const obj = val as Map<str, MsgPackValue>;
+        let len = obj.size;
         if (len <= 15) {
             w.writeU8(0x80 | len);
         } else if (len <= 65535) {
@@ -218,9 +214,9 @@ function encodeValue(w: ByteWriter, val: MsgPackValue): void {
             w.writeU8(0xDF);
             w.writeU32(len);
         }
-        for (let k of keys) {
+        for (const (k, v) of obj) {
             encodeValue(w, k);
-            encodeValue(w, obj[k]);
+            encodeValue(w, v);
         }
         return;
     }
@@ -242,11 +238,11 @@ function decodeValue(r: ByteReader): MsgPackValue {
     // Fixmap (0x80 - 0x8f)
     if ((tag & 0xF0) == 0x80) {
         let len = tag & 0x0F;
-        let map: { [key: str]: MsgPackValue } = {};
+        const map = new Map<str, MsgPackValue>();
         for (let i = 0; i < len; i = i + 1) {
             let k = decodeValue(r) as str;
             let v = decodeValue(r);
-            map[k] = v;
+            map.set(k, v);
         }
         return map;
     }
@@ -349,21 +345,21 @@ function decodeValue(r: ByteReader): MsgPackValue {
     // Map 16, 32
     if (tag == 0xDE) {
         let len = r.readU16();
-        let map: { [key: str]: MsgPackValue } = {};
+        const map = new Map<str, MsgPackValue>();
         for (let i = 0; i < len; i = i + 1) {
             let k = decodeValue(r) as str;
             let v = decodeValue(r);
-            map[k] = v;
+            map.set(k, v);
         }
         return map;
     }
     if (tag == 0xDF) {
         let len = r.readU32();
-        let map: { [key: str]: MsgPackValue } = {};
+        const map = new Map<str, MsgPackValue>();
         for (let i = 0; i < len; i = i + 1) {
             let k = decodeValue(r) as str;
             let v = decodeValue(r);
-            map[k] = v;
+            map.set(k, v);
         }
         return map;
     }

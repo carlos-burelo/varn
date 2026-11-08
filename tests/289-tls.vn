@@ -92,7 +92,7 @@ await describe("289 tls", async () => {
 
     await it("fetch speaks https to an HttpServer over TLS", async () => {
         const server = new HttpServer();
-        server.get("/secure", async (req: Request) => new Response("over tls", 200, {}));
+        server.get("/secure", async (req: Request) => new Response("over tls", 200));
         server.listenTls(19893, cert, key);
         await delay(150);
         const res = await fetch("https://localhost:19893/secure", { ca: ca });
@@ -132,7 +132,7 @@ await describe("289 tls", async () => {
 
     await it("fetch presents its identity to an HttpServer that requires one", async () => {
         const server = new HttpServer();
-        server.get("/mutual", async (req: Request) => new Response("mutual", 200, {}));
+        server.get("/mutual", async (req: Request) => new Response("mutual", 200));
         server.listenTls(19896, cert, key, "127.0.0.1", clientCa);
         await delay(150);
         const res = await fetch("https://localhost:19896/mutual", { ca: ca, identity: identity });

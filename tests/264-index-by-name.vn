@@ -5,7 +5,7 @@ class Box {
     label: str = "box";
 }
 
-type Settings = { [key: str]: int };
+type Settings = Map<str, int>;
 
 class Animal {}
 class Dog extends Animal {
@@ -24,8 +24,8 @@ await describe("264 index by name", async () => {
         expect(label.length).toBe(3);
     });
 
-    await it("an index signature yields an optional value", () => {
-        const settings: Settings = { retries: 3 };
+    await it("a map index yields an optional value", () => {
+        const settings: Settings = new Map([("retries", 3)]);
         const retries: int? = settings["retries"];
         const missing: int? = settings["timeout"];
         expect(retries).toBe(3);

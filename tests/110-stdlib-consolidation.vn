@@ -1,4 +1,4 @@
-import { Json, Base64, Hex, Toml } from "std:encoding";
+import { Json, JsonValue, Base64, Hex, Toml, TomlValue } from "std:encoding";
 import { Color, Table, Cli, Prompt } from "std:cli";
 import { Mutex, Semaphore, WaitGroup, delay, spawn, Task } from "std:task";
 import { LogLevel, Logger, getLogger } from "std:log";
@@ -72,10 +72,10 @@ function testLog(): void {
     jsonLogger.debug("testing json", { "ok": true });
         expect(logJsonLines.length).toBe(1);;
 
-    let parsedRecord = Json.parse(logJsonLines[0]) as { [key: str]: dynamic };
-        expect(parsedRecord["level"]).toBe("DEBUG");;
-        expect(parsedRecord["target"]).toBe("jsonApp");;
-        expect(parsedRecord["message"]).toBe("testing json");;
+    let parsedRecord = Json.parse<Map<str, JsonValue>>(logJsonLines[0]);
+        expect(parsedRecord.get("level")).toBe("DEBUG");;
+        expect(parsedRecord.get("target")).toBe("jsonApp");;
+        expect(parsedRecord.get("message")).toBe("testing json");;
 
     // Child logger
     let childLogger = logger.child("worker");
@@ -125,10 +125,10 @@ function testCollections(): void {
 async function testEncoding(): Task<void> {
 let tomlSample = "[server]\nhost = \"localhost\"\nport = 8080\nenabled = true\n";
 let parsedToml = Toml.parse(tomlSample);
-let serverObj = parsedToml["server"] as { [key: str]: dynamic };
-expect(serverObj["host"]).toBe("localhost");
-expect(serverObj["port"]).toBe(8080);
-expect(serverObj["enabled"]).toBe(true);
+let serverObj = parsedToml.get("server") as Map<str, TomlValue>;
+expect(serverObj.get("host")).toBe("localhost");
+expect(serverObj.get("port")).toBe(8080);
+expect(serverObj.get("enabled")).toBe(true);
 let stringifiedToml = Toml.stringify(parsedToml);
 expect(stringifiedToml.includes("[server]")).toBeTruthy();
 expect(stringifiedToml.includes("host = \"localhost\"")).toBeTruthy();

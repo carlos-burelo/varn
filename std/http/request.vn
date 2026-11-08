@@ -6,7 +6,7 @@ import { Json, JsonValue } from "std:encoding";
 
 export interface RequestInit {
     method?: HttpMethod;
-    headers?: { [key: str]: str };
+    headers?: Map<str, str>;
     body?: str;
     ca?: str;
     identity?: str;
@@ -21,7 +21,7 @@ const MAX_HEAD = 65536;
 export class RawRequest {
     method: HttpMethod? = null;
     path: str = "";
-    headers: { [key: str]: str } = {};
+    headers: Map<str, str> = new Map<str, str>();
     body: str = "";
     payload: Bytes = Bytes.alloc(0);
 }
@@ -77,9 +77,9 @@ function isDigits(text: str): bool {
 }
 
 async function readBody(wire: WireReader, req: RawRequest, maxContentLength: int): Task<Bytes> {
-    const expect = req.headers["expect"];
-    const coding = req.headers["transfer-encoding"];
-    const lengthText = req.headers["content-length"];
+    const expect = req.headers.get("expect");
+    const coding = req.headers.get("transfer-encoding");
+    const lengthText = req.headers.get("content-length");
     if (coding != null) {
         if (lengthText != null) {
             throw new HttpRejection(400, "Bad Request");
@@ -152,22 +152,22 @@ export async function readHttpRequest(wire: WireReader, maxContentLength: int = 
 export class Request {
     url: str = "";
     method: HttpMethod = HttpMethod.GET;
-    headers: Headers = new Headers({});
+    headers: Headers = new Headers();
     body: str = "";
     payload: Bytes? = null;
     path: str = "";
-    query: { [key: str]: str } = {};
-    params: { [key: str]: str } = {};
-    cookies: { [key: str]: str } = {};
+    query: Map<str, str> = new Map<str, str>();
+    params: Map<str, str> = new Map<str, str>();
+    cookies: Map<str, str> = new Map<str, str>();
 
     constructor(url: str = "", init: RequestInit = {}) {
         this.url = url;
         this.path = url;
-        this.query = {};
-        this.params = {};
-        this.cookies = {};
+        this.query = new Map<str, str>();
+        this.params = new Map<str, str>();
+        this.cookies = new Map<str, str>();
         this.method = init.method ?? HttpMethod.GET;
-        this.headers = new Headers(init.headers ?? {});
+        this.headers = new Headers(init.headers ?? new Map<str, str>());
         this.body = init.body ?? "";
 
         let cookieHdr = this.headers.get("cookie");
@@ -179,7 +179,7 @@ export class Request {
                     if (eq != null && eq > 0) {
                         let k = p.slice(0, eq).trim();
                         let v = p.slice(eq + 1).trim();
-                        this.cookies[k] = v;
+                        this.cookies.set(k, v);
                     }
                 }
             }
@@ -199,8 +199,8 @@ export class Request {
         return Json.parse(this.body);
     }
 
-    formData(): { [key: str]: str } {
-        let res: { [key: str]: str } = {};
+    formData(): Map<str, str> {
+        const res = new Map<str, str>();
         if (this.body.length == 0) return res;
         let pairs = this.body.split("&");
         for (let p of pairs) {
@@ -208,7 +208,7 @@ export class Request {
             if (eq != null && eq > 0) {
                 let k = p.slice(0, eq);
                 let v = p.slice(eq + 1);
-                res[k] = v;
+                res.set(k, v);
             }
         }
         return res;

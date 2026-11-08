@@ -1,6 +1,6 @@
 import { parse$, stringify$ } from "runtime:json";
 
-export type JsonValue = int | float | str | bool | null | JsonValue[] | { [key: str]: JsonValue };
+export type JsonValue = int | float | str | bool | null | JsonValue[] | Map<str, JsonValue>;
 
 export namespace Json {
     export function parse<T = JsonValue>(text: str): T {

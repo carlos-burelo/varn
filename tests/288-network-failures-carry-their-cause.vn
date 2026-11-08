@@ -52,7 +52,7 @@ await describe("288 network failures carry their cause", async () => {
         server.get("/boom", async (req: Request) => {
             throw new Error("handler failed")
         });
-        server.get("/ok", async (req: Request) => new Response("fine", 200, {}));
+        server.get("/ok", async (req: Request) => new Response("fine", 200));
         server.listen(19883);
         await delay(150);
         const boom = await fetch("http://127.0.0.1:19883/boom");

@@ -35,22 +35,6 @@ await describe("179 explicit collection decoding", async () => {
         expect(parsed::type).toBe("Object")
     })
 
-    await it("an index signature takes the object as it is, without copying", () => {
-        const parsed: dynamic = Json.parse("{\"a\":1,\"b\":2}")
-        const dict: { [k: str]: int } = parsed as { [k: str]: int }
-        expect(dict::type).toBe("Object")
-        expect(dict["a"]).toBe(1)
-        dict["c"] = 3
-        expect(dict["c"]).toBe(3)
-        expect((parsed as { [k: str]: int })["c"]).toBe(3)
-        let total = 0
-        for (const (k, v) of dict) { total = total + v }
-        expect(total).toBe(6)
-        let caught = ""
-        try { const bad: { [k: str]: int } = Json.parse<{ [k: str]: int }>("{\"a\":\"x\"}") } catch (e) { caught = e.message }
-        expect(caught).toBe("type mismatch: expected '{ [key: str]: int }', got 'object'")
-    })
-
     await it("typed decoders check values and construct nested collections", () => {
         expect(outcome(() => { const m: Map<str, int> = Json.parse<Map<str, int>>("{\"a\":\"x\"}") }))
             .toBe("type mismatch: expected 'Map<str, int>', got 'Map'")

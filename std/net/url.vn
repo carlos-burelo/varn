@@ -291,24 +291,13 @@ export function parseUrl(url: str): Url {
     return Url.parse(url);
 }
 
-export function appendQuery(url: str, q: { [key: str]: str | str[] }): str {
-    let hasKeys = false;
-    for (const key in q) {
-        if (q[key] != null) {
-            hasKeys = true;
-            break;
-        }
-    }
-    if (!hasKeys) {
+export function appendQuery(url: str, q: Map<str, str | str[]>): str {
+    if (q.size == 0) {
         return url;
     }
 
     const parsed = Url.parse(url);
-    for (const key in q) {
-        const value = q[key];
-        if (value == null) {
-            continue;
-        }
+    for (const (key, value) of q) {
         if (value is str[]) {
             for (const item of value) {
                 parsed.query.append(key, item);

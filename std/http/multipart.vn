@@ -4,7 +4,7 @@ export type FormPart = {
     name: str;
     filename: str?;
     contentType?: str;
-    headers: { [key: str]: str };
+    headers: Map<str, str>;
     body: str;
     data: Bytes
 };
@@ -34,8 +34,8 @@ function find(hay: Bytes, needle: Bytes, from: int): int {
     return -1;
 }
 
-function parameters(value: str): { [key: str]: str } {
-    const out: { [key: str]: str } = {};
+function parameters(value: str): Map<str, str> {
+    const out = new Map<str, str>();
     let i = 0;
     const length = value.length;
     while (i < length) {
@@ -71,21 +71,21 @@ function parameters(value: str): { [key: str]: str } {
             text = value.slice(i, end).trim();
             i = end;
         }
-        if (key.length > 0 && out[key] == null) {
-            out[key] = text;
+        if (key.length > 0 && out.get(key) == null) {
+            out.set(key, text);
         }
     }
     return out;
 }
 
-function parsePartHeaders(block: str): { [key: str]: str } {
-    const out: { [key: str]: str } = {};
+function parsePartHeaders(block: str): Map<str, str> {
+    const out = new Map<str, str>();
     for (const line of block.split("\r\n")) {
         const colon = line.indexOf(":");
         if (colon != null && colon > 0) {
             const name = line.slice(0, colon).trim().toLowerCase();
-            if (out[name] == null) {
-                out[name] = line.slice(colon + 1).trim();
+            if (out.get(name) == null) {
+                out.set(name, line.slice(colon + 1).trim());
             }
         }
     }
@@ -134,13 +134,13 @@ export namespace Multipart {
                 throw new ParseError("a multipart body is not closed by its boundary");
             }
             const headers = parsePartHeaders(headerText);
-            const disposition = headers["content-disposition"];
-            const attributes = disposition == null ? {} : parameters(disposition);
+            const disposition = headers.get("content-disposition");
+            const attributes = disposition == null ? new Map<str, str>() : parameters(disposition);
             const content = data.slice(bodyStart, next);
             parts.push({
-                name: attributes["name"] ?? "",
-                filename: attributes["filename"],
-                contentType: headers["content-type"],
+                name: attributes.get("name") ?? "",
+                filename: attributes.get("filename"),
+                contentType: headers.get("content-type"),
                 headers: headers,
                 body: content.toString(),
                 data: content
@@ -155,7 +155,7 @@ export namespace Multipart {
         if (semicolon == null) {
             return null;
         }
-        const value = parameters(contentType.slice(semicolon + 1))["boundary"];
+        const value = parameters(contentType.slice(semicolon + 1)).get("boundary");
         if (value == null || value.length == 0) {
             return null;
         }

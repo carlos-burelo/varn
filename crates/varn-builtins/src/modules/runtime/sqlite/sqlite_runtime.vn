@@ -2,7 +2,7 @@
 
 export type SqlValue = str | int | float | Bytes | null;
 export type SqlParam = SqlValue | bool;
-export type SqlRow = { [key: str]: SqlValue };
+export type SqlRow = Map<str, SqlValue>;
 
 export declare function open$(path: str): int;
 export declare function close$(dbId: int): void;

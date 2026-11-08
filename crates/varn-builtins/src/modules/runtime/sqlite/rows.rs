@@ -73,7 +73,12 @@ pub fn select(conn: &Connection, sql: &str, bound: Vec<Value>, limit: i64) -> Re
             let value = row.get_ref(i).map_err(|e| failure(e, sql))?;
             fields.push((name.clone(), column(sql, name, value)?));
         }
-        out.push(SendValue::Object(fields));
+        out.push(SendValue::Map(
+            fields
+                .into_iter()
+                .map(|(name, value)| (SendValue::Str(name), value))
+                .collect(),
+        ));
     }
     Ok(out)
 }

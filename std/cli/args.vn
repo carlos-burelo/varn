@@ -1,14 +1,14 @@
 import { args$ } from "runtime:sys";
 
 export interface ParsedArgs {
-    flags: { [key: str]: str };
+    flags: Map<str, str>;
     positionals: str[];
 }
 
 export namespace Cli {
     export function parse(rawArgs?: str[]): ParsedArgs {
         let input = rawArgs != null ? rawArgs : args$();
-        let flags: { [key: str]: str } = {};
+        const flags = new Map<str, str>();
         let positionals: str[] = [];
 
         for (let i = 0; i < input.length; i = i + 1) {
@@ -19,13 +19,13 @@ export namespace Cli {
                 if (eqIdx != null && eqIdx > 0) {
                     let k = body.slice(0, eqIdx);
                     let v = body.slice(eqIdx + 1);
-                    flags[k] = v;
+                    flags.set(k, v);
                 } else {
-                    flags[body] = "true";
+                    flags.set(body, "true");
                 }
             } else if (arg.startsWith("-")) {
                 let flag = arg.slice(1);
-                flags[flag] = "true";
+                flags.set(flag, "true");
             } else {
                 positionals.push(arg);
             }

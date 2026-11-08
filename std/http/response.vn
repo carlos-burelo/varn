@@ -12,7 +12,7 @@ const MAX_HEAD = 131072;
 export class RawResponse {
     status: int = 200;
     statusText: str = "";
-    headers: { [key: str]: str } = {};
+    headers: Map<str, str> = new Map<str, str>();
     cookies: str[] = [];
     payload: Bytes = Bytes.alloc(0);
 }
@@ -32,8 +32,8 @@ function addHeader(resp: RawResponse, line: str): void {
         resp.cookies.push(value);
         return;
     }
-    const previous = resp.headers[key];
-    resp.headers[key] = previous == null ? value : `${previous}, ${value}`;
+    const previous = resp.headers.get(key);
+    resp.headers.set(key, previous == null ? value : `${previous}, ${value}`);
 }
 
 export async function readHttpResponse(connId: int, headOnly: bool = false): Task<RawResponse?> {
@@ -79,7 +79,7 @@ export async function readHttpResponse(connId: int, headOnly: bool = false): Tas
     if (headOnly || resp.status < 200 || resp.status == 204 || resp.status == 304) {
         return resp;
     }
-    const coding = resp.headers["transfer-encoding"];
+    const coding = resp.headers.get("transfer-encoding");
     if (coding != null) {
         if (coding.trim().toLowerCase() != "chunked") {
             throw new ProtocolError(`unsupported Transfer-Encoding '${coding}'`);
@@ -87,7 +87,7 @@ export async function readHttpResponse(connId: int, headOnly: bool = false): Tas
         resp.payload = await readChunkedBody(wire, MAX_BODY);
         return resp;
     }
-    const lengthText = resp.headers["content-length"];
+    const lengthText = resp.headers.get("content-length");
     if (lengthText != null) {
         const expected = int.tryParse(lengthText);
         if (expected == null || expected < 0 || expected > MAX_BODY || lengthText.trim().startsWith("+")) {
@@ -143,13 +143,13 @@ export class Response {
     statusText: str = "OK";
     ok: bool = true;
     body: str = "";
-    headers: Headers = new Headers({});
+    headers: Headers = new Headers();
     cookies: str[] = [];
     bodyStream: AsyncReader? = null;
     payload: Bytes? = null;
     url: str = "";
 
-    constructor(body: str = "", status: int = 200, headers: { [key: str]: str } = {}) {
+    constructor(body: str = "", status: int = 200, headers: Map<str, str> = new Map<str, str>()) {
         this.body = body;
         this.status = status;
         this.statusText = getHttpStatusText(status);
@@ -210,19 +210,19 @@ export class Response {
     }
 }
 
-export function json(data: JsonValue, status: int = 200, headers: { [key: str]: str } = {}): Response {
+export function json<T>(data: T, status: int = 200, headers: Map<str, str> = new Map<str, str>()): Response {
     let body = Json.stringify(data);
     let h = new Headers(headers);
     if (!h.has("content-type")) {
         h.set("Content-Type", "application/json");
     }
-    return new Response(body, status, h.toObject());
+    return new Response(body, status, h.toMap());
 }
 
 export function redirect(url: str, status: int = 302): Response {
-    return new Response("", status, { "Location": url });
+    return new Response("", status, new Map<str, str>([("Location", url)]));
 }
 
 export function error(status: int = 500, message: str = "Internal Server Error"): Response {
-    return new Response(message, status, { "Content-Type": "text/plain" });
+    return new Response(message, status, new Map<str, str>([("Content-Type", "text/plain")]));
 }
