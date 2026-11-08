@@ -75,6 +75,10 @@ impl<'r> super::super::Binder<'r> {
 
     pub(crate) fn bind_function(&mut self, f: &FunctionDecl) {
         let line = f.range.start.line;
+        let outer = self.current;
+        let child = self.scopes.child(ScopeKind::Function, outer);
+        self.current = child;
+        self.bind_type_params(&f.type_params, line);
         let params: Vec<varn_sem::types::FunctionParam> = f
             .params
             .iter()
@@ -107,6 +111,7 @@ impl<'r> super::super::Binder<'r> {
             },
             &mut *std::sync::Arc::make_mut(&mut self.ty_table),
         );
+        self.current = outer;
 
         let mut sym = Symbol::new(SymbolKind::Function, f.id, line).with_type(fn_type);
         sym.col = f.range.start.column + (f.id_offset - f.range.start.offset);
@@ -137,11 +142,8 @@ impl<'r> super::super::Binder<'r> {
             });
         }
 
-        let child = self.scopes.child(ScopeKind::Function, self.current);
         let saved = self.current;
         self.current = child;
-
-        self.bind_type_params(&f.type_params, line);
 
         for p in f.params.iter() {
             let ty = self.param_binding_type(p, crate::ParamSite::Declared);
