@@ -1,6 +1,6 @@
 # ADR-0026 — Taxonomía de los tipos de datos
 
-Estado: APROBADO EN DISEÑO (2026-11-07). Etapas 1 y 2 implementadas; 3 a 8 pendientes (§8).
+Estado: APROBADO EN DISEÑO (2026-11-07). Etapas 1, 2 y 3 implementadas; la 4 salvo el diccionario; 5 a 8 pendientes (§8).
 
 ## 1. Problema
 
@@ -242,8 +242,8 @@ import { a } from "std:test"    export    namespace N { }
 
 1. **HECHA** (`562fabc7`). **Cimiento de tipos**: `Record` e `Interface` como variantes; la expansión genérica de una interfaz conserva la naturaleza.
 2. **HECHA** (`6ffc2d08`..`56af75d0`). **Reglas del checker**: asignabilidad de §3 y §4; tipado esperado de `??`/`||` y de variantes; propiedades de interfaz de solo lectura con `mut`; varianza `out`/`in` declarada (`VN4118`). Un test negativo por cada prohibición; `std` y tests adaptados.
-3. **Record inmutable**: error al mutar un campo de record; `with` sobre record; spread sin sobrescritura; separadores en tipos; migración de `std` y tests.
-4. **Eliminaciones léxicas**: `===`/`!==`, `switch`, `instanceof`, `typeof` como valor, dict `{[k:str]:V}` → `Map<str,V>`. Primero verificar en el corpus que `match` e `is` cubren todo uso.
+3. **HECHA** (`91558975`, `e61c69ce`, `5c78dc2e`). **Record inmutable**: error al mutar un campo de record (`VN3005`); un literal no repite un campo (`VN3035`); separadores `;` en tipos. Medido antes: 7 sitios en 3 tests y 1 en `std`.
+4. **HECHA salvo el diccionario**. `===`/`!==` (859 usos migrados), `instanceof` → `is` (93), `typeof` valor → `x::type` (58), `switch` → `match` (1 test). Por el camino: `is` ya no responde «verdadero» a tipos que no sabe probar (`VN3036`) y `continue` dentro de un `match` ya ejecuta el paso del `for`. Pendiente: dict `{[k:str]:V}` → `Map<str,V>` (130 usos).
 5. **Hashable estático** para Map y Set; borrar el hashing dinámico de la VM; `new Map(entradas)` / `new Set(elementos)`; `readonly T[]` y las vistas.
 6. **TIR y emisor**: forma canónica del record, `Resolution::ShapeSlot`, selector de interfaz; borrar `ByName` y `DynReason::{Shape, Interface}`.
 7. **Borde dinámico**: `CONFORM`/`DECODE` y natives entregan forma canónica.
