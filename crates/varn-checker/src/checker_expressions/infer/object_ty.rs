@@ -54,7 +54,17 @@ impl Checker<'_> {
                 return exp;
             }
         }
-        let members = self.infer_object_members(rec, properties, bind);
+        let (members, duplicates) = self.infer_object_members(rec, properties, bind);
+        let range = self.ast_arena.expr(expr).range;
+        for name in duplicates {
+            self.emit(
+                varn_core::Diagnostic::error(
+                    varn_core::ErrorCode::DuplicateRecordField,
+                    format!("field '{name}' is given more than once: a record field is replaced with `with`, not by repeating it"),
+                )
+                .with_range(range),
+            );
+        }
         Type::record(members, Arc::make_mut(&mut self.ty_table))
     }
 
@@ -63,8 +73,9 @@ impl Checker<'_> {
         rec: &mut Recorder,
         properties: &[varn_core::ast::ObjectProp],
         bind: &BindResult,
-    ) -> Vec<ObjectTypeMember> {
+    ) -> (Vec<ObjectTypeMember>, Vec<String>) {
         let mut members = Vec::new();
+        let mut duplicates = Vec::new();
         for prop in properties {
             match prop {
                 varn_core::ast::ObjectProp::Property { key, value, .. } => {
@@ -74,6 +85,7 @@ impl Checker<'_> {
                     let ty = self.infer_type(rec, *value, bind);
                     put_member(
                         &mut members,
+                        &mut duplicates,
                         ObjectTypeMember::Property {
                             name,
                             ty: ty.0,
@@ -112,6 +124,7 @@ impl Checker<'_> {
                     let params = signature;
                     put_member(
                         &mut members,
+                        &mut duplicates,
                         ObjectTypeMember::Method {
                             name,
                             params,
@@ -132,7 +145,7 @@ impl Checker<'_> {
                             if let ObjectTypeMember::Property { readonly, .. } = &mut m {
                                 *readonly = false;
                             }
-                            put_member(&mut members, m);
+                            put_member(&mut members, &mut duplicates, m);
                         }
                     } else if let varn_core::TypeKind::Named(name, origin) = spread_kind {
                         let name_str = bind.interner.resolve(name).to_string();
@@ -144,6 +157,7 @@ impl Checker<'_> {
                                 if !cm.is_static {
                                     put_member(
                                         &mut members,
+                                        &mut duplicates,
                                         ObjectTypeMember::Property {
                                             name: cm.name.clone(),
                                             ty: cm.ty.0,
@@ -158,7 +172,7 @@ impl Checker<'_> {
                 }
             }
         }
-        members
+        (members, duplicates)
     }
 }
 
@@ -181,11 +195,21 @@ fn member_name(member: &ObjectTypeMember) -> Option<&Arc<str>> {
     }
 }
 
-fn put_member(members: &mut Vec<ObjectTypeMember>, member: ObjectTypeMember) {
+fn put_member(
+    members: &mut Vec<ObjectTypeMember>,
+    duplicates: &mut Vec<String>,
+    member: ObjectTypeMember,
+) {
     let existing = member_name(&member)
         .and_then(|name| members.iter().position(|m| member_name(m) == Some(name)));
     match existing {
-        Some(at) => members[at] = member,
-        None => members.push(member),
+        Some(at) => {
+            let name = member_name(&member).map(|n| n.to_string());
+            members[at] = member;
+            duplicates.extend(name);
+        }
+        None => {
+            members.push(member);
+        }
     }
 }

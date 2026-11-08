@@ -1,0 +1,3 @@
+// expect: error[VN3035]
+const base = { x: 1, y: 2 }
+const merged = { ...base, x: 5 }

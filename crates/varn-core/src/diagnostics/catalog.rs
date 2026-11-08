@@ -50,6 +50,7 @@ pub enum ErrorCode {
     InvalidWithEntry = 3032,
     DynamicNeedsCast = 3033,
     AwaitHasNoEffect = 3034,
+    DuplicateRecordField = 3035,
 
     TypeArgInferenceFailed = 3201,
     ConstraintViolation = 3202,
@@ -195,6 +196,7 @@ impl ErrorCode {
             ErrorCode::InvalidWithEntry => "invalid-with-entry",
             ErrorCode::DynamicNeedsCast => "dynamic-needs-cast",
             ErrorCode::AwaitHasNoEffect => "await-has-no-effect",
+            ErrorCode::DuplicateRecordField => "duplicate-record-field",
             ErrorCode::NotIterable => "not-iterable",
         }
     }
