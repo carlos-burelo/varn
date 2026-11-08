@@ -1,11 +1,11 @@
 import { ParseError } from "std:error";
 
 export type FormPart = {
-    name: str,
-    filename: str?,
-    contentType?: str,
-    headers: { [key: str]: str },
-    body: str,
+    name: str;
+    filename: str?;
+    contentType?: str;
+    headers: { [key: str]: str };
+    body: str;
     data: Bytes
 };
 

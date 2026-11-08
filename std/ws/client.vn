@@ -43,7 +43,7 @@ export function bytesConcat(a: Bytes, b: Bytes): Bytes {
 const MAX_HANDSHAKE = 16384;
 const DEFAULT_MAX_MESSAGE = 16777216;
 
-export async function readHttpHead(connId: int): Task<{ head: str, rest: Bytes }> {
+export async function readHttpHead(connId: int): Task<{ head: str; rest: Bytes }> {
     let buf = Bytes.alloc(0);
     while (true) {
         let end = findHeadEnd(buf);

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "std:test";
 
-type Part = { name: str, tag?: str }
+type Part = { name: str; tag?: str }
 
 function tally(words: str[]): Map<str, int> {
     const seen = new Map<str, int>()

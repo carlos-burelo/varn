@@ -1,9 +1,9 @@
 import { ParseError } from "std:error";
 export type SemVer = {
-    major: int,
-    minor: int,
-    patch: int,
-    pre: str[],
+    major: int;
+    minor: int;
+    patch: int;
+    pre: str[];
     build: str
 };
 

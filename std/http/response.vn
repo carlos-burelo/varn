@@ -171,7 +171,7 @@ export class Response {
         return Json.parse(this.body);
     }
 
-    setCookie(name: str, value: str, options?: { maxAge?: int, path?: str, secure?: bool, httpOnly?: bool, sameSite?: str }): Response {
+    setCookie(name: str, value: str, options?: { maxAge?: int; path?: str; secure?: bool; httpOnly?: bool; sameSite?: str }): Response {
         requireCookiePart("name", name, true);
         requireCookiePart("value", value, false);
         if (options !== null && options.path !== null) {

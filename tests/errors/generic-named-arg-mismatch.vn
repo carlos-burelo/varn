@@ -1,6 +1,6 @@
 // expect: error[VN3001]
 type Todo = {
-    id: int,
+    id: int;
     title: str
 };
 

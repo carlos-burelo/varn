@@ -3,10 +3,10 @@ import { sleep } from "std:task/combinators";
 import { now, toParts, fromParts, TimeParts } from "std:time";
 
 export type CronSpec = {
-    minutes: bool[],
-    hours: bool[],
-    days: bool[],
-    months: bool[],
+    minutes: bool[];
+    hours: bool[];
+    days: bool[];
+    months: bool[];
     weekdays: bool[]
 };
 

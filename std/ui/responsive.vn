@@ -28,7 +28,7 @@ export class AdaptiveValue<T> {
     }
 }
 
-export function Adaptive<T>(values: { compact: T, medium: T, expanded: T }): AdaptiveValue<T> {
+export function Adaptive<T>(values: { compact: T; medium: T; expanded: T }): AdaptiveValue<T> {
     return new AdaptiveValue<T>(values.compact, values.medium, values.expanded);
 }
 

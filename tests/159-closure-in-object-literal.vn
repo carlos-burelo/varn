@@ -7,7 +7,7 @@ function seesLaterWrite(i: int): int {
     return o.g();
 }
 
-function makeCounter(i: int): { g: () => int, bump: () => void } {
+function makeCounter(i: int): { g: () => int; bump: () => void } {
     let x = i;
     const o = { g: () => x, bump: () => { x = x + 1; } };
     x = x + 10;

@@ -195,7 +195,7 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> PResult<TypeNode> {
 
             let mut members = vec![];
             while !s.check(TokenKind::RBrace) && !s.is_eof() {
-                while s.eat(TokenKind::Semicolon) || s.eat(TokenKind::Comma) {}
+                while s.eat(TokenKind::Semicolon) {}
                 if s.check(TokenKind::RBrace) {
                     break;
                 }
@@ -204,7 +204,15 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> PResult<TypeNode> {
                     crate::parser::decls::type_decls::MemberContext::Record,
                 )?);
 
-                s.eat(TokenKind::Comma);
+                if s.check(TokenKind::Comma) {
+                    let at = s.range();
+                    s.push_error(
+                        "separate the members of a type with `;` or a new line, not with `,`"
+                            .to_owned(),
+                        at,
+                    );
+                    s.advance();
+                }
                 s.eat(TokenKind::Semicolon);
             }
             s.expect(TokenKind::RBrace)?;

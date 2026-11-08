@@ -2,8 +2,8 @@ import { ClosedError } from "std:error";
 import { udpBind$, udpSendTo$, udpRecvFrom$, udpClose$ } from "runtime:net";
 
 export type UdpPacket = {
-    data: Bytes,
-    host: str,
+    data: Bytes;
+    host: str;
     port: int
 };
 

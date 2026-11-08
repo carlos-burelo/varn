@@ -63,7 +63,7 @@ export function Dialog(open: Signal<bool>, title: str, body: Widget[]): Widget {
     return new DialogNode(open, title, body);
 }
 
-export type ToastItem = { text: str, until: int };
+export type ToastItem = { text: str; until: int };
 
 export class Toaster {
     items: Signal<ToastItem[]> = signal<ToastItem[]>([]);

@@ -206,9 +206,9 @@ async function runComprehensiveTest(): Task<void> {
     expect(777).toBe(777);
 
     // 18. std:types
-    let partialVar: Partial<{ x: int, y: str }> = { x: 42 };
+    let partialVar: Partial<{ x: int; y: str }> = { x: 42 };
     let readonlyVar: Readonly<{ a: bool }> = { a: true };
-    let requiredVar: Required<{ x?: int, y?: str }> = { x: 10, y: "yes" };
+    let requiredVar: Required<{ x?: int; y?: str }> = { x: 10, y: "yes" };
     let mutableVar: Mutable<{ readonly a: bool }> = { a: false };
     let recordVar: { [key: str]: int } = { "tested": 100 };
 

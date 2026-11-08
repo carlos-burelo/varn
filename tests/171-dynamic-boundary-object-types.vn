@@ -1,8 +1,8 @@
 import { describe, it, expect } from "std:test";
 import { Json } from "std:encoding";
 
-type Account = { id: int, name: str }
-type Card = { owner: Account, tags: str[], score?: float }
+type Account = { id: int; name: str }
+type Card = { owner: Account; tags: str[]; score?: float }
 
 function outcome(f: () => void): str {
     try {

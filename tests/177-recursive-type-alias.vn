@@ -1,7 +1,7 @@
 import { describe, it, expect } from "std:test";
 
-type Link = { value: int, next: Link? }
-type Branch = { label: str, kids: Branch[] }
+type Link = { value: int; next: Link? }
+type Branch = { label: str; kids: Branch[] }
 
 function length(head: Link?): int {
     let node: Link? = head

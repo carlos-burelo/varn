@@ -11,7 +11,7 @@ namespace Wire {
     }
 }
 
-type Point = { x: int, y: int };
+type Point = { x: int; y: int };
 
 function readFails(text: str): bool {
     try {

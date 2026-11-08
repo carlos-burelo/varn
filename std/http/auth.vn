@@ -1,7 +1,7 @@
 import { Base64 } from "std:encoding";
 
 export type BasicCredentials = {
-    user: str,
+    user: str;
     pass: str
 };
 

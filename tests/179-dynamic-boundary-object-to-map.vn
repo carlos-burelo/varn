@@ -20,7 +20,7 @@ class Bag {
     constructor(public items: Map<str, int>) {}
     count(extra: Map<str, int>): int { return this.items.size + extra.size }
 }
-type Config = { name: str, limits: Map<str, int> }
+type Config = { name: str; limits: Map<str, int> }
 
 await describe("179 explicit collection decoding", async () => {
     await it("a typed decoder constructs a Map without changing its source", () => {

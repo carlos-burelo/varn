@@ -4,9 +4,9 @@ import { describe, it, expect } from "std:test";
 
 // ── Closure capturing mutable state ─────────────────────────────
 function makeStateMachine(initial: str): {
-    transition: (event: str) => str,
-    state: () => str,
-    history: () => str[],
+    transition: (event: str) => str;
+    state: () => str;
+    history: () => str[];
 } {
     let current = initial
     const hist: str[] = [initial]
@@ -25,7 +25,7 @@ const sm = makeStateMachine("idle")
 const h = sm.history()
 
 // ── Closure sharing state between siblings ───────────────────────
-function makeSharedCounter(): { inc: () => void, dec: () => void, get: () => int } {
+function makeSharedCounter(): { inc: () => void; dec: () => void; get: () => int } {
     let n = 0
     return {
         inc: () => { n = n + 1 },

@@ -36,16 +36,16 @@ let jsonStr = Json.stringify(jsonObj);
 
 // 9. Generic Typed Json.parse<T> & Csv.parse<T>
 type UserDto = {
-    id: int,
-    name: str,
-    age: int,
-    active: bool,
+    id: int;
+    name: str;
+    age: int;
+    active: bool;
     score: float
 }
 let typedUsers = Csv.parse<UserDto>(csvBasic);
 
 type ApiResponse = {
-    message: str,
+    message: str;
     status: int
 }
 let typedJson = Json.parse<ApiResponse>("{\"message\": \"hello\", \"status\": 200}");

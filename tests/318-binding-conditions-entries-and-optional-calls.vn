@@ -1,6 +1,6 @@
 import { describe, it, expect } from "std:test";
 
-type Pair = { a: int, b: str };
+type Pair = { a: int; b: str };
 type Holder = { f: (() => int)? };
 
 function find(xs: int[], n: int): int? { return xs.indexOf(n); }
