@@ -402,9 +402,10 @@ impl Checker<'_> {
 
     fn is_variant_construction(&self, expr: ExprId, bind: &BindResult) -> bool {
         let arena = self.ast_arena;
-        let member = match &arena.expr(expr).kind {
-            ExprKind::Call { callee, .. } => *callee,
-            _ => expr,
+        let member = if let ExprKind::Call { callee, .. } = &arena.expr(expr).kind {
+            *callee
+        } else {
+            expr
         };
         let ExprKind::Member { object, .. } = &arena.expr(member).kind else {
             return false;

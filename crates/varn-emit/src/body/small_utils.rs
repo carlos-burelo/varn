@@ -160,16 +160,17 @@ fn has_continue_in(ast_arena: &AstArena, stmt: StmtId, in_nested_loop: bool) -> 
 }
 
 fn expression_has_continue(ast_arena: &AstArena, expr: ExprId, in_nested_loop: bool) -> bool {
-    match &ast_arena.expr(expr).kind {
-        ExprKind::Paren { expression } => {
-            expression_has_continue(ast_arena, *expression, in_nested_loop)
-        }
-        ExprKind::Match { cases, .. } => cases.iter().any(|case| match &case.body {
+    let kind = &ast_arena.expr(expr).kind;
+    if let ExprKind::Paren { expression } = kind {
+        return expression_has_continue(ast_arena, *expression, in_nested_loop);
+    }
+    if let ExprKind::Match { cases, .. } = kind {
+        return cases.iter().any(|case| match &case.body {
             MatchBody::Block(stmt) => has_continue_in(ast_arena, *stmt, in_nested_loop),
             MatchBody::Expr(expression) => {
                 expression_has_continue(ast_arena, *expression, in_nested_loop)
             }
-        }),
-        _ => false,
+        });
     }
+    false
 }

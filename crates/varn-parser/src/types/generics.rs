@@ -84,10 +84,13 @@ pub(crate) fn parse_fn_type_params(s: &mut TokenStream) -> PResult<Vec<varn_core
 
 fn parse_declared_variance(s: &mut TokenStream) -> Option<varn_core::ast::DeclaredVariance> {
     let names_a_parameter = matches!(s.peek_kind(1), TokenKind::Identifier);
-    let variance = match s.kind() {
-        TokenKind::Out if names_a_parameter => varn_core::ast::DeclaredVariance::Out,
-        TokenKind::In if names_a_parameter => varn_core::ast::DeclaredVariance::In,
-        _ => return None,
+    let kind = s.kind();
+    let variance = if names_a_parameter && kind == TokenKind::Out {
+        varn_core::ast::DeclaredVariance::Out
+    } else if names_a_parameter && kind == TokenKind::In {
+        varn_core::ast::DeclaredVariance::In
+    } else {
+        return None;
     };
     s.advance();
     Some(variance)
