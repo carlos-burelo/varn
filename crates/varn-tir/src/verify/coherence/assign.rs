@@ -42,6 +42,15 @@ fn assignable_with_depth(m: &TirModule, from: BackendTy, to: BackendTy, depth: u
         {
             return assignable_with_depth(m, m.types.get(a), m.types.get(b), depth + 1);
         }
+        (BackendTy::Map(ak, av), BackendTy::Map(bk, bv))
+            if m.types.contains(ak)
+                && m.types.contains(av)
+                && m.types.contains(bk)
+                && m.types.contains(bv) =>
+        {
+            return assignable_with_depth(m, m.types.get(ak), m.types.get(bk), depth + 1)
+                && assignable_with_depth(m, m.types.get(av), m.types.get(bv), depth + 1);
+        }
         (BackendTy::Tuple(a), BackendTy::Tuple(b))
             if m.types.contains_list(a) && m.types.contains_list(b) =>
         {
