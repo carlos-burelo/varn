@@ -112,24 +112,24 @@ impl<'a> FnEmitter<'a> {
                 span,
             };
         }
-        if let Some(ci) = self.class_ref_of(&obj) {
-            if let Some(slot) = ci.static_slot(&name) {
-                let declared = ci.static_at(slot).map(|s| s.ty).unwrap_or(ty);
-                let ty = if ty != declared && ty == declared.non_nullable(self.tt) {
-                    ty
-                } else {
-                    declared
-                };
-                return TirExpr {
-                    kind: TirExprKind::Field {
-                        object: Box::new(obj),
-                        name,
-                    },
-                    ty,
-                    res: Resolution::StaticField(slot),
-                    span,
-                };
-            }
+        if let Some(ci) = self.class_ref_of(&obj)
+            && let Some(slot) = ci.static_slot(&name)
+        {
+            let declared = ci.static_at(slot).map(|s| s.ty).unwrap_or(ty);
+            let ty = if ty != declared && ty == declared.non_nullable(self.tt) {
+                ty
+            } else {
+                declared
+            };
+            return TirExpr {
+                kind: TirExprKind::Field {
+                    object: Box::new(obj),
+                    name,
+                },
+                ty,
+                res: Resolution::StaticField(slot),
+                span,
+            };
         }
         if let Some(ci) = self.class_of(obj.ty) {
             if let Some(field) = ci.field(&name).cloned() {
