@@ -1,0 +1,3 @@
+// expect: error[VN3001]
+enum Opt<T> { Some(T), None }
+function wrong(): Opt<int> { return Opt.Some("x") }

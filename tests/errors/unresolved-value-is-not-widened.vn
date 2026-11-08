@@ -1,0 +1,6 @@
+// expect: error[VN3001]
+enum Opt<T> { Some(T), None }
+function make(): Opt<never> { return Opt.None }
+function take(o: Opt<int>): void {}
+const o = make()
+take(o)
