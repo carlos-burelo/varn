@@ -197,21 +197,9 @@ impl<'r> super::Binder<'r> {
                 self.bind_expr(callee);
                 self.bind_args(args);
             }
-            ExprKind::New {
-                callee,
-                type_args,
-                args,
-            } => {
+            ExprKind::New { callee, args, .. } => {
                 self.bind_expr(*callee);
                 self.bind_args(args);
-                if !type_args.is_empty() {
-                    let ty = self.infer_expr_type_self(id);
-                    self.generic_type_uses.push(varn_sem::bind::GenericTypeUse {
-                        range: arena.expr(id).range,
-                        scope: self.current,
-                        ty,
-                    });
-                }
             }
             ExprKind::Conditional {
                 test,

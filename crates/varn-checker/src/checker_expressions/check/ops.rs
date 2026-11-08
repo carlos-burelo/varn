@@ -191,6 +191,20 @@ impl<'r> Checker<'r> {
             );
         }
         self.check_expr(rec, callee, bind);
+        let instance = self.infer_type(rec, expr, bind);
+        let expected = self
+            .expected_for(expr)
+            .map(|ty| ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table)));
+        if expected != Some(instance) {
+            self.check_generic_type_use(
+                &varn_sem::bind::GenericTypeUse {
+                    range,
+                    scope: self.current_scope,
+                    ty: instance,
+                },
+                bind,
+            );
+        }
         let view = varn_sem::bind::BindView::new(bind, self.resolver);
         if let ExprKind::New { type_args, .. } = &arena.expr(expr).kind
             && !type_args.is_empty()

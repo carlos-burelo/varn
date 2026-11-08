@@ -10,7 +10,7 @@ impl Checker<'_> {
         }
     }
 
-    fn check_generic_type_use(&mut self, usage: &GenericTypeUse, bind: &BindResult) {
+    pub(crate) fn check_generic_type_use(&mut self, usage: &GenericTypeUse, bind: &BindResult) {
         let TypeKind::Generic(name, args, _) = self.ty_table.get(usage.ty.0) else {
             return;
         };
