@@ -201,6 +201,10 @@ impl<'r> Binder<'r> {
                     .iter()
                     .map(|tp| Arc::from(self.interner.resolve(tp.name)))
                     .collect();
+                let fn_defaults: Vec<Option<varn_sem::types::CheckerTyId>> = type_params
+                    .iter()
+                    .map(|tp| tp.default.as_ref().map(|d| self.resolve_type(d).0))
+                    .collect();
 
                 let fn_ty = Type::fn_(
                     FunctionType {
@@ -208,7 +212,7 @@ impl<'r> Binder<'r> {
                         return_type: ret.0,
                         is_arrow: false,
                         type_params: fn_tps,
-                        type_param_defaults: Vec::new(),
+                        type_param_defaults: fn_defaults,
                     },
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 );
