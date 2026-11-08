@@ -130,22 +130,6 @@ fn collect_returns_recursive(
                 table,
             );
         }
-        StmtKind::Switch { cases, .. } => {
-            for case in cases {
-                for &s in &case.body {
-                    collect_returns_recursive(
-                        ctx,
-                        sym_map,
-                        s,
-                        ast_arena,
-                        bind,
-                        current_class,
-                        results,
-                        table,
-                    );
-                }
-            }
-        }
         StmtKind::Try {
             block,
             catches,
@@ -322,21 +306,6 @@ fn enrich_vars_recursive(
                 resolver,
                 current_class,
             );
-        }
-        StmtKind::Switch { cases, .. } => {
-            for case in cases {
-                for &s in &case.body {
-                    enrich_vars_recursive(
-                        ctx,
-                        sym_map,
-                        s,
-                        ast_arena,
-                        bind,
-                        resolver,
-                        current_class,
-                    );
-                }
-            }
         }
         StmtKind::Try {
             block,

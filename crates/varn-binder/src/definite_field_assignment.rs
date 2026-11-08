@@ -179,7 +179,6 @@ fn walk_stmt(s: StmtId, arena: &AstArena, interner: &AtomInterner, out: &mut FxH
         | StmtKind::For { .. }
         | StmtKind::ForIn { .. }
         | StmtKind::ForOf { .. }
-        | StmtKind::Switch { .. }
         | StmtKind::Return { .. }
         | StmtKind::Break { .. }
         | StmtKind::Continue { .. }

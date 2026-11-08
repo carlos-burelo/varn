@@ -8,7 +8,7 @@ use varn_core::term::terminal::Section;
 use varn_core::AtomInterner;
 
 use decl::print_decl;
-use expr::{format_expr_short, format_pattern, print_expr};
+use expr::{format_pattern, print_expr};
 
 pub fn debug_ast(program: &Program, arena: &AstArena, interner: &AtomInterner) {
     Section::new("abstract syntax tree")
@@ -165,38 +165,6 @@ pub(super) fn print_stmt(
             ));
             print_expr(right, arena, &child_indent, false, interner);
             print_stmt(body, arena, &child_indent, true, interner);
-        }
-        StmtKind::Switch {
-            discriminant,
-            cases,
-        } => {
-            let discriminant = *discriminant;
-            terminal::log(format!("{indent}{marker}{}", chalk("SwitchStmt").bold()));
-            print_expr(
-                discriminant,
-                arena,
-                &child_indent,
-                cases.is_empty(),
-                interner,
-            );
-            for (i, case) in cases.iter().enumerate() {
-                let is_l = i == cases.len() - 1;
-                let m = if is_l { "└── " } else { "├── " };
-                let label = if let Some(t) = &case.test {
-                    format_expr_short(*t, arena, interner)
-                } else {
-                    "default".to_owned()
-                };
-                terminal::log(format!(
-                    "{child_indent}{m}{} {}",
-                    chalk("Case").bold(),
-                    chalk(label).yellow()
-                ));
-                let c_indent = format!("{child_indent}{}", if is_l { "    " } else { "│   " });
-                for (j, &s) in case.body.iter().enumerate() {
-                    print_stmt(s, arena, &c_indent, j == case.body.len() - 1, interner);
-                }
-            }
         }
         StmtKind::Return { argument } => {
             let argument = *argument;

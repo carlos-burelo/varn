@@ -3,9 +3,7 @@ use super::abrupt::{
     parse_using_stmt,
 };
 use super::block::parse_block;
-use super::branches::{
-    parse_do_while_stmt, parse_for_stmt, parse_if_stmt, parse_switch_stmt, parse_while_stmt,
-};
+use super::branches::{parse_do_while_stmt, parse_for_stmt, parse_if_stmt, parse_while_stmt};
 use crate::error::{PResult, ParseError};
 use crate::stream::TokenStream;
 use varn_core::ast::{StmtId, StmtKind};
@@ -51,7 +49,19 @@ pub fn parse_stmt_or_decl_inner(s: &mut TokenStream) -> PResult<StmtId> {
         TokenKind::While => parse_while_stmt(s),
         TokenKind::Do => parse_do_while_stmt(s),
         TokenKind::For => parse_for_stmt(s),
-        TokenKind::Switch => parse_switch_stmt(s),
+        TokenKind::Switch => {
+            let start = s.range();
+            s.push_error(
+                "`switch` does not exist: write `match (x) { 1 => { ... }, _ => { ... } }`"
+                    .to_owned(),
+                start,
+            );
+            s.advance();
+            skip_group(s, TokenKind::LParen, TokenKind::RParen);
+            skip_group(s, TokenKind::LBrace, TokenKind::RBrace);
+            let range = s.span_from(start);
+            Ok(s.stmt(range, StmtKind::Error))
+        }
         TokenKind::Return => parse_return_stmt(s),
         TokenKind::Break => parse_break_stmt(s),
         TokenKind::Continue => parse_continue_stmt(s),
@@ -230,6 +240,25 @@ pub fn parse_stmt_or_decl_inner(s: &mut TokenStream) -> PResult<StmtId> {
             s.eat_semicolon();
             let range = s.span_from(start_range);
             Ok(s.stmt(range, StmtKind::Expr { expression: expr }))
+        }
+    }
+}
+
+fn skip_group(s: &mut TokenStream, open: TokenKind, close: TokenKind) {
+    if !s.check(open) {
+        return;
+    }
+    let mut depth = 0usize;
+    while !s.is_eof() {
+        let kind = s.kind();
+        s.advance();
+        if kind == open {
+            depth += 1;
+        } else if kind == close {
+            depth -= 1;
+            if depth == 0 {
+                break;
+            }
         }
     }
 }

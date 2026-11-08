@@ -76,7 +76,6 @@ pub(super) fn emit_member_fn(
                 | StmtKind::For { .. }
                 | StmtKind::ForIn { .. }
                 | StmtKind::ForOf { .. }
-                | StmtKind::Switch { .. }
                 | StmtKind::Return { .. }
                 | StmtKind::Break { .. }
                 | StmtKind::Continue { .. }
@@ -300,7 +299,6 @@ pub(super) fn emit_function(
             | StmtKind::For { .. }
             | StmtKind::ForIn { .. }
             | StmtKind::ForOf { .. }
-            | StmtKind::Switch { .. }
             | StmtKind::Return { .. }
             | StmtKind::Break { .. }
             | StmtKind::Continue { .. }

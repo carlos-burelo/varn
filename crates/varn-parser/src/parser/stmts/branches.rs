@@ -2,7 +2,7 @@ use super::dispatch::parse_stmt_or_decl_inner;
 use crate::error::{PResult, ParseError};
 use crate::stream::TokenStream;
 use varn_core::ast::operators::VarKind;
-use varn_core::ast::{ForInit, StmtId, StmtKind, SwitchCase};
+use varn_core::ast::{ForInit, StmtId, StmtKind};
 use varn_core::TokenKind;
 
 pub(super) fn parse_if_stmt(s: &mut TokenStream) -> PResult<StmtId> {
@@ -330,50 +330,6 @@ pub(super) fn parse_for_stmt(s: &mut TokenStream) -> PResult<StmtId> {
             test,
             update,
             body,
-        },
-    ))
-}
-
-pub(super) fn parse_switch_stmt(s: &mut TokenStream) -> PResult<StmtId> {
-    let start_range = s.range();
-    s.advance();
-    s.expect(TokenKind::LParen)?;
-    let discriminant = crate::expressions::parse_expr(s)?;
-    s.expect(TokenKind::RParen)?;
-    s.expect(TokenKind::LBrace)?;
-
-    let mut cases = vec![];
-    while !s.check(TokenKind::RBrace) && !s.is_eof() {
-        let case_start = s.range();
-        let test = if s.eat(TokenKind::Case) {
-            Some(crate::expressions::parse_expr(s)?)
-        } else {
-            s.expect(TokenKind::Default)?;
-            None
-        };
-        s.expect(TokenKind::Colon)?;
-
-        let mut body = vec![];
-        while !matches!(
-            s.kind(),
-            TokenKind::Case | TokenKind::Default | TokenKind::RBrace | TokenKind::EOF
-        ) {
-            body.push(parse_stmt_or_decl_inner(s)?);
-        }
-        let case_range = s.span_from(case_start);
-        cases.push(SwitchCase {
-            test,
-            body,
-            range: case_range,
-        });
-    }
-    s.expect(TokenKind::RBrace)?;
-    let range = s.span_from(start_range);
-    Ok(s.stmt(
-        range,
-        StmtKind::Switch {
-            discriminant,
-            cases,
         },
     ))
 }

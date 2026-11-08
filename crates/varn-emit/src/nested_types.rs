@@ -112,7 +112,6 @@ impl NestedTypes {
                 | StmtKind::For { .. }
                 | StmtKind::ForIn { .. }
                 | StmtKind::ForOf { .. }
-                | StmtKind::Switch { .. }
                 | StmtKind::Return { .. }
                 | StmtKind::Break { .. }
                 | StmtKind::Continue { .. }

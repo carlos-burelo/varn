@@ -5,7 +5,7 @@ pub(super) mod literals;
 pub(super) mod operators;
 pub(super) mod short;
 
-pub(crate) use short::{format_expr_short, format_pattern};
+pub(crate) use short::format_pattern;
 
 use varn_core::ast::{AstArena, ExprId};
 use varn_core::term::chalk::chalk;

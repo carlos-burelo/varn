@@ -12,4 +12,3 @@ mod keyed_receiver;
 pub(crate) mod reassignment;
 mod resource;
 mod sequence;
-mod switch;

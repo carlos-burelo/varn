@@ -254,18 +254,6 @@ impl Collector<'_> {
                 self.expr(*right);
                 self.stmt(*body);
             }
-            StmtKind::Switch {
-                discriminant,
-                cases,
-            } => {
-                self.expr(*discriminant);
-                for case in cases {
-                    if let Some(t) = case.test {
-                        self.expr(t);
-                    }
-                    case.body.iter().for_each(|&x| self.stmt(x));
-                }
-            }
             StmtKind::Try {
                 block,
                 catches,

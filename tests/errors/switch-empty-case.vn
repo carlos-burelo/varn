@@ -1,9 +1,0 @@
-// expect: error[VN4019]
-function f(n: int): str {
-    switch (n) {
-        case 1:
-        case 2:
-            return "low"
-    }
-    return "high"
-}

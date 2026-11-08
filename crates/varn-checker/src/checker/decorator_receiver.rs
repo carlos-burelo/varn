@@ -65,16 +65,6 @@ fn stmt_uses_receiver(arena: &AstArena, id: StmtId) -> bool {
                 || expr_uses_receiver(arena, *right)
                 || stmt_uses_receiver(arena, *body)
         }
-        StmtKind::Switch {
-            discriminant,
-            cases,
-        } => {
-            expr_uses_receiver(arena, *discriminant)
-                || cases.iter().any(|c| {
-                    c.test.is_some_and(|t| expr_uses_receiver(arena, t))
-                        || c.body.iter().any(|s| stmt_uses_receiver(arena, *s))
-                })
-        }
         StmtKind::Return { argument } => argument.is_some_and(|e| expr_uses_receiver(arena, e)),
         StmtKind::Break { .. } => false,
         StmtKind::Continue { .. } => false,

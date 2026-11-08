@@ -91,20 +91,6 @@ pub(crate) fn assigned_in_stmt(stmt: StmtId, arena: &AstArena, out: &mut Assigne
             assigned_in_expr(*right, arena, out);
             assigned_in_stmt(*body, arena, out);
         }
-        StmtKind::Switch {
-            discriminant,
-            cases,
-        } => {
-            assigned_in_expr(*discriminant, arena, out);
-            for case in cases {
-                if let Some(test) = case.test {
-                    assigned_in_expr(test, arena, out);
-                }
-                for s in &case.body {
-                    assigned_in_stmt(*s, arena, out);
-                }
-            }
-        }
         StmtKind::Return { argument } => {
             if let Some(a) = argument {
                 assigned_in_expr(*a, arena, out);

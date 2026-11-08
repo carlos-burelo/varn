@@ -64,13 +64,11 @@ impl ErrorCode {
         ErrorCode::InvalidContinueTarget,
         ErrorCode::ReturnOutsideFunction,
         ErrorCode::InvalidThrowOperand,
-        ErrorCode::DuplicateCaseLabel,
         ErrorCode::AwaitOutsideAsync,
         ErrorCode::MatchPatternTypeMismatch,
         ErrorCode::InvalidUsingTarget,
         ErrorCode::UseBeforeAssignment,
         ErrorCode::MissingReturn,
-        ErrorCode::InvalidSwitchCase,
         ErrorCode::NamespaceAsValue,
         ErrorCode::MutableExport,
         ErrorCode::UninitializedField,
@@ -163,13 +161,11 @@ impl ErrorCode {
             | ErrorCode::InvalidContinueTarget
             | ErrorCode::ReturnOutsideFunction
             | ErrorCode::InvalidThrowOperand
-            | ErrorCode::DuplicateCaseLabel
             | ErrorCode::AwaitOutsideAsync
             | ErrorCode::MatchPatternTypeMismatch
             | ErrorCode::InvalidUsingTarget
             | ErrorCode::UseBeforeAssignment
             | ErrorCode::MissingReturn
-            | ErrorCode::InvalidSwitchCase
             | ErrorCode::NamespaceAsValue
             | ErrorCode::MutableExport
             | ErrorCode::UninitializedField
@@ -256,13 +252,11 @@ impl ErrorCode {
             ErrorCode::InvalidContinueTarget => "`continue` appears outside a loop, or names an unknown label.",
             ErrorCode::ReturnOutsideFunction => "`return` appears outside a function body.",
             ErrorCode::InvalidThrowOperand => "Only `Error` values and their subclasses can be thrown.",
-            ErrorCode::DuplicateCaseLabel => "Two cases of a switch have the same label.",
             ErrorCode::AwaitOutsideAsync => "`await` is only valid inside an async function or at the top level.",
             ErrorCode::MatchPatternTypeMismatch => "A match pattern can never match the type of its subject, or names a missing field.",
             ErrorCode::InvalidUsingTarget => "`using` needs a resource that can be disposed.",
             ErrorCode::UseBeforeAssignment => "A variable is read before every path has assigned it.",
             ErrorCode::MissingReturn => "A function with a return type can finish without returning a value.",
-            ErrorCode::InvalidSwitchCase => "A switch case has a form switch does not allow.",
             ErrorCode::NamespaceAsValue => "A namespace is used where a value is required.",
             ErrorCode::MutableExport => "A module exports a mutable binding.",
             ErrorCode::UninitializedField => "A class field is neither initialized nor assigned by every constructor path.",

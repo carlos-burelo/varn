@@ -143,7 +143,6 @@ fn collect_in_stmt(a: &AstArena, stmt: StmtId, line: u32, col: u32, ranges: &mut
         | StmtKind::For { .. }
         | StmtKind::ForIn { .. }
         | StmtKind::ForOf { .. }
-        | StmtKind::Switch { .. }
         | StmtKind::Break { .. }
         | StmtKind::Continue { .. }
         | StmtKind::Throw { .. }

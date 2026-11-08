@@ -129,7 +129,6 @@ impl AstJson<'_> {
             StmtKind::Empty => leaf("EmptyStmt".to_string(), "field", line),
             StmtKind::Error => leaf("ErrorStmt".to_string(), "field", line),
             StmtKind::DoWhile { .. }
-            | StmtKind::Switch { .. }
             | StmtKind::Throw { .. }
             | StmtKind::Try { .. }
             | StmtKind::Using { .. }

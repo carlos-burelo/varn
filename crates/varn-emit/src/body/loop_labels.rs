@@ -80,7 +80,6 @@ impl<'a> FnEmitter<'a> {
             | StmtKind::Decl(_)
             | StmtKind::Error
             | StmtKind::If { .. }
-            | StmtKind::Switch { .. }
             | StmtKind::Return { .. }
             | StmtKind::Throw { .. }
             | StmtKind::Try { .. }

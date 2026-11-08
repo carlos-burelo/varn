@@ -32,13 +32,6 @@ impl<'r> Checker<'r> {
             | StmtKind::ForIn { body, .. }
             | StmtKind::ForOf { body, .. }
             | StmtKind::Labeled { body, .. } => self.reject_return_in_finally(*body),
-            StmtKind::Switch { cases, .. } => {
-                for case in cases {
-                    case.body
-                        .iter()
-                        .for_each(|&s| self.reject_return_in_finally(s));
-                }
-            }
             StmtKind::Try {
                 block,
                 catches,

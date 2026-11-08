@@ -59,7 +59,6 @@ impl<'a> FnEmitter<'a> {
             | StmtKind::For { .. }
             | StmtKind::ForIn { .. }
             | StmtKind::ForOf { .. }
-            | StmtKind::Switch { .. }
             | StmtKind::Return { .. }
             | StmtKind::Break { .. }
             | StmtKind::Continue { .. }
@@ -224,11 +223,6 @@ impl<'a> FnEmitter<'a> {
                 catches,
                 finally,
             } => self.lower_try(*block, catches, *finally),
-
-            StmtKind::Switch {
-                discriminant,
-                cases,
-            } => self.lower_switch(*discriminant, cases),
 
             StmtKind::Using { declarations, .. } => {
                 let dyn_ty = BackendTy::Dynamic(DynReason::Unrecorded);

@@ -128,11 +128,6 @@ fn has_continue_in(ast_arena: &AstArena, stmt: StmtId, in_nested_loop: bool) -> 
             has_continue_in(ast_arena, *consequent, in_nested_loop)
                 || alternate.is_some_and(|a| has_continue_in(ast_arena, a, in_nested_loop))
         }
-        StmtKind::Switch { cases, .. } => cases.iter().any(|c| {
-            c.body
-                .iter()
-                .any(|&s| has_continue_in(ast_arena, s, in_nested_loop))
-        }),
         StmtKind::Try {
             block,
             catches,

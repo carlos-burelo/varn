@@ -192,7 +192,6 @@ impl<'r> Checker<'r> {
                         | varn_core::ast::StmtKind::For { .. }
                         | varn_core::ast::StmtKind::ForIn { .. }
                         | varn_core::ast::StmtKind::ForOf { .. }
-                        | varn_core::ast::StmtKind::Switch { .. }
                         | varn_core::ast::StmtKind::Return { .. }
                         | varn_core::ast::StmtKind::Break { .. }
                         | varn_core::ast::StmtKind::Continue { .. }
@@ -216,7 +215,6 @@ impl<'r> Checker<'r> {
                 | varn_core::ast::StmtKind::For { .. }
                 | varn_core::ast::StmtKind::ForIn { .. }
                 | varn_core::ast::StmtKind::ForOf { .. }
-                | varn_core::ast::StmtKind::Switch { .. }
                 | varn_core::ast::StmtKind::Return { .. }
                 | varn_core::ast::StmtKind::Break { .. }
                 | varn_core::ast::StmtKind::Continue { .. }

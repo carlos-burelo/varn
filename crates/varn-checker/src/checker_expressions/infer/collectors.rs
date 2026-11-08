@@ -120,13 +120,6 @@ fn collect_returns(
             }
         }
         StmtKind::Labeled { body, .. } => collect_returns(*body, checker, rec, bind, out),
-        StmtKind::Switch { cases, .. } => {
-            for case in cases.clone() {
-                for s in &case.body {
-                    collect_returns(*s, checker, rec, bind, out);
-                }
-            }
-        }
 
         StmtKind::Empty
         | StmtKind::Expr { .. }

@@ -304,28 +304,6 @@ impl<'a> CtorFlow<'a> {
                 self.branch(*body, assigned);
                 false
             }
-            StmtKind::Switch {
-                discriminant,
-                cases,
-            } => {
-                self.expr(*discriminant, assigned);
-                let mut arms = Vec::with_capacity(cases.len());
-                let mut has_default = false;
-                for case in cases {
-                    match case.test {
-                        Some(t) => self.expr(t, assigned),
-                        None => has_default = true,
-                    }
-                    let mut arm = assigned.clone();
-                    let diverged = self.block(&case.body, &mut arm);
-                    arms.push((arm, diverged));
-                }
-                if has_default {
-                    Self::join(assigned, arms)
-                } else {
-                    false
-                }
-            }
             StmtKind::Try {
                 block,
                 catches,

@@ -127,19 +127,6 @@ impl<'r> Binder<'r> {
                 self.bind_stmt(body);
                 self.current = saved;
             }
-            StmtKind::Switch {
-                discriminant,
-                cases,
-            } => {
-                let discriminant = *discriminant;
-                self.bind_expr(discriminant);
-                for case in cases {
-                    if let Some(t) = &case.test {
-                        self.bind_expr(*t);
-                    }
-                    self.bind_stmts(&case.body);
-                }
-            }
             StmtKind::Try {
                 block,
                 catches,

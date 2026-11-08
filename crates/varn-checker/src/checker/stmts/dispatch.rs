@@ -95,13 +95,6 @@ impl<'r> Checker<'r> {
                 self.check_for_in_stmt(rec, left.clone(), *right, *body, range, bind);
             }
 
-            StmtKind::Switch {
-                discriminant,
-                cases,
-            } => {
-                self.check_switch_stmt(rec, *discriminant, cases.clone(), bind);
-            }
-
             StmtKind::Try {
                 block,
                 catches,

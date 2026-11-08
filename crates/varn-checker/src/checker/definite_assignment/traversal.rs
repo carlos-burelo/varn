@@ -400,41 +400,6 @@ impl<'r> Checker<'r> {
                 self.da_stmt(body, &mut inner, bind);
             }
 
-            StmtKind::Switch {
-                discriminant,
-                cases,
-            } => {
-                let (discriminant, cases) = (*discriminant, cases.clone());
-                self.da_expr(discriminant, flow, bind);
-                let mut acc: Option<Flow> = None;
-                let mut has_default = false;
-                for c in &cases {
-                    if let Some(t) = c.test {
-                        self.da_expr(t, flow, bind);
-                    } else {
-                        has_default = true;
-                    }
-                    let mut arm = flow.clone();
-                    for &s in &c.body {
-                        if arm.diverged {
-                            break;
-                        }
-                        self.da_stmt(s, &mut arm, bind);
-                    }
-                    acc = Some(match acc {
-                        None => arm,
-                        Some(prev) => {
-                            let mut m = flow.clone();
-                            m.merge(prev, arm);
-                            m
-                        }
-                    });
-                }
-                if has_default && let Some(a) = acc {
-                    *flow = a;
-                }
-            }
-
             StmtKind::Try {
                 block,
                 catches,

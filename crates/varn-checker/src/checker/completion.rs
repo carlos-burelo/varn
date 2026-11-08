@@ -34,7 +34,6 @@ pub(crate) fn can_complete_normally(stmt: StmtId, arena: &AstArena) -> bool {
         | StmtKind::For { .. }
         | StmtKind::ForIn { .. }
         | StmtKind::ForOf { .. }
-        | StmtKind::Switch { .. }
         | StmtKind::Using { .. }
         | StmtKind::Labeled { .. } => true,
     }

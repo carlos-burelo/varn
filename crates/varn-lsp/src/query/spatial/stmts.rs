@@ -2,8 +2,7 @@ use super::exprs::collect_expr;
 use super::index::SpatialEntry;
 use varn_core::ast::{
     AstArena, ClassDecl, ClassMember, Decl, EnumDecl, ExportDecl, ExportDefaultDecl, ExtensionDecl,
-    ExtensionMember, ForInit, FunctionDecl, NamespaceDecl, StmtId, StmtKind, SwitchCase,
-    VarDeclarator,
+    ExtensionMember, ForInit, FunctionDecl, NamespaceDecl, StmtId, StmtKind, VarDeclarator,
 };
 
 pub(super) fn collect_stmt(a: &AstArena, stmt: &StmtId, out: &mut Vec<SpatialEntry>) {
@@ -68,15 +67,6 @@ pub(super) fn collect_stmt(a: &AstArena, stmt: &StmtId, out: &mut Vec<SpatialEnt
             collect_expr(a, right, out);
             collect_stmt(a, body, out);
         }
-        StmtKind::Switch {
-            discriminant,
-            cases,
-        } => {
-            collect_expr(a, discriminant, out);
-            for case in cases {
-                collect_switch_case(a, case, out);
-            }
-        }
         StmtKind::Return { argument } => {
             if let Some(arg) = argument {
                 collect_expr(a, arg, out);
@@ -106,15 +96,6 @@ pub(super) fn collect_stmt(a: &AstArena, stmt: &StmtId, out: &mut Vec<SpatialEnt
         StmtKind::Labeled { body, .. } => {
             collect_stmt(a, body, out);
         }
-    }
-}
-
-pub(super) fn collect_switch_case(a: &AstArena, case: &SwitchCase, out: &mut Vec<SpatialEntry>) {
-    if let Some(test) = &case.test {
-        collect_expr(a, test, out);
-    }
-    for s in &case.body {
-        collect_stmt(a, s, out);
     }
 }
 

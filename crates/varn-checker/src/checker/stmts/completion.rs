@@ -55,16 +55,6 @@ fn completes(
             !forever || breaks(*body, arena)
         }
         StmtKind::For { test, body, .. } => test.is_some() || breaks(*body, arena),
-        StmtKind::Switch { cases, .. } => {
-            let has_default = cases.iter().any(|c| c.test.is_none());
-            let escapes = cases
-                .iter()
-                .any(|c| c.body.iter().any(|s| breaks(*s, arena)));
-            let falls_out = cases
-                .last()
-                .is_none_or(|c| c.body.iter().all(|s| completes(*s, arena, table)));
-            !has_default || escapes || falls_out
-        }
         StmtKind::Try {
             block,
             catches,
@@ -121,11 +111,6 @@ fn breaks(stmt: StmtId, arena: &AstArena) -> bool {
                 || finally.is_some_and(|f| breaks(f, arena))
         }
         StmtKind::Labeled { body, .. } => breaks(*body, arena),
-        StmtKind::Switch { cases, .. } => cases.iter().any(|c| {
-            c.body
-                .iter()
-                .any(|s| matches!(arena.stmt(*s).kind, StmtKind::Break { label: Some(_) }))
-        }),
         StmtKind::While { body, .. }
         | StmtKind::DoWhile { body, .. }
         | StmtKind::For { body, .. }
@@ -170,9 +155,6 @@ fn labeled_break(stmt: StmtId, arena: &AstArena) -> bool {
         | StmtKind::For { body, .. }
         | StmtKind::ForIn { body, .. }
         | StmtKind::ForOf { body, .. } => labeled_break(*body, arena),
-        StmtKind::Switch { cases, .. } => cases
-            .iter()
-            .any(|c| c.body.iter().any(|s| labeled_break(*s, arena))),
         StmtKind::Empty
         | StmtKind::Expr { .. }
         | StmtKind::Decl(_)

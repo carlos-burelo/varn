@@ -180,7 +180,6 @@ fn find_class_at_line<'a>(
             | StmtKind::For { .. }
             | StmtKind::ForIn { .. }
             | StmtKind::ForOf { .. }
-            | StmtKind::Switch { .. }
             | StmtKind::Return { .. }
             | StmtKind::Break { .. }
             | StmtKind::Continue { .. }
@@ -226,7 +225,6 @@ fn find_interface(
             | StmtKind::For { .. }
             | StmtKind::ForIn { .. }
             | StmtKind::ForOf { .. }
-            | StmtKind::Switch { .. }
             | StmtKind::Return { .. }
             | StmtKind::Break { .. }
             | StmtKind::Continue { .. }

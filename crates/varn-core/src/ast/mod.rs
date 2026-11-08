@@ -33,5 +33,5 @@ pub use pattern::{
     literal_variant_name, ArrayPatternEl, MatchField, MatchPattern, ObjPatternProp, Param, Pattern,
     SequenceRest, VariantPayload,
 };
-pub use stmt::{CatchClause, ForInit, StmtKind, SwitchCase, VarDeclarator, VariableDecl};
+pub use stmt::{CatchClause, ForInit, StmtKind, VarDeclarator, VariableDecl};
 pub use types::{AstTypeKind, DeclaredVariance, Decorator, TypeNode, TypeParam};

@@ -70,10 +70,6 @@ pub enum StmtKind {
         body: StmtId,
         is_await: bool,
     },
-    Switch {
-        discriminant: ExprId,
-        cases: Vec<SwitchCase>,
-    },
 
     Return {
         argument: Option<ExprId>,
@@ -110,13 +106,6 @@ pub enum ForInit {
         declarators: Vec<VarDeclarator>,
     },
     Expr(ExprId),
-}
-
-#[derive(Clone, Debug)]
-pub struct SwitchCase {
-    pub test: Option<ExprId>,
-    pub body: Vec<StmtId>,
-    pub range: SourceRange,
 }
 
 #[derive(Clone, Debug)]

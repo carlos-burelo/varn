@@ -1,9 +1,8 @@
-// expect: error[VN4019]
+// expect: error[VN2002]
 function f(n: int): int {
     switch (n) {
-        default:
-            return 0
         case 1:
             return 1
     }
+    return 0
 }
