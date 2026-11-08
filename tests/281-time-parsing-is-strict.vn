@@ -34,8 +34,7 @@ await describe("281 time parsing is strict", async () => {
     });
 
     await it("fromParts validates every range", async () => {
-        const base = { year: 2024, month: 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0 };
-        expect(fromParts(base)).toBe(1704067200000);
+        expect(fromParts({ year: 2024, month: 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0 })).toBe(1704067200000);
         expect(rejects(() => fromParts({ year: 2024, month: 1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 5000 }))).toBeTruthy();
         expect(rejects(() => fromParts({ year: 2024, month: -1, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0 }))).toBeTruthy();
     });

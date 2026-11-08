@@ -1,0 +1,3 @@
+// expect: error[VN3001]
+const given = { retries: 3 }
+const options: { retries: int; verbose?: bool } = given

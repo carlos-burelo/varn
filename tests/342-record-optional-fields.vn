@@ -1,0 +1,29 @@
+import { describe, it, expect } from "std:test";
+
+type Options = { retries: int; verbose?: bool }
+
+function retriesOf(options: Options): int { return options.retries }
+function defaults(): Options { return { retries: 3 } }
+
+await describe("342 record optional fields", async () => {
+    await it("a literal may omit an optional field", () => {
+        const quiet: Options = { retries: 1 }
+        const loud: Options = { retries: 2, verbose: true }
+        expect(quiet.retries).toBe(1)
+        expect(quiet.verbose).toBe(null)
+        expect(loud.verbose).toBe(true)
+    })
+
+    await it("a literal is checked against the parameter and the return type", () => {
+        expect(retriesOf({ retries: 4 })).toBe(4)
+        expect(retriesOf({ retries: 5, verbose: false })).toBe(5)
+        expect(defaults().retries).toBe(3)
+    })
+
+    await it("a record of the same fields in another order is the same type", () => {
+        const first: { id: int; name: str } = { id: 1, name: "a" }
+        const second: { name: str; id: int } = first
+        expect(second.id).toBe(1)
+        expect(second.name).toBe("a")
+    })
+})

@@ -31,9 +31,8 @@ await describe("339 record and interface types", async () => {
         expect(describe2({ name: "ed" })).toBe("ed")
     })
 
-    await it("a record without optional fields widens to one that has them", () => {
-        const base = { retries: 3 }
-        expect(retriesOf(base)).toBe(3)
+    await it("a literal omits the optional fields of the expected record", () => {
+        expect(retriesOf({ retries: 3 })).toBe(3)
         expect(retriesOf({ retries: 4, verbose: true })).toBe(4)
     })
 

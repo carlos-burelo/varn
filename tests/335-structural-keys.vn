@@ -1,6 +1,6 @@
 import { describe, it, expect } from "std:test";
 
-enum Shape { Circle(float), Rect(float, float), Unit }
+enum Shape { Circle(int), Rect(int, int), Unit }
 
 await describe("335 structural keys", async () => {
     await it("equal tuples are the same key of a Map", async () => {
@@ -34,12 +34,12 @@ await describe("335 structural keys", async () => {
 
     await it("enum variants with the same payload are the same key", async () => {
         const m = new Map<Shape, str>();
-        m.set(Shape.Circle(1.0), "small");
-        m.set(Shape.Circle(1.0), "unit");
-        m.set(Shape.Rect(1.0, 2.0), "rect");
+        m.set(Shape.Circle(1), "small");
+        m.set(Shape.Circle(1), "unit");
+        m.set(Shape.Rect(1, 2), "rect");
         expect(m.size).toBe(2);
-        expect(m.get(Shape.Circle(1.0))).toBe("unit");
-        expect(m.get(Shape.Circle(2.0))).toBe(null);
-        expect(m.get(Shape.Rect(1.0, 2.0))).toBe("rect");
+        expect(m.get(Shape.Circle(1))).toBe("unit");
+        expect(m.get(Shape.Circle(2))).toBe(null);
+        expect(m.get(Shape.Rect(1, 2))).toBe("rect");
     });
 });

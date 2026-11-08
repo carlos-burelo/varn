@@ -241,18 +241,15 @@ pub(super) fn record_arm(
         | ObjectTypeMember::Index { .. }
         | ObjectTypeMember::Callable { .. } => true,
     });
-    let extras_are_optional = decl.iter().all(|dm| match dm {
-        ObjectTypeMember::Property { name, optional, .. } => {
-            *optional
-                || inf
-                    .iter()
-                    .any(|im| matches!(im, ObjectTypeMember::Property { name: n, .. } if n == name))
-        }
+    let every_field_is_given = decl.iter().all(|dm| match dm {
+        ObjectTypeMember::Property { name, .. } => inf
+            .iter()
+            .any(|im| matches!(im, ObjectTypeMember::Property { name: n, .. } if n == name)),
         ObjectTypeMember::Method { .. }
         | ObjectTypeMember::Index { .. }
         | ObjectTypeMember::Callable { .. } => true,
     });
     shared_names_agree
-        && extras_are_optional
+        && every_field_is_given
         && object_arm(decl_fields, inf_fields, bind, cache, in_progress, table)
 }
