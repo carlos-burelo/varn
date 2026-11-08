@@ -121,6 +121,15 @@ pub struct BindResult {
     pub namespace_imports: Vec<NamespaceImport>,
     #[serde(skip, default)]
     pub declared_type_names: FxHashMap<varn_core::ast::AstId, Arc<str>>,
+    #[serde(skip, default)]
+    pub generic_type_uses: Vec<GenericTypeUse>,
+}
+
+#[derive(Clone, Debug)]
+pub struct GenericTypeUse {
+    pub range: varn_core::SourceRange,
+    pub scope: ScopeId,
+    pub ty: Type,
 }
 
 #[derive(Clone, Debug)]

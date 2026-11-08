@@ -14,7 +14,7 @@ impl<'r> Binder<'r> {
         result
     }
 
-    fn reject_forbidden_type_forms(&mut self, node: &TypeNode) {
+    pub(crate) fn reject_forbidden_type_forms(&mut self, node: &TypeNode) {
         use varn_core::TypeKind as K;
         let children: Vec<&TypeNode> = match &node.kind {
             K::Generic(name, args, _) => {
@@ -29,6 +29,16 @@ impl<'r> Binder<'r> {
                         )
                         .with_range(node.range),
                     );
+                }
+                if self.reported_type_forms.insert(node.range.start.offset) {
+                    let mut table = std::mem::take(std::sync::Arc::make_mut(&mut self.ty_table));
+                    let ty = resolve_type_node(node, Some(&*self), &mut table);
+                    self.ty_table = std::sync::Arc::new(table);
+                    self.generic_type_uses.push(varn_sem::bind::GenericTypeUse {
+                        range: node.range,
+                        scope: self.current,
+                        ty,
+                    });
                 }
                 args.iter().collect()
             }

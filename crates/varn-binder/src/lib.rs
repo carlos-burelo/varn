@@ -73,4 +73,5 @@ pub struct Binder<'r> {
     pub(crate) namespace_imports: Vec<varn_sem::bind::NamespaceImport>,
     pub(crate) namespace_path: Vec<Arc<str>>,
     pub(crate) declared_type_names: FxHashMap<varn_core::ast::AstId, Arc<str>>,
+    pub(crate) generic_type_uses: Vec<varn_sem::bind::GenericTypeUse>,
 }

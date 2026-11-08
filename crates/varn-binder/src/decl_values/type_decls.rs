@@ -19,10 +19,25 @@ impl<'r> super::super::Binder<'r> {
         sym.col = t.range.start.column;
         sym.doc = t.doc.as_ref().map(|s| self.intern_local(s.as_str()));
         sym.type_params = t.type_params.iter().map(|tp| tp.name).collect();
+        sym.type_param_constraints = t
+            .type_params
+            .iter()
+            .map(|tp| tp.constraint.as_ref().map(|con| self.resolve_type(con)))
+            .collect();
         if has_type_params {
             sym.alias_node = Some(Box::new(t.alias.clone()));
         }
         self.define(t.id, sym);
+        if has_type_params {
+            let saved = self.current;
+            self.current = self.scopes.push(varn_sem::scope::CheckerScope::new(
+                varn_sem::scope::ScopeKind::Block,
+                Some(saved),
+            ));
+            self.bind_type_params(&t.type_params, t.range.start.line);
+            self.reject_forbidden_type_forms(&t.alias);
+            self.current = saved;
+        }
     }
 
     pub(crate) fn bind_enum(&mut self, e: &EnumDecl) {

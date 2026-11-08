@@ -85,6 +85,7 @@ impl<'r> Binder<'r> {
             namespace_imports: Vec::new(),
             namespace_path: Vec::new(),
             declared_type_names: FxHashMap::default(),
+            generic_type_uses: Vec::new(),
         };
 
         let global = b.scopes.push(CheckerScope::new(ScopeKind::Global, None));
@@ -137,6 +138,7 @@ impl<'r> Binder<'r> {
             user_decorators: b.user_decorators,
             namespace_imports: b.namespace_imports,
             declared_type_names: b.declared_type_names,
+            generic_type_uses: b.generic_type_uses,
         }
     }
 }
