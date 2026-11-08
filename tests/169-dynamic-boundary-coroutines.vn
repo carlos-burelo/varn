@@ -20,7 +20,7 @@ async function outcome(f: () => Task<dynamic>): str {
         const r = await f()
         return `ok ${r}`
     } catch (e) {
-        if (e instanceof TypeError) { return e.message }
+        if (e is TypeError) { return e.message }
         return "other"
     }
 }

@@ -16,7 +16,7 @@ await describe("230 a foreign class keeps its whole ancestry", async () => {
     await it("a grandchild of an imported class is an instance of the root", () => {
         expect(asShape().describe()).toBe("square")
         expect(asAlias().sides).toBe(4)
-        expect(makeSquare() instanceof Shape).toBe(true)
+        expect(makeSquare() is Shape).toBe(true)
         expect(describeAll([new Square(), asShape()]).length).toBe(2)
     })
 })

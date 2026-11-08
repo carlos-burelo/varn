@@ -17,12 +17,12 @@ await describe("120 int division", async () => {
         expect(d(0 - 7, 2)).toBe(0 - 3);
         expect(d(7, 0 - 2)).toBe(0 - 3);
         expect(literalDiv).toBe(2);
-        try { d(1, 0) } catch (e) { if (e instanceof DivisionByZero) { dz = "zero" } }
+        try { d(1, 0) } catch (e) { if (e is DivisionByZero) { dz = "zero" } }
     });
 
     await it("group 1 part 2", async () => {
         expect(dz).toBe("zero");
-        try { d(0 - 9223372036854775807 - 1, 0 - 1) } catch (e) { if (e instanceof IntegerOverflow) { ov = "ovf" } }
+        try { d(0 - 9223372036854775807 - 1, 0 - 1) } catch (e) { if (e is IntegerOverflow) { ov = "ovf" } }
         expect(ov).toBe("ovf");
         expect((dyn as int) / 2).toBe(3);
         expect(f).toBe(2.5);

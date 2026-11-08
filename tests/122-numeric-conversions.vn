@@ -5,7 +5,7 @@ function i2f(x: int): float { return x as float }
 
 function faultOf(f: () => int): str {
     try { f(); return "none" } catch (e) {
-        if (e instanceof IntegerOverflow) { return "ovf" }
+        if (e is IntegerOverflow) { return "ovf" }
         return "other"
     }
 }
@@ -24,7 +24,7 @@ let acc = 0
 const bigF: bigint = 12345678901234567890n
 function bigKind(f: () => bigint): str {
     try { f(); return "none" } catch (e) {
-        if (e instanceof IntegerOverflow) { return "ovf" }
+        if (e is IntegerOverflow) { return "ovf" }
         return "other"
     }
 }

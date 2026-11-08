@@ -7,7 +7,7 @@ function parseFails(text: str): bool {
         Csv.parse(text);
         return false;
     } catch (e) {
-        return e instanceof ParseError;
+        return e is ParseError;
     }
 }
 

@@ -30,7 +30,6 @@ pub(super) fn infer_binary(
         | BinaryOp::GtEq
         | BinaryOp::Eq
         | BinaryOp::NotEq
-        | BinaryOp::Instanceof
         | BinaryOp::In => Some(Type::Bool),
         BinaryOp::BitAnd
         | BinaryOp::BitOr

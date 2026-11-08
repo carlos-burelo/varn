@@ -16,7 +16,7 @@ function thrown(msg: str): str {
 }
 
 function ranged(msg: str): bool {
-    try { throw new RangeError(msg) } catch (e) { return (e as Error) instanceof RangeError }
+    try { throw new RangeError(msg) } catch (e) { return (e as Error) is RangeError }
 }
 
 await describe("205 foreign subclass and native new", async () => {
@@ -26,9 +26,9 @@ await describe("205 foreign subclass and native new", async () => {
         expect(poly(4)).toBe("poly4!s")
         expect(poly(0)).toBe("poly0!s")
         expect(dot()).toBe("dot0dot")
-        expect(new Polygon(3) instanceof Polygon).toBe(true)
-        expect(new Polygon(3) instanceof Shape).toBe(true)
-        expect(new Dot() instanceof Shape).toBe(true)
+        expect(new Polygon(3) is Polygon).toBe(true)
+        expect(new Polygon(3) is Shape).toBe(true)
+        expect(new Dot() is Shape).toBe(true)
         expect(total).toBe(300 * (7 + 7))
     })
 

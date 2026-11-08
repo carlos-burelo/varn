@@ -1,0 +1,4 @@
+// expect: error[VN2002]
+class Animal {}
+const a = new Animal()
+const same = a instanceof Animal

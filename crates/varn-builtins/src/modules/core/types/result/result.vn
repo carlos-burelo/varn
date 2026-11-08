@@ -41,10 +41,7 @@ export enum Result<out T, out E> {
         try {
             return Result.Ok(run());
         } catch (e) {
-            if (e instanceof Error) {
-                return Result.Err(e);
-            }
-            return Result.Err(new Error(e.toString()));
+            return Result.Err(e);
         }
     }
 }

@@ -12,7 +12,7 @@ namespace Metric {
     export type Id = int
     export function make(): Item { return new Item() }
     export function shape(): Shape { return { w: 7 } }
-    export function isItem(x: dynamic): bool { return x instanceof Item }
+    export function isItem(x: dynamic): bool { return x is Item }
     export namespace Fine { export function grain(): int { return 1 } }
 }
 namespace Imperial {
@@ -66,6 +66,6 @@ await describe("203 namespace types", async () => {
         expect(width(box)).toBe(4)
         expect(kind == Geo.Kind.Deep).toBe(true)
         expect(crate.w + crate.h).toBe(11)
-        expect(crate instanceof Geo.Box).toBe(true)
+        expect(crate is Geo.Box).toBe(true)
     })
 })

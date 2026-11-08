@@ -10,8 +10,8 @@ const p7: int = 7
 
 function kind(f: () => int): str {
     try { f(); return "none" } catch (e) {
-        if (e instanceof IntegerOverflow) { return "ovf" }
-        if (e instanceof DivisionByZero) { return "zero" }
+        if (e is IntegerOverflow) { return "ovf" }
+        if (e is DivisionByZero) { return "zero" }
         return "other"
     }
 }

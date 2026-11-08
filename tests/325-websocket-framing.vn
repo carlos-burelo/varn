@@ -58,7 +58,7 @@ async function serverReadFails(port: int, send: Bytes[]): Task<bool> {
         try {
             await ws.read();
         } catch (e) {
-            outcome.value = e instanceof ProtocolError;
+            outcome.value = e is ProtocolError;
         }
     })());
     const raw = await TcpStream.connect("127.0.0.1", port, 1);
@@ -124,7 +124,7 @@ await describe("325 websocket framing", async () => {
             try {
                 await ws.read();
             } catch (e) {
-                outcome.value = e instanceof ProtocolError;
+                outcome.value = e is ProtocolError;
             }
         })());
         const raw = await TcpStream.connect("127.0.0.1", 19936, 1);

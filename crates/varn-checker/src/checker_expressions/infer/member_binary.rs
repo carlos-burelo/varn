@@ -119,7 +119,6 @@ pub(super) fn infer_binary_type(
         | BinaryOp::Gt
         | BinaryOp::LtEq
         | BinaryOp::GtEq
-        | BinaryOp::Instanceof
         | BinaryOp::In => Type::Bool,
         BinaryOp::Add
         | BinaryOp::Sub
@@ -190,7 +189,6 @@ pub(super) fn infer_binary_type(
                 | BinaryOp::Gt
                 | BinaryOp::LtEq
                 | BinaryOp::GtEq
-                | BinaryOp::Instanceof
                 | BinaryOp::In => unresolved,
             }
         }

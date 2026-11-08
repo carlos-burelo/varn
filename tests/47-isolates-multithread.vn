@@ -28,7 +28,7 @@ async function testIsolates() {
     await in3.tx.send(Msg.Exit)
     await h3.join()
     let dialogClosed = false
-    try { await out3.rx.receive() } catch (e) { dialogClosed = e instanceof ChannelClosed }
+    try { await out3.rx.receive() } catch (e) { dialogClosed = e is ChannelClosed }
     expect(dialogClosed).toBeTruthy()
 
     // ---- 4 ----

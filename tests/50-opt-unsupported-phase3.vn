@@ -60,7 +60,7 @@ function testUsingDestructure(): void {
     expect(resource.disposed).toBeTruthy();
 }
 
-// 3. destructuring a caught error after instanceof narrowing
+// 3. destructuring a caught error after is narrowing
 class CustomError extends Error {
     code: int;
     constructor(message: str, code: int) {
@@ -73,7 +73,7 @@ function testCatchDestructure(): void {
     try {
         throw new CustomError("process failed", 500);
     } catch (e) {
-        if (e instanceof CustomError) {
+        if (e is CustomError) {
             const { message, code } = e;
             expect(message).toBe("process failed");
             expect(code).toBe(500);

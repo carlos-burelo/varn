@@ -5,7 +5,7 @@ const shared = new Marker();
 
 await describe("234 an imported class without a constructor", async () => {
     await it("is constructed by the importer", () => {
-        expect(shared instanceof Marker).toBe(true)
+        expect(shared is Marker).toBe(true)
         expect(new Lone().peek()).toBe(4)
     })
     await it("keeps working when it inherits from a generic base", () => {

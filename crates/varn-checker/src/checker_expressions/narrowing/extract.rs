@@ -61,7 +61,6 @@ impl<'r> Checker<'r> {
                     is_true_branch,
                     &mut narrowings,
                 );
-                self.narrow_instanceof(rec, left, right, op, bind, is_true_branch, &mut narrowings);
             }
 
             ExprKind::Logical {

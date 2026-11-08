@@ -1,7 +1,6 @@
 mod condition;
 mod discriminant;
 mod extract;
-mod instanceof;
 mod is_check;
 mod logical;
 mod null_check;

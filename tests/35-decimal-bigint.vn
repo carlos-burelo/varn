@@ -13,7 +13,7 @@ function isBigInt(v: bigint): bool { return v is bigint }
 
 function decKind(f: () => decimal): str {
     try { f(); return "none" } catch (e) {
-        if (e instanceof DivisionByZero) { return "zero" }
+        if (e is DivisionByZero) { return "zero" }
         return "other"
     }
 }

@@ -54,7 +54,7 @@ function parseFails(text: str): bool {
         Url.parse(text);
         return false;
     } catch (e) {
-        return e instanceof ParseError;
+        return e is ParseError;
     }
 }
 

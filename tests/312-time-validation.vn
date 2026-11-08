@@ -4,7 +4,7 @@ import { ParseError } from "std:error";
 
 function outcome(f: () => str): str {
     try { return f(); } catch (e) {
-        return e instanceof RangeError ? "range" : e instanceof ParseError ? "parse" : "other:" + e.name;
+        return e is RangeError ? "range" : e is ParseError ? "parse" : "other:" + e.name;
     }
 }
 

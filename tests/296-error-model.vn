@@ -29,17 +29,17 @@ class Expected {
 }
 
 function parentName(error: StdError): str {
-    if (error instanceof DecodeError) return "ParseError";
-    if (error instanceof SqlConstraintError) return "SqlError";
-    if (error instanceof FsNotFoundError || error instanceof FsPermissionError
-        || error instanceof FsExistsError || error instanceof FsEncodingError) return "FsError";
-    if (error instanceof ResolveError || error instanceof ConnectError
-        || error instanceof TlsError || error instanceof ProtocolError) return "NetError";
-    if (error instanceof FsError || error instanceof BadDescriptorError
-        || error instanceof ClosedError || error instanceof NetError) return "IoError";
-    if (error instanceof IoError || error instanceof CapabilityError || error instanceof TimeoutError
-        || error instanceof CancelledError || error instanceof ParseError
-        || error instanceof SqlError) return "StdError";
+    if (error is DecodeError) return "ParseError";
+    if (error is SqlConstraintError) return "SqlError";
+    if (error is FsNotFoundError || error is FsPermissionError
+        || error is FsExistsError || error is FsEncodingError) return "FsError";
+    if (error is ResolveError || error is ConnectError
+        || error is TlsError || error is ProtocolError) return "NetError";
+    if (error is FsError || error is BadDescriptorError
+        || error is ClosedError || error is NetError) return "IoError";
+    if (error is IoError || error is CapabilityError || error is TimeoutError
+        || error is CancelledError || error is ParseError
+        || error is SqlError) return "StdError";
     return "Error";
 }
 
@@ -72,8 +72,8 @@ await describe("296 error model", async () => {
         for (const item of all) {
             expect(item.error.code).toBe(item.code);
             expect(parentName(item.error)).toBe(item.parent);
-            expect(item.error instanceof StdError).toBe(true);
-            expect(item.error instanceof Error).toBe(true);
+            expect(item.error is StdError).toBe(true);
+            expect(item.error is Error).toBe(true);
         }
     });
 
@@ -181,7 +181,7 @@ await describe("296 error model", async () => {
     await it("AssertionError is a named Error", async () => {
         const failure = new AssertionError("expected 1 but received 2");
         expect(failure.name).toBe("AssertionError");
-        expect(failure instanceof Error).toBe(true);
+        expect(failure is Error).toBe(true);
         expect(failure.message).toBe("expected 1 but received 2");
     });
     await it("an error serializes to JSON with its code and fields", async () => {

@@ -49,7 +49,7 @@ impl<'r> Checker<'r> {
     ) {
         let l_ty = self.infer_type(rec, left, bind);
         let r_ty = self.infer_type(rec, right, bind);
-        if !matches!(op, BinaryOp::Eq | BinaryOp::NotEq | BinaryOp::Instanceof) {
+        if !matches!(op, BinaryOp::Eq | BinaryOp::NotEq) {
             let left_rejected = self.reject_dynamic_operand(&l_ty, "operate on", range);
             let right_rejected = self.reject_dynamic_operand(&r_ty, "operate on", range);
             if left_rejected || right_rejected {
@@ -121,7 +121,6 @@ impl<'r> Checker<'r> {
                             || self.value_fits(rec, &r_ty, &l_ty, Some(left), Some(bind))
                     }
                 }
-                BinaryOp::Instanceof => true,
                 BinaryOp::In => l_base == Type::Str && self.is_keyed_dictionary(&r_base),
             };
             if !valid && op == BinaryOp::In {

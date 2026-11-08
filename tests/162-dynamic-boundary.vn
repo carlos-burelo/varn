@@ -93,7 +93,7 @@ function kindOf(f: () => void): str {
         f()
         return "none"
     } catch (e) {
-        if (e instanceof TypeError) { return "TypeError" }
+        if (e is TypeError) { return "TypeError" }
         return "Error"
     }
 }

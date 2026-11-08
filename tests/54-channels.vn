@@ -19,12 +19,12 @@ async function testTypedClose(): void {
     try {
         await ch.rx.receive()
     } catch (e) {
-        typed = e instanceof ChannelClosed
+        typed = e is ChannelClosed
     }
     try {
         await ch.tx.send("nope")
     } catch (e) {
-        sendClosed = e instanceof ChannelClosed
+        sendClosed = e is ChannelClosed
     }
     expect(typed).toBeTruthy()
     expect(sendClosed).toBeTruthy()
@@ -51,7 +51,7 @@ async function testUsingDispose(): void {
     // dispose cerró el canal: drena y termina
     expect(await ch.rx.receive()).toBe(5)
     let closed = false
-    try { await ch.rx.receive() } catch (e) { closed = e instanceof ChannelClosed }
+    try { await ch.rx.receive() } catch (e) { closed = e is ChannelClosed }
     expect(closed).toBeTruthy()
 }
 
@@ -64,7 +64,7 @@ async function testCrossIsolate(): void {
     a.tx.close()
     await handle.join()
     let done = false
-    try { await b.rx.receive() } catch (e) { done = e instanceof ChannelClosed }
+    try { await b.rx.receive() } catch (e) { done = e is ChannelClosed }
     expect(done).toBeTruthy()
 }
 

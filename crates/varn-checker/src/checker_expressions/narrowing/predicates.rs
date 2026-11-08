@@ -7,7 +7,7 @@ impl<'r> Checker<'r> {
         matches!(
             &self.ast_arena.expr(expr).kind,
             ExprKind::Binary {
-                op: BinaryOp::Eq | BinaryOp::NotEq | BinaryOp::Instanceof,
+                op: BinaryOp::Eq | BinaryOp::NotEq,
                 ..
             } | ExprKind::Logical { .. }
                 | ExprKind::Is { .. }

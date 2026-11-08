@@ -69,10 +69,10 @@ await describe("12 Classes", async () => {
         expect(pd.speak()).toBe("Woof!");
         expect(pd.badge).toBe(42);
         expect(pd.name).toBe("K9");
-        expect(pd instanceof PoliceDog).toBeTruthy();
-        expect(pd instanceof Dog).toBeTruthy();
-        expect(pd instanceof Animal).toBeTruthy();
-        expect(!(d instanceof PoliceDog)).toBeTruthy();
+        expect(pd is PoliceDog).toBeTruthy();
+        expect(pd is Dog).toBeTruthy();
+        expect(pd is Animal).toBeTruthy();
+        expect(!(d is PoliceDog)).toBeTruthy();
     });
 
     await it("static state", () => {

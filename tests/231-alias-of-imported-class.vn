@@ -13,6 +13,6 @@ await describe("231 an alias keeps the origin of the class it names", async () =
         expect(viaHelper().size).toBe(-1.0)
         expect(maybe(true) != null).toBe(true)
         expect(maybe(false) == null).toBe(true)
-        expect(asRoot(make()) instanceof Leaf).toBe(true)
+        expect(asRoot(make()) is Leaf).toBe(true)
     })
 })

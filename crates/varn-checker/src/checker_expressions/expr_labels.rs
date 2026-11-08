@@ -26,6 +26,5 @@ pub(super) fn op_str(op: &BinaryOp) -> &'static str {
         BinaryOp::LtEq => "<=",
         BinaryOp::GtEq => ">=",
         BinaryOp::In => "in",
-        BinaryOp::Instanceof => "instanceof",
     }
 }

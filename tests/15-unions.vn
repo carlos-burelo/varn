@@ -3,7 +3,7 @@ import { describe, it, expect } from "std:test";
 type StringOrInt = str | int
 type MaybeStr = str | null
 function processValue(v: StringOrInt): str {
-    if (v instanceof str) {
+    if (v is str) {
         return "string: " + v;
     } else {
         return `number: ${v}`;

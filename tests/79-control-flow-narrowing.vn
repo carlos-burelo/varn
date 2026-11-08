@@ -52,7 +52,7 @@ class Dog extends Animal {
 }
 
 function speak(a: Animal): str {
-    if (a instanceof Dog) {
+    if (a is Dog) {
         return a.bark();
     }
     return a.name;

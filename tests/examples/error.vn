@@ -8,7 +8,7 @@ await describe("example std:error", async () => {
         expect(err.code).toBe("fs.not_found");
         expect(err.path).toBe("/data/report.csv");
         expect(err.message).toBe("no such file or directory: /data/report.csv");
-        expect(err instanceof Error).toBe(true);
+        expect(err is Error).toBe(true);
     });
 
     await it("catching a parent class catches every child", () => {
@@ -50,7 +50,7 @@ await describe("example std:error", async () => {
         let wrapped = new DecodeError("$.user.age", "age is not a number", cause);
         expect(wrapped.cause == cause).toBe(true);
         expect(wrapped.path).toBe("$.user.age");
-        expect(wrapped instanceof ParseError).toBe(true);
+        expect(wrapped is ParseError).toBe(true);
     });
 });
 

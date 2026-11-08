@@ -9,7 +9,7 @@ function outcome(f: () => void): str {
         f()
         return "ok"
     } catch (e) {
-        if (e instanceof TypeError) { return e.message }
+        if (e is TypeError) { return e.message }
         return "other: " + e.message
     }
 }

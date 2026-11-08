@@ -11,7 +11,7 @@ function parseFails(input: str, boundary: str): bool {
         Multipart.parse(input, boundary);
         return false;
     } catch (e) {
-        return e instanceof ParseError;
+        return e is ParseError;
     }
 }
 

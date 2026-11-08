@@ -16,7 +16,7 @@ function items(r: Range<int>): str {
 
 function outcome(f: () => str): str {
     try { return f(); } catch (e) {
-        return e instanceof IntegerOverflow ? "overflow" : e instanceof RangeError ? "range" : "other:" + e.name;
+        return e is IntegerOverflow ? "overflow" : e is RangeError ? "range" : "other:" + e.name;
     }
 }
 

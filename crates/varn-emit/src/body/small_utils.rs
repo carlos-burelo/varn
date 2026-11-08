@@ -100,7 +100,7 @@ pub(super) fn bin_op(op: BinaryOp) -> Option<TirBinOp> {
         BinaryOp::Shl => TirBinOp::Shl,
         BinaryOp::Shr => TirBinOp::Shr,
         BinaryOp::UShr => TirBinOp::Ushr,
-        BinaryOp::Instanceof | BinaryOp::In => return None,
+        BinaryOp::In => return None,
     })
 }
 

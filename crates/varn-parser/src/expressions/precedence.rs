@@ -33,7 +33,6 @@ pub(crate) fn binary_prec(kind: TokenKind) -> Option<(Prec, bool)> {
         | TokenKind::RAngle
         | TokenKind::LtEq
         | TokenKind::GtEq
-        | TokenKind::Instanceof
         | TokenKind::In => (Prec::Relational, false),
         TokenKind::PipeGt => (Prec::Pipe, false),
         TokenKind::DotDot | TokenKind::DotDotEq => (Prec::Range, false),
@@ -43,6 +42,7 @@ pub(crate) fn binary_prec(kind: TokenKind) -> Option<(Prec, bool)> {
         TokenKind::StarStar => (Prec::Exponent, true),
         TokenKind::QuestionQuestion => (Prec::NullCoalesce, false),
         TokenKind::EOF
+        | TokenKind::Instanceof
         | TokenKind::Dynamic
         | TokenKind::Identifier
         | TokenKind::IntegerLiteral

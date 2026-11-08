@@ -7,7 +7,7 @@ const FL: float[] = [0.0, 1.0, -0.0, 2.0];
 
 function kind(f: () => int): str {
     try { return f().toString(); } catch (e) {
-        return e instanceof RangeError ? "range" : e instanceof IntegerOverflow ? "overflow" : "other:" + e.name;
+        return e is RangeError ? "range" : e is IntegerOverflow ? "overflow" : "other:" + e.name;
     }
 }
 

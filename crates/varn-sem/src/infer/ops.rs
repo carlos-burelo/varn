@@ -40,7 +40,6 @@ pub(crate) fn infer_binary(
         | BinaryOp::Gt
         | BinaryOp::LtEq
         | BinaryOp::GtEq
-        | BinaryOp::Instanceof
         | BinaryOp::In => Type::Bool,
         BinaryOp::BitAnd
         | BinaryOp::BitOr

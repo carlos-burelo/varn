@@ -18,7 +18,7 @@ class DynShape {
 }
 
 function dynIs(x: dynamic): bool {
-    const r = x instanceof DynShape
+    const r = x is DynShape
     return r
 }
 
@@ -29,7 +29,7 @@ const dShape = new DynShape(4)
 const dObj: dynamic = { alpha: 1 }
 
 await describe("142 jit operators beyond native types", async () => {
-    await it("str equality, int? negation and instanceof on a dynamic run compiled", async () => {
+    await it("str equality, int? negation and is on a dynamic run compiled", async () => {
         for (let i = 0; i < 3000; i = i + 1) {
             if (strEquals(`key-${(i % 2)}`, "key-0")) { dStr = dStr + 1 }
             if (intNot(i % 3 == 0 ? null : i % 3)) { dIntNot = dIntNot + 1 }

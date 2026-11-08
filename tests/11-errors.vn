@@ -51,7 +51,7 @@ await describe("11 Errors", async () => {
         try {
             throw new RangeError("too big");
         } catch (e) {
-            isRangeError = e instanceof RangeError;
+            isRangeError = e is RangeError;
         }
         expect(isRangeError).toBeTruthy();
     });
@@ -75,14 +75,14 @@ await describe("11 Errors", async () => {
         try {
             throw new ValidationError("email", "invalid format");
         } catch (e) {
-            if (e instanceof ValidationError) {
+            if (e is ValidationError) {
                 ve = e;
             }
         }
         expect(ve?.name).toBe("ValidationError");
         expect(ve?.message).toBe("invalid format");
         expect(ve?.field).toBe("email");
-        expect(ve instanceof Error).toBeTruthy();
+        expect(ve is Error).toBeTruthy();
     });
 
     await it("finally", () => {

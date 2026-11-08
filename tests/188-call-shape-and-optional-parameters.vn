@@ -183,8 +183,8 @@ await describe("188 call shape and optional parameters", async () => {
         for (let i = 0; i < 400; i = i + 1) { total = total + made(i) }
         expect(made(2)).toBe(2 + 0 + 3 + 2 + 3 + 0 + 2)
         expect(total).toBe(4 * 79800 + 400 * 4)
-        expect(new Tally(1) instanceof Tally).toBe(true)
-        expect(new Counter(1) instanceof Tally).toBe(true)
+        expect(new Tally(1) is Tally).toBe(true)
+        expect(new Counter(1) is Tally).toBe(true)
         expect(typeof new Holder(2.5).held).toBe("float")
     })
 

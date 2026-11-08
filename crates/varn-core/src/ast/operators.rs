@@ -44,7 +44,6 @@ pub enum BinaryOp {
     Shl,
     Shr,
     UShr,
-    Instanceof,
     In,
 }
 

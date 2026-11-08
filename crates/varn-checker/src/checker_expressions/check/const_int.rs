@@ -103,7 +103,6 @@ pub(super) fn const_int_expr(e: ExprId, arena: &varn_core::ast::AstArena) -> Con
                 | BinaryOp::Shl
                 | BinaryOp::Shr
                 | BinaryOp::UShr
-                | BinaryOp::Instanceof
                 | BinaryOp::In => NotConst,
             }
         }

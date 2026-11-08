@@ -94,7 +94,7 @@ await describe("163 implicit constructor chain", async () => {
         const e = new Coded("boom")
         expect(e.code).toBe(42)
         expect(e.message).toBe("boom")
-        expect(e instanceof Error).toBe(true)
+        expect(e is Error).toBe(true)
     })
 
     await it("a bound native method keeps its receiver under spread", () => {

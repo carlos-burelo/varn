@@ -10,7 +10,7 @@ const i: int = 7
 
 function kind(f: () => bigint): str {
     try { f(); return "none" } catch (e) {
-        if (e instanceof DivisionByZero) { return "zero" }
+        if (e is DivisionByZero) { return "zero" }
         return "other"
     }
 }

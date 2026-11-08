@@ -21,9 +21,9 @@ pub(crate) fn token_to_binary_op(kind: TokenKind) -> Option<BinaryOp> {
         TokenKind::LtLt => Some(BinaryOp::Shl),
         TokenKind::GtGt => Some(BinaryOp::Shr),
         TokenKind::GtGtGt => Some(BinaryOp::UShr),
-        TokenKind::Instanceof => Some(BinaryOp::Instanceof),
         TokenKind::In => Some(BinaryOp::In),
         TokenKind::EOF
+        | TokenKind::Instanceof
         | TokenKind::Dynamic
         | TokenKind::Identifier
         | TokenKind::IntegerLiteral

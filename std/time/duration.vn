@@ -24,12 +24,12 @@ export class Duration {
     }
 
     static from(input: DurationLike): Duration {
-        if (input instanceof Duration) {
+        if (input is Duration) {
             return input as Duration;
-        } else if (input instanceof str) {
+        } else if (input is str) {
             let ms = parseIsoDuration$(input as str);
             return new Duration(ms);
-        } else if (input instanceof int) {
+        } else if (input is int) {
             return new Duration(input as int);
         } else {
             let parts = input as DurationParts;

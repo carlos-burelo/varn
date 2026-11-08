@@ -12,9 +12,9 @@ async function describeFailure(f: () => Task<int>): str {
         await f()
         return "none"
     } catch (e) {
-        if (e instanceof TypeError) { return "TypeError: " + e.message }
-        if (e instanceof RangeError) { return "RangeError: " + e.message }
-        if (e instanceof Error) { return "Error: " + e.message }
+        if (e is TypeError) { return "TypeError: " + e.message }
+        if (e is RangeError) { return "RangeError: " + e.message }
+        if (e is Error) { return "Error: " + e.message }
         return "untyped"
     }
 }

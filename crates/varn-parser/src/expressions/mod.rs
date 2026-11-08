@@ -172,9 +172,14 @@ pub(super) fn parse_binary_expr(s: &mut TokenStream, min_prec: Prec) -> PResult<
 
         if kind == TokenKind::As
             || kind == TokenKind::Is
+            || kind == TokenKind::Instanceof
             || (kind == TokenKind::Identifier
                 && ContextualKeyword::of(s.lexeme()) == Some(ContextualKeyword::Satisfies))
         {
+            if kind == TokenKind::Instanceof {
+                let at = s.range();
+                s.push_error("`instanceof` does not exist: write `x is T`".to_owned(), at);
+            }
             s.advance();
             let ty = parse_type(s)?;
             let ty_range = *ty.clone().range();
@@ -187,7 +192,7 @@ pub(super) fn parse_binary_expr(s: &mut TokenStream, min_prec: Prec) -> PResult<
                         type_ann: ty,
                     },
                 )
-            } else if kind == TokenKind::Is {
+            } else if kind == TokenKind::Is || kind == TokenKind::Instanceof {
                 s.expr(
                     range,
                     ExprKind::Is {
