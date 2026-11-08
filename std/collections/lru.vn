@@ -1,5 +1,5 @@
 type CacheEntry<V> = {
-    key: str,
+    key: str;
     value: V
 };
 
@@ -31,9 +31,8 @@ export class LRUCache<V> {
         for (let index = 0; index < this._entries.length; index = index + 1) {
             let entry = this._entries[index];
             if (entry.key === key) {
-                entry.value = value;
                 this._entries.splice(index, 1);
-                this._entries.push(entry);
+                this._entries.push({ key: key, value: value });
                 return;
             }
         }

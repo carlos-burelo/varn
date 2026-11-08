@@ -1,0 +1,4 @@
+// expect: error[VN3005]
+type Pt = { x: int; y: int }
+const p: Pt = { x: 1, y: 2 }
+p.x = 5

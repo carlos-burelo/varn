@@ -18,6 +18,10 @@ function tapEnter(win: UiWindow, fr: UiFrame, focus: Focus, tree: Widget): void 
     present(win, fr);
 }
 
+class ToggleState {
+    on: bool = false
+}
+
 await describe("219 widgets", async () => {
     await it("renders a tree headless", () => {
         using win = UiWindow.open("t", 800, 600, true);
@@ -110,7 +114,7 @@ await describe("219 widgets", async () => {
         using win = UiWindow.open("t", 800, 600, true);
         const fr = new UiFrame(800, 600);
         const focus = new Focus();
-        const state = { on: false };
+        const state = new ToggleState();
         const tree = Checkbox(state.on, onChange: (next: bool) => { state.on = next; });
         render(win, fr, focus, tree, 10.0, 10.0, 30.0, 30.0);
         present(win, fr);

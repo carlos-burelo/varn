@@ -1,0 +1,3 @@
+// expect: error[VN3005]
+const p = { total: 1 }
+p.total += 2

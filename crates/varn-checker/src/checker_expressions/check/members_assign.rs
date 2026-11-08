@@ -28,6 +28,9 @@ impl<'r> Checker<'r> {
                 TypeKind::Tuple(_) => {
                     Some("cannot assign to a tuple element: tuples are immutable")
                 }
+                TypeKind::Record(members) if self.is_fixed_record(members) => {
+                    Some("cannot assign to a field of a record: records are immutable, use `with`")
+                }
                 TypeKind::Primitive(varn_core::LangPrimitive::Str) | TypeKind::Literal(_) => {
                     Some("cannot assign to a character of a string: strings are immutable")
                 }
@@ -84,6 +87,20 @@ impl<'r> Checker<'r> {
                 .insert(target_range.start.offset, mangled.clone());
         }
         self.check_accessor_side(&obj_ty, prop_name, true, &target_range, bind);
+        let record_field = matches!(
+            self.ty_table.get(non_null.0),
+            TypeKind::Record(members) if self.is_fixed_record(members)
+        );
+        if record_field {
+            self.emit(
+                Diagnostic::error(
+                    ErrorCode::NotAssignable,
+                    format!("cannot assign to field '{prop_name}' of a record: records are immutable, use `with`"),
+                )
+                .with_range(target_range),
+            );
+            return;
+        }
         let frozen = matches!(
             self.find_member(&obj_ty, prop_name, bind),
             Some(ObjectTypeMember::Property { readonly: true, .. })
@@ -144,5 +161,15 @@ impl<'r> Checker<'r> {
             }
             None | Some(Visibility::Public) => {}
         }
+    }
+}
+
+impl Checker<'_> {
+    fn is_fixed_record(&self, members: varn_sem::types::ObjectMembersId) -> bool {
+        !self
+            .ty_table
+            .get_object_members(members)
+            .iter()
+            .any(|m| matches!(m, ObjectTypeMember::Index { .. }))
     }
 }

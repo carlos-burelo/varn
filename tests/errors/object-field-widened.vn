@@ -1,4 +1,4 @@
 // expect: error[VN3001]
-function relabel(o: { tag: int | str }): void { o.tag = "s" }
+function relabel(o: { tag: int | str }): void {}
 const point: { tag: int } = { tag: 1 }
 relabel(point)
