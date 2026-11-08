@@ -1,3 +1,3 @@
 // expect: error[VN3037]
-type Index<K extends Keyable> = Map<K, int>
+type Index<K extends Hashable> = Map<K, int>
 const prices: Index<float> = new Map()

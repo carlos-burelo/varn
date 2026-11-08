@@ -1,9 +1,9 @@
-import { Keyable } from "core:types/keyable";
+import { Hashable } from "core:types/hashable";
 
 /**
  * Hash set of distinct values `T`.
  */
-export declare class Set<T extends Keyable> {
+export declare class Set<T extends Hashable> {
     constructor();
     @throws(TypeError) add(value: T): void;
     @throws(TypeError) has(value: T): bool;

@@ -12,15 +12,15 @@ pub(super) fn constraint_shortcut(
     table: &CheckerTyTable,
 ) -> Option<bool> {
     match declared.lang_constraint(table)? {
-        LangConstraint::Keyable => Some(is_keyable(inferred, bind, table)),
+        LangConstraint::Hashable => Some(is_hashable(inferred, bind, table)),
     }
 }
 
-pub fn is_keyable(ty: &Type, bind: Option<&BindView>, table: &CheckerTyTable) -> bool {
-    keyable_in(ty, bind, &mut FxHashSet::default(), table)
+pub fn is_hashable(ty: &Type, bind: Option<&BindView>, table: &CheckerTyTable) -> bool {
+    hashable_in(ty, bind, &mut FxHashSet::default(), table)
 }
 
-const fn primitive_is_keyable(primitive: LangPrimitive) -> bool {
+const fn primitive_is_hashable(primitive: LangPrimitive) -> bool {
     match primitive {
         LangPrimitive::Null
         | LangPrimitive::Bool
@@ -35,7 +35,7 @@ const fn primitive_is_keyable(primitive: LangPrimitive) -> bool {
     }
 }
 
-fn keyable_in(
+fn hashable_in(
     ty: &Type,
     bind: Option<&BindView>,
     visiting: &mut FxHashSet<Type>,
@@ -44,12 +44,12 @@ fn keyable_in(
     if !visiting.insert(*ty) {
         return true;
     }
-    let result = keyable_kind(ty, bind, visiting, table);
+    let result = hashable_kind(ty, bind, visiting, table);
     visiting.remove(ty);
     result
 }
 
-fn all_keyable(
+fn all_hashable(
     list: TyListId,
     bind: Option<&BindView>,
     visiting: &mut FxHashSet<Type>,
@@ -58,21 +58,21 @@ fn all_keyable(
     table
         .get_list(list)
         .iter()
-        .all(|id| keyable_in(&Type::resolved(*id), bind, visiting, table))
+        .all(|id| hashable_in(&Type::resolved(*id), bind, visiting, table))
 }
 
-fn keyable_kind(
+fn hashable_kind(
     ty: &Type,
     bind: Option<&BindView>,
     visiting: &mut FxHashSet<Type>,
     table: &CheckerTyTable,
 ) -> bool {
     match table.get(ty.0) {
-        TypeKind::Primitive(primitive) => primitive_is_keyable(primitive),
-        TypeKind::Literal(literal) => primitive_is_keyable(literal.base()),
+        TypeKind::Primitive(primitive) => primitive_is_hashable(primitive),
+        TypeKind::Literal(literal) => primitive_is_hashable(literal.base()),
         TypeKind::TemplateLiteral(_) | TypeKind::EnumVariant { .. } => true,
         TypeKind::Tuple(list) | TypeKind::Union(list) | TypeKind::Intersection(list) => {
-            all_keyable(list, bind, visiting, table)
+            all_hashable(list, bind, visiting, table)
         }
         TypeKind::Array(_)
         | TypeKind::Record(_)
@@ -87,7 +87,7 @@ fn keyable_kind(
         | TypeKind::IndexedAccess { .. }
         | TypeKind::Mapped { .. } => true,
         TypeKind::Named(name, origin) => {
-            nominal_is_keyable(name, origin, &[], bind, visiting, table)
+            nominal_is_hashable(name, origin, &[], bind, visiting, table)
         }
         TypeKind::Generic(name, args, origin) => {
             let args: Vec<Type> = table
@@ -95,12 +95,12 @@ fn keyable_kind(
                 .iter()
                 .map(|id| Type::resolved(*id))
                 .collect();
-            nominal_is_keyable(name, origin, &args, bind, visiting, table)
+            nominal_is_hashable(name, origin, &args, bind, visiting, table)
         }
     }
 }
 
-fn nominal_is_keyable(
+fn nominal_is_hashable(
     name: Atom,
     origin: Option<Atom>,
     args: &[Type],
@@ -124,8 +124,8 @@ fn nominal_is_keyable(
 
     if origin.is_none() && bind.symbol_kind(&name_str) == Some(SymbolKind::TypeParameter) {
         return bind.type_param_constraint(&name_str).is_some_and(|bound| {
-            bound.lang_constraint(table) == Some(LangConstraint::Keyable)
-                || keyable_in(&bound, Some(bind), visiting, table)
+            bound.lang_constraint(table) == Some(LangConstraint::Hashable)
+                || hashable_in(&bound, Some(bind), visiting, table)
         });
     }
     if bind.get_enum_members(&name_str, origin_str).is_some() {
@@ -151,11 +151,12 @@ fn nominal_is_keyable(
             .is_some_and(|text| params.iter().any(|param| &**param == text.as_str()))
     };
     args.iter()
-        .all(|arg| keyable_in(arg, Some(bind), visiting, table))
+        .all(|arg| hashable_in(arg, Some(bind), visiting, table))
         && members
             .iter()
             .filter(|member| !member.is_static && member.kind == ClassMemberKind::Property)
             .all(|member| {
-                names_a_parameter(&member.ty) || keyable_in(&member.ty, Some(bind), visiting, table)
+                names_a_parameter(&member.ty)
+                    || hashable_in(&member.ty, Some(bind), visiting, table)
             })
 }

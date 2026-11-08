@@ -5,9 +5,9 @@ enum Level { Low, High }
 struct Point { x: int; y: int }
 struct Labeled<T> { label: str; value: T }
 
-type Index<K extends Keyable> = Map<K, int>
+type Index<K extends Hashable> = Map<K, int>
 
-function counter<K extends Keyable>(keys: K[]): Map<K, int> {
+function counter<K extends Hashable>(keys: K[]): Map<K, int> {
     const counts = new Map<K, int>()
     for (const key of keys) {
         counts.set(key, (counts.get(key) ?? 0) + 1)
@@ -50,7 +50,7 @@ await describe("341 map and set keys", async () => {
         expect(byLabeled.size).toBe(1)
     })
 
-    await it("a generic key that declares Keyable is a key", () => {
+    await it("a generic key that declares Hashable is a key", () => {
         const counts = counter(["a", "b", "a"])
         const keyed: Index<str> = counts
         expect(keyed.get("a")).toBe(2)

@@ -254,21 +254,21 @@ impl CoreSum {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum LangConstraint {
-    Keyable,
+    Hashable,
 }
 
 impl LangConstraint {
-    pub const ALL: [Self; 1] = [Self::Keyable];
+    pub const ALL: [Self; 1] = [Self::Hashable];
 
     pub const fn name(self) -> &'static str {
         match self {
-            Self::Keyable => "Keyable",
+            Self::Hashable => "Hashable",
         }
     }
 
     pub const fn module(self) -> &'static str {
         match self {
-            Self::Keyable => "core:types/keyable",
+            Self::Hashable => "core:types/hashable",
         }
     }
 

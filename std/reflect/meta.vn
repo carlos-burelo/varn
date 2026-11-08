@@ -49,10 +49,10 @@ export function getMetadataKeys<T>(target: T): str[] {
     return [];
 }
 
-export class MetaKey<K extends Keyable, V> {
+export class MetaKey<K extends Hashable, V> {
     private values: Map<K, V> = new Map<K, V>();
 
-    static create<A extends Keyable, B>(): MetaKey<A, B> {
+    static create<A extends Hashable, B>(): MetaKey<A, B> {
         return new MetaKey<A, B>();
     }
 

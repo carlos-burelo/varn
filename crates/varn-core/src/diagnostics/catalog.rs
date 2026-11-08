@@ -52,7 +52,7 @@ pub enum ErrorCode {
     AwaitHasNoEffect = 3034,
     DuplicateRecordField = 3035,
     IsNeedsRuntimeType = 3036,
-    NotKeyable = 3037,
+    NotHashable = 3037,
 
     TypeArgInferenceFailed = 3201,
     ConstraintViolation = 3202,
@@ -196,7 +196,7 @@ impl ErrorCode {
             ErrorCode::AwaitHasNoEffect => "await-has-no-effect",
             ErrorCode::DuplicateRecordField => "duplicate-record-field",
             ErrorCode::IsNeedsRuntimeType => "is-needs-runtime-type",
-            ErrorCode::NotKeyable => "not-keyable",
+            ErrorCode::NotHashable => "not-hashable",
             ErrorCode::NotIterable => "not-iterable",
         }
     }

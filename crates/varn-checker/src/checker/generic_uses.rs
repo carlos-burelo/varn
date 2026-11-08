@@ -39,12 +39,12 @@ impl Checker<'_> {
             }
             let shown = arg.display(&self.ty_table, &bind.interner);
             let diagnostic =
-                if bound.lang_constraint(&self.ty_table) == Some(LangConstraint::Keyable) {
+                if bound.lang_constraint(&self.ty_table) == Some(LangConstraint::Hashable) {
                     Diagnostic::error(
-                        ErrorCode::NotKeyable,
+                        ErrorCode::NotHashable,
                         format!(
                             "type '{shown}' cannot be used as a key of '{name}': {}",
-                            self.keyable_alternative(arg)
+                            self.hashable_alternative(arg)
                         ),
                     )
                 } else {
@@ -60,7 +60,7 @@ impl Checker<'_> {
         }
     }
 
-    fn keyable_alternative(&self, arg: &Type) -> &'static str {
+    fn hashable_alternative(&self, arg: &Type) -> &'static str {
         match self.ty_table.get(arg.0) {
             TypeKind::Primitive(LangPrimitive::Float) => {
                 "a float is not equal to itself when it is NaN; use a decimal, or an int scaled from the float"

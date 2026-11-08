@@ -2,4 +2,4 @@
  * The types that can be the key of a `Map` or the element of a `Set`: those
  * with a value or identity equality that does not change while they are held.
  */
-export declare interface Keyable {}
+export declare interface Hashable {}

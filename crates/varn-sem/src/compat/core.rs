@@ -1,6 +1,6 @@
 use super::arrays::array_arms;
 use super::generics::generic_arms;
-use super::keyable::constraint_shortcut;
+use super::hashable::constraint_shortcut;
 use super::nominal::{class_value_arm, nominal_arms};
 use super::objects::{object_arm, record_arm};
 use super::scalar::{is_simple_type, simple_types_compatible, t};
