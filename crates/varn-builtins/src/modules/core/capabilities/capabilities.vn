@@ -18,10 +18,6 @@ export interface Comparable<T> {
     compare(other: T): int;
 }
 
-export interface Hashable {
-    hash(): int;
-}
-
 export interface Cloneable<T> {
     clone(): T;
 }

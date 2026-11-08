@@ -1,5 +1,4 @@
 use super::ctx::ExecCtx;
-use crate::error::{RuntimeError, VmResult};
 use crate::heap::HeapObj;
 use crate::value::VmValue;
 
@@ -7,42 +6,14 @@ const TUPLE_BUCKET: u32 = u32::MAX;
 const ENUM_BUCKET: u32 = u32::MAX - 1;
 
 impl ExecCtx {
-    pub(crate) fn hashable_key(&mut self, key: VmValue) -> VmResult<VmValue> {
-        let Some(class_id) = self.instance_class_id(key) else {
-            return Ok(match self.composite_bucket(key) {
+    pub(crate) fn canonical_key(&mut self, key: VmValue) -> VmValue {
+        match self.instance_class_id(key) {
+            Some(class_id) => self.value_instance_key(key, class_id),
+            None => match self.composite_bucket(key) {
                 Some(bucket) => self.structural_key(key, bucket),
                 None => key,
-            });
-        };
-        let (Some(hash_fn), Some(equals_fn)) = (
-            self.bound_method(key, "hash"),
-            self.bound_method(key, "equals"),
-        ) else {
-            return Ok(self.value_instance_key(key, class_id));
-        };
-        let hash = self.invoke(hash_fn, &[hash_fn])?;
-        if !hash.is_int() {
-            return Err(RuntimeError::new("hash() must return int"));
+            },
         }
-        let bucket_key = (class_id, hash.as_int());
-        let candidates = unsafe { &*self.hashable_keys.get() }
-            .get(&bucket_key)
-            .cloned()
-            .unwrap_or_default();
-        for rep in candidates {
-            if rep == key {
-                return Ok(rep);
-            }
-            let same = self.invoke(equals_fn, &[equals_fn, rep])?;
-            if same.is_bool() && same.as_bool() {
-                return Ok(rep);
-            }
-        }
-        unsafe { &mut *self.hashable_keys.get() }
-            .entry(bucket_key)
-            .or_default()
-            .push(key);
-        Ok(key)
     }
 
     fn value_instance_key(&mut self, key: VmValue, class_id: u32) -> VmValue {
@@ -110,15 +81,5 @@ impl ExecCtx {
             return None;
         }
         self.heap.instance(v.as_heap()).map(|inst| inst.class_id)
-    }
-
-    pub(crate) fn bound_method(&mut self, recv: VmValue, name: &str) -> Option<VmValue> {
-        let method = super::props::get_property(recv, name, &mut self.heap).ok()?;
-        let callable = method.is_heap()
-            && matches!(
-                self.heap.get(method.as_heap()),
-                Some(HeapObj::BoundMethod(_) | HeapObj::VmClosure(_) | HeapObj::NativeFn(..))
-            );
-        callable.then_some(method)
     }
 }

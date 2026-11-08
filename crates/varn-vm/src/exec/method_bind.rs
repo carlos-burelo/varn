@@ -1,7 +1,20 @@
+use super::ctx::ExecCtx;
 use crate::error::{RuntimeError, VmResult};
-use crate::heap::Heap;
+use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use varn_types::NativeCtx;
+
+impl ExecCtx {
+    pub(crate) fn bound_method(&mut self, recv: VmValue, name: &str) -> Option<VmValue> {
+        let method = super::props::get_property(recv, name, &mut self.heap).ok()?;
+        let callable = method.is_heap()
+            && matches!(
+                self.heap.get(method.as_heap()),
+                Some(HeapObj::BoundMethod(_) | HeapObj::VmClosure(_) | HeapObj::NativeFn(..))
+            );
+        callable.then_some(method)
+    }
+}
 
 pub(crate) fn bind_method(
     receiver: VmValue,

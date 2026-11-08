@@ -5,7 +5,6 @@ class Money {
     constructor(c: int) { this.cents = c }
     equals(other: Money): bool { return this.cents == other.cents }
     compare(other: Money): int { return this.cents - other.cents }
-    hash(): int { return this.cents }
     clone(): Money { return new Money(this.cents) }
     debug(): str { return `Money(${this.cents})` }
     toString(): str { return `$${this.cents}` }
@@ -17,7 +16,6 @@ function same<T>(a: Equatable<T>, b: T): bool { return a.equals(b) }
 
 const c: Comparable<Money> = new Money(5)
 
-const h: Hashable = new Money(5)
 const k: Cloneable<Money> = new Money(9)
 const d: Display = new Money(7)
 const g: Debug = new Money(7)
@@ -37,7 +35,7 @@ await describe("132 capabilities", async () => {
         await it("group 1 part 1", async () => {
         expect(same(new Money(1), new Money(1))).toBeTruthy();
         expect(c.compare(new Money(3)) > 0).toBeTruthy();
-        expect(h.hash() == 5 && k.clone().cents).toBe(9);
+        expect(k.clone().cents).toBe(9);
         expect(d.toString() == "$7" && g.debug()).toBe("Money(7)");
     });
 

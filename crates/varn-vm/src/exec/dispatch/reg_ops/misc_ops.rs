@@ -72,7 +72,7 @@ impl ExecCtx {
         obj: VmValue,
         key_nv: VmValue,
     ) -> VmResult<VmValue> {
-        let key_nv = self.hashable_key(key_nv)?;
+        let key_nv = self.canonical_key(key_nv);
         crate::exec::collections::get_index(obj, key_nv, &mut self.heap)
     }
 
@@ -100,7 +100,7 @@ impl ExecCtx {
         idx: VmValue,
         val: VmValue,
     ) -> VmResult<()> {
-        let idx = self.hashable_key(idx)?;
+        let idx = self.canonical_key(idx);
         crate::exec::collections::set_index(obj, idx, val, &mut self.heap)
     }
 
@@ -130,7 +130,7 @@ impl ExecCtx {
         obj: VmValue,
         key_nv: VmValue,
     ) -> VmResult<VmValue> {
-        let key_nv = self.hashable_key(key_nv)?;
+        let key_nv = self.canonical_key(key_nv);
         crate::exec::collections::map_get_index(obj, key_nv, &mut self.heap)
     }
 
@@ -141,7 +141,7 @@ impl ExecCtx {
         idx: VmValue,
         val: VmValue,
     ) -> VmResult<()> {
-        let idx = self.hashable_key(idx)?;
+        let idx = self.canonical_key(idx);
         crate::exec::collections::map_set_index(obj, idx, val, &mut self.heap)
     }
 

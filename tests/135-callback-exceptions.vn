@@ -10,12 +10,6 @@ function raisesBoom(f: () => void): bool {
 const byKey: Map<int, int> = new Map()
 const inSet: Set<int> = new Set()
 
-class BadKey {
-    hash(): int { throw new Boom("boom") }
-    equals(o: BadKey): bool { return true }
-}
-const bad: Map<BadKey, int> = new Map()
-
 class Ver {
     n: int
     constructor(n: int) { this.n = n }
@@ -42,7 +36,6 @@ await describe("135 callback exceptions", async () => {
         inSet.add(2)
         expect(raisesBoom(() => { inSet.forEach((v: int) => { boom(v) }) })).toBeTruthy();
         expect(raisesBoom(() => { (1..4).map(boom) })).toBeTruthy();
-        expect(raisesBoom(() => { bad.set(new BadKey(), 1) })).toBeTruthy();
         expect([10, 9, 1, 100].sort().join(",")).toBe("1,9,10,100");
     });
 

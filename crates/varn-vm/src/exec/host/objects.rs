@@ -5,7 +5,7 @@ impl ExecCtx {
         &mut self,
         v: VmValue,
     ) -> Result<varn_types::value::MapKey, varn_types::NativeError> {
-        let v = self.hashable_key(v)?;
+        let v = self.canonical_key(v);
         Ok(self.heap.canonical_map_key(v))
     }
     pub(super) fn host_is_object(&self, v: VmValue) -> bool {
