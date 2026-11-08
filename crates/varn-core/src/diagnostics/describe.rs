@@ -23,6 +23,7 @@ impl ErrorCode {
         ErrorCode::InvalidDecoratorTarget,
         ErrorCode::ConstWithoutInitializer,
         ErrorCode::InvalidRegex,
+        ErrorCode::ForbiddenIndexSignature,
         ErrorCode::TypeMismatch,
         ErrorCode::UnknownSymbol,
         ErrorCode::NotCallable,
@@ -127,6 +128,7 @@ impl ErrorCode {
             | ErrorCode::InvalidDecoratorTarget
             | ErrorCode::ConstWithoutInitializer
             | ErrorCode::InvalidRegex
+            | ErrorCode::ForbiddenIndexSignature
             | ErrorCode::TypeMismatch
             | ErrorCode::UnknownSymbol
             | ErrorCode::NotCallable
@@ -213,6 +215,7 @@ impl ErrorCode {
             ErrorCode::InvalidDecoratorTarget => "A decorator is applied to a declaration that does not accept it.",
             ErrorCode::ConstWithoutInitializer => "A `const` must be initialized where it is declared.",
             ErrorCode::InvalidRegex => "A regular expression literal does not compile, or would build a user class named Regex.",
+            ErrorCode::ForbiddenIndexSignature => "An index signature `{ [key: K]: V }` was written; a keyed collection is a `Map<K, V>`.",
             ErrorCode::TypeMismatch => "A value of one type is used where an incompatible type is required.",
             ErrorCode::UnknownSymbol => "A name or type is not declared in any visible scope.",
             ErrorCode::NotCallable => "A call is applied to a value whose type is not a function.",

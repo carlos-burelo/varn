@@ -1,0 +1,2 @@
+// expect: error[VN2022]
+const scores: { [name: str]: int } = { ada: 1 }

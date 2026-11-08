@@ -4,7 +4,7 @@ use crate::stream::TokenStream;
 use crate::types::{parse_type, parse_type_params};
 use varn_core::ast::decl::Decl;
 use varn_core::ast::{InterfaceDecl, InterfaceMember, NamespaceDecl, StmtKind, TypeAliasDecl};
-use varn_core::TokenKind;
+use varn_core::{ErrorCode, TokenKind};
 
 pub fn parse_interface_decl(s: &mut TokenStream) -> PResult<InterfaceDecl> {
     let range = s.range();
@@ -95,6 +95,12 @@ pub fn parse_interface_member(
         s.eat(TokenKind::Semicolon);
         let full_range = s.span_from(mem_range);
         reject_mut_on_callable_member(s, mutable, mem_range);
+        s.push_diagnostic(
+            ErrorCode::ForbiddenIndexSignature,
+            "an index signature does not exist: write `Map<K, V>` for a keyed collection"
+                .to_owned(),
+            full_range,
+        );
         return Ok(InterfaceMember::Index {
             param,
             return_type,

@@ -22,6 +22,7 @@ pub enum ErrorCode {
     InvalidDecoratorTarget = 2013,
     ConstWithoutInitializer = 2020,
     InvalidRegex = 2021,
+    ForbiddenIndexSignature = 2022,
 
     TypeMismatch = 3001,
     UnknownSymbol = 3002,
@@ -123,6 +124,7 @@ impl ErrorCode {
             ErrorCode::InvalidDecoratorTarget => "invalid-decorator-target",
             ErrorCode::ConstWithoutInitializer => "const-without-initializer",
             ErrorCode::InvalidRegex => "invalid-regex",
+            ErrorCode::ForbiddenIndexSignature => "forbidden-index-signature",
 
             ErrorCode::TypeMismatch => "type-mismatch",
             ErrorCode::UnknownSymbol => "unknown-symbol",
