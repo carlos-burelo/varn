@@ -38,14 +38,26 @@ fn dep_source_fingerprint(dep: &str) -> Option<u64> {
     Some(varn_core::fingerprint::fingerprint(text.as_bytes()))
 }
 
-fn current_dep_hashes(bind: &BindResult) -> Option<Vec<(String, u64)>> {
-    bind.deps
-        .iter()
-        .map(|dep| {
-            let dep = dep.to_string();
-            dep_source_fingerprint(&dep).map(|h| (dep, h))
-        })
-        .collect()
+fn dependency_closure_hashes(
+    resolver: &super::super::module_resolver::ModuleResolver,
+    bind: &BindResult,
+) -> Option<Vec<(String, u64)>> {
+    use varn_sem::resolver::ImportResolver;
+    let mut hashes: std::collections::BTreeMap<String, u64> = std::collections::BTreeMap::new();
+    let mut pending: Vec<String> = bind.deps.iter().map(ToString::to_string).collect();
+    while let Some(dep) = pending.pop() {
+        if hashes.contains_key(&dep) {
+            continue;
+        }
+        hashes.insert(dep.clone(), dep_source_fingerprint(&dep)?);
+        let dep_bind = if varn_binder::paths::is_known_module(&dep) {
+            resolver.stdlib_bind(&dep)
+        } else {
+            resolver.module_bind(&dep)
+        }?;
+        pending.extend(dep_bind.deps.iter().map(ToString::to_string));
+    }
+    Some(hashes.into_iter().collect())
 }
 
 pub(crate) fn try_load_cache(
@@ -131,7 +143,7 @@ pub(crate) fn save_to_cache(
     let id = cache_module_id(virtual_id);
     let fingerprint = cache_fingerprint(source);
     if let Ok(payload) = serialize_module_interface(exports, bind) {
-        let Some(dep_hashes) = current_dep_hashes(bind) else {
+        let Some(dep_hashes) = dependency_closure_hashes(resolver, bind) else {
             return;
         };
         let envelope = CachedInterfaceEnvelope {
