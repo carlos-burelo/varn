@@ -9,33 +9,9 @@ use varn_sem::bind::BindResult;
 use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
-    fn is_keyed_dictionary(&self, ty: &Type) -> bool {
-        match self.ty_table.get(ty.0) {
-            varn_core::TypeKind::Record(members) | varn_core::TypeKind::Interface(members) => self
-                .ty_table
-                .get_object_members(members)
-                .iter()
-                .any(|m| matches!(m, varn_sem::types::ObjectTypeMember::Index { .. })),
-            varn_core::TypeKind::Primitive(_)
-            | varn_core::TypeKind::Literal(_)
-            | varn_core::TypeKind::This
-            | varn_core::TypeKind::Union(_)
-            | varn_core::TypeKind::Intersection(_)
-            | varn_core::TypeKind::Tuple(_)
-            | varn_core::TypeKind::Array(_)
-            | varn_core::TypeKind::Named(..)
-            | varn_core::TypeKind::Generic(..)
-            | varn_core::TypeKind::TemplateLiteral(_)
-            | varn_core::TypeKind::Fn(_)
-            | varn_core::TypeKind::Typeof(_)
-            | varn_core::TypeKind::KeyOf(_)
-            | varn_core::TypeKind::IndexedAccess { .. }
-            | varn_core::TypeKind::Mapped { .. }
-            | varn_core::TypeKind::Conditional { .. }
-            | varn_core::TypeKind::Infer(_)
-            | varn_core::TypeKind::EnumVariant { .. }
-            | varn_core::TypeKind::TypePredicate { .. } => false,
-        }
+    fn map_key_type(&self, ty: &Type) -> Option<Type> {
+        ty.is_builtin(varn_core::BuiltinType::Map, &self.ty_table)
+            .then(|| ty.builtin_arg(0, &self.ty_table))
     }
 
     pub(super) fn check_binary_operands(
@@ -121,7 +97,9 @@ impl<'r> Checker<'r> {
                             || self.value_fits(rec, &r_ty, &l_ty, Some(left), Some(bind))
                     }
                 }
-                BinaryOp::In => l_base == Type::Str && self.is_keyed_dictionary(&r_base),
+                BinaryOp::In => self
+                    .map_key_type(&r_base)
+                    .is_some_and(|key| self.types_compatible_cached(&key, &l_base, Some(bind))),
             };
             if !valid && op == BinaryOp::In {
                 let r_ty_s = r_ty.display(&self.ty_table, &bind.interner);
@@ -129,7 +107,7 @@ impl<'r> Checker<'r> {
                     Diagnostic::error(
                         ErrorCode::InvalidTypeOperator,
                         format!(
-                            "'in' tests whether a dictionary has a str key, and '{r_ty_s}' is not one: its members are known statically, use `.contains(..)`, `.has(..)` or `.includes(..)`"
+                            "'in' tests whether a Map holds a key, and '{r_ty_s}' is not a Map with a key of the left type: use .has(..) or .includes(..) for anything else"
                         ),
                     )
                     .with_range(range),

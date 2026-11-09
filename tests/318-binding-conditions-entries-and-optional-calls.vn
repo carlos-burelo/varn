@@ -81,8 +81,9 @@ await describe("318 binding conditions, entries and optional calls", async () =>
 
     await it("a map and a range answer whether they hold a key or a value", async () => {
         const dict = new Map([("a", 1)]);
+        expect("a" in dict).toBe(true);
+        expect("z" in dict).toBe(false);
         expect(dict.has("a")).toBe(true);
-        expect(dict.has("z")).toBe(false);
         expect((1..5).contains(3)).toBe(true);
         expect((1..5).contains(9)).toBe(false);
     });
