@@ -5,8 +5,21 @@ use crate::value::VmValue;
 const TUPLE_BUCKET: u32 = u32::MAX;
 const ENUM_BUCKET: u32 = u32::MAX - 1;
 
+fn same_value_zero(n: f64) -> VmValue {
+    if n.is_nan() {
+        VmValue::from_f64(f64::NAN)
+    } else if n == 0.0 {
+        VmValue::from_f64(0.0)
+    } else {
+        VmValue::from_f64(n)
+    }
+}
+
 impl ExecCtx {
     pub(crate) fn canonical_key(&mut self, key: VmValue) -> VmValue {
+        if key.is_f64() {
+            return same_value_zero(key.as_f64());
+        }
         match self.instance_class_id(key) {
             Some(class_id) => self.value_instance_key(key, class_id),
             None => match self.composite_bucket(key) {

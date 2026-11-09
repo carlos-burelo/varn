@@ -1,2 +1,0 @@
-// expect: error[VN3037]
-const prices = new Map([(1.5, "low"), (2.5, "high")])

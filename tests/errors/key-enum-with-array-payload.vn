@@ -1,3 +1,3 @@
 // expect: error[VN3037]
-enum Shape { Circle(r: float), Unit }
+enum Shape { Circle(r: int[]), Unit }
 const areas: Map<Shape, int> = new Map()

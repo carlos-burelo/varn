@@ -25,13 +25,14 @@ const fn primitive_is_hashable(primitive: LangPrimitive) -> bool {
         LangPrimitive::Null
         | LangPrimitive::Bool
         | LangPrimitive::Int
+        | LangPrimitive::Float
         | LangPrimitive::BigInt
         | LangPrimitive::Decimal
         | LangPrimitive::Char
         | LangPrimitive::Str
         | LangPrimitive::Never
         | LangPrimitive::Error => true,
-        LangPrimitive::Float | LangPrimitive::Void | LangPrimitive::Dynamic => false,
+        LangPrimitive::Void | LangPrimitive::Dynamic => false,
     }
 }
 

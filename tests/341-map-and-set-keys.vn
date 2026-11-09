@@ -65,6 +65,24 @@ await describe("341 map and set keys", async () => {
         expect(outcomes.size).toBe(2)
     })
 
+    await it("a float is a key with SameValueZero equality", () => {
+        const nan = 0.0 / 0.0
+        const byFloat = new Map<float, str>()
+        byFloat.set(1.5, "a")
+        byFloat.set(nan, "nan")
+        byFloat.set(0.0, "zero")
+        expect(byFloat.get(1.5)).toBe("a")
+        expect(byFloat.get(0.0 / 0.0)).toBe("nan")
+        expect(byFloat.get(-0.0)).toBe("zero")
+        expect(byFloat.size).toBe(3)
+        const seen = new Set<float>()
+        seen.add(nan)
+        seen.add(0.0 / 0.0)
+        seen.add(0.0)
+        seen.add(-0.0)
+        expect(seen.size).toBe(2)
+    })
+
     await it("a generic key that declares Hashable is a key", () => {
         const counts = counter(["a", "b", "a"])
         const keyed: Index<str> = counts

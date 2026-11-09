@@ -1,5 +1,5 @@
 use super::Checker;
-use varn_core::{Diagnostic, ErrorCode, LangConstraint, LangPrimitive, TypeKind};
+use varn_core::{Diagnostic, ErrorCode, LangConstraint, TypeKind};
 use varn_sem::bind::{BindResult, BindView, GenericTypeUse};
 use varn_sem::types::Type;
 
@@ -62,9 +62,6 @@ impl Checker<'_> {
 
     fn hashable_alternative(&self, arg: &Type) -> &'static str {
         match self.ty_table.get(arg.0) {
-            TypeKind::Primitive(LangPrimitive::Float) => {
-                "a float is not equal to itself when it is NaN; use a decimal, or an int scaled from the float"
-            }
             TypeKind::Array(_) => {
                 "an array is mutable; use a tuple, or a str built from its elements"
             }
@@ -90,7 +87,7 @@ impl Checker<'_> {
             | TypeKind::Infer(_)
             | TypeKind::EnumVariant { .. }
             | TypeKind::TypePredicate { .. } => {
-                "only int, str, bool, char, bigint, decimal, enums, classes and tuples or structs of those can be keys"
+                "only int, float, str, bool, char, bigint, decimal, enums, classes and tuples or structs of those can be keys"
             }
         }
     }
