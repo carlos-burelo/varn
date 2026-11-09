@@ -43,6 +43,14 @@ await describe("350 read-only views", async () => {
         expect(ro.every((n: int): bool => n > 0)).toBe(true)
     })
 
+    await it("entries gives the index and the item of a view", () => {
+        const ro: readonly str[] = ["a", "b"]
+        let seen = ""
+        for (const (i, v) of ro.entries()) { seen += `${i}${v}` }
+        expect(seen).toBe("0a1b")
+        expect(ro.entries().length).toBe(2)
+    })
+
     await it("a view of nested arrays is a view of the outer one", () => {
         const nested: readonly int[][] = [[1], [2, 3]]
         expect(nested[1].length).toBe(2)

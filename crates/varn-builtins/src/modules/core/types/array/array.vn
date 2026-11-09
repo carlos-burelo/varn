@@ -44,6 +44,7 @@ export declare class Array<T> {
 export interface ReadonlyArray<out T> {
     length: int;
     join(separator?: str): str;
+    entries(): ReadonlyArray<(int, T)>;
     slice(start?: int, end?: int): ReadonlyArray<T>;
     at(index: int): T?;
     filter(predicate: (item: T, index: int, array: ReadonlyArray<T>) => bool): ReadonlyArray<T>;
