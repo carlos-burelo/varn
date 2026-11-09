@@ -12,6 +12,17 @@ impl<'r> Checker<'r> {
         ext: &varn_core::ast::ExtensionDecl,
         bind: &BindResult,
     ) {
+        let outer_scope = self.current_scope;
+        if let Some(type_scope) = self.next_child_scope(bind) {
+            self.current_scope = type_scope;
+        }
+        let mut injected: Vec<Arc<str>> = Vec::new();
+        for tp in &ext.type_params {
+            let name: Arc<str> = Arc::from(bind.interner.resolve(tp.name));
+            if self.active_type_params.insert(name.clone()) {
+                injected.push(name);
+            }
+        }
         let ext_self_ty = self.resolve_type_node_cached(&ext.target, bind);
         let ext_class_name = match self.ty_table.get(ext_self_ty.0) {
             TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => {
@@ -55,6 +66,12 @@ impl<'r> Checker<'r> {
             let saved_expected = self.expected_return_type.take();
             match member {
                 varn_core::ast::ExtensionMember::Method(method) => {
+                    for tp in &method.type_params {
+                        let name: Arc<str> = Arc::from(bind.interner.resolve(tp.name));
+                        if self.active_type_params.insert(name.clone()) {
+                            injected.push(name);
+                        }
+                    }
                     self.expected_return_type = method.return_type.as_ref().map(|rt| {
                         let ty = self.resolve_type_node_cached(rt, bind);
                         if method.modifiers.is_async {
@@ -104,6 +121,10 @@ impl<'r> Checker<'r> {
             self.expected_return_type = saved_expected;
         }
 
+        for name in injected {
+            self.active_type_params.remove(name.as_ref());
+        }
+        self.current_scope = outer_scope;
         self.current_class = saved_class;
         self.extension_self = saved_self;
     }

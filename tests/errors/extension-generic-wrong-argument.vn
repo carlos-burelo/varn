@@ -1,0 +1,6 @@
+// expect: error[VN3001]
+extension Tools<T> on readonly T[] {
+    has(x: T): bool { return true }
+}
+const names: readonly str[] = ["ann"]
+names.has(5)

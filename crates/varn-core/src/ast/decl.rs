@@ -265,6 +265,7 @@ pub struct NamespaceDecl {
 pub struct ExtensionDecl {
     pub id: Option<Atom>,
     pub ast_id: AstId,
+    pub type_params: Vec<TypeParam>,
     pub target: TypeNode,
     pub members: Vec<ExtensionMember>,
     pub range: SourceRange,

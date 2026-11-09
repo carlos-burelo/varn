@@ -1,0 +1,9 @@
+// expect: error[VN3010]
+extension Tools<T> on readonly T[] {
+    has(x: T): bool {
+        for (const v of this) {
+            if (v == x) { return true }
+        }
+        return false
+    }
+}

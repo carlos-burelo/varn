@@ -339,6 +339,7 @@ import "./347-postfix-update-stays-on-its-line.vn"
 import "./348-map-literals.vn"
 import "./349-foreign-variance.vn"
 import "./350-readonly-views.vn"
+import "./351-generic-extensions.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

@@ -5,7 +5,33 @@ use varn_sem::symbol::{Symbol, SymbolKind};
 use varn_sem::types::Type;
 
 impl<'r> super::super::Binder<'r> {
+    fn define_outside(
+        &mut self,
+        scope: varn_sem::scope::ScopeId,
+        name: varn_core::Atom,
+        sym: Symbol,
+    ) -> varn_sem::symbol::SymbolId {
+        let inner = self.current;
+        self.current = scope;
+        let id = self.define(name, sym);
+        self.current = inner;
+        id
+    }
+
     pub(crate) fn bind_extension(&mut self, e: &ExtensionDecl) {
+        let outer = self.current;
+        self.current = self.scopes.child(ScopeKind::Function, outer);
+        self.bind_type_params(&e.type_params, e.range.start.line);
+        self.bind_extension_in_scope(e, outer);
+        self.current = outer;
+    }
+
+    fn bind_extension_in_scope(&mut self, e: &ExtensionDecl, outer: varn_sem::scope::ScopeId) {
+        let ext_params: Vec<Arc<str>> = e
+            .type_params
+            .iter()
+            .map(|t| Arc::from(self.interner.resolve(t.name)))
+            .collect();
         let receiver_ty = self.resolve_type(&e.target);
         let Some(type_name) = receiver_ty.extension_key(&self.ty_table, &|atom| {
             self.interner
@@ -30,7 +56,7 @@ impl<'r> super::super::Binder<'r> {
             let mut sym = Symbol::new(SymbolKind::Extension, id, line).with_type(ext_type);
             sym.col = e.range.start.column;
             sym.offset = e.range.start.offset;
-            self.define(id, sym);
+            self.define_outside(outer, id, sym);
         }
 
         for member in &e.members {
@@ -75,10 +101,15 @@ impl<'r> super::super::Binder<'r> {
                             params: param_types,
                             return_type: ret_ty.0,
                             is_arrow: false,
-                            type_params: method
-                                .type_params
+                            type_params: ext_params
                                 .iter()
-                                .map(|t| Arc::from(self.interner.resolve(t.name)))
+                                .cloned()
+                                .chain(
+                                    method
+                                        .type_params
+                                        .iter()
+                                        .map(|t| Arc::from(self.interner.resolve(t.name))),
+                                )
                                 .collect(),
                             type_param_defaults: Vec::new(),
                         },
@@ -93,7 +124,7 @@ impl<'r> super::super::Binder<'r> {
                     sym.has_explicit_type = method.return_type.is_some();
                     sym.is_async = method.modifiers.is_async;
                     sym.is_generator = method.modifiers.is_generator;
-                    self.define(mangled_atom, sym);
+                    self.define_outside(outer, mangled_atom, sym);
                     self.extensions
                         .methods
                         .entry(Arc::from(type_name.as_str()))
@@ -142,7 +173,7 @@ impl<'r> super::super::Binder<'r> {
                             }],
                             return_type: ret_ty.0,
                             is_arrow: false,
-                            type_params: vec![],
+                            type_params: ext_params.clone(),
                             type_param_defaults: Vec::new(),
                         },
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
@@ -153,7 +184,7 @@ impl<'r> super::super::Binder<'r> {
                     sym.col = range.start.column;
                     sym.offset = range.start.offset;
                     sym.has_explicit_type = return_type.is_some();
-                    self.define(mangled_atom, sym);
+                    self.define_outside(outer, mangled_atom, sym);
                     self.extensions
                         .getters
                         .entry(Arc::from(type_name.as_str()))
@@ -196,7 +227,7 @@ impl<'r> super::super::Binder<'r> {
                             ],
                             return_type: Type::Void.0,
                             is_arrow: false,
-                            type_params: vec![],
+                            type_params: ext_params.clone(),
                             type_param_defaults: Vec::new(),
                         },
                         &mut *std::sync::Arc::make_mut(&mut self.ty_table),
@@ -207,7 +238,7 @@ impl<'r> super::super::Binder<'r> {
                     sym.col = range.start.column;
                     sym.offset = range.start.offset;
                     sym.has_explicit_type = true;
-                    self.define(mangled_atom, sym);
+                    self.define_outside(outer, mangled_atom, sym);
                     self.extensions
                         .setters
                         .entry(Arc::from(type_name.as_str()))

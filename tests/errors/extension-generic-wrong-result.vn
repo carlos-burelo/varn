@@ -1,0 +1,6 @@
+// expect: error[VN3001]
+extension Tools<T> on readonly T[] {
+    head(): T? { return this.at(0) }
+}
+const names: readonly str[] = ["ann"]
+const n: int? = names.head()

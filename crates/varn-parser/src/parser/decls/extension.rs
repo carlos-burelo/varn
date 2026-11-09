@@ -17,10 +17,16 @@ pub fn parse_extension_decl(s: &mut TokenStream) -> PResult<ExtensionDecl> {
         ));
     }
 
-    let id = if s.check(TokenKind::On) {
+    let id = if s.check(TokenKind::On) || s.check(TokenKind::LAngle) {
         None
     } else {
         Some(s.expect_id()?)
+    };
+
+    let type_params = if s.check(TokenKind::LAngle) {
+        crate::types::parse_type_params(s)?
+    } else {
+        Vec::new()
     };
 
     s.expect(TokenKind::On)?;
@@ -49,6 +55,7 @@ pub fn parse_extension_decl(s: &mut TokenStream) -> PResult<ExtensionDecl> {
     Ok(ExtensionDecl {
         id,
         ast_id: s.next_ast_id(),
+        type_params,
         target,
         members,
         range: full_range,
