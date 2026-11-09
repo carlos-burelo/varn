@@ -35,22 +35,16 @@ fn clean() -> Result<(), CliError> {
                 clean_dir(&path, count, bytes)?;
                 let _ = std::fs::remove_dir(&path);
             } else if path.is_file() {
-                let ext = path.extension().map(|e| e.to_string_lossy().to_string());
-                if ext.as_deref() == Some("vnc")
-                    || ext.as_deref() == Some("vnm")
-                    || ext.as_deref() == Some("bin")
-                {
-                    if let Ok(meta) = std::fs::metadata(&path) {
-                        *bytes += meta.len();
-                    }
-                    std::fs::remove_file(&path).map_err(|e| {
-                        CliError::fatal(format!(
-                            "error[cache]: cannot remove {}: {e}",
-                            path.display()
-                        ))
-                    })?;
-                    *count += 1;
+                if let Ok(meta) = std::fs::metadata(&path) {
+                    *bytes += meta.len();
                 }
+                std::fs::remove_file(&path).map_err(|e| {
+                    CliError::fatal(format!(
+                        "error[cache]: cannot remove {}: {e}",
+                        path.display()
+                    ))
+                })?;
+                *count += 1;
             }
         }
         Ok(())
