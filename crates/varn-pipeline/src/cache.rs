@@ -17,7 +17,7 @@ pub fn compile_cache_path(file_path: &str) -> std::path::PathBuf {
         "{}.{:x}.{:016x}.vncache",
         stem,
         path_hash as u32,
-        u64::from(varn_modules::artifact::cache_key()) ^ std_identity
+        u64::from(varn_modules::artifact::compiler_identity()) ^ std_identity
     ))
 }
 
@@ -100,7 +100,7 @@ pub fn store_cached_graph(cache_path: &Path, graph: &ModuleGraphArtifact) -> Pip
     })?;
     let bytes = varn_modules::artifact::write_artifact(
         varn_modules::artifact::ArtifactKind::ModuleGraph,
-        varn_modules::artifact::ArtifactClass::Cache,
+        varn_modules::artifact::ArtifactClass::Portable,
         &payload,
     );
     varn_modules::artifact::write_artifact_file(cache_path, &bytes).map_err(|e| {

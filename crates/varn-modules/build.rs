@@ -2,21 +2,22 @@
 use std::io::Write;
 use std::path::Path;
 
-const FINGERPRINTED_CRATES: &[&str] = &[
-    "varn-core",
-    "varn-lexer",
-    "varn-parser",
-    "varn-binder",
-    "varn-sem",
-    "varn-checker",
-    "varn-tir",
-    "varn-emit",
-    "varn-compiler",
-    "varn-types",
-    "varn-modules",
-    "varn-resolver",
-    "varn-pipeline",
-    "varn-builtins",
+const CRATES_WITHOUT_ARTIFACT_OUTPUT: &[&str] = &[
+    "varn-cli",
+    "varn-dap",
+    "varn-debug",
+    "varn-gpu",
+    "varn-inspect",
+    "varn-jit",
+    "varn-jit-abi",
+    "varn-lsp",
+    "varn-pm",
+    "varn-project",
+    "varn-shadow",
+    "varn-text",
+    "varn-ui",
+    "varn-vm",
+    "xtask",
 ];
 
 fn main() {
@@ -27,10 +28,31 @@ fn main() {
         .to_path_buf();
 
     let mut hash: u64 = 0xcbf29ce484222325;
-    for krate in FINGERPRINTED_CRATES {
-        let src = crates_root.join(krate).join("src");
+    let mut crates: Vec<_> = std::fs::read_dir(&crates_root)
+        .expect("crates/ is readable")
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.join("src").is_dir())
+        .collect();
+    crates.sort();
+    for krate in crates {
+        let name = krate.file_name().unwrap().to_string_lossy().into_owned();
+        if CRATES_WITHOUT_ARTIFACT_OUTPUT.contains(&name.as_str()) {
+            continue;
+        }
+        let src = krate.join("src");
         println!("cargo:rerun-if-changed={}", src.display());
+        fnv1a(name.as_bytes(), &mut hash);
         hash_dir(&src, &mut hash);
+    }
+
+    let lockfile = crates_root
+        .parent()
+        .expect("crates/ lives under the workspace root")
+        .join("Cargo.lock");
+    println!("cargo:rerun-if-changed={}", lockfile.display());
+    if let Ok(bytes) = std::fs::read(&lockfile) {
+        fnv1a(&bytes, &mut hash);
     }
 
     let folded = (hash ^ (hash >> 32)) as u32;

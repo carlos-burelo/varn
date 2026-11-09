@@ -8,11 +8,7 @@ pub fn write_portable(path: &str, artifact: &ModuleGraphArtifact) -> Result<(), 
     let payload = postcard::to_allocvec(artifact)
         .map_err(|e| Failure::internal(format!("cannot serialize .vnc: {e}")))?;
 
-    let out = write_artifact(
-        ArtifactKind::ModuleGraph,
-        ArtifactClass::Distributable,
-        &payload,
-    );
+    let out = write_artifact(ArtifactKind::ModuleGraph, ArtifactClass::Portable, &payload);
 
     write_artifact_file(std::path::Path::new(path), &out)
         .map_err(|e| Failure::io(format!("cannot write '{}': {e}", path)))

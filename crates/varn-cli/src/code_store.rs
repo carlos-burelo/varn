@@ -54,7 +54,7 @@ impl varn_vm::jit::code_cache::CodeStore for DiskCodeStore {
             return;
         }
         self.pruned.call_once(|| self.prune());
-        let bytes = artifact::write_artifact(ArtifactKind::JitCode, ArtifactClass::Cache, payload);
+        let bytes = artifact::write_artifact(ArtifactKind::JitCode, ArtifactClass::Native, payload);
         let _ = artifact::write_artifact_file(&self.path(key), &bytes);
     }
 }

@@ -33,8 +33,8 @@ pub fn producer_fingerprint() -> u32 {
     })
 }
 
-pub fn cache_key() -> u32 {
-    BUILD_FINGERPRINT ^ producer_fingerprint()
+pub fn compiler_identity() -> u32 {
+    BUILD_FINGERPRINT
 }
 
 pub fn prune_superseded(current: &Path) {
@@ -85,7 +85,7 @@ pub const MAGIC: &[u8; 4] = b"VARN";
 
 pub const MAGIC_VEXE: &[u8; 4] = b"VEXE";
 
-const ENVELOPE_VERSION: u16 = 2;
+const ENVELOPE_VERSION: u16 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
@@ -97,6 +97,8 @@ pub enum ArtifactKind {
     StdBundle = 3,
 
     JitCode = 4,
+
+    ImportManifest = 5,
 }
 
 impl ArtifactKind {
@@ -106,6 +108,7 @@ impl ArtifactKind {
             2 => Some(Self::CheckerInterface),
             3 => Some(Self::StdBundle),
             4 => Some(Self::JitCode),
+            5 => Some(Self::ImportManifest),
             _ => None,
         }
     }
@@ -116,6 +119,7 @@ impl ArtifactKind {
             Self::CheckerInterface => "interfaz de checker",
             Self::StdBundle => "bundle de stdlib",
             Self::JitCode => "codigo JIT",
+            Self::ImportManifest => "manifiesto de imports",
         }
     }
 }
@@ -123,24 +127,24 @@ impl ArtifactKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ArtifactClass {
-    Cache = 1,
+    Portable = 1,
 
-    Distributable = 2,
+    Native = 2,
 }
 
 impl ArtifactClass {
     fn from_u8(v: u8) -> Option<Self> {
         match v {
-            1 => Some(Self::Cache),
-            2 => Some(Self::Distributable),
+            1 => Some(Self::Portable),
+            2 => Some(Self::Native),
             _ => None,
         }
     }
 
     fn producer_stamp(self) -> u32 {
         match self {
-            Self::Cache => producer_fingerprint(),
-            Self::Distributable => 0,
+            Self::Portable => 0,
+            Self::Native => producer_fingerprint(),
         }
     }
 }
@@ -230,7 +234,7 @@ pub fn write_module_artifact(
     if std::fs::create_dir_all(dir).is_err() {
         return;
     }
-    let bytes = write_artifact(kind, ArtifactClass::Cache, payload);
+    let bytes = write_artifact(kind, ArtifactClass::Portable, payload);
     if write_artifact_file(&path, &bytes).is_ok() {
         prune_superseded(&path);
     }

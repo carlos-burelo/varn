@@ -65,7 +65,9 @@ fn carried_image() -> Option<&'static [u8]> {
 }
 
 fn tree_stamp(root: &Path) -> u64 {
-    let mut stamp = varn_modules::artifact::cache_key().to_le_bytes().to_vec();
+    let mut stamp = varn_modules::artifact::compiler_identity()
+        .to_le_bytes()
+        .to_vec();
     for m in std_root::tree_modules(root) {
         stamp.extend_from_slice(m.path.as_bytes());
         stamp.extend_from_slice(&m.len.to_le_bytes());

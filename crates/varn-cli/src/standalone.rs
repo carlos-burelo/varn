@@ -77,11 +77,7 @@ pub fn write_executable(
     std_image: &[u8],
 ) -> Result<(), String> {
     let payload = postcard::to_allocvec(graph).map_err(|e| e.to_string())?;
-    let envelope = write_artifact(
-        ArtifactKind::ModuleGraph,
-        ArtifactClass::Distributable,
-        &payload,
-    );
+    let envelope = write_artifact(ArtifactKind::ModuleGraph, ArtifactClass::Portable, &payload);
 
     let mut bytes =
         std::fs::read(runtime).map_err(|e| format!("cannot read '{}': {e}", runtime.display()))?;

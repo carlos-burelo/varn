@@ -134,9 +134,5 @@ pub fn write_image(
         payload.extend_from_slice(&w.to_le_bytes());
     }
     payload.extend_from_slice(&data);
-    write_artifact(
-        ArtifactKind::StdBundle,
-        ArtifactClass::Distributable,
-        &payload,
-    )
+    write_artifact(ArtifactKind::StdBundle, ArtifactClass::Portable, &payload)
 }
