@@ -20,5 +20,6 @@ pub struct CoreMembers {
 #[derive(Default)]
 pub struct CoreExports {
     pub symbols: FxHashMap<Arc<str>, Symbol>,
+    pub extensions: crate::bind::Extensions,
     pub table: Arc<CheckerTyTable>,
 }

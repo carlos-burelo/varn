@@ -19,6 +19,7 @@ impl<'r> Binder<'r> {
             interner,
             resolver,
             None,
+            None,
             FxHashMap::default(),
         )
     }
@@ -36,6 +37,7 @@ impl<'r> Binder<'r> {
             interner,
             resolver,
             Some(&globals.table),
+            Some(&globals.extensions),
             globals
                 .symbols
                 .iter()
@@ -49,6 +51,7 @@ impl<'r> Binder<'r> {
         interner: varn_core::AtomInterner,
         resolver: &'r dyn varn_sem::resolver::ImportResolver,
         globals_table: Option<&varn_sem::types::CheckerTyTable>,
+        global_extensions: Option<&Extensions>,
         globals: I,
     ) -> varn_sem::bind::BindResult
     where
@@ -94,6 +97,9 @@ impl<'r> Binder<'r> {
         b.intern_local(&source_file);
         if let Some(table) = globals_table {
             b.adopt(table);
+        }
+        if let Some(extensions) = global_extensions {
+            b.extensions.absorb(extensions);
         }
 
         for (name, sym) in globals {

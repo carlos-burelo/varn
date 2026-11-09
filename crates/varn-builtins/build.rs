@@ -125,7 +125,16 @@ impl ContractSurface {
                         .collect(),
                     v.is_declare,
                 ),
-                Decl::Import(_) | Decl::Export(_) | Decl::Extension(_) => (Vec::new(), false),
+                Decl::Extension(ext) => (
+                    Vec::new(),
+                    ext.members.iter().all(|member| {
+                        matches!(
+                            member,
+                            varn_core::ast::ExtensionMember::Method(f) if f.modifiers.is_declare
+                        )
+                    }),
+                ),
+                Decl::Import(_) | Decl::Export(_) => (Vec::new(), false),
             };
             exports.extend(names);
             has_code |= !declared;

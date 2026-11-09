@@ -34,6 +34,7 @@ fn exports_of<'a>(
     let mut core = CoreExports::default();
     for spec in specs {
         let exports = resolver.stdlib_exports(spec);
+        core.extensions.absorb(&exports.extensions);
         let table = Arc::make_mut(&mut core.table);
         table.absorb(&exports.table);
         let origin = table.intern_name(spec);
