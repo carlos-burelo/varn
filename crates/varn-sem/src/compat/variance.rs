@@ -34,6 +34,7 @@ struct Ctx<'a> {
     table: &'a CheckerTyTable,
     interner: &'a AtomInterner,
     declared: &'a rustc_hash::FxHashMap<Arc<str>, Vec<Variance>>,
+    foreign: &'a dyn Fn(&str, &str) -> Option<Vec<Variance>>,
 }
 
 fn resolve_name(ctx: &Ctx, atom: Atom) -> Option<String> {
@@ -88,9 +89,22 @@ fn walk(ctx: &mut Ctx, id: crate::types::CheckerTyId, pol: Pol, shadow: &[String
                 walk(ctx, *id, pol, shadow);
             }
         }
-        TypeKind::Generic(name, args, _) => {
-            let positions =
-                resolve_name(ctx, name).and_then(|n| ctx.declared.get(n.as_str()).cloned());
+        TypeKind::Generic(name, args, origin) => {
+            let written = resolve_name(ctx, name);
+            let positions = written.as_ref().and_then(|n| {
+                ctx.declared.get(n.as_str()).cloned().or_else(|| {
+                    let origin = resolve_name(ctx, origin?)?;
+                    (ctx.foreign)(n, &origin)
+                })
+            });
+            let unresolved_origin = positions.is_none()
+                && origin.is_some_and(|o| resolve_name(ctx, o).is_some_and(|o| !o.is_empty()))
+                && written
+                    .as_ref()
+                    .is_some_and(|n| !ctx.declared.contains_key(n.as_str()));
+            if unresolved_origin {
+                return;
+            }
             for (i, id) in table.get_list(args).iter().enumerate() {
                 match positions.as_ref().and_then(|list| list.get(i)) {
                     Some(Variance::Covariant) => walk(ctx, *id, pol, shadow),
@@ -181,6 +195,7 @@ pub fn measure_params(
     table: &CheckerTyTable,
     interner: &AtomInterner,
     declared: &rustc_hash::FxHashMap<Arc<str>, Vec<Variance>>,
+    foreign: &dyn Fn(&str, &str) -> Option<Vec<Variance>>,
 ) -> Vec<ParamUses> {
     let mut ctx = Ctx {
         params,
@@ -188,6 +203,7 @@ pub fn measure_params(
         table,
         interner,
         declared,
+        foreign,
     };
     for m in members {
         match m.kind {

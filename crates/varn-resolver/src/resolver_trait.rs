@@ -41,6 +41,10 @@ impl ImportResolver for ModuleResolver {
             return Some(cached);
         }
 
+        if self.is_binding(&canonical) {
+            return None;
+        }
+
         let source = self.load_source(&ModuleId::local_str(&canonical))?;
         let source = source.text;
         let source = source.as_ref();

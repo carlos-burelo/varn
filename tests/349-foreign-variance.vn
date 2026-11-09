@@ -1,0 +1,27 @@
+import { describe, it, expect } from "std:test";
+import { Source } from "./helpers/foreign_variance.vn";
+
+class Animal { name: str = "animal" }
+class Dog extends Animal {}
+
+interface Pipe<out T> {
+    source(): Source<T>
+}
+
+class DogSource implements Source<Dog> {
+    next(): Dog? { return new Dog() }
+}
+
+class DogPipe implements Pipe<Dog> {
+    source(): Source<Dog> { return new DogSource() }
+}
+
+function firstName(pipe: Pipe<Animal>): str {
+    return pipe.source().next()?.name ?? "none"
+}
+
+await describe("349 variance through a generic from another module", async () => {
+    await it("an out parameter used through an out generic of another module stays out", () => {
+        expect(firstName(new DogPipe())).toBe("animal")
+    })
+})

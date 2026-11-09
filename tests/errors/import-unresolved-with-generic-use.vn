@@ -1,0 +1,6 @@
+// expect: error[VN2010]
+import { Sink } from "./does-not-exist.vn";
+
+interface Pipe<out T> {
+    drain(into: Sink<T>): void
+}

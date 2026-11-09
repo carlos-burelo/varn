@@ -1,0 +1,7 @@
+export interface Source<out T> {
+    next(): T?
+}
+
+export interface Sink<in T> {
+    put(item: T): void
+}

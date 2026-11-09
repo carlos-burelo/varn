@@ -101,6 +101,16 @@ pub(super) fn compute_type_param_variance(
             &b.ty_table,
             &b.interner,
             &declared_variances,
+            &|name, origin| {
+                if origin == b.source_file.as_ref() {
+                    return None;
+                }
+                let bound = b
+                    .resolver
+                    .stdlib_bind(origin)
+                    .or_else(|| b.resolver.module_bind(origin))?;
+                bound.type_param_variance.get(name).cloned()
+            },
         );
         for (i, declared) in g.declared.iter().enumerate() {
             let Some(use_) = uses.get(i) else { continue };

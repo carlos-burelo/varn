@@ -337,6 +337,7 @@ import "./345-type-member-separators.vn"
 import "./346-fields-of-a-value-are-updated-in-place.vn"
 import "./347-postfix-update-stays-on-its-line.vn"
 import "./348-map-literals.vn"
+import "./349-foreign-variance.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

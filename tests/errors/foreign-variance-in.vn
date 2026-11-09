@@ -1,0 +1,6 @@
+// expect: error[VN4118]
+import { Source } from "../helpers/foreign_variance.vn";
+
+interface Consumer<in T> {
+    produce(): Source<T>
+}
