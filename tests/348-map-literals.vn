@@ -1,0 +1,53 @@
+import { describe, it, expect } from "std:test";
+
+function table(): Map<str, int> { return { a: 1, b: 2 } }
+function total(m: Map<str, int>): int {
+    let sum = 0
+    for (const (_, v) of m) { sum += v }
+    return sum
+}
+
+await describe("348 map literals", async () => {
+    await it("a literal with a Map as its expected type builds that Map", () => {
+        const ages: Map<str, int> = { "ann": 30, bob: 25 }
+        expect(ages.size).toBe(2)
+        expect(ages.get("ann")).toBe(30)
+        expect(ages["bob"]).toBe(25)
+        expect("ann" in ages).toBe(true)
+        expect("zed" in ages).toBe(false)
+    })
+
+    await it("int keys and computed keys", () => {
+        const byId: Map<int, str> = { 1: "a", 2: "b" }
+        expect(byId.get(2)).toBe("b")
+        const name = "dyn"
+        const computed: Map<str, int> = { [name]: 1, ["x" + "y"]: 2 }
+        expect(computed.get("dyn")).toBe(1)
+        expect(computed.get("xy")).toBe(2)
+        const grid: Map<(int, int), str> = { [(1, 2)]: "p", [(3, 4)]: "q" }
+        expect(grid.get((1, 2))).toBe("p")
+        const floats: Map<float, str> = { [1.5]: "x" }
+        expect(floats.get(1.5)).toBe("x")
+    })
+
+    await it("the expected type comes from a return, an argument and a nullable declaration", () => {
+        expect(table().get("b")).toBe(2)
+        expect(total({ a: 3, b: 4 })).toBe(7)
+        const maybe: Map<str, int>? = { a: 1 }
+        expect(maybe?.get("a")).toBe(1)
+    })
+
+    await it("the value of each entry is checked against the expected value type", () => {
+        const nested: Map<str, Map<str, int>> = { outer: { inner: 5 } }
+        expect(nested.get("outer")?.get("inner")).toBe(5)
+        const widened: Map<str, float> = { a: 1, b: 2.5 }
+        expect(widened.get("a")).toBe(1.0)
+    })
+
+    await it("the literal builds a fresh Map each time it runs", () => {
+        function fresh(): Map<str, int> { return { a: 1 } }
+        const first = fresh()
+        first["a"] = 9
+        expect(fresh().get("a")).toBe(1)
+    })
+})

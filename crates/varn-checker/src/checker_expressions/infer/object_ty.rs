@@ -13,6 +13,9 @@ impl Checker<'_> {
         bind: &BindResult,
         expr: ExprId,
     ) -> Type {
+        if let Some((map, _, _)) = self.expected_map(expr) {
+            return map;
+        }
         let (members, duplicates) = self.infer_object_members(rec, properties, bind);
         let range = self.ast_arena.expr(expr).range;
         for name in duplicates {

@@ -9,6 +9,7 @@ mod destructure_assign;
 mod dynamic_use;
 mod exhaustiveness;
 mod is_target;
+mod map_literal;
 mod match_arm;
 pub(crate) mod member_index;
 mod member_side;

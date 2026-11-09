@@ -140,6 +140,9 @@ impl<'a> FnEmitter<'a> {
                 return self.lower_tuple(elements, ty, span);
             }
             ExprKind::Object { properties } => {
+                if self.is_map_literal(e) {
+                    return self.lower_map_literal(properties, ty, span);
+                }
                 return self.lower_object(properties, ty, span);
             }
             ExprKind::New { callee, args, .. } => {

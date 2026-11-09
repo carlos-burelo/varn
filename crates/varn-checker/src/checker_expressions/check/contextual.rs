@@ -157,6 +157,10 @@ impl<'r> Checker<'r> {
         properties: &[ObjectProp],
         bind: &BindResult,
     ) {
+        if let Some((_, key_ty, value_ty)) = self.expected_map(expr) {
+            self.check_map_literal(rec, expr, properties, (key_ty, value_ty), bind);
+            return;
+        }
         let expected_members: Vec<ObjectTypeMember> = if let Some(t) = self.expected_for(expr) {
             let ty = t.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
             if let Some(cached) = self.expected_object_members_cache.get(&ty) {

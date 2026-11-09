@@ -13,6 +13,7 @@ mod expr_closure;
 mod expr_collection;
 mod expr_convert;
 mod expr_ident;
+mod expr_map_literal;
 mod expr_member;
 mod expr_method;
 mod expr_misc;
