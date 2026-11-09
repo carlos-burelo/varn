@@ -76,6 +76,22 @@ fn feed(v: VmValue, heap: &Heap, h: &mut rustc_hash::FxHasher, depth: u32) {
                 feed(*slot, heap, h, depth + 1);
             }
         }
+        Some(HeapObj::Object(obj)) => {
+            let obj = obj.borrow();
+            let names = obj.shape().ordered_names();
+            14u8.hash(h);
+            names.len().hash(h);
+            let mut fields: u64 = 0;
+            for (slot, name) in names.iter().enumerate() {
+                let mut field = rustc_hash::FxHasher::default();
+                name.as_ref().hash(&mut field);
+                if let Some(value) = obj.field_at(slot) {
+                    feed(value, heap, &mut field, depth + 1);
+                }
+                fields = fields.wrapping_add(field.finish());
+            }
+            fields.hash(h);
+        }
         Some(HeapObj::Char(c)) => {
             7u8.hash(h);
             c.hash(h);
@@ -91,7 +107,6 @@ fn feed(v: VmValue, heap: &Heap, h: &mut rustc_hash::FxHasher, depth: u32) {
         Some(
             HeapObj::Str(_)
             | HeapObj::Array(_)
-            | HeapObj::Object(_)
             | HeapObj::Buffer(_)
             | HeapObj::Module(_)
             | HeapObj::FrozenModule(_)

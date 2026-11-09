@@ -1,0 +1,5 @@
+// expect: error[VN3010]
+type Row = { id: int; tags: str[] }
+const a: Row = { id: 1, tags: [] }
+const b: Row = { id: 1, tags: [] }
+a == b

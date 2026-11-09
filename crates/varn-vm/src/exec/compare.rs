@@ -70,7 +70,9 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
                 return composite_eq(a, b, heap);
             }
             (Some(HeapObj::Array(_)), Some(HeapObj::Array(_))) => return false,
-            (Some(HeapObj::Object(_)), Some(HeapObj::Object(_))) => return false,
+            (Some(HeapObj::Object(_)), Some(HeapObj::Object(_))) => {
+                return composite_eq(a, b, heap);
+            }
             (Some(HeapObj::Tuple(_)), Some(HeapObj::Tuple(_))) => {
                 return composite_eq(a, b, heap);
             }
@@ -216,6 +218,20 @@ fn expand(
     let null = VmValue::null();
     match (heap.get(a.as_heap())?, heap.get(b.as_heap())?) {
         (HeapObj::Tuple(x), HeapObj::Tuple(y)) => Some(push_elements(x, y, pending, null)),
+        (HeapObj::Object(x), HeapObj::Object(y)) => {
+            let (x, y) = (x.borrow(), y.borrow());
+            let names = x.shape().ordered_names();
+            if names.len() != y.shape().ordered_names().len() {
+                return Some(false);
+            }
+            for (slot, name) in names.iter().enumerate() {
+                let (Some(mine), Some(theirs)) = (x.field_at(slot), y.get(name)) else {
+                    return Some(false);
+                };
+                pending.push((mine, theirs, true));
+            }
+            Some(true)
+        }
         (HeapObj::Array(x), HeapObj::Array(y)) if member => {
             Some(push_elements(x, y, pending, null))
         }

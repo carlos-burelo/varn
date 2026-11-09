@@ -1,0 +1,3 @@
+// expect: error[VN3037]
+type Inventory = { owner: str; stock: Map<str, int> }
+const seen = new Set<Inventory>()

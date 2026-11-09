@@ -1,0 +1,79 @@
+import { describe, it, expect } from "std:test";
+
+type Point = { x: int; y: int }
+type Segment = { from: Point; to: Point }
+type Named = { id: int; label: str; note?: str }
+
+await describe("354 records are values", async () => {
+    await it("two records are equal when their fields are, in any order", () => {
+        const a: Point = { x: 1, y: 2 }
+        const b: Point = { y: 2, x: 1 }
+        expect(a == b).toBe(true)
+        expect(a != b).toBe(false)
+        expect(a == { x: 1, y: 3 }).toBe(false)
+    })
+
+    await it("a nested record compares by its fields", () => {
+        const s: Segment = { from: { x: 0, y: 0 }, to: { x: 1, y: 1 } }
+        const t: Segment = { to: { y: 1, x: 1 }, from: { y: 0, x: 0 } }
+        expect(s == t).toBe(true)
+        expect(s == { from: { x: 0, y: 0 }, to: { x: 2, y: 1 } }).toBe(false)
+    })
+
+    await it("an optional field takes part in the comparison", () => {
+        const a: Named = { id: 1, label: "a" }
+        const b: Named = { id: 1, label: "a", note: "n" }
+        expect(a == b).toBe(false)
+        expect(a == { id: 1, label: "a" }).toBe(true)
+        expect(b == { note: "n", label: "a", id: 1 }).toBe(true)
+    })
+
+    await it("with builds a record equal to the one written out", () => {
+        const base: Point = { x: 1, y: 2 }
+        expect(base with { x: 5 } == { x: 5, y: 2 }).toBe(true)
+        expect(base == { x: 1, y: 2 }).toBe(true)
+    })
+
+    await it("an array finds a record by value", () => {
+        const points: Point[] = [{ x: 1, y: 2 }, { y: 4, x: 3 }]
+        expect(points.includes({ x: 3, y: 4 })).toBe(true)
+        expect(points.indexOf({ y: 4, x: 3 })).toBe(1)
+        expect(points.includes({ x: 9, y: 9 })).toBe(false)
+    })
+
+    await it("a record is a key of a Map and an element of a Set", () => {
+        const heights = new Map<Point, str>()
+        heights.set({ x: 1, y: 2 }, "a")
+        heights.set({ y: 2, x: 1 }, "b")
+        heights.set({ x: 3, y: 4 }, "c")
+        expect(heights.size).toBe(2)
+        expect(heights.get({ y: 4, x: 3 })).toBe("c")
+        expect(heights.has({ x: 1, y: 2 })).toBe(true)
+        expect(heights.get({ x: 7, y: 7 })).toBe(null)
+        const seen = new Set<Segment>()
+        seen.add({ from: { x: 0, y: 0 }, to: { x: 1, y: 1 } })
+        seen.add({ to: { y: 1, x: 1 }, from: { y: 0, x: 0 } })
+        expect(seen.size).toBe(1)
+    })
+
+    await it("a record key built in a hot loop stays a single key", () => {
+        const counts = new Map<Point, int>()
+        for (let i = 0; i < 3000; i++) {
+            const key: Point = { x: i % 10, y: i % 7 }
+            counts.set(key, (counts.get(key) ?? 0) + 1)
+        }
+        expect(counts.size).toBe(70)
+        expect(counts.get({ y: 0, x: 0 })).toBe(43)
+    })
+
+    await it("updating a field through its place gives a different key", () => {
+        let p: Point = { x: 1, y: 2 }
+        const seen = new Set<Point>()
+        seen.add(p)
+        p.x = 9
+        seen.add(p)
+        expect(seen.size).toBe(2)
+        expect(seen.has({ x: 1, y: 2 })).toBe(true)
+        expect(seen.has({ x: 9, y: 2 })).toBe(true)
+    })
+})

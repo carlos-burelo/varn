@@ -1,7 +1,9 @@
 use super::resolve::resolve_atom;
 use crate::bind::BindView;
 use crate::symbol::SymbolKind;
-use crate::types::{CheckerTyTable, ClassMemberInfo, ClassMemberKind, TyListId, Type, TypeContext};
+use crate::types::{
+    CheckerTyTable, ClassMemberInfo, ClassMemberKind, ObjectTypeMember, TyListId, Type, TypeContext,
+};
 use rustc_hash::FxHashSet;
 use varn_core::{Atom, LangConstraint, LangPrimitive, TypeKind};
 
@@ -84,8 +86,18 @@ fn hashable_kind(
         TypeKind::Tuple(list) | TypeKind::Union(list) | TypeKind::Intersection(list) => {
             all_hashable(list, bind, visiting, table)
         }
+        TypeKind::Record(members) => {
+            table
+                .get_object_members(members)
+                .iter()
+                .all(|member| match member {
+                    ObjectTypeMember::Property { ty, .. } => {
+                        hashable_in(&Type::resolved(*ty), bind, visiting, table)
+                    }
+                    ObjectTypeMember::Method { .. } | ObjectTypeMember::Callable { .. } => false,
+                })
+        }
         TypeKind::Array(_)
-        | TypeKind::Record(_)
         | TypeKind::Fn(_)
         | TypeKind::Interface(_)
         | TypeKind::This

@@ -67,7 +67,7 @@ impl Checker<'_> {
             }
             TypeKind::Fn(_) => "a function has no equality; key by a name or an int instead",
             TypeKind::Record(_) => {
-                "a record is compared by identity at run time; use a tuple, or a struct with the same fields"
+                "a record is a key only when every field is one: this record holds a field that is not (an array, a Map, a Set, a function or a record of those)"
             }
             TypeKind::Primitive(_)
             | TypeKind::Literal(_)

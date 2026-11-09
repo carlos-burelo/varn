@@ -17,7 +17,8 @@ enum Shape { Circle(float), Rect(float, float), Unit }
 await describe("131 object struct class equality", async () => {
         await it("group 1 part 1", async () => {
         expect(sameValue(p1, p1) && !(sameValue(p1, p2))).toBeTruthy();
-        expect(sameValue(o1, alias) && !(sameValue(o1, { x: 1 }))).toBeTruthy();
+        expect(sameValue(o1, alias) && sameValue(o1, { x: 1 }) && !(sameValue(o1, { x: 2 }))).toBeTruthy();
+        expect(o1 == { x: 1 } && o1 != { x: 2 }).toBeTruthy();
         expect(r1 == r2).toBeTruthy();
         expect(r1).toBe(r2);
         expect(!(new Cell(1) == new Cell(2))).toBeTruthy();

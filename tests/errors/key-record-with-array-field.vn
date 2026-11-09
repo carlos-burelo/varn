@@ -1,0 +1,3 @@
+// expect: error[VN3037]
+type Row = { id: int; tags: str[] }
+const rows = new Map<Row, int>()

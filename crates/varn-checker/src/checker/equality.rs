@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use varn_core::ast::{BinaryOp, ExprId};
 use varn_core::{Diagnostic, ErrorCode, LangPrimitive, SourceRange, TypeKind};
 use varn_sem::bind::{BindResult, BindView};
-use varn_sem::types::{CheckerTyId, ClassMemberKind, Type, TypeContext};
+use varn_sem::types::{CheckerTyId, ClassMemberKind, ObjectTypeMember, Type, TypeContext};
 
 impl Checker<'_> {
     pub(crate) fn reject_reference_equality(
@@ -95,6 +95,19 @@ impl Checker<'_> {
                 .get_list(list)
                 .iter()
                 .all(|id| self.struct_field_comparable(Type::resolved(*id), view, path)),
+            TypeKind::Record(members) => {
+                self.ty_table
+                    .get_object_members(members)
+                    .iter()
+                    .all(|member| match member {
+                        ObjectTypeMember::Property { ty, .. } => {
+                            self.struct_field_comparable(Type::resolved(*ty), view, path)
+                        }
+                        ObjectTypeMember::Method { .. } | ObjectTypeMember::Callable { .. } => {
+                            false
+                        }
+                    })
+            }
             TypeKind::Literal(_)
             | TypeKind::EnumVariant { .. }
             | TypeKind::TemplateLiteral(_)
@@ -153,7 +166,6 @@ impl Checker<'_> {
             }
             TypeKind::This
             | TypeKind::Array(_)
-            | TypeKind::Record(_)
             | TypeKind::Interface(_)
             | TypeKind::Fn(_)
             | TypeKind::Typeof(_)

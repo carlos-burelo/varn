@@ -4,6 +4,7 @@ use crate::value::VmValue;
 
 const TUPLE_BUCKET: u32 = u32::MAX;
 const ENUM_BUCKET: u32 = u32::MAX - 1;
+const RECORD_BUCKET: u32 = u32::MAX - 2;
 
 fn same_value_zero(n: f64) -> VmValue {
     if n.is_nan() {
@@ -45,10 +46,10 @@ impl ExecCtx {
         match self.heap.get(v.as_heap()) {
             Some(HeapObj::Tuple(_)) => Some(TUPLE_BUCKET),
             Some(HeapObj::EnumVariant(_)) => Some(ENUM_BUCKET),
+            Some(HeapObj::Object(_)) => Some(RECORD_BUCKET),
             Some(
                 HeapObj::Str(_)
                 | HeapObj::Array(_)
-                | HeapObj::Object(_)
                 | HeapObj::Buffer(_)
                 | HeapObj::Module(_)
                 | HeapObj::FrozenModule(_)
