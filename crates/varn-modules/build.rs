@@ -2,7 +2,22 @@
 use std::io::Write;
 use std::path::Path;
 
-const FINGERPRINTED_CRATES: &[&str] = &["varn-core", "varn-types", "varn-modules", "varn-checker"];
+const FINGERPRINTED_CRATES: &[&str] = &[
+    "varn-core",
+    "varn-lexer",
+    "varn-parser",
+    "varn-binder",
+    "varn-sem",
+    "varn-checker",
+    "varn-tir",
+    "varn-emit",
+    "varn-compiler",
+    "varn-types",
+    "varn-modules",
+    "varn-resolver",
+    "varn-pipeline",
+    "varn-builtins",
+];
 
 fn main() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
