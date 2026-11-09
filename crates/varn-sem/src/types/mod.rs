@@ -87,11 +87,6 @@ pub enum ObjectTypeMember {
         is_arrow: bool,
         type_params: Vec<Arc<str>>,
     },
-    Index {
-        param_name: Arc<str>,
-        key_ty: CheckerTyId,
-        value_ty: CheckerTyId,
-    },
     Callable {
         params: Vec<FunctionParam>,
         return_type: CheckerTyId,
@@ -147,7 +142,6 @@ impl ObjectTypeMember {
         match self {
             ObjectTypeMember::Property { name, .. } => name.as_ref(),
             ObjectTypeMember::Method { name, .. } => name.as_ref(),
-            ObjectTypeMember::Index { param_name, .. } => param_name.as_ref(),
             ObjectTypeMember::Callable { .. } => "",
         }
     }

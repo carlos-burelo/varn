@@ -1,5 +1,4 @@
 use crate::types::{CheckerTyTable, ObjectTypeMember, Type, TypeContext};
-use std::sync::Arc;
 use varn_core::ast::TypeNode;
 use varn_core::TypeKind;
 
@@ -83,21 +82,11 @@ pub(super) fn resolve_mapped(
             | TypeKind::EnumVariant { .. }
             | TypeKind::TypePredicate { .. } => None,
         };
-        if let Some(key_ty) = key_ty {
-            let mapped_ctx = MappedContext {
-                inner: ctx,
-                key_var: key_var.to_owned(),
-                key_value: key_ty,
-            };
-            let value_ty = resolve_type_node(value_node, Some(&mapped_ctx), table);
-            let member = ObjectTypeMember::Index {
-                param_name: Arc::from(key_var),
-                key_ty: key_ty.0,
-                value_ty: value_ty.0,
-            };
-            return Type::record(vec![member], table);
-        }
-        return Type::Dynamic;
+        return if key_ty.is_some() {
+            Type::Error
+        } else {
+            Type::Dynamic
+        };
     }
 
     let members: Vec<ObjectTypeMember> = keys

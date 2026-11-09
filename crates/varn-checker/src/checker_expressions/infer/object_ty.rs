@@ -2,7 +2,6 @@ use super::Checker;
 use crate::checker::recorder::Recorder;
 use std::sync::Arc;
 use varn_core::ast::ExprId;
-use varn_core::TypeKind;
 use varn_sem::bind::BindResult;
 use varn_sem::types::{ObjectTypeMember, Type, TypeContext};
 
@@ -14,46 +13,6 @@ impl Checker<'_> {
         bind: &BindResult,
         expr: ExprId,
     ) -> Type {
-        let has_methods = properties
-            .iter()
-            .any(|p| matches!(p, varn_core::ast::ObjectProp::Method { .. }));
-        if !has_methods && let Some(expected) = self.expected_for(expr) {
-            let exp = expected.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
-            let exp_kind = self.ty_table.get(exp.0);
-            let is_index_signature = match exp_kind {
-                TypeKind::Record(mid) | TypeKind::Interface(mid) => {
-                    let members = self.ty_table.get_object_members(mid);
-                    members.len() == 1 && matches!(&members[0], ObjectTypeMember::Index { .. })
-                }
-                TypeKind::Primitive(_)
-                | TypeKind::Literal(_)
-                | TypeKind::This
-                | TypeKind::Array(_)
-                | TypeKind::Union(_)
-                | TypeKind::Intersection(_)
-                | TypeKind::Tuple(_)
-                | TypeKind::Named(..)
-                | TypeKind::Generic(..)
-                | TypeKind::TemplateLiteral(_)
-                | TypeKind::Fn(_)
-                | TypeKind::Typeof(_)
-                | TypeKind::KeyOf(_)
-                | TypeKind::IndexedAccess { .. }
-                | TypeKind::Mapped { .. }
-                | TypeKind::Conditional { .. }
-                | TypeKind::Infer(_)
-                | TypeKind::EnumVariant { .. }
-                | TypeKind::TypePredicate { .. } => false,
-            };
-            if is_index_signature {
-                for prop in properties {
-                    if let varn_core::ast::ObjectProp::Property { value, .. } = prop {
-                        self.infer_type(rec, *value, bind);
-                    }
-                }
-                return exp;
-            }
-        }
         let (members, duplicates) = self.infer_object_members(rec, properties, bind);
         let range = self.ast_arena.expr(expr).range;
         for name in duplicates {
@@ -191,7 +150,7 @@ fn member_name(member: &ObjectTypeMember) -> Option<&Arc<str>> {
         ObjectTypeMember::Property { name, .. } | ObjectTypeMember::Method { name, .. } => {
             Some(name)
         }
-        ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => None,
+        ObjectTypeMember::Callable { .. } => None,
     }
 }
 

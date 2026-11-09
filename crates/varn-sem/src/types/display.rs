@@ -196,18 +196,6 @@ impl fmt::Display for TypeDisplay<'_> {
                             }
                             write!(f, "): {}", self.child(*return_type))?;
                         }
-                        ObjectTypeMember::Index {
-                            param_name,
-                            key_ty,
-                            value_ty,
-                        } => {
-                            write!(
-                                f,
-                                "[{param_name}: {}]: {}",
-                                self.child(*key_ty),
-                                self.child(*value_ty)
-                            )?;
-                        }
                         ObjectTypeMember::Callable {
                             params,
                             return_type,

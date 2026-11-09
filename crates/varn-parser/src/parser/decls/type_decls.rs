@@ -88,10 +88,10 @@ pub fn parse_interface_member(
 
     if s.check(TokenKind::LBracket) {
         s.advance();
-        let param = super::super::params::parse_single_param(s)?;
+        super::super::params::parse_single_param(s)?;
         s.expect(TokenKind::RBracket)?;
         s.expect(TokenKind::Colon)?;
-        let return_type = parse_type(s)?;
+        let value_type = parse_type(s)?;
         s.eat(TokenKind::Semicolon);
         let full_range = s.span_from(mem_range);
         reject_mut_on_callable_member(s, mutable, mem_range);
@@ -101,9 +101,11 @@ pub fn parse_interface_member(
                 .to_owned(),
             full_range,
         );
-        return Ok(InterfaceMember::Index {
-            param,
-            return_type,
+        return Ok(InterfaceMember::Property {
+            key: s.interner.intern(TokenKind::Placeholder.as_str()),
+            type_ann: value_type,
+            optional: false,
+            readonly: false,
             range: full_range,
         });
     }

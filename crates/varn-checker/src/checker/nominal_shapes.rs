@@ -103,9 +103,7 @@ impl Checker<'_> {
                                     ..ClassMemberInfo::default()
                                 }
                             }
-                            ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => {
-                                return None
-                            }
+                            ObjectTypeMember::Callable { .. } => return None,
                         };
                         fields.push(field);
                     }

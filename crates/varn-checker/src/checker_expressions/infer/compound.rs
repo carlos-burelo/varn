@@ -4,7 +4,7 @@ use std::sync::Arc;
 use varn_core::ast::ExprId;
 use varn_core::TypeKind;
 use varn_sem::bind::BindResult;
-use varn_sem::types::{ObjectTypeMember, Type};
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(crate) fn infer_computed_member(
@@ -53,12 +53,9 @@ impl<'r> Checker<'r> {
             TypeKind::Generic(..) | TypeKind::Named(..) => {
                 builtin == Some(varn_core::BuiltinType::Map)
             }
-            TypeKind::Record(mid) | TypeKind::Interface(mid) => self
-                .ty_table
-                .get_object_members(mid)
-                .iter()
-                .any(|m| matches!(m, ObjectTypeMember::Index { .. })),
-            TypeKind::Primitive(_)
+            TypeKind::Record(_)
+            | TypeKind::Interface(_)
+            | TypeKind::Primitive(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Array(_)
@@ -136,17 +133,7 @@ impl<'r> Checker<'r> {
             {
                 obj_ty.builtin_arg(0, &self.ty_table)
             }
-            TypeKind::Record(mid) | TypeKind::Interface(mid) => self
-                .ty_table
-                .get_object_members(mid)
-                .iter()
-                .find_map(|m| match m {
-                    ObjectTypeMember::Index { value_ty, .. } => Some(Type::resolved(*value_ty)),
-                    ObjectTypeMember::Property { .. }
-                    | ObjectTypeMember::Method { .. }
-                    | ObjectTypeMember::Callable { .. } => None,
-                })
-                .unwrap_or(Type::Dynamic),
+            TypeKind::Record(_) | TypeKind::Interface(_) => Type::Dynamic,
             TypeKind::Primitive(_)
             | TypeKind::Literal(_)
             | TypeKind::This

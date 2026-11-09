@@ -131,8 +131,7 @@ impl<'r> Checker<'r> {
                     | varn_sem::types::ObjectTypeMember::Method { name, .. } => {
                         !extracted.contains(&name.as_ref())
                     }
-                    varn_sem::types::ObjectTypeMember::Index { .. }
-                    | varn_sem::types::ObjectTypeMember::Callable { .. } => true,
+                    varn_sem::types::ObjectTypeMember::Callable { .. } => true,
                 })
                 .cloned()
                 .collect();

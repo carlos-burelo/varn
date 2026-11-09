@@ -93,7 +93,6 @@ impl<'r> super::super::Binder<'r> {
                                 )),
                                 varn_sem::types::ObjectTypeMember::Property { .. }
                                 | varn_sem::types::ObjectTypeMember::Method { .. }
-                                | varn_sem::types::ObjectTypeMember::Index { .. }
                                 | varn_sem::types::ObjectTypeMember::Callable { .. } => None,
                             }),
                         Some(varn_core::TypeKind::Named(name_atom, origin_atom))

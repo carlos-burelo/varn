@@ -55,15 +55,6 @@ impl ObjectTypeMember {
                     type_params: type_params.clone(),
                 }
             }
-            ObjectTypeMember::Index {
-                param_name,
-                key_ty,
-                value_ty,
-            } => ObjectTypeMember::Index {
-                param_name: param_name.clone(),
-                key_ty: f(Type::resolved(*key_ty), table).0,
-                value_ty: f(Type::resolved(*value_ty), table).0,
-            },
             ObjectTypeMember::Callable {
                 params,
                 return_type,

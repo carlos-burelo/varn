@@ -57,17 +57,7 @@ pub(crate) fn infer_member(
             TypeKind::Generic(..) if obj_ty.is_builtin(varn_core::BuiltinType::Map, table) => {
                 obj_ty.builtin_arg(1, table)
             }
-            TypeKind::Record(mid) | TypeKind::Interface(mid) => table
-                .get_object_members(mid)
-                .iter()
-                .find_map(|m| match m {
-                    crate::types::ObjectTypeMember::Index { value_ty, .. } => Some(*value_ty),
-                    crate::types::ObjectTypeMember::Property { .. }
-                    | crate::types::ObjectTypeMember::Method { .. }
-                    | crate::types::ObjectTypeMember::Callable { .. } => None,
-                })
-                .map(Type::resolved)
-                .unwrap_or(Type::Dynamic),
+            TypeKind::Record(_) | TypeKind::Interface(_) => Type::Dynamic,
             TypeKind::Primitive(_)
             | TypeKind::Literal(_)
             | TypeKind::This

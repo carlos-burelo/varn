@@ -205,18 +205,7 @@ impl Checker<'_> {
                         }
                         ObjectTypeMember::Property { .. }
                         | ObjectTypeMember::Method { .. }
-                        | ObjectTypeMember::Index { .. }
                         | ObjectTypeMember::Callable { .. } => None,
-                    });
-                    let slot = slot.or_else(|| {
-                        members.iter().find_map(|m| match m {
-                            ObjectTypeMember::Index { value_ty, .. } => {
-                                Some(Type::resolved(*value_ty))
-                            }
-                            ObjectTypeMember::Property { .. }
-                            | ObjectTypeMember::Method { .. }
-                            | ObjectTypeMember::Callable { .. } => None,
-                        })
                     });
                     let Some(slot) = slot else {
                         return false;
@@ -239,7 +228,6 @@ impl Checker<'_> {
                     } => present.contains(&name.as_ref()),
                     ObjectTypeMember::Property { .. }
                     | ObjectTypeMember::Method { .. }
-                    | ObjectTypeMember::Index { .. }
                     | ObjectTypeMember::Callable { .. } => true,
                 });
             }

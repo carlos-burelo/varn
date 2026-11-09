@@ -67,7 +67,7 @@ impl Checker<'_> {
                 | TypeKind::EnumVariant { .. }
                 | TypeKind::TypePredicate { .. } => return None,
             },
-            ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => return None,
+            ObjectTypeMember::Callable { .. } => return None,
         };
         let (param, ret) = fn_ty;
         let result = match op.shape {

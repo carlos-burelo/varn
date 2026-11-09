@@ -92,7 +92,7 @@ pub fn get_members_of_type(
                             true,
                         );
                     }
-                    ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => {}
+                    ObjectTypeMember::Callable { .. } => {}
                 }
             }
         }

@@ -204,11 +204,6 @@ pub enum InterfaceMember {
         is_async: bool,
         range: SourceRange,
     },
-    Index {
-        param: Param,
-        return_type: TypeNode,
-        range: SourceRange,
-    },
     Callable {
         params: Vec<Param>,
         return_type: TypeNode,

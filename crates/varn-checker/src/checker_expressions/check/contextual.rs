@@ -167,17 +167,6 @@ impl<'r> Checker<'r> {
                     TypeKind::Record(mid) | TypeKind::Interface(mid) => {
                         self.ty_table.get_object_members(mid).to_vec()
                     }
-                    TypeKind::Generic(_, args, _)
-                        if ty.is_builtin(varn_core::BuiltinType::Map, &self.ty_table)
-                            && self.ty_table.get_list(args).len() == 2 =>
-                    {
-                        let arg_ids = self.ty_table.get_list(args).to_vec();
-                        vec![ObjectTypeMember::Index {
-                            param_name: std::sync::Arc::from("key"),
-                            key_ty: arg_ids[0],
-                            value_ty: arg_ids[1],
-                        }]
-                    }
                     TypeKind::Named(name_atom, origin_atom)
                     | TypeKind::Generic(name_atom, _, origin_atom) => {
                         let resolve_atom = |a: varn_core::Atom| -> String {
@@ -308,9 +297,6 @@ impl<'r> Checker<'r> {
                         expected_members.iter().find_map(|m| match m {
                             ObjectTypeMember::Property { name, ty, .. } if name.as_ref() == k => {
                                 Some(Type::resolved(*ty))
-                            }
-                            ObjectTypeMember::Index { value_ty, .. } => {
-                                Some(Type::resolved(*value_ty))
                             }
                             ObjectTypeMember::Property { .. }
                             | ObjectTypeMember::Method { .. }

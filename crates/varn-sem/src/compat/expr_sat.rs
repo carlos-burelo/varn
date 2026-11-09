@@ -82,7 +82,6 @@ pub fn expr_satisfies_target_type(
                 }
                 ObjectTypeMember::Property { .. }
                 | ObjectTypeMember::Method { .. }
-                | ObjectTypeMember::Index { .. }
                 | ObjectTypeMember::Callable { .. } => false,
             });
             if !matched {
@@ -103,7 +102,6 @@ pub fn expr_satisfies_target_type(
             } => !present.contains(&name.as_ref()),
             ObjectTypeMember::Property { .. }
             | ObjectTypeMember::Method { .. }
-            | ObjectTypeMember::Index { .. }
             | ObjectTypeMember::Callable { .. } => false,
         });
         return !required_missing;

@@ -1,4 +1,3 @@
-use super::compat_fn_sig::types_compatible_with_fn_signature;
 use super::core::types_compatible_impl;
 use super::scalar::t;
 use crate::bind::BindView;
@@ -33,7 +32,6 @@ pub(super) fn object_arm(
                     } if iname == name => Some((*ity, *source_readonly)),
                     ObjectTypeMember::Property { .. }
                     | ObjectTypeMember::Method { .. }
-                    | ObjectTypeMember::Index { .. }
                     | ObjectTypeMember::Callable { .. } => None,
                 });
                 match found {
@@ -92,7 +90,6 @@ pub(super) fn object_arm(
                     } if iname == name => Some((p2.clone(), *r2, *o2)),
                     ObjectTypeMember::Property { .. }
                     | ObjectTypeMember::Method { .. }
-                    | ObjectTypeMember::Index { .. }
                     | ObjectTypeMember::Callable { .. } => None,
                 });
                 match found {
@@ -128,90 +125,21 @@ pub(super) fn object_arm(
                     }
                 }
             }
-            ObjectTypeMember::Index {
-                key_ty, value_ty, ..
-            } => {
-                let has_compatible_index = inf_fields.iter().any(|im| match im {
-                    ObjectTypeMember::Index {
-                        key_ty: ikey,
-                        value_ty: ivalue,
-                        ..
-                    } => {
-                        types_compatible_impl(
-                            &t(*key_ty),
-                            &t(*ikey),
-                            bind,
-                            cache,
-                            in_progress,
-                            table,
-                        ) && super::arrays::same_element(
-                            &t(*value_ty),
-                            &t(*ivalue),
-                            bind,
-                            cache,
-                            in_progress,
-                            table,
-                        )
-                    }
-                    ObjectTypeMember::Property { .. }
-                    | ObjectTypeMember::Method { .. }
-                    | ObjectTypeMember::Callable { .. } => false,
-                });
-                if has_compatible_index {
-                    continue;
-                }
-
-                let explicit_members_compatible = inf_fields.iter().all(|im| match im {
-                    ObjectTypeMember::Property { ty, .. } => super::arrays::same_element(
-                        &t(*value_ty),
-                        &t(*ty),
-                        bind,
-                        cache,
-                        in_progress,
-                        table,
-                    ),
-                    ObjectTypeMember::Method {
-                        params,
-                        return_type,
-                        is_arrow,
-                        ..
-                    } => types_compatible_with_fn_signature(
-                        &t(*value_ty),
-                        params,
-                        *return_type,
-                        *is_arrow,
-                        bind,
-                        cache,
-                        in_progress,
-                        table,
-                    ),
-                    ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => true,
-                });
-                if !explicit_members_compatible {
-                    ok = false;
-                    break 'outer;
-                }
-            }
             ObjectTypeMember::Callable { .. } => {}
         }
     }
 
     if ok {
-        let has_index_decl = decl_fields
-            .iter()
-            .any(|m| matches!(m, ObjectTypeMember::Index { .. }));
-        if !has_index_decl {
-            for im in &inf_fields {
-                if let ObjectTypeMember::Property { name: iname, .. } = im {
-                    let exists_in_decl = decl_fields.iter().any(|dm| match dm {
-                        ObjectTypeMember::Property { name: dname, .. } => dname == iname,
-                        ObjectTypeMember::Method { name: dname, .. } => dname == iname,
-                        ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => false,
-                    });
-                    if !exists_in_decl {
-                        ok = false;
-                        break;
-                    }
+        for im in &inf_fields {
+            if let ObjectTypeMember::Property { name: iname, .. } = im {
+                let exists_in_decl = decl_fields.iter().any(|dm| match dm {
+                    ObjectTypeMember::Property { name: dname, .. } => dname == iname,
+                    ObjectTypeMember::Method { name: dname, .. } => dname == iname,
+                    ObjectTypeMember::Callable { .. } => false,
+                });
+                if !exists_in_decl {
+                    ok = false;
+                    break;
                 }
             }
         }
@@ -237,17 +165,13 @@ pub(super) fn record_arm(
                     if n == name && o == optional
             )
         }),
-        ObjectTypeMember::Method { .. }
-        | ObjectTypeMember::Index { .. }
-        | ObjectTypeMember::Callable { .. } => true,
+        ObjectTypeMember::Method { .. } | ObjectTypeMember::Callable { .. } => true,
     });
     let every_field_is_given = decl.iter().all(|dm| match dm {
         ObjectTypeMember::Property { name, .. } => inf
             .iter()
             .any(|im| matches!(im, ObjectTypeMember::Property { name: n, .. } if n == name)),
-        ObjectTypeMember::Method { .. }
-        | ObjectTypeMember::Index { .. }
-        | ObjectTypeMember::Callable { .. } => true,
+        ObjectTypeMember::Method { .. } | ObjectTypeMember::Callable { .. } => true,
     });
     shared_names_agree
         && every_field_is_given

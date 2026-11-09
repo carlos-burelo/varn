@@ -140,12 +140,6 @@ pub(crate) fn infer_object_members(
             ObjectProp::Property { key, value, .. } => {
                 let value = *value;
                 if matches!(key, PropKey::Computed(_)) {
-                    let val_ty = infer_expr_type(value, arena, ctx, table);
-                    members.push(ObjectTypeMember::Index {
-                        param_name: Arc::from("_key"),
-                        key_ty: Type::Str.0,
-                        value_ty: val_ty.0,
-                    });
                     continue;
                 }
                 let name = match key {

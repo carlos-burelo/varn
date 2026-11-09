@@ -264,7 +264,6 @@ pub(super) fn class_members_match_object(
                     } if name == &dm.name => Some((*ty, *readonly)),
                     ObjectTypeMember::Property { .. }
                     | ObjectTypeMember::Method { .. }
-                    | ObjectTypeMember::Index { .. }
                     | ObjectTypeMember::Callable { .. } => None,
                 });
                 match found {
@@ -294,7 +293,6 @@ pub(super) fn class_members_match_object(
                     } if name == &dm.name => Some((params.as_slice(), *return_type, *is_arrow)),
                     ObjectTypeMember::Property { .. }
                     | ObjectTypeMember::Method { .. }
-                    | ObjectTypeMember::Index { .. }
                     | ObjectTypeMember::Callable { .. } => None,
                 });
                 let Some((params, return_type, is_arrow)) = found else {
@@ -398,7 +396,7 @@ pub(super) fn object_matches_class_members(
                     return false;
                 }
             }
-            ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => {}
+            ObjectTypeMember::Callable { .. } => {}
         }
     }
     true

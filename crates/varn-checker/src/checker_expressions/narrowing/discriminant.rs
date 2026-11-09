@@ -133,7 +133,6 @@ impl<'r> Checker<'r> {
                                                 name.as_ref() == prop_name_str && *ty == disc_ty.0
                                             }
                                             ObjectTypeMember::Method { .. }
-                                            | ObjectTypeMember::Index { .. }
                                             | ObjectTypeMember::Callable { .. } => false,
                                         }),
                                     TypeKind::Named(cn, _) => {
@@ -279,9 +278,7 @@ impl<'r> Checker<'r> {
                     ObjectTypeMember::Property { name, ty, .. } => {
                         name.as_ref() == prop_name && *ty == disc_ty.0
                     }
-                    ObjectTypeMember::Method { .. }
-                    | ObjectTypeMember::Index { .. }
-                    | ObjectTypeMember::Callable { .. } => false,
+                    ObjectTypeMember::Method { .. } | ObjectTypeMember::Callable { .. } => false,
                 }),
             TypeKind::Named(cn, _) => {
                 let cn_str = bind.interner.resolve(cn).to_string();

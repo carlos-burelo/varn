@@ -113,13 +113,6 @@ fn interface_member_types(m: &varn_core::ast::InterfaceMember) -> Vec<&TypeNode>
             .filter_map(|p| p.type_ann.as_ref())
             .chain(return_type.as_ref())
             .collect(),
-        M::Index {
-            param, return_type, ..
-        } => param
-            .type_ann
-            .iter()
-            .chain(std::iter::once(return_type))
-            .collect(),
         M::Callable {
             params,
             return_type,

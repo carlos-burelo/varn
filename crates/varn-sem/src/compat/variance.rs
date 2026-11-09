@@ -119,12 +119,6 @@ fn walk(ctx: &mut Ctx, id: crate::types::CheckerTyId, pol: Pol, shadow: &[String
                         }
                         walk(ctx, *return_type, pol, shadow);
                     }
-                    ObjectTypeMember::Index {
-                        key_ty, value_ty, ..
-                    } => {
-                        walk_both(ctx, *key_ty, shadow);
-                        walk_both(ctx, *value_ty, shadow);
-                    }
                     ObjectTypeMember::Callable {
                         params,
                         return_type,

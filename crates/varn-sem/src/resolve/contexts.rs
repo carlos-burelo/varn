@@ -108,9 +108,7 @@ pub(super) fn is_member_optional(
                 ObjectTypeMember::Property { name, optional, .. } => {
                     name.as_ref() == key && *optional
                 }
-                ObjectTypeMember::Method { .. }
-                | ObjectTypeMember::Index { .. }
-                | ObjectTypeMember::Callable { .. } => false,
+                ObjectTypeMember::Method { .. } | ObjectTypeMember::Callable { .. } => false,
             })
         }
         TypeKind::Named(name, _) => {

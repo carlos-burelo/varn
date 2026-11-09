@@ -114,7 +114,7 @@ impl<'r> Checker<'r> {
                     },
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 ),
-                ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => Type::Dynamic,
+                ObjectTypeMember::Callable { .. } => Type::Dynamic,
             };
             (ty, None)
         })

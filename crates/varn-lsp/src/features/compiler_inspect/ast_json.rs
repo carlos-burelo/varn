@@ -216,7 +216,7 @@ impl AstJson<'_> {
                             "property",
                             range.start.line,
                         )),
-                        InterfaceMember::Index { .. } | InterfaceMember::Callable { .. } => None,
+                        InterfaceMember::Callable { .. } => None,
                     })
                     .collect();
                 let name = self.name(i.id);

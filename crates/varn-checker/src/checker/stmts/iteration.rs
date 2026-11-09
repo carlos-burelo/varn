@@ -36,20 +36,9 @@ impl Checker<'_> {
                 let elem = Type::union(members, std::sync::Arc::make_mut(&mut self.ty_table));
                 return Some((ForOfPlan::Collection { method: None, elem }, elem));
             }
-            TypeKind::Record(members) | TypeKind::Interface(members) => {
-                if let [varn_sem::types::ObjectTypeMember::Index {
-                    key_ty, value_ty, ..
-                }] = self.ty_table.get_object_members(members)
-                {
-                    let (key, value) = (*key_ty, *value_ty);
-                    let table = std::sync::Arc::make_mut(&mut self.ty_table);
-                    let pair = table.intern_list(&[key, value]);
-                    let entry = Type::resolved(table.intern(TypeKind::Tuple(pair)));
-                    let value = Type::resolved(value);
-                    return Some((ForOfPlan::Dict { value }, entry));
-                }
-            }
-            TypeKind::Primitive(_)
+            TypeKind::Record(_)
+            | TypeKind::Interface(_)
+            | TypeKind::Primitive(_)
             | TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Union(_)

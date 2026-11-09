@@ -18,7 +18,7 @@ impl<'r> Checker<'r> {
                 .filter_map(|m| match m {
                     ObjectTypeMember::Property { name, .. }
                     | ObjectTypeMember::Method { name, .. } => Some(name.clone()),
-                    ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => None,
+                    ObjectTypeMember::Callable { .. } => None,
                 })
                 .collect(),
             TypeKind::Named(cn, _) | TypeKind::Generic(cn, _, _) => {

@@ -179,14 +179,6 @@ fn lower_kind(
 
         TypeKind::Record(members) | TypeKind::Interface(members) => {
             let members = table.get_object_members(members);
-            if let [varn_sem::types::ObjectTypeMember::Index {
-                key_ty, value_ty, ..
-            }] = members
-            {
-                let _ = key_ty;
-                let v = lower_type(&Type::resolved(*value_ty), table, interner, tt, names);
-                return BackendTy::Dict(tt.intern(v));
-            }
             lower_shape(members, table, interner, tt, names, DynReason::Shape)
         }
         TypeKind::Fn(_) => BackendTy::Dynamic(DynReason::Callable),
@@ -210,7 +202,7 @@ fn is_plain_shape(members: &[varn_sem::types::ObjectTypeMember]) -> bool {
     use varn_sem::types::ObjectTypeMember as Member;
     members.iter().all(|m| match m {
         Member::Property { .. } | Member::Method { .. } => true,
-        Member::Index { .. } | Member::Callable { .. } => false,
+        Member::Callable { .. } => false,
     })
 }
 
@@ -242,7 +234,7 @@ fn shape_fields(
                 optional: *optional,
                 readonly: true,
             }),
-            Member::Index { .. } | Member::Callable { .. } => {}
+            Member::Callable { .. } => {}
         }
     }
     fields

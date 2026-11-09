@@ -68,12 +68,6 @@ impl Reach {
                     self.push_params(params);
                     self.pending.push(*return_type);
                 }
-                ObjectTypeMember::Index {
-                    key_ty, value_ty, ..
-                } => {
-                    self.pending.push(*key_ty);
-                    self.pending.push(*value_ty);
-                }
             }
         }
         self.object_members.insert(id, members);

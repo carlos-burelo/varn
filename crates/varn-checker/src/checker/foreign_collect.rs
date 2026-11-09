@@ -109,12 +109,6 @@ impl Checker<'_> {
                             }
                             self.collect_refs_in(bind, Type::resolved(return_type), out);
                         }
-                        ObjectTypeMember::Index {
-                            key_ty, value_ty, ..
-                        } => {
-                            self.collect_refs_in(bind, Type::resolved(key_ty), out);
-                            self.collect_refs_in(bind, Type::resolved(value_ty), out);
-                        }
                     }
                 }
             }

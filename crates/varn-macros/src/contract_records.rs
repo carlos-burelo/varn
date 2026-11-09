@@ -63,9 +63,7 @@ fn interface_fields(
                 interner.resolve(*key).to_string(),
                 classify(type_ann, interner),
             )),
-            InterfaceMember::Method { .. }
-            | InterfaceMember::Index { .. }
-            | InterfaceMember::Callable { .. } => {
+            InterfaceMember::Method { .. } | InterfaceMember::Callable { .. } => {
                 return Err(format!(
                 "interface `{name}` declares a non-field member; a native record holds fields only"
             ))

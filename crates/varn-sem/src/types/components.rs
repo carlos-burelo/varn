@@ -34,11 +34,6 @@ impl Type {
                             ids.extend(params.iter().map(|p| p.ty));
                             ids.push(*return_type);
                         }
-                        ObjectTypeMember::Index {
-                            key_ty, value_ty, ..
-                        } => {
-                            ids.extend([*key_ty, *value_ty]);
-                        }
                     }
                 }
             }

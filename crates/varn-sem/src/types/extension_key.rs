@@ -35,9 +35,9 @@ impl Type {
                             let mark = if *optional { "?" } else { "" };
                             parts.push(format!("{name}{mark}:{value}"));
                         }
-                        ObjectTypeMember::Method { .. }
-                        | ObjectTypeMember::Index { .. }
-                        | ObjectTypeMember::Callable { .. } => return None,
+                        ObjectTypeMember::Method { .. } | ObjectTypeMember::Callable { .. } => {
+                            return None
+                        }
                     }
                 }
                 parts.sort();

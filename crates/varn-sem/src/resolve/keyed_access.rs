@@ -1,6 +1,4 @@
-use crate::types::{
-    CheckerTyId, CheckerTyTable, FunctionType, ObjectTypeMember, Type, TypeContext,
-};
+use crate::types::{CheckerTyTable, FunctionType, ObjectTypeMember, Type, TypeContext};
 use std::sync::Arc;
 use varn_core::TypeKind;
 
@@ -9,25 +7,6 @@ pub(super) fn resolve_keyof(
     ctx: Option<&dyn TypeContext>,
     table: &mut CheckerTyTable,
 ) -> Type {
-    if let TypeKind::Record(mid) | TypeKind::Interface(mid) = table.get(ty.0) {
-        let mut key_types: Vec<CheckerTyId> = vec![];
-        for member in table.get_object_members(mid).to_vec() {
-            if let ObjectTypeMember::Index { key_ty, .. } = member
-                && !key_types.contains(&key_ty)
-            {
-                key_types.push(key_ty);
-            }
-        }
-        if !key_types.is_empty() {
-            return if key_types.len() == 1 {
-                Type::resolved(key_types[0])
-            } else {
-                let types: Vec<Type> = key_types.into_iter().map(Type::resolved).collect();
-                Type::union(types, table)
-            };
-        }
-    }
-
     let keys = collect_type_keys(&ty, ctx, table);
     if keys.is_empty() {
         Type::Never
@@ -48,7 +27,7 @@ pub(super) fn collect_type_keys(
             .filter_map(|m| match m {
                 ObjectTypeMember::Property { name, .. } => Some(name.clone()),
                 ObjectTypeMember::Method { name, .. } => Some(name.clone()),
-                ObjectTypeMember::Index { .. } | ObjectTypeMember::Callable { .. } => None,
+                ObjectTypeMember::Callable { .. } => None,
             })
             .collect(),
         TypeKind::Named(name, origin) => {
@@ -169,7 +148,6 @@ pub(super) fn resolve_indexed_access(
                     }
                     ObjectTypeMember::Property { .. }
                     | ObjectTypeMember::Method { .. }
-                    | ObjectTypeMember::Index { .. }
                     | ObjectTypeMember::Callable { .. } => {}
                 }
             }
@@ -208,28 +186,7 @@ pub(super) fn resolve_indexed_access(
             | TypeKind::Conditional { .. }
             | TypeKind::Infer(_)
             | TypeKind::EnumVariant { .. }
-            | TypeKind::TypePredicate { .. } => {
-                let value_from_index = members.iter().find_map(|m| match m {
-                    ObjectTypeMember::Index {
-                        key_ty, value_ty, ..
-                    } if crate::compat::types_compatible(
-                        &Type::resolved(*key_ty),
-                        &index,
-                        None,
-                        table,
-                    ) =>
-                    {
-                        Some(*value_ty)
-                    }
-                    ObjectTypeMember::Property { .. }
-                    | ObjectTypeMember::Method { .. }
-                    | ObjectTypeMember::Index { .. }
-                    | ObjectTypeMember::Callable { .. } => None,
-                });
-                if let Some(v) = value_from_index {
-                    return Type::resolved(v);
-                }
-            }
+            | TypeKind::TypePredicate { .. } => {}
         }
     }
 

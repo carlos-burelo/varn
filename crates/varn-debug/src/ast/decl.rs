@@ -129,9 +129,6 @@ pub(super) fn print_decl(
                     InterfaceMember::Callable { .. } => {
                         terminal::log(format!("{child_indent}{mk}{}", chalk("Callable").bold()))
                     }
-                    InterfaceMember::Index { .. } => {
-                        terminal::log(format!("{child_indent}{mk}{}", chalk("Index").bold()))
-                    }
                 }
             }
         }

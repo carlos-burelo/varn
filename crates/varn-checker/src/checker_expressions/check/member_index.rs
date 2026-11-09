@@ -4,7 +4,7 @@ use varn_core::ast::{ExprId, ExprKind};
 use varn_core::source::SourceRange;
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 use varn_sem::bind::BindResult;
-use varn_sem::types::{ObjectTypeMember, Type};
+use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     pub(super) fn check_member_index(
@@ -32,16 +32,6 @@ impl<'r> Checker<'r> {
                     None
                 }
             }
-            TypeKind::Record(mid) | TypeKind::Interface(mid) => self
-                .ty_table
-                .get_object_members(mid)
-                .iter()
-                .find_map(|m| match m {
-                    ObjectTypeMember::Index { key_ty, .. } => Some(Type::resolved(*key_ty)),
-                    ObjectTypeMember::Property { .. }
-                    | ObjectTypeMember::Method { .. }
-                    | ObjectTypeMember::Callable { .. } => None,
-                }),
             TypeKind::Array(_) => Some(Type::Int),
             TypeKind::Named(..) if builtin == Some(varn_core::BuiltinType::Bytes) => {
                 Some(Type::Int)
@@ -78,6 +68,8 @@ impl<'r> Checker<'r> {
             | TypeKind::Generic(..)
             | TypeKind::TemplateLiteral(_)
             | TypeKind::Fn(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
             | TypeKind::Typeof(_)
             | TypeKind::KeyOf(_)
             | TypeKind::IndexedAccess { .. }

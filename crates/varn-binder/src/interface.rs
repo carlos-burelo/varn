@@ -192,38 +192,6 @@ impl<'r> super::Binder<'r> {
                     ..Default::default()
                 });
             }
-            InterfaceMember::Index {
-                param,
-                return_type,
-                range,
-                ..
-            } => {
-                let ret = self.resolve_type(return_type);
-                let param_name = pattern_lead_name(&param.pattern, &self.interner).to_string();
-                let key_ty = self.param_type(param, super::binding_types::ParamSite::Declared);
-                members.push(ClassMemberInfo {
-                    name: Arc::from(format!(
-                        "[{param_name}: {}]",
-                        key_ty.display(&self.ty_table, &self.interner)
-                    )),
-                    kind: ClassMemberKind::Property,
-                    is_async: false,
-                    is_generator: false,
-                    is_static: false,
-                    is_optional: false,
-                    line: range.start.line.saturating_sub(1),
-                    col: range.start.column,
-                    offset: range.start.offset,
-                    ty: ret,
-                    members: Vec::new(),
-                    visibility: None,
-                    is_abstract: false,
-                    is_readonly: false,
-                    is_override: false,
-                    symbol_id: None,
-                    ..Default::default()
-                });
-            }
             InterfaceMember::Callable {
                 params,
                 return_type,

@@ -82,24 +82,6 @@ pub(super) fn resolve_object_members(
                         .collect(),
                 }
             }
-            InterfaceMember::Index {
-                param, return_type, ..
-            } => {
-                let key_ty = param
-                    .type_ann
-                    .as_ref()
-                    .map(|ann| resolve_type_node(ann, ctx, table))
-                    .unwrap_or(Type::Str);
-                let value_ty = resolve_type_node(return_type, ctx, table);
-                ObjectTypeMember::Index {
-                    param_name: Arc::from(crate::infer::pattern_lead_name(
-                        &param.pattern,
-                        interner,
-                    )),
-                    key_ty: key_ty.0,
-                    value_ty: value_ty.0,
-                }
-            }
             InterfaceMember::Callable {
                 params,
                 return_type,
