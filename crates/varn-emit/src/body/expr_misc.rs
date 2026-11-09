@@ -18,7 +18,6 @@ impl<'a> FnEmitter<'a> {
             | BackendTy::BigInt
             | BackendTy::Array(_)
             | BackendTy::Map(..)
-            | BackendTy::Dict(_)
             | BackendTy::Set(_)
             | BackendTy::Tuple(_)
             | BackendTy::Class(_)
@@ -85,7 +84,6 @@ impl<'a> FnEmitter<'a> {
             | BackendTy::Class(_) => true,
             BackendTy::Array(_)
             | BackendTy::Map(..)
-            | BackendTy::Dict(_)
             | BackendTy::Set(_)
             | BackendTy::Tuple(_)
             | BackendTy::Enum(_)

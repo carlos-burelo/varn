@@ -10,7 +10,7 @@ pub fn run(func: &mut SsaFunc) -> bool {
     for (i, vdef) in func.values.iter().enumerate() {
         if matches!(vdef.ty, BackendTy::Array(_)) {
             array_values.insert(i as u32);
-        } else if matches!(vdef.ty, BackendTy::Map(..) | BackendTy::Dict(_)) {
+        } else if matches!(vdef.ty, BackendTy::Map(..)) {
             map_values.insert(i as u32);
         }
     }

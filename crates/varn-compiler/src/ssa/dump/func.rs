@@ -52,7 +52,6 @@ fn dump_block(out: &mut String, func: &SsaFunc, id: u32, block: &Block) {
                 | BackendTy::BigInt
                 | BackendTy::Array(_)
                 | BackendTy::Map(..)
-                | BackendTy::Dict(_)
                 | BackendTy::Set(_)
                 | BackendTy::Tuple(_)
                 | BackendTy::Class(_)

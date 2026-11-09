@@ -68,7 +68,6 @@ pub(super) fn numeric_domain(bt: BackendTy) -> Option<varn_core::NumericDomain> 
         | BackendTy::Bytes
         | BackendTy::Array(_)
         | BackendTy::Map(..)
-        | BackendTy::Dict(_)
         | BackendTy::Set(_)
         | BackendTy::Tuple(_)
         | BackendTy::Class(_)

@@ -109,7 +109,6 @@ impl<'m> Builder<'m> {
             | BackendTy::Never
             | BackendTy::Dynamic(_)
             | BackendTy::Map(..)
-            | BackendTy::Dict(_)
             | BackendTy::Set(_)
             | BackendTy::Class(_)
             | BackendTy::Nullable(_) => InstKind::GetProperty {
@@ -149,7 +148,7 @@ impl<'m> Builder<'m> {
                 object: obj,
                 index: idx,
             }
-        } else if matches!(self.value_ty(obj), BackendTy::Map(..) | BackendTy::Dict(_)) {
+        } else if matches!(self.value_ty(obj), BackendTy::Map(..)) {
             InstKind::MapGetIndex {
                 object: obj,
                 index: idx,

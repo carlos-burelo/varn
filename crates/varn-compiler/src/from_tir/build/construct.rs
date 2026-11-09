@@ -276,7 +276,6 @@ fn supplied(arg: &TirArg) -> Option<bool> {
         | varn_tir::BackendTy::BigInt
         | varn_tir::BackendTy::Array(_)
         | varn_tir::BackendTy::Map(..)
-        | varn_tir::BackendTy::Dict(_)
         | varn_tir::BackendTy::Set(_)
         | varn_tir::BackendTy::Tuple(_)
         | varn_tir::BackendTy::Class(_)

@@ -97,23 +97,6 @@ impl<'a> FnEmitter<'a> {
                 out.extend(std::mem::take(&mut self.pending));
                 out.extend(self.for_of_over_array(left, items, elem, body));
             }
-            Some(ForOfPlan::Dict { value }) => {
-                let value_ty = self.lower_checked(&value);
-                let dict = self.hoist(source);
-                out.extend(std::mem::take(&mut self.pending));
-                let s = self.tt.intern(BackendTy::Str);
-                let keys = TirExpr {
-                    kind: TirExprKind::ObjectKeys {
-                        operand: Box::new(dict.clone()),
-                    },
-                    ty: BackendTy::Array(s),
-                    res: Resolution::None,
-                    span: Span::EMPTY,
-                };
-                let keys = self.hoist(keys);
-                out.extend(std::mem::take(&mut self.pending));
-                out.extend(self.for_of_over_dict(left, dict, keys, value_ty, body));
-            }
             Some(ForOfPlan::IntRange) => {
                 let range = self.hoist(source);
                 out.extend(std::mem::take(&mut self.pending));
@@ -212,28 +195,6 @@ impl<'a> FnEmitter<'a> {
         let source = arr.clone();
         self.indexed_loop(left, arr, body, move |idx| {
             index(source.clone(), idx, elem_ty)
-        })
-    }
-
-    fn for_of_over_dict(
-        &mut self,
-        left: &Pattern,
-        dict: TirExpr,
-        keys: TirExpr,
-        value_ty: BackendTy,
-        body: StmtId,
-    ) -> Vec<TirStmt> {
-        let pair = self.tt.intern_list(&[BackendTy::Str, value_ty]);
-        let key_source = keys.clone();
-        self.indexed_loop(left, keys, body, move |idx| {
-            let key = index(key_source.clone(), idx, BackendTy::Str);
-            let value = index(dict.clone(), key.clone(), value_ty);
-            TirExpr {
-                kind: TirExprKind::TupleLit(vec![key, value]),
-                ty: BackendTy::Tuple(pair),
-                res: Resolution::None,
-                span: Span::EMPTY,
-            }
         })
     }
 

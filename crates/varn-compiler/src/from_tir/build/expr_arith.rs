@@ -73,7 +73,6 @@ impl<'m> Builder<'m> {
                 | BackendTy::Never
                 | BackendTy::Array(_)
                 | BackendTy::Map(..)
-                | BackendTy::Dict(_)
                 | BackendTy::Set(_)
                 | BackendTy::Tuple(_)
                 | BackendTy::Class(_)
@@ -109,7 +108,6 @@ impl<'m> Builder<'m> {
             | BackendTy::Str
             | BackendTy::Array(_)
             | BackendTy::Map(..)
-            | BackendTy::Dict(_)
             | BackendTy::Set(_)
             | BackendTy::Tuple(_)
             | BackendTy::Class(_) => Some(self.emit(InstKind::ConstBool(true), BackendTy::Bool)),
@@ -120,7 +118,6 @@ impl<'m> Builder<'m> {
                 | BackendTy::Str
                 | BackendTy::Array(_)
                 | BackendTy::Map(..)
-                | BackendTy::Dict(_)
                 | BackendTy::Set(_)
                 | BackendTy::Tuple(_)
                 | BackendTy::Class(_) => {
@@ -204,7 +201,6 @@ impl<'m> Builder<'m> {
             | BackendTy::Never
             | BackendTy::Array(_)
             | BackendTy::Map(..)
-            | BackendTy::Dict(_)
             | BackendTy::Set(_)
             | BackendTy::Tuple(_)
             | BackendTy::Class(_)

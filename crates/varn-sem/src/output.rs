@@ -138,9 +138,6 @@ pub enum ForOfPlan {
         elem: Type,
     },
     IntRange,
-    Dict {
-        value: Type,
-    },
     Protocol {
         iterator: Option<Type>,
         next: Type,
@@ -152,7 +149,7 @@ impl ForOfPlan {
     pub fn step(&self) -> Option<&Type> {
         match self {
             Self::Protocol { step, .. } => Some(step),
-            Self::Collection { .. } | Self::IntRange | Self::Dict { .. } => None,
+            Self::Collection { .. } | Self::IntRange => None,
         }
     }
 }

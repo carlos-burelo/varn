@@ -225,7 +225,6 @@ impl<'a> FnEmitter<'a> {
                 | BackendTy::BigInt
                 | BackendTy::Array(_)
                 | BackendTy::Map(..)
-                | BackendTy::Dict(_)
                 | BackendTy::Set(_)
                 | BackendTy::Tuple(_)
                 | BackendTy::Class(_)

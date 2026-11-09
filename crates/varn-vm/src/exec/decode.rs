@@ -111,17 +111,6 @@ fn walk(
                 .collect();
             heap.alloc_tuple_vm(items)
         }
-        TypeDesc::Dict(inner) => {
-            let Some(layout) = object_layout(heap, v) else {
-                return v;
-            };
-            let values: Vec<VmValue> = layout
-                .values
-                .iter()
-                .map(|x| walk(heap, stack_floor, *x, inner, scope, visiting))
-                .collect();
-            rebuild(heap, &layout, values)
-        }
         TypeDesc::Map(key, inner) => {
             let entries = if let Some(entries) = object_entries(heap, v) {
                 if !matches!(**key, TypeDesc::Str | TypeDesc::Any) {

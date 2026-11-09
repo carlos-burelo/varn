@@ -68,7 +68,6 @@ impl<'a> FnEmitter<'a> {
                 | other @ BackendTy::BigInt
                 | other @ BackendTy::Array(_)
                 | other @ BackendTy::Map(..)
-                | other @ BackendTy::Dict(_)
                 | other @ BackendTy::Set(_)
                 | other @ BackendTy::Tuple(_)
                 | other @ BackendTy::Class(_)
@@ -93,7 +92,6 @@ impl<'a> FnEmitter<'a> {
                 | other @ BackendTy::BigInt
                 | other @ BackendTy::Array(_)
                 | other @ BackendTy::Map(..)
-                | other @ BackendTy::Dict(_)
                 | other @ BackendTy::Set(_)
                 | other @ BackendTy::Tuple(_)
                 | other @ BackendTy::Class(_)

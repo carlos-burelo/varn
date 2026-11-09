@@ -163,7 +163,6 @@ fn simplify(
         | BackendTy::Never
         | BackendTy::Array(_)
         | BackendTy::Map(..)
-        | BackendTy::Dict(_)
         | BackendTy::Set(_)
         | BackendTy::Tuple(_)
         | BackendTy::Class(_)

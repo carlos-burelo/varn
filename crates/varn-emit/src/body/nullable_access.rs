@@ -4,7 +4,7 @@ use varn_tir::{BackendTy, Resolution, Span, TirExpr, TirExprKind};
 impl<'a> FnEmitter<'a> {
     pub(super) fn keyed_read_ty(&mut self, container: BackendTy, slot: BackendTy) -> BackendTy {
         match container.non_nullable(self.tt) {
-            BackendTy::Map(..) | BackendTy::Dict(_) => self.nullable_of(slot),
+            BackendTy::Map(..) => self.nullable_of(slot),
             BackendTy::Literal(_)
             | BackendTy::Int
             | BackendTy::Float
@@ -47,7 +47,6 @@ impl<'a> FnEmitter<'a> {
             | member @ BackendTy::BigInt
             | member @ BackendTy::Array(_)
             | member @ BackendTy::Map(..)
-            | member @ BackendTy::Dict(_)
             | member @ BackendTy::Set(_)
             | member @ BackendTy::Tuple(_)
             | member @ BackendTy::Class(_)

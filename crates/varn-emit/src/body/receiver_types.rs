@@ -16,7 +16,6 @@ impl<'a> FnEmitter<'a> {
             | BackendTy::BigInt
             | BackendTy::Array(_)
             | BackendTy::Map(..)
-            | BackendTy::Dict(_)
             | BackendTy::Set(_)
             | BackendTy::Tuple(_)
             | BackendTy::Enum(_)
@@ -57,7 +56,6 @@ impl<'a> FnEmitter<'a> {
             BackendTy::Dynamic(DynReason::Yields(_)) => T::Generator,
             BackendTy::Dynamic(DynReason::Range(_)) => T::Range,
             BackendTy::Tuple(_)
-            | BackendTy::Dict(_)
             | BackendTy::Class(_)
             | BackendTy::Enum(_)
             | BackendTy::Fn(_)

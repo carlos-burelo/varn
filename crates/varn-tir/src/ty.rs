@@ -91,7 +91,6 @@ pub enum BackendTy {
     BigInt,
     Array(TyId),
     Map(TyId, TyId),
-    Dict(TyId),
     Set(TyId),
     Tuple(TyListId),
     Class(ClassId),
@@ -121,7 +120,6 @@ impl BackendTy {
             | other @ BackendTy::BigInt
             | other @ BackendTy::Array(_)
             | other @ BackendTy::Map(..)
-            | other @ BackendTy::Dict(_)
             | other @ BackendTy::Set(_)
             | other @ BackendTy::Tuple(_)
             | other @ BackendTy::Class(_)
@@ -160,7 +158,6 @@ impl BackendTy {
             BackendTy::Array(_) => Some(T::Array),
             BackendTy::Set(_) => Some(T::Set),
             BackendTy::Map(..) => Some(T::Map),
-            BackendTy::Dict(_) => Some(T::Object),
             BackendTy::Class(_) => Some(T::Class),
             BackendTy::Nullable(_) => {
                 let kind = self.non_nullable(types).field_kind(types)?;
@@ -197,7 +194,6 @@ impl BackendTy {
             | other @ BackendTy::BigInt
             | other @ BackendTy::Array(_)
             | other @ BackendTy::Map(..)
-            | other @ BackendTy::Dict(_)
             | other @ BackendTy::Set(_)
             | other @ BackendTy::Tuple(_)
             | other @ BackendTy::Class(_)

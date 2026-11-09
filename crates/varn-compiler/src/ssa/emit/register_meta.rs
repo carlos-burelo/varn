@@ -56,7 +56,6 @@ pub(crate) fn slot_kind_of(ty: BackendTy) -> varn_types::register_meta::SlotKind
         | BackendTy::Enum(_)
         | BackendTy::Fn(_)
         | BackendTy::Map(..)
-        | BackendTy::Dict(_)
         | BackendTy::Set(_)
         | BackendTy::Tuple(_)
         | BackendTy::Dynamic(DynReason::Runtime) => SlotKind::Ref,

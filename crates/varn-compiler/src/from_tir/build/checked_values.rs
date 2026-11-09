@@ -161,7 +161,6 @@ impl Builder<'_> {
             varn_tir::BackendTy::Literal(_)
             | varn_tir::BackendTy::Array(_)
             | varn_tir::BackendTy::Map(..)
-            | varn_tir::BackendTy::Dict(_)
             | varn_tir::BackendTy::Set(_)
             | varn_tir::BackendTy::Tuple(_)
             | varn_tir::BackendTy::Enum(_)
@@ -228,7 +227,6 @@ impl Builder<'_> {
                     | BackendTy::Never
                     | BackendTy::Array(_)
                     | BackendTy::Map(..)
-                    | BackendTy::Dict(_)
                     | BackendTy::Set(_)
                     | BackendTy::Tuple(_)
                     | BackendTy::Class(_)
@@ -261,7 +259,6 @@ impl Builder<'_> {
             | BackendTy::Never
             | BackendTy::Array(_)
             | BackendTy::Map(..)
-            | BackendTy::Dict(_)
             | BackendTy::Set(_)
             | BackendTy::Tuple(_)
             | BackendTy::Class(_) => {

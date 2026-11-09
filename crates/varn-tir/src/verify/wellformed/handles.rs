@@ -49,14 +49,6 @@ fn check_ty_recursive(
                 check_ty_recursive(m, inner_ty, e, errors, visited, visited_lists);
             }
         }
-        BackendTy::Dict(v) => {
-            if !m.types.contains(v) {
-                bad(&format!("TyId({})", v.0), errors);
-            } else if visited.insert(v) {
-                let inner_ty = m.types.get(v);
-                check_ty_recursive(m, inner_ty, e, errors, visited, visited_lists);
-            }
-        }
         BackendTy::Map(k, v) => {
             if !m.types.contains(k) {
                 bad(&format!("TyId({})", k.0), errors);
@@ -116,7 +108,6 @@ pub(super) fn check_res(
         | BackendTy::BigInt
         | BackendTy::Array(_)
         | BackendTy::Map(..)
-        | BackendTy::Dict(_)
         | BackendTy::Set(_)
         | BackendTy::Tuple(_)
         | BackendTy::Enum(_)
@@ -182,7 +173,6 @@ pub(super) fn check_res(
                             | BackendTy::BigInt
                             | BackendTy::Array(_)
                             | BackendTy::Map(..)
-                            | BackendTy::Dict(_)
                             | BackendTy::Set(_)
                             | BackendTy::Tuple(_)
                             | BackendTy::Class(_)

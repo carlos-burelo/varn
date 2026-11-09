@@ -199,28 +199,6 @@ fn fit_in(cx: &Cx, v: VmValue, desc: &TypeDesc, scope: Option<&Scope>) -> Option
             }
             Some(())
         }
-        TypeDesc::Dict(val) => {
-            if !v.is_heap() {
-                return None;
-            }
-            if let Some(HeapObj::Object(obj)) = heap.get(v.as_heap()) {
-                let obj = obj.borrow();
-                for slot in 0..obj.slot_count() {
-                    if let Some(x) = obj.field_at(slot) {
-                        fit_in(cx, x, val, scope)?;
-                    }
-                }
-                return Some(());
-            }
-            let map = heap.map_of(v)?;
-            for (key, value) in map.read().iter() {
-                if !heap.is_string(key.0) {
-                    return None;
-                }
-                fit_in(cx, *value, val, scope)?;
-            }
-            Some(())
-        }
         TypeDesc::Set(el) => {
             let set = heap.set_of(v)?;
             for k in set.read().iter() {

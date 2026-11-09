@@ -101,7 +101,6 @@ fn build_inner(
             | BackendTy::Decimal
             | BackendTy::Array(_)
             | BackendTy::Map(..)
-            | BackendTy::Dict(_)
             | BackendTy::Set(_)
             | BackendTy::Tuple(_)
             | BackendTy::Class(_)
@@ -214,7 +213,6 @@ impl<'m> Builder<'m> {
             | BackendTy::Fn(_)
             | BackendTy::Array(_)
             | BackendTy::Map(..)
-            | BackendTy::Dict(_)
             | BackendTy::Set(_)
             | BackendTy::Tuple(_)
             | BackendTy::Class(_) => None,

@@ -85,7 +85,7 @@ impl<'m> Builder<'m> {
         entries: &[varn_tir::TirObjectEntry],
         ty: BackendTy,
     ) -> Result<Value> {
-        if matches!(ty, BackendTy::Map(..) | BackendTy::Dict(_)) {
+        if matches!(ty, BackendTy::Map(..)) {
             let mut pairs = Vec::with_capacity(entries.len());
             for entry in entries {
                 match entry {

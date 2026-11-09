@@ -11,7 +11,6 @@ pub(super) fn is_structural(ty: BackendTy) -> bool {
         BackendTy::Literal(_)
             | BackendTy::Array(_)
             | BackendTy::Map(..)
-            | BackendTy::Dict(_)
             | BackendTy::Set(_)
             | BackendTy::Tuple(_)
             | BackendTy::Enum(_)

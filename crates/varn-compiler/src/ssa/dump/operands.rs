@@ -34,7 +34,7 @@ pub(super) fn ty(t: BackendTy) -> &'static str {
         BackendTy::Never => "never",
 
         BackendTy::Array(_) => "array",
-        BackendTy::Map(..) | BackendTy::Dict(_) => "map",
+        BackendTy::Map(..) => "map",
         BackendTy::Set(_) => "set",
         BackendTy::Tuple(_) => "tuple",
         BackendTy::Class(_) => "class",

@@ -100,7 +100,6 @@ fn bin_opcode(op: HirBinOp, ty: BackendTy) -> OpCode {
         | BackendTy::Never
         | BackendTy::Array(_)
         | BackendTy::Map(..)
-        | BackendTy::Dict(_)
         | BackendTy::Set(_)
         | BackendTy::Tuple(_)
         | BackendTy::Class(_)

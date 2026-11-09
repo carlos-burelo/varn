@@ -68,7 +68,6 @@ impl<'m> Describer<'m> {
             BackendTy::Decimal => TypeDesc::Decimal,
             BackendTy::BigInt => TypeDesc::BigInt,
             BackendTy::Array(el) => TypeDesc::Array(Box::new(self.of(el)?)),
-            BackendTy::Dict(v) => TypeDesc::Dict(Box::new(self.of(v)?)),
             BackendTy::Map(k, v) => {
                 let key = self.of(k)?;
                 let val = self.of(v)?;
@@ -199,7 +198,6 @@ pub(crate) fn param_contract(tir: &TirModule, f: &TirFunction) -> Result<Option<
                 | required @ TypeDesc::Array(_)
                 | required @ TypeDesc::Map(_, _)
                 | required @ TypeDesc::Set(_)
-                | required @ TypeDesc::Dict(_)
                 | required @ TypeDesc::Tuple(_)
                 | required @ TypeDesc::Class { .. }
                 | required @ TypeDesc::Enum { .. }
@@ -223,7 +221,6 @@ pub(crate) fn param_contract(tir: &TirModule, f: &TirFunction) -> Result<Option<
                 | required @ TypeDesc::Array(_)
                 | required @ TypeDesc::Map(_, _)
                 | required @ TypeDesc::Set(_)
-                | required @ TypeDesc::Dict(_)
                 | required @ TypeDesc::Tuple(_)
                 | required @ TypeDesc::Class { .. }
                 | required @ TypeDesc::Enum { .. }
