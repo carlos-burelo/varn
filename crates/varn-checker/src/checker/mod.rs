@@ -68,6 +68,7 @@ pub struct Checker<'r> {
     pub(crate) current_class: Option<Arc<str>>,
     pub(crate) extension_self: Option<Type>,
     pub(crate) active_type_params: FxHashSet<Arc<str>>,
+    pub(crate) owner_lookup_depth: u32,
     pub(crate) abstract_classes: FxHashSet<Arc<str>>,
     pub(crate) is_assignment_target: bool,
     pub(crate) super_reachable: bool,

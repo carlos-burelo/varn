@@ -53,7 +53,8 @@ pub fn emit_module(
 
     let mut declared = module_globals::collect_declared(program, ast_arena, interner, bind);
     let prelude = prelude::prelude_imports(&program.filename, &declared, ast_arena, interner);
-    for import in &prelude {
+    let linked_extensions = extensions::extension_imports(bind, desugar, &declared);
+    for import in prelude.iter().chain(&linked_extensions) {
         declared.extend(import.specs.iter().map(|spec| spec.local.clone()));
     }
 
@@ -193,7 +194,18 @@ pub fn emit_module(
     let mut imports = prelude;
     imports.extend(collect_imports(program, ast_arena, interner));
     namespace_scope::import_members(&mut imports, &bind.namespace_imports);
-    let exports = collect_exports(program, ast_arena, interner, &namespace_exports);
+    imports.extend(linked_extensions);
+    let mut exports = collect_exports(program, ast_arena, interner, &namespace_exports);
+    exports.extend(
+        extensions::exported_extension_names(program, ast_arena, bind)
+            .into_iter()
+            .map(|name| varn_tir::TirExport {
+                exported: name.clone(),
+                local: name,
+                reexport_from: None,
+                namespace: false,
+            }),
+    );
 
     let mut module = TirModule {
         source_file: Arc::from(program.filename.as_ref()),

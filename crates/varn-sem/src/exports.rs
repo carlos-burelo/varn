@@ -11,6 +11,7 @@ pub struct ExportMap {
     #[serde(skip)]
     pub table: Arc<CheckerTyTable>,
     pub collisions: Vec<ExportCollision>,
+    pub extensions: crate::bind::Extensions,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -26,6 +27,7 @@ impl ExportMap {
             symbols: FxHashMap::default(),
             table,
             collisions: Vec::new(),
+            extensions: crate::bind::Extensions::default(),
         }
     }
 

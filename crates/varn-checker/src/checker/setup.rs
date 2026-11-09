@@ -32,6 +32,7 @@ impl<'r> Checker<'r> {
             current_class: None,
             extension_self: None,
             active_type_params: FxHashSet::default(),
+            owner_lookup_depth: 0,
             abstract_classes: FxHashSet::default(),
             is_assignment_target: false,
             super_reachable: false,

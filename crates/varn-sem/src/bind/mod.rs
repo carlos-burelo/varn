@@ -69,6 +69,42 @@ pub struct Extensions {
     pub setters: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Arc<str>>>,
 }
 
+impl Extensions {
+    pub fn absorb(&mut self, other: &Extensions) {
+        for (mine, theirs) in [
+            (&mut self.methods, &other.methods),
+            (&mut self.getters, &other.getters),
+            (&mut self.setters, &other.setters),
+        ] {
+            for (target, members) in theirs {
+                let entry = mine.entry(target.clone()).or_default();
+                for (member, mangled) in members {
+                    entry.insert(member.clone(), mangled.clone());
+                }
+            }
+        }
+    }
+
+    pub fn record(
+        &mut self,
+        kind: varn_core::extension_names::ExtensionKind,
+        target: &str,
+        member: &str,
+        mangled: &str,
+    ) {
+        use varn_core::extension_names::ExtensionKind;
+        let table = match kind {
+            ExtensionKind::Method => &mut self.methods,
+            ExtensionKind::Getter => &mut self.getters,
+            ExtensionKind::Setter => &mut self.setters,
+        };
+        table
+            .entry(Arc::from(target))
+            .or_default()
+            .insert(Arc::from(member), Arc::from(mangled));
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ClassParent {
     pub name: Arc<str>,
@@ -151,8 +187,10 @@ pub enum DeclKind {
     Namespace,
 }
 
+mod extension_labels;
 mod settle;
 mod view;
+pub use extension_labels::{extension_label, extension_names, ExtensionName};
 pub use settle::settle_members;
 pub use view::BindView;
 

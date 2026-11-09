@@ -153,7 +153,10 @@ impl<'r> Checker<'r> {
                 }
 
                 if let Some(owner) = self.foreign_owner(bind, &name, origin.as_deref()) {
-                    return self.member_exists(ty, key, &owner);
+                    self.owner_lookup_depth += 1;
+                    let exists = self.member_exists(ty, key, &owner);
+                    self.owner_lookup_depth -= 1;
+                    return exists || self.extension_member_exists(ty, key, bind);
                 }
 
                 let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
@@ -289,39 +292,27 @@ impl<'r> Checker<'r> {
             | TypeKind::Infer(_)
             | TypeKind::TypePredicate { .. } => false,
         };
-        if !res
-            && let Some(tn) = crate::checker_expressions::check::members::extension_type_name(
-                self,
-                ty,
-                &self.ty_table,
-                bind,
-            )
-        {
-            if bind
-                .extensions
-                .methods
-                .get(&tn)
-                .is_some_and(|m| m.contains_key(key))
-            {
-                return true;
-            }
-            if bind
-                .extensions
-                .getters
-                .get(&tn)
-                .is_some_and(|m| m.contains_key(key))
-            {
-                return true;
-            }
-            if bind
-                .extensions
-                .setters
-                .get(&tn)
-                .is_some_and(|m| m.contains_key(key))
-            {
-                return true;
-            }
+        res || self.extension_member_exists(ty, key, bind)
+    }
+
+    fn extension_member_exists(&mut self, ty: &Type, key: &str, bind: &BindResult) -> bool {
+        if self.owner_lookup_depth != 0 {
+            return false;
         }
-        res
+        let Some(tn) = crate::checker_expressions::check::members::extension_type_name(
+            self,
+            ty,
+            &self.ty_table,
+            bind,
+        ) else {
+            return false;
+        };
+        [
+            &bind.extensions.methods,
+            &bind.extensions.getters,
+            &bind.extensions.setters,
+        ]
+        .into_iter()
+        .any(|table| table.get(&tn).is_some_and(|m| m.contains_key(key)))
     }
 }

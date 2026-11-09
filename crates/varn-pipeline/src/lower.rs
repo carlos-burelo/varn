@@ -54,10 +54,17 @@ pub(crate) fn emit_tir(
     )
 }
 
-pub(crate) fn tir_import_sources(tir: &varn_tir::TirModule) -> Vec<std::sync::Arc<str>> {
+pub(crate) fn written_import_sources(tir: &varn_tir::TirModule) -> Vec<std::sync::Arc<str>> {
     tir.imports
         .iter()
-        .filter(|i| !i.is_type_only && !i.specs.is_empty())
+        .filter(|i| {
+            !i.is_type_only
+                && !i.specs.is_empty()
+                && !i
+                    .specs
+                    .iter()
+                    .all(|spec| varn_core::extension_names::is_extension_name(&spec.local))
+        })
         .map(|i| std::sync::Arc::from(i.source.as_ref()))
         .collect()
 }
@@ -202,7 +209,7 @@ pub(crate) fn lower_module(input: LowerInput<'_>) -> Result<Lowered, Failure> {
         program,
         arena,
         &check.bind.interner,
-        tir_import_sources(&tir).iter().map(|s| s.as_ref()),
+        written_import_sources(&tir).iter().map(|s| s.as_ref()),
     )
     .map_err(Failure::internal)?;
     inject_star_reexports(&mut tir, &exports);

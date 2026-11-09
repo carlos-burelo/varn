@@ -65,8 +65,12 @@ impl<'r> super::Binder<'r> {
         } else {
             None
         };
+        let extension_origin = resolved_target
+            .clone()
+            .or_else(|| is_stdlib.then(|| source_str.clone()));
         for exports in relative_exports.iter().chain(stdlib_exports.iter()) {
             self.adopt(&exports.table);
+            self.adopt_extensions(exports, extension_origin.as_deref());
         }
         if let Some(dep) = resolved_target
             .clone()
@@ -228,6 +232,40 @@ impl<'r> super::Binder<'r> {
                 Symbol::new(SymbolKind::Let, local, line)
             };
 
+            self.define(local, sym);
+        }
+    }
+
+    pub(super) fn adopt_extensions(
+        &mut self,
+        exports: &varn_sem::exports::ExportMap,
+        origin: Option<&str>,
+    ) {
+        self.extensions.absorb(&exports.extensions);
+        let origin_atom = origin.map(|o| self.intern_local(o));
+        let mut mangled: Vec<Arc<str>> = [
+            &exports.extensions.methods,
+            &exports.extensions.getters,
+            &exports.extensions.setters,
+        ]
+        .into_iter()
+        .flat_map(|by_type| by_type.values())
+        .flat_map(|members| members.values().cloned())
+        .collect();
+        mangled.sort();
+        mangled.dedup();
+        for name in mangled {
+            let Some(exported) = exports.get(name.as_ref()) else {
+                continue;
+            };
+            let local = self.intern_local(&name);
+            let mut sym = exported.clone();
+            sym.name = local;
+            sym.origin_module = sym.origin_module.or(origin_atom);
+            if let (Some(ty), Some(origin)) = (&mut sym.ty, &sym.origin_module) {
+                let table = &mut *std::sync::Arc::make_mut(&mut self.ty_table);
+                *ty = ty.with_origin(*origin, table);
+            }
             self.define(local, sym);
         }
     }

@@ -54,10 +54,6 @@ pub trait TypeContext {
         None
     }
 
-    fn get_extension_method(&self, _type_name: &str, _method_name: &str) -> Option<Type> {
-        None
-    }
-
     fn resolver(&self) -> Option<&dyn crate::resolver::ImportResolver> {
         None
     }

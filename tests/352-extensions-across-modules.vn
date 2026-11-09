@@ -1,0 +1,17 @@
+import { describe, it, expect } from "std:test";
+import { Meter } from "./helpers/extension_source.vn";
+
+await describe("352 extensions across modules", async () => {
+    await it("an exported extension reaches the module that imports its module", () => {
+        const m = new Meter(4)
+        expect(m.doubled()).toBe(8)
+        expect(m.label).toBe("4m")
+    })
+
+    await it("an exported generic extension reaches any receiver of its type", () => {
+        const names: readonly str[] = ["ann", "bob", "cy"]
+        expect(names.second()).toBe("bob")
+        const none: readonly int[] = [1]
+        expect(none.second()).toBe(null)
+    })
+})

@@ -13,6 +13,33 @@ fn intern_origin(out: &mut ExportMap, s: &str) -> Atom {
 
 fn adopt_exports(out: &mut ExportMap, from: &ExportMap) {
     Arc::make_mut(&mut out.table).absorb(&from.table);
+    out.extensions.absorb(&from.extensions);
+}
+
+fn export_extension(
+    bind: &BindResult,
+    ext: &varn_core::ast::ExtensionDecl,
+    abs_path: &str,
+    out: &mut ExportMap,
+) {
+    let Some(label) = varn_sem::bind::extension_label(
+        ext.target.id,
+        &bind.annotation_types,
+        &bind.ty_table,
+        &bind.interner,
+    ) else {
+        return;
+    };
+    for name in varn_sem::bind::extension_names(ext, &label, &bind.interner) {
+        let Some(sym) = lookup_global(bind, &name.mangled) else {
+            continue;
+        };
+        let mut exported = sym.clone();
+        exported.origin_module = Some(intern_origin(out, abs_path));
+        out.insert(name.mangled.to_string(), exported);
+        out.extensions
+            .record(name.kind, &label, &name.member, &name.mangled);
+    }
 }
 
 fn rehome_to_declaring_module(
@@ -96,6 +123,9 @@ pub(super) fn collect_exports(
                 if let Decl::Namespace(ns) = declaration.as_ref() {
                     let name = bind.interner.resolve(ns.id);
                     crate::namespace_exports::export_declared(bind, name, name, abs_path, out);
+                }
+                if let Decl::Extension(ext) = declaration.as_ref() {
+                    export_extension(bind, ext, abs_path, out);
                 }
                 if let Decl::SumType(st) = declaration.as_ref() {
                     for variant in &st.variants {

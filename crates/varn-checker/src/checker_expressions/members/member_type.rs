@@ -69,6 +69,7 @@ impl<'r> Checker<'r> {
             return self.find_member_info_uncached(&instance, key, bind);
         }
         if res.is_none()
+            && self.owner_lookup_depth == 0
             && let Some(tn) = crate::checker_expressions::check::members::extension_type_name(
                 self,
                 ty,
@@ -251,6 +252,7 @@ impl<'r> Checker<'r> {
             | TypeKind::TypePredicate { .. } => None,
         };
         if res.is_none()
+            && self.owner_lookup_depth == 0
             && let Some(tn) = crate::checker_expressions::check::members::extension_type_name(
                 self,
                 ty,

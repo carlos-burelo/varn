@@ -10,6 +10,49 @@ use varn_core::AtomInterner;
 use varn_sem::output::TypeEntry;
 use varn_tir::{BackendTy, DynReason, Signature, TirFunction, TyTable};
 
+pub(super) fn top_level_extensions<'a>(
+    program: &'a Program,
+    ast_arena: &'a AstArena,
+) -> Vec<(&'a varn_core::ast::ExtensionDecl, bool)> {
+    program
+        .body
+        .iter()
+        .filter_map(|&stmt| {
+            let StmtKind::Decl(d) = &ast_arena.stmt(stmt).kind else {
+                return None;
+            };
+            match d.as_ref() {
+                Decl::Extension(ext) => Some((ext, false)),
+                Decl::Export(varn_core::ast::ExportDecl::Decl { declaration, .. }) => {
+                    match declaration.as_ref() {
+                        Decl::Extension(ext) => Some((ext, true)),
+                        Decl::Variable(_)
+                        | Decl::Function(_)
+                        | Decl::Class(_)
+                        | Decl::Interface(_)
+                        | Decl::TypeAlias(_)
+                        | Decl::Enum(_)
+                        | Decl::Namespace(_)
+                        | Decl::Import(_)
+                        | Decl::Export(_)
+                        | Decl::SumType(_) => None,
+                    }
+                }
+                Decl::Variable(_)
+                | Decl::Function(_)
+                | Decl::Class(_)
+                | Decl::Interface(_)
+                | Decl::TypeAlias(_)
+                | Decl::Enum(_)
+                | Decl::Namespace(_)
+                | Decl::Import(_)
+                | Decl::Export(_)
+                | Decl::SumType(_) => None,
+            }
+        })
+        .collect()
+}
+
 pub(super) fn collect_extension_names(
     program: &Program,
     ast_arena: &AstArena,
@@ -19,13 +62,7 @@ pub(super) fn collect_extension_names(
     table: &varn_sem::types::CheckerTyTable,
 ) {
     use varn_core::ast::ExtensionMember;
-    for &stmt in &program.body {
-        let StmtKind::Decl(d) = &ast_arena.stmt(stmt).kind else {
-            continue;
-        };
-        let Decl::Extension(ext) = d.as_ref() else {
-            continue;
-        };
+    for (ext, _) in top_level_extensions(program, ast_arena) {
         let Some(label) = extension_target_label(&ext.target, annotation_types, table, interner)
         else {
             continue;
@@ -53,14 +90,84 @@ pub(super) fn extension_target_label(
     table: &varn_sem::types::CheckerTyTable,
     interner: &AtomInterner,
 ) -> Option<Arc<str>> {
-    annotation_types
-        .get(&target.id)?
-        .extension_key(table, &|atom| {
-            interner
-                .try_resolve(atom)
-                .or_else(|| table.name(atom))
-                .map(Arc::from)
+    varn_sem::bind::extension_label(target.id, annotation_types, table, interner)
+}
+
+pub(super) fn exported_extension_names(
+    program: &Program,
+    ast_arena: &AstArena,
+    bind: &varn_sem::bind::BindResult,
+) -> Vec<Arc<str>> {
+    let mut out = Vec::new();
+    for (ext, exported) in top_level_extensions(program, ast_arena) {
+        if !exported {
+            continue;
+        }
+        let Some(label) = extension_target_label(
+            &ext.target,
+            &bind.annotation_types,
+            &bind.ty_table,
+            &bind.interner,
+        ) else {
+            continue;
+        };
+        out.extend(
+            varn_sem::bind::extension_names(ext, &label, &bind.interner)
+                .into_iter()
+                .map(|name| name.mangled),
+        );
+    }
+    out
+}
+
+pub(super) fn extension_imports(
+    bind: &varn_sem::bind::BindResult,
+    desugar: &varn_sem::output::Desugarings,
+    declared: &FxHashSet<Arc<str>>,
+) -> Vec<varn_tir::TirImport> {
+    let mut used: Vec<Arc<str>> = desugar
+        .extension_calls
+        .values()
+        .chain(desugar.extension_members.values())
+        .chain(desugar.extension_set_members.values())
+        .filter(|name| !declared.contains(name.as_ref()))
+        .cloned()
+        .collect();
+    used.sort();
+    used.dedup();
+    let mut by_origin: std::collections::BTreeMap<Arc<str>, Vec<Arc<str>>> =
+        std::collections::BTreeMap::new();
+    for name in used {
+        let Some(origin) = bind
+            .interner
+            .get(name.as_ref())
+            .and_then(|atom| bind.scopes.get(bind.global_scope).bindings.get(&atom))
+            .and_then(|&id| bind.arena.get(id).origin_module)
+            .and_then(|atom| {
+                bind.interner
+                    .try_resolve(atom)
+                    .or_else(|| bind.ty_table.name(atom))
+            })
+        else {
+            continue;
+        };
+        by_origin.entry(Arc::from(origin)).or_default().push(name);
+    }
+    by_origin
+        .into_iter()
+        .map(|(source, names)| varn_tir::TirImport {
+            source,
+            is_type_only: false,
+            specs: names
+                .into_iter()
+                .map(|name| varn_tir::TirImportSpec {
+                    local: name.clone(),
+                    kind: varn_tir::TirImportKind::Named(name),
+                    slot: None,
+                })
+                .collect(),
         })
+        .collect()
 }
 
 pub(super) fn emit_extensions(
@@ -73,13 +180,7 @@ pub(super) fn emit_extensions(
     out: &mut Vec<TirFunction>,
 ) {
     use varn_core::ast::ExtensionMember;
-    for &stmt in &program.body {
-        let StmtKind::Decl(d) = &ast_arena.stmt(stmt).kind else {
-            continue;
-        };
-        let Decl::Extension(ext) = d.as_ref() else {
-            continue;
-        };
+    for (ext, _) in top_level_extensions(program, ast_arena) {
         let Some(label) = extension_target_label(
             &ext.target,
             ctx.annotation_types,

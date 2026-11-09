@@ -67,9 +67,10 @@ impl<'r> Checker<'r> {
         }
 
         if let Some(owner) = self.foreign_owner(bind, &name, origin.as_deref()) {
-            return self
-                .find_member_info_uncached(ty, key, &owner)
-                .map(|(t, sym)| (self.reintern_foreign_ty(&owner, t), sym));
+            self.owner_lookup_depth += 1;
+            let found = self.find_member_info_uncached(ty, key, &owner);
+            self.owner_lookup_depth -= 1;
+            return found.map(|(t, sym)| (self.reintern_foreign_ty(&owner, t), sym));
         }
 
         let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();

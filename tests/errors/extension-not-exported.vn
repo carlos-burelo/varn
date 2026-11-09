@@ -1,0 +1,5 @@
+// expect: error[VN3004]
+import { Meter } from "../helpers/extension_source.vn";
+
+const m = new Meter(1)
+m.secret()

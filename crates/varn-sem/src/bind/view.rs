@@ -263,14 +263,4 @@ impl TypeContext for BindView<'_> {
     fn resolver(&self) -> Option<&dyn crate::resolver::ImportResolver> {
         Some(self.resolver)
     }
-
-    fn get_extension_method(&self, type_name: &str, method_name: &str) -> Option<Type> {
-        let mangled = self
-            .bind
-            .extensions
-            .methods
-            .get(type_name)?
-            .get(method_name)?;
-        self.resolve_symbol(mangled)
-    }
 }
