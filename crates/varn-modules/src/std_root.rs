@@ -101,7 +101,7 @@ pub struct TreeModule {
     pub id: String,
     pub path: String,
     pub len: u64,
-    pub modified_nanos: u128,
+    pub content: u64,
 }
 
 pub fn tree_modules(root: &Path) -> Vec<TreeModule> {
@@ -129,16 +129,14 @@ pub fn tree_modules(root: &Path) -> Vec<TreeModule> {
                 .strip_suffix("/mod.vn")
                 .or_else(|| rel.strip_suffix(".vn"))
                 .unwrap_or(&rel);
-            let modified_nanos = meta
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map_or(0, |d| d.as_nanos());
+            let Ok(bytes) = std::fs::read(&p) else {
+                continue;
+            };
             out.push(TreeModule {
                 id: format!("{}{stem}", varn_core::ModuleKind::Stdlib.prefix()),
                 path: rel.clone(),
                 len: meta.len(),
-                modified_nanos,
+                content: varn_core::fingerprint::fingerprint(&bytes),
             });
         }
     }

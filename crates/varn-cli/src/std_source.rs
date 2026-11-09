@@ -69,7 +69,7 @@ fn tree_stamp(root: &Path) -> u64 {
     for m in std_root::tree_modules(root) {
         stamp.extend_from_slice(m.path.as_bytes());
         stamp.extend_from_slice(&m.len.to_le_bytes());
-        stamp.extend_from_slice(&m.modified_nanos.to_le_bytes());
+        stamp.extend_from_slice(&m.content.to_le_bytes());
     }
     varn_core::fingerprint::fingerprint(&stamp)
 }

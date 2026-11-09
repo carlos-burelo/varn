@@ -109,3 +109,26 @@ fn a_std_change_three_imports_away_invalidates_every_cached_interface() {
     std_chain(&project, "export function value(): str { return \"x\" }\n");
     assert_rejected(&project.run("main.vn"), "VN3001");
 }
+
+#[test]
+fn a_std_file_rewritten_with_the_same_length_and_time_is_still_seen() {
+    let project = Project::new("std-same-stamp");
+    std_chain(&project, "export function value(): int { return 100 }\n");
+    assert_ok(&project.run("main.vn"), "100");
+
+    let c = project.root.join("std").join("zz_c.vn");
+    let before = std::fs::metadata(&c)
+        .and_then(|m| m.modified())
+        .expect("mtime");
+    std_chain(&project, "export function value(): str { return \"a\" }\n");
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(&c)
+        .and_then(|file| file.set_modified(before))
+        .expect("restore mtime");
+    assert_eq!(
+        std::fs::metadata(&c).expect("metadata").len(),
+        "export function value(): int { return 100 }\n".len() as u64
+    );
+    assert_rejected(&project.run("main.vn"), "VN3001");
+}
