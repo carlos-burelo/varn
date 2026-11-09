@@ -1,0 +1,5 @@
+// expect: error[VN3005]
+struct Counter {
+    n: int
+    bump(): void { this.n = this.n + 1 }
+}

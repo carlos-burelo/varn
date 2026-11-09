@@ -23,6 +23,7 @@ mod expr_special;
 mod expr_template;
 mod expr_try;
 mod expr_update;
+mod expr_value_update;
 mod field_access;
 mod finally_splice;
 mod loop_labels;

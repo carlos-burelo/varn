@@ -218,6 +218,9 @@ impl<'a> FnEmitter<'a> {
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
+        if self.is_value_field_place(target) {
+            return self.lower_value_field_assign(op, target, value, span);
+        }
         if let Some(assigned) = self.lower_accessor_assign(op, target, value.clone(), span) {
             return assigned;
         }
@@ -231,24 +234,7 @@ impl<'a> FnEmitter<'a> {
         let v = self.assign_value(value);
         let declared = self.expr_ty(target);
         let v = self.as_assigned(op, v, declared);
-        let rhs = match assign_bin_op(op) {
-            Ok(None) => v,
-            Ok(Some(bop)) => {
-                let (lhs, rhs, nty) = self.coerce_binary_operands(bop, t.clone(), v, t.ty);
-                TirExpr {
-                    kind: TirExprKind::Binary {
-                        op: bop,
-                        lhs: Box::new(lhs),
-                        rhs: Box::new(rhs),
-                    },
-                    ty: nty,
-                    res: Resolution::None,
-                    span,
-                }
-            }
-
-            Err(()) => self.lower_logical_assign(op, t.clone(), v, span),
-        };
+        let rhs = self.assigned_rhs(op, t.clone(), v, span);
         let rhs = self.guard_dynamic(rhs, t.ty);
         TirExpr {
             kind: TirExprKind::Assign {
@@ -261,7 +247,34 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
-    fn as_assigned(&self, op: AssignOp, value: TirExpr, place: BackendTy) -> TirExpr {
+    pub(super) fn assigned_rhs(
+        &mut self,
+        op: AssignOp,
+        current: TirExpr,
+        v: TirExpr,
+        span: Span,
+    ) -> TirExpr {
+        match assign_bin_op(op) {
+            Ok(None) => v,
+            Ok(Some(bop)) => {
+                let node_ty = current.ty;
+                let (lhs, rhs, nty) = self.coerce_binary_operands(bop, current, v, node_ty);
+                TirExpr {
+                    kind: TirExprKind::Binary {
+                        op: bop,
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                    },
+                    ty: nty,
+                    res: Resolution::None,
+                    span,
+                }
+            }
+            Err(()) => self.lower_logical_assign(op, current, v, span),
+        }
+    }
+
+    pub(super) fn as_assigned(&self, op: AssignOp, value: TirExpr, place: BackendTy) -> TirExpr {
         match assign_bin_op(op) {
             Ok(Some(_)) => value,
             Ok(None) | Err(()) => self.widened(value, place),

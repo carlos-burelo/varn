@@ -118,6 +118,17 @@ impl<'a> FnEmitter<'a> {
                 given.push((name, self.lower_expr(*value)));
             }
         }
+        self.value_with_given(class, source, given, ty, span)
+    }
+
+    pub(super) fn value_with_given(
+        &mut self,
+        class: varn_tir::ClassId,
+        source: TirExpr,
+        mut given: Vec<(Arc<str>, TirExpr)>,
+        ty: BackendTy,
+        span: Span,
+    ) -> TirExpr {
         let fields: Vec<(Arc<str>, BackendTy)> = self.m.classes[class.0 as usize]
             .fields
             .iter()

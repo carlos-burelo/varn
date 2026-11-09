@@ -106,10 +106,11 @@ impl<'a> FnEmitter<'a> {
         prefix: bool,
         span: Span,
     ) -> TirExpr {
-        self.place_target = true;
+        let value_field = self.is_value_field_place(operand);
+        self.place_target = !value_field;
         let t = self.lower_expr(operand);
         self.place_target = false;
-        let t = self.pin_place(t);
+        let t = if value_field { t } else { self.pin_place(t) };
         let bop = match op {
             UpdateOp::Increment => TirBinOp::Add,
             UpdateOp::Decrement => TirBinOp::Sub,
@@ -136,6 +137,11 @@ impl<'a> FnEmitter<'a> {
             res: Resolution::None,
             span,
         };
+        if value_field {
+            let stepped = self.pin(stepped);
+            self.store_value_field(operand, stepped.clone(), span);
+            return if prefix { stepped } else { old };
+        }
         let assign = TirExpr {
             kind: TirExprKind::Assign {
                 target: Box::new(t),

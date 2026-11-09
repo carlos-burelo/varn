@@ -20,6 +20,7 @@ mod operator_capability;
 mod ops;
 mod pattern_cover;
 mod pattern_matrix;
+mod value_update;
 
 use crate::checker::recorder::Recorder;
 use crate::checker::Checker;

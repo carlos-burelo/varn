@@ -1,0 +1,4 @@
+// expect: error[VN3005]
+type Pt = { x: int; y: int }
+function make(): Pt { return { x: 1, y: 2 } }
+make().x = 5

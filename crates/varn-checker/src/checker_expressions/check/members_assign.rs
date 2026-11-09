@@ -86,12 +86,15 @@ impl<'r> Checker<'r> {
                 .insert(target_range.start.offset, mangled.clone());
         }
         self.check_accessor_side(&obj_ty, prop_name, true, &target_range, bind);
+        if self.plan_value_update(rec, target, bind) {
+            return;
+        }
         let record_field = matches!(self.ty_table.get(non_null.0), TypeKind::Record(_));
         if record_field {
             self.emit(
                 Diagnostic::error(
                     ErrorCode::NotAssignable,
-                    format!("cannot assign to field '{prop_name}' of a record: records are immutable, use `with`"),
+                    format!("cannot assign to field '{prop_name}' of a record through an optional chain: use `with`"),
                 )
                 .with_range(target_range),
             );

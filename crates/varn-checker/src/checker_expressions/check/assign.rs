@@ -270,6 +270,7 @@ impl<'r> Checker<'r> {
         let arena = self.ast_arena;
         self.check_expr(rec, operand, bind);
         self.require_number(rec, operand, "'++' and '--'", bind);
+        self.plan_value_update(rec, operand, bind);
         if self.pure_scope.is_some() {
             let range = arena.expr(operand).range;
             match &arena.expr(operand).kind {

@@ -1,0 +1,4 @@
+// expect: error[VN3005]
+type Pt = { readonly x: int; y: int }
+let p: Pt = { x: 1, y: 2 }
+p.x = 5
