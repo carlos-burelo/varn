@@ -9,7 +9,7 @@ El sistema de tipos conflate naturalezas distintas bajo un mismo símbolo, y cad
 - `TypeKind::Object` significa a la vez el tipo anotado `{x:int}`, el tipo inferido de un literal y una interfaz genérica ya expandida. Aceptar clase → interfaz pero no clase → `{x:int}` es imposible de expresar.
 - El record es una bolsa mutable con identidad; la tupla y el struct son valores inmutables. Tres productos con tres semánticas.
 - `Map<float,V>`, `Map<{x:int},V>` y `Map<Clase,V>` compilan sin restricción de clave; la VM decide en runtime cómo hashear (`varn-vm/src/exec/hashable_keys.rs`): una decisión dinámica sobre un hecho estático (Leyes 6 y 17).
-- Los accesos a miembros de records e interfaces van por nombre (`Resolution::ByName`, `DynReason::{Shape, Interface}`): medido 2,5× más lento que un slot fijo.
+- Los accesos a miembros de records e interfaces van por nombre (`Resolution::ByName`, `DynReason::{Shape, Interface}`). Medido el 2026-11-09 (§12): con la caché en línea, una lectura de record cuesta lo mismo que la de un campo de clase o struct, y la de interfaz solo es más lenta en el intérprete.
 - La invariancia se decide en ocho sitios con `arrays::same_element` en lugar de usar una única relación de equivalencia (§4).
 - Hay dos o tres formas de decir lo mismo: `==` y `===`, `switch` y `match`, `instanceof` e `is`, `{[k:str]:V}` y `Map<str,V>`, spread con sobrescritura y `with`.
 
@@ -54,7 +54,7 @@ Todos los productos comparten semántica: inmutables, `with`, desestructuración
 - **Record**: nombres de campo, anónimo, **estructural y cerrado**. Dos records son el mismo tipo si tienen exactamente los mismos campos con tipos idénticos. Sin subtipado por ancho ni por profundidad. Un record no tiene métodos propios; el comportamiento va en `extension`.
 - **Struct**: nombrado, nominal, puede tener métodos, genéricos e `implements`.
 
-Layout canónico de record y tupla: campos en orden alfabético / posicional (Ley 4), **decidido en el backend** al fijar la forma (etapa 6), no en el id del tipo: ordenar los campos en el tipo cambiaba el texto de los mensajes. La comprobación de tipos de un record es independiente del orden. Todo record con los mismos campos comparte forma y offsets. Al ser inmutable, su representación (inline o en heap) es una decisión del compilador y se comparte sin copiar.
+La comprobación de tipos de un record, su igualdad y su hash son independientes del orden de los campos: `{ x: 1, y: 2 } == { y: 2, x: 1 }`. La igualdad compara campo a campo y el hash suma los hashes de cada par nombre-valor, una operación conmutativa; no hace falta un layout canónico para ello. Al ser inmutable, su representación es una decisión del compilador y se comparte sin copiar.
 
 Un **literal** de record puede omitir los campos opcionales del tipo esperado (`{ retries: 3 }` donde se pide `{ retries: int; verbose?: bool }`). Es una regla del literal, que se comprueba contra el tipo esperado, y no de la asignabilidad entre records: dos tipos record son asignables solo si tienen los mismos campos con la misma opcionalidad y tipos equivalentes, en cualquier orden. Una variable `{ retries: int }` no pasa a `{ retries: int; verbose?: bool }`. No hay conversión ni copia implícita (§4.3, Ley 17).
 
@@ -77,7 +77,7 @@ Vistas de solo lectura (`readonly T[]`, `ReadonlyMap<K,V>`, `ReadonlySet<T>`): c
 
 Una propiedad de interfaz es de **solo lectura salvo que se declare `mut`**. Es un contrato de lo que el consumidor puede hacer: sin `mut`, un miembro más estrecho en el implementador (un campo `Dog` donde la interfaz pide `Animal`) es seguro y se acepta (covarianza); con `mut` el consumidor puede escribir, y la propiedad es invariante. `readonly` dentro de una `interface` es un error; `mut` sobre un método también.
 
-Acceso a un miembro de interfaz: selector estable (hash de nombre y firma), tabla por clase y caché en línea. La lectura sale tipada, porque el tipo del miembro es el mismo para todo implementador.
+Acceso a un miembro de interfaz: caché en línea por sitio, como `invokeinterface` de Java y el despacho de interfaces de C#. La lectura sale tipada, porque el tipo del miembro es el mismo para todo implementador. Un selector estable con tabla por clase (el itab de Go) exige un valor de interfaz de dos palabras (dato y tabla); la VM tiene un valor de una palabra y la medición no justifica ese cambio (§12).
 
 `interface` solo define contratos. `type` solo define alias transparentes: `type X = T` hace que `X` y `T` sean el mismo tipo; un alias nunca crea un tipo ni cambia su naturaleza.
 
@@ -88,8 +88,8 @@ Capacidad estática calculada una sola vez por el checker y transportada por el 
 | Hashable | No Hashable |
 |---|---|
 | `int`, `float`, `bool`, `char`, `str`, `bigint`, `decimal` | arrays, Map, Set (contenido mutable) |
-| tuplas, structs y enums cuyos miembros (payloads) son Hashable | funciones |
-| **clases, por identidad** | records, hasta que la etapa 6 les dé forma canónica |
+| tuplas, structs, **records** y enums cuyos miembros (payloads) son Hashable | funciones |
+| **clases, por identidad** | una tupla, struct o record con un campo de los anteriores |
 
 La igualdad de una clave `float` es `SameValueZero`: NaN es la misma clave que NaN y `-0.0` la misma que `0.0`, normalizado al entrar en la colección. Un enum es Hashable solo si lo son todos los payloads de todas sus variantes: `Result<int, str>` lo es y `Result<int[], str>` no. Una clase como clave es segura porque la identidad no cambia al mutar el objeto, y su igualdad es `sameValue`, la misma identidad con la que es clave; sus métodos `hash` y `equals` no intervienen. `Map<T[], V>` y similares son un error de compilación (`VN3037`) con diagnóstico que indica la alternativa. El código genérico escribe `K extends Hashable`. No hay `IdentityMap`.
 
@@ -230,7 +230,7 @@ import { a } from "std:test"    export    namespace N { }
 | repetir un campo explícito, o explícito más spread, en un literal | `with` (comprueba que el campo exista y conserva el tipo) |
 | mutar un record o struct a través de un alias | `place.campo = v` reescrito a `place = place with { campo: v }` sobre `let`, `var`, parámetro, campo de clase o elemento; `const` es profundo |
 | `TypeKind::Object` unificado | `Record` e `Interface`, cada uno con su payload |
-| `DynReason::{Shape, Interface}`, `Resolution::ByName` para estos casos | forma canónica y selector |
+| ~~`DynReason::{Shape, Interface}`, `Resolution::ByName` para estos casos~~ | retirado: no hay ganancia medida (§12) |
 | `arrays::same_element` repetido en ocho sitios | una única función de equivalencia (§4.1) |
 | `Hashable { hash(): int }` de `core:capabilities` y el despacho de `hash`/`equals` en la VM | `Hashable` calculado por el compilador (§3.4) |
 | un record asignable a otro por añadir campos opcionales | omisión de campos opcionales solo en el literal (§3.1) |
@@ -250,8 +250,8 @@ import { a } from "std:test"    export    namespace N { }
 3. **HECHA** (`91558975`, `e61c69ce`, `5c78dc2e`). **Record inmutable**: error al mutar un campo de record (`VN3005`); un literal no repite un campo (`VN3035`); separadores `;` en tipos. Medido antes: 7 sitios en 3 tests y 1 en `std`.
 4. **HECHA salvo el diccionario**. `===`/`!==` (859 usos migrados), `instanceof` → `is` (93), `typeof` valor → `x::type` (58), `switch` → `match` (1 test). Por el camino: `is` ya no responde «verdadero» a tipos que no sabe probar (`VN3036`) y `continue` dentro de un `match` ya ejecuta el paso del `for`. Pendiente: dict `{[k:str]:V}` → `Map<str,V>` (130 usos).
 5. **PARCIAL** (`ed009cb0`..`e3e01334`, `c2db6040`, `92c9215b`). **Clave estática para Map y Set**: `Hashable` es una restricción intrínseca que calcula el compilador. `Map<K extends Hashable, V>` y `Set<T extends Hashable>` rechazan con `VN3037` lo que no lo es; el código genérico escribe `K extends Hashable`. Son Hashable: `int`, `float` (`SameValueZero`), `bool`, `char`, `str`, `bigint`, `decimal`, enums, clases (por identidad) y tuplas o structs de ellos. El literal `{ k: v }` con un `Map` esperado construye ese Map. La capacidad `Hashable { hash(): int }` de `core:capabilities` se borró, y la VM ya no invoca `hash` ni `equals` de una clase: una clase es clave por su identidad, nunca por sus métodos. **Los records no son Hashable todavía**: la VM los compara y hashea por identidad, y lo serán cuando la etapa 6 les dé forma canónica. Pendiente: que la VM deje de decidir en runtime la representación de la clave (`map_keys.rs`), `new Map(entradas)` / `new Set(elementos)`, `readonly T[]` y las vistas.
-6. **TIR y emisor**: forma canónica del record, `Resolution::ShapeSlot`, selector de interfaz; borrar `ByName` y `DynReason::{Shape, Interface}`.
-7. **Borde dinámico**: `CONFORM`/`DECODE` y natives entregan forma canónica.
+6. **RETIRADA** (2026-11-09, §12). Forma canónica del record, `Resolution::ShapeSlot` y selector de interfaz: la medición no muestra ganancia (Ley 10) y el selector exigiría un valor de interfaz de dos palabras. Lo que sí tenía valor semántico, que el record sea un valor completo, se hizo sin layout: `==`, `!=`, clave de `Map` y de `Set`, y búsqueda en arrays por valor.
+7. **RETIRADA** (2026-11-09). `CONFORM`/`DECODE` entregando forma canónica dependía de la etapa 6.
 8. **HECHA.** Extensiones sobre records.
 9. **HECHA** (enmienda, §11). Coma en tipos, spread entre fuentes, actualización de campo de valor por su lugar, `float` como clave, literal de `Map`.
 10. **HECHA** (`543c2ee7`). Vistas de solo lectura: `readonly T[]` (`ReadonlyArray<T>`), `ReadonlyMap<K, out V>`, `ReadonlySet<T>`. Una colección es asignable a su vista y no al revés; la vista no tiene `push`, `set` ni `add`; baja al tipo del backend de su colección. Una vista devuelve vistas, por lo que su covarianza es sólida.
@@ -262,7 +262,7 @@ import { a } from "std:test"    export    namespace N { }
 - Corpus completo en los tres niveles (`verify.ps1`): `FAILED: 0`.
 - Un test negativo por cada prohibición de §3, §4 y §6.
 - `vn debug -p bytecode tests/main.vn`: `GetProperty` por nombre sobre records e interfaces cae a ~0. Línea base: 1348 `GetProperty` frente a 1821 `GetFixedField`.
-- Microbench de lectura sobre record e interfaz ≈ lectura sobre clase (hoy ≈ 2,5× más lenta).
+- Microbench de lectura sobre record e interfaz (§12): record ≈ clase; la interfaz solo es más lenta en el intérprete.
 - Antes de la etapa 3, medir en el corpus cuántos sitios mutan un campo de record.
 
 ## 11. Enmienda (Leyes 20 y 21): cómo lo habría hecho Anders sin retrocompatibilidad
@@ -280,6 +280,21 @@ Criterio: TypeScript es el puente de sintaxis, no el modelo de semántica. Varn 
 | `===`, `switch`, `instanceof`, `typeof` como valor | Se mantienen las sustituciones (`==` estricto, `match`, `is`, `x::type`) | Decisión del propietario: Varn no reconstruye TypeScript. `==` no coacciona, así que no hay dos significados; `match` exhaustivo sustituye a `switch` con más poder; `is` cubre `instanceof` y los tipos que no son clases |
 | Tuplas con paréntesis | Se mantienen | Es la sintaxis de C#, Kotlin y Swift |
 | Uniones `A \| B` | Siguen fuera de alcance, y son el siguiente ADR | La Ley 20 pide conservarlas y resolverlas en compilación: unión anónima con etiqueta insertada por el compilador (Rust, Swift) y estrechamiento estático, sin `DynReason::Union` |
+
+## 12. Medición que retira la etapa 6 (2026-11-09)
+
+Lectura de campo en un bucle de 30 millones de iteraciones (perfil `quick`; una clase, un struct, un record y una interfaz implementada por la clase):
+
+| Acceso | JIT | Intérprete |
+|---|---|---|
+| clase (2 lecturas) | 20 a 46 ms | 908 a 1119 ms |
+| struct (2 lecturas) | 14 ms | 1241 ms |
+| record (2 lecturas) | 13 a 20 ms | 1028 a 1243 ms |
+| interfaz (1 lectura) | 52 ms | 2462 ms |
+
+Con seis millones de lecturas a través de una función, el record con un orden de campos o con dos cuesta 51 y 49 ms con JIT y 609 y 659 ms en el intérprete; la interfaz con una, dos o tres clases, 36 a 38 ms con JIT. La caché en línea ya deja el acceso de un record al nivel de uno de clase y la polimorfia apenas se nota. La etapa 6 prometía un 2,5× que no existe para records. Solo la lectura de interfaz en el intérprete es unas 2,7 veces más lenta, y el JIT, que es el camino de producción, la iguala.
+
+Conclusión conforme a la Ley 10: sin ganancia medible no se justifica cambiar la representación del record ni el valor de interfaz. Lo que el record necesitaba era ser un valor de verdad, y eso no depende del layout.
 
 ## 10. Puntos que aún requieren comprobación
 
