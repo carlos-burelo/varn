@@ -1,0 +1,20 @@
+import { describe, it, expect } from "std:test";
+
+type WithCommas = { x: int, y: int }
+type WithSemicolons = { x: int; y: int }
+type Mixed = { x: int, y: int; z: int }
+type Lines = {
+    x: int
+    y: int
+}
+
+await describe("345 type member separators", async () => {
+    await it("commas, semicolons and line breaks separate the members of a record type", () => {
+        const a: WithCommas = { x: 1, y: 2 }
+        const b: WithSemicolons = a
+        const c: Lines = b
+        const d: Mixed = { x: 1, y: 2, z: 3 }
+        expect(c.x + c.y).toBe(3)
+        expect(d.z).toBe(3)
+    })
+})

@@ -333,6 +333,7 @@ import "./341-map-and-set-keys.vn"
 import "./342-record-optional-fields.vn"
 import "./343-extension-targets.vn"
 import "./344-collection-constructors.vn"
+import "./345-type-member-separators.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {
