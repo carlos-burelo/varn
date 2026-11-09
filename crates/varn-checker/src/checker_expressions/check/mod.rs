@@ -157,11 +157,15 @@ impl<'r> Checker<'r> {
                         })
                     }
                     varn_core::ast::LogicalOp::Or => {
+                        let expected = self.fallback_expected(rec, left, right, bind);
                         self.in_branch(rec, left, bind, false, |c, rec| {
-                            c.check_expr(rec, right, bind)
+                            c.with_expected(expected, |c| c.check_expr(rec, right, bind))
                         })
                     }
-                    varn_core::ast::LogicalOp::Nullish => self.check_expr(rec, right, bind),
+                    varn_core::ast::LogicalOp::Nullish => {
+                        let expected = self.fallback_expected(rec, left, right, bind);
+                        self.with_expected(expected, |c| c.check_expr(rec, right, bind))
+                    }
                 }
             }
             ExprKind::Assign { target, value, op } => {

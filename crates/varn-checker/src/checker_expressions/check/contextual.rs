@@ -38,6 +38,21 @@ impl<'r> Checker<'r> {
         }
     }
 
+    pub(crate) fn fallback_expected(
+        &mut self,
+        rec: &mut Recorder,
+        left: ExprId,
+        right: ExprId,
+        bind: &BindResult,
+    ) -> Option<Type> {
+        if let Some(given) = self.expected_for(right) {
+            return Some(given);
+        }
+        let present = self.infer_type(rec, left, bind);
+        let present = present.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+        (!present.is_unresolved()).then_some(present)
+    }
+
     pub(crate) fn expected_for(&self, expr: ExprId) -> Option<Type> {
         self.expected_type.filter(|_| {
             self.expected_owner == Some(expr.index())

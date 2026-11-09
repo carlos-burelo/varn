@@ -1,0 +1,4 @@
+// expect: error[VN3001]
+const absent: Map<str, int>? = null
+const counts = absent ?? new Map()
+counts.set(1, 2)

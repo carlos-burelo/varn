@@ -34,4 +34,17 @@ await describe("344 collection constructors", async () => {
         expect(none.size).toBe(0)
         expect(nothing.size).toBe(0)
     })
+
+    await it("the right side of ?? and || takes the type of the left side", () => {
+        const absent: Map<str, int>? = null
+        const counts = absent ?? new Map()
+        counts.set("a", 1)
+        expect(counts.get("a")).toBe(1)
+        const none: Set<int>? = null
+        const seen = none || new Set()
+        seen.add(2)
+        expect(seen.has(2)).toBe(true)
+        const present: Map<str, int>? = new Map([("k", 7)])
+        expect((present ?? new Map()).get("k")).toBe(7)
+    })
 })
