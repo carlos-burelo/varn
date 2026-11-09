@@ -27,37 +27,81 @@ pub(super) fn cache_fingerprint(source: &str) -> u64 {
     varn_core::fingerprint::fingerprint(source.as_bytes())
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
-struct CachedInterfaceEnvelope {
-    interface: Vec<u8>,
-    dep_hashes: Vec<(String, u64)>,
+fn cache_dir_of(resolver: &super::super::module_resolver::ModuleResolver) -> PathBuf {
+    get_cache_dir(resolver)
 }
 
-fn dep_source_fingerprint(dep: &str) -> Option<u64> {
-    let text = varn_modules::loader::read_module_text(dep).ok()?;
-    Some(varn_core::fingerprint::fingerprint(text.as_bytes()))
-}
-
-fn dependency_closure_hashes(
+fn read_manifest(
     resolver: &super::super::module_resolver::ModuleResolver,
-    bind: &BindResult,
-) -> Option<Vec<(String, u64)>> {
-    use varn_sem::resolver::ImportResolver;
-    let mut hashes: std::collections::BTreeMap<String, u64> = std::collections::BTreeMap::new();
-    let mut pending: Vec<String> = bind.deps.iter().map(ToString::to_string).collect();
-    while let Some(dep) = pending.pop() {
-        if hashes.contains_key(&dep) {
-            continue;
-        }
-        hashes.insert(dep.clone(), dep_source_fingerprint(&dep)?);
-        let dep_bind = if varn_binder::paths::is_known_module(&dep) {
-            resolver.stdlib_bind(&dep)
-        } else {
-            resolver.module_bind(&dep)
-        }?;
-        pending.extend(dep_bind.deps.iter().map(ToString::to_string));
+    virtual_id: &str,
+    source_digest: u64,
+) -> Option<Vec<String>> {
+    let payload = varn_modules::artifact::read_module_artifact(
+        &cache_dir_of(resolver),
+        varn_modules::artifact::ArtifactKind::ImportManifest,
+        &cache_module_id(virtual_id),
+        source_digest,
+    )?;
+    postcard::from_bytes(&payload).ok()
+}
+
+fn write_manifest(
+    resolver: &super::super::module_resolver::ModuleResolver,
+    virtual_id: &str,
+    source_digest: u64,
+    deps: &[String],
+) {
+    if let Ok(payload) = postcard::to_allocvec(deps) {
+        varn_modules::artifact::write_module_artifact(
+            &cache_dir_of(resolver),
+            varn_modules::artifact::ArtifactKind::ImportManifest,
+            &cache_module_id(virtual_id),
+            source_digest,
+            &payload,
+        );
     }
-    Some(hashes.into_iter().collect())
+}
+
+fn dependency_digest(
+    resolver: &super::super::module_resolver::ModuleResolver,
+    dep: &str,
+    visiting: &mut Vec<String>,
+) -> Option<u64> {
+    if varn_core::ModuleKind::Core.owns(dep) || varn_core::ModuleKind::Runtime.owns(dep) {
+        return Some(0);
+    }
+    let image = varn_modules::provider::get().map_or(0, |p| p.image_identity());
+    if image != 0 && varn_core::ModuleKind::Stdlib.owns(dep) {
+        return Some(image);
+    }
+    if visiting.iter().any(|open| open == dep) {
+        return Some(0);
+    }
+    let text = varn_modules::loader::read_module_text(dep).ok()?;
+    let digest = cache_fingerprint(&text);
+    let deps = read_manifest(resolver, dep, digest)?;
+    visiting.push(dep.to_owned());
+    let key = interface_key(resolver, digest, &deps, visiting);
+    visiting.pop();
+    key
+}
+
+fn interface_key(
+    resolver: &super::super::module_resolver::ModuleResolver,
+    source_digest: u64,
+    deps: &[String],
+    visiting: &mut Vec<String>,
+) -> Option<u64> {
+    let mut sorted = deps.to_vec();
+    sorted.sort();
+    sorted.dedup();
+    let mut stamp = source_digest.to_le_bytes().to_vec();
+    for dep in sorted {
+        let digest = dependency_digest(resolver, &dep, visiting)?;
+        stamp.extend_from_slice(dep.as_bytes());
+        stamp.extend_from_slice(&digest.to_le_bytes());
+    }
+    Some(varn_core::fingerprint::fingerprint(&stamp))
 }
 
 pub(crate) fn try_load_cache(
@@ -68,23 +112,17 @@ pub(crate) fn try_load_cache(
     if !has_portable_interface(virtual_id) {
         return None;
     }
-    let id = cache_module_id(virtual_id);
-    let fingerprint = cache_fingerprint(source);
-    let payload = varn_modules::artifact::read_module_artifact(
-        &get_cache_dir(resolver),
+    let digest = cache_fingerprint(source);
+    let deps = read_manifest(resolver, virtual_id, digest)?;
+    let key = interface_key(resolver, digest, &deps, &mut vec![virtual_id.to_owned()])?;
+    let interface = varn_modules::artifact::read_module_artifact(
+        &cache_dir_of(resolver),
         varn_modules::artifact::ArtifactKind::CheckerInterface,
-        &id,
-        fingerprint,
+        &cache_module_id(virtual_id),
+        key,
     )?;
-    let envelope: CachedInterfaceEnvelope = postcard::from_bytes(&payload).ok()?;
-    for (dep, saved_hash) in &envelope.dep_hashes {
-        if dep_source_fingerprint(dep) != Some(*saved_hash) {
-            return None;
-        }
-    }
-    adopt_interface(resolver, virtual_id, &envelope.interface)
+    adopt_interface(resolver, virtual_id, &interface)
 }
-
 pub(crate) fn adopt_interface(
     resolver: &super::super::module_resolver::ModuleResolver,
     virtual_id: &str,
@@ -137,27 +175,30 @@ pub(crate) fn save_to_cache(
     exports: &ExportMap,
     bind: &BindResult,
 ) {
+    use varn_sem::resolver::ImportResolver;
     if !has_portable_interface(virtual_id) {
         return;
     }
-    let id = cache_module_id(virtual_id);
-    let fingerprint = cache_fingerprint(source);
-    if let Ok(payload) = serialize_module_interface(exports, bind) {
-        let Some(dep_hashes) = dependency_closure_hashes(resolver, bind) else {
-            return;
-        };
-        let envelope = CachedInterfaceEnvelope {
-            interface: payload,
-            dep_hashes,
-        };
-        if let Ok(wrapped) = postcard::to_allocvec(&envelope) {
-            varn_modules::artifact::write_module_artifact(
-                &get_cache_dir(resolver),
-                varn_modules::artifact::ArtifactKind::CheckerInterface,
-                &id,
-                fingerprint,
-                &wrapped,
-            );
+    let digest = cache_fingerprint(source);
+    let deps: Vec<String> = bind.deps.iter().map(ToString::to_string).collect();
+    for dep in &deps {
+        if varn_core::ModuleKind::of(dep).is_none() {
+            let _ = resolver.module_bind(dep);
+        } else if varn_core::ModuleKind::Stdlib.owns(dep) {
+            let _ = resolver.stdlib_bind(dep);
         }
+    }
+    write_manifest(resolver, virtual_id, digest, &deps);
+    let Some(key) = interface_key(resolver, digest, &deps, &mut vec![virtual_id.to_owned()]) else {
+        return;
+    };
+    if let Ok(interface) = serialize_module_interface(exports, bind) {
+        varn_modules::artifact::write_module_artifact(
+            &cache_dir_of(resolver),
+            varn_modules::artifact::ArtifactKind::CheckerInterface,
+            &cache_module_id(virtual_id),
+            key,
+            &interface,
+        );
     }
 }
