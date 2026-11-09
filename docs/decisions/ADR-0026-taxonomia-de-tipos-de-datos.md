@@ -1,6 +1,6 @@
 # ADR-0026 — Taxonomía de los tipos de datos
 
-Estado: APROBADO EN DISEÑO (2026-11-07). Etapas 1, 2 y 3 implementadas; la 4 salvo el diccionario; la 5 en parte (restricción `Hashable` y clases por identidad, sin records); 6 a 8 pendientes (§8).
+Estado: APROBADO EN DISEÑO (2026-11-07), ENMENDADO (2026-11-09) bajo las Leyes 20 y 21 (§11). Etapas 1 a 4 implementadas, incluido el diccionario; la 5 en parte (`Hashable`, claves `float`, literal de `Map`; faltan `readonly T[]` y las vistas); 6 y 7 pendientes (§8); 8 hecha.
 
 ## 1. Problema
 
@@ -87,12 +87,11 @@ Capacidad estática calculada una sola vez por el checker y transportada por el 
 
 | Hashable | No Hashable |
 |---|---|
-| `int`, `bool`, `char`, `str`, `bigint`, `decimal` | `float` (NaN ≠ NaN, `0.0` ≡ `-0.0`) |
-| tuplas, structs y enums cuyos miembros (payloads) son Hashable | arrays, Map, Set (contenido mutable) |
-| **clases, por identidad** | funciones |
-| | records, hasta que la etapa 6 les dé forma canónica |
+| `int`, `float`, `bool`, `char`, `str`, `bigint`, `decimal` | arrays, Map, Set (contenido mutable) |
+| tuplas, structs y enums cuyos miembros (payloads) son Hashable | funciones |
+| **clases, por identidad** | records, hasta que la etapa 6 les dé forma canónica |
 
-Un enum es Hashable solo si lo son todos los payloads de todas sus variantes: `Result<int, str>` lo es y `Result<float, str>` no. Una clase como clave es segura porque la identidad no cambia al mutar el objeto, y su igualdad es `sameValue`, la misma identidad con la que es clave; sus métodos `hash` y `equals` no intervienen. `Map<float, V>`, `Map<T[], V>` y similares son un error de compilación (`VN3037`) con diagnóstico que indica la alternativa. El código genérico escribe `K extends Hashable`. No hay `IdentityMap`.
+La igualdad de una clave `float` es `SameValueZero`: NaN es la misma clave que NaN y `-0.0` la misma que `0.0`, normalizado al entrar en la colección. Un enum es Hashable solo si lo son todos los payloads de todas sus variantes: `Result<int, str>` lo es y `Result<int[], str>` no. Una clase como clave es segura porque la identidad no cambia al mutar el objeto, y su igualdad es `sameValue`, la misma identidad con la que es clave; sus métodos `hash` y `equals` no intervienen. `Map<T[], V>` y similares son un error de compilación (`VN3037`) con diagnóstico que indica la alternativa. El código genérico escribe `K extends Hashable`. No hay `IdentityMap`.
 
 ## 4. Relaciones entre tipos (una por pregunta)
 
@@ -113,7 +112,7 @@ Los productores de records (literales, `CONFORM`/`DECODE` del borde dinámico, n
 `✚` nuevo. `✎` cambia. Sin marca: ya existe y no cambia.
 
 ### 5.1 Separadores
-- Miembros de una declaración de tipo (`interface`, `struct`, `class`, tipo `{...}`): `;` o salto de línea. ✎ el tipo `{ x: int, y: int }` con coma deja de aceptarse.
+- Miembros de una declaración de tipo (`interface`, `struct`, `class`, tipo `{...}`): `;`, `,` o salto de línea; el separador es léxico y no cambia el significado.
 - Valores (literales, tuplas, argumentos, patrones): `,`.
 
 ### 5.2 Enlaces y ausencia
@@ -134,10 +133,12 @@ t[0]
 type User = { id: int; name: str; email?: str; age: int? }          ✎ inmutable
 const u: User = { id: 1, name: "Ana" }
 const v = u with { name: "Eva" }
-const w = { ...u, ...extra }                                         ✎ repetir un campo es error
+const w = { ...defaults, ...extra }                                  ✎ entre spreads gana el último
 const { id, name: nombre, ...rest } = u
 const r = { id, name }
-u.name = "x"                                                         error
+let m = u
+m.name = "x"                                                         ✎ m = m with { name: "x" }
+u.name = "x"                                                         error: u es const (deep)
 
 struct Point { x: int; y: int }
 struct Pair<A, B> { first: A; second: B }
@@ -175,6 +176,8 @@ const ro: readonly int[] = xs                                       ✚
 
 const m = new Map<str, int>()
 const m2 = new Map([("a", 1), ("b", 2)])                            ✚
+const m3: Map<str, int> = { a: 1, [key]: 2 }                        ✚ literal tipado por el Map esperado
+"a" in m3                                                           ✚ m3.has("a")
 m.set("c", 3)    m.get("a")     m.has("a")    m.delete("a")    m.size
 for (const (k, v) of m) { ... }
 
@@ -224,9 +227,8 @@ import { a } from "std:test"    export    namespace N { }
 | `switch` | `match` |
 | `instanceof` | `is` |
 | `typeof x` como valor | `is` y `match`; `typeof` en posición de tipo se mantiene |
-| coma como separador en tipos | `;` / salto de línea |
-| spread que sobrescribe un campo | `with` |
-| mutación de campo de record | `with`, o una `class` si hace falta estado mutable |
+| repetir un campo explícito, o explícito más spread, en un literal | `with` (comprueba que el campo exista y conserva el tipo) |
+| mutar un record o struct a través de un alias | `place.campo = v` reescrito a `place = place with { campo: v }` sobre `let`, `var`, parámetro, campo de clase o elemento; `const` es profundo |
 | `TypeKind::Object` unificado | `Record` e `Interface`, cada uno con su payload |
 | `DynReason::{Shape, Interface}`, `Resolution::ByName` para estos casos | forma canónica y selector |
 | `arrays::same_element` repetido en ocho sitios | una única función de equivalencia (§4.1) |
@@ -247,10 +249,11 @@ import { a } from "std:test"    export    namespace N { }
 2. **HECHA** (`6ffc2d08`..`56af75d0`). **Reglas del checker**: asignabilidad de §3 y §4; tipado esperado de `??`/`||` y de variantes; propiedades de interfaz de solo lectura con `mut`; varianza `out`/`in` declarada (`VN4118`). Un test negativo por cada prohibición; `std` y tests adaptados.
 3. **HECHA** (`91558975`, `e61c69ce`, `5c78dc2e`). **Record inmutable**: error al mutar un campo de record (`VN3005`); un literal no repite un campo (`VN3035`); separadores `;` en tipos. Medido antes: 7 sitios en 3 tests y 1 en `std`.
 4. **HECHA salvo el diccionario**. `===`/`!==` (859 usos migrados), `instanceof` → `is` (93), `typeof` valor → `x::type` (58), `switch` → `match` (1 test). Por el camino: `is` ya no responde «verdadero» a tipos que no sabe probar (`VN3036`) y `continue` dentro de un `match` ya ejecuta el paso del `for`. Pendiente: dict `{[k:str]:V}` → `Map<str,V>` (130 usos).
-5. **PARCIAL** (`ed009cb0`..`e3e01334`). **Clave estática para Map y Set**: `Hashable` es una restricción intrínseca que calcula el compilador. `Map<K extends Hashable, V>` y `Set<T extends Hashable>` rechazan con `VN3037` lo que no lo es; el código genérico escribe `K extends Hashable`. Son Hashable: `int`, `bool`, `char`, `str`, `bigint`, `decimal`, enums, clases (por identidad) y tuplas o structs de ellos. La capacidad `Hashable { hash(): int }` de `core:capabilities` se borró, y la VM ya no invoca `hash` ni `equals` de una clase: una clase es clave por su identidad, nunca por sus métodos. **Los records no son Hashable todavía**: la VM los compara y hashea por identidad, y lo serán cuando la etapa 6 les dé forma canónica. Pendiente: que la VM deje de decidir en runtime la representación de la clave (`map_keys.rs`), `new Map(entradas)` / `new Set(elementos)`, `readonly T[]` y las vistas.
+5. **PARCIAL** (`ed009cb0`..`e3e01334`, `c2db6040`, `92c9215b`). **Clave estática para Map y Set**: `Hashable` es una restricción intrínseca que calcula el compilador. `Map<K extends Hashable, V>` y `Set<T extends Hashable>` rechazan con `VN3037` lo que no lo es; el código genérico escribe `K extends Hashable`. Son Hashable: `int`, `float` (`SameValueZero`), `bool`, `char`, `str`, `bigint`, `decimal`, enums, clases (por identidad) y tuplas o structs de ellos. El literal `{ k: v }` con un `Map` esperado construye ese Map. La capacidad `Hashable { hash(): int }` de `core:capabilities` se borró, y la VM ya no invoca `hash` ni `equals` de una clase: una clase es clave por su identidad, nunca por sus métodos. **Los records no son Hashable todavía**: la VM los compara y hashea por identidad, y lo serán cuando la etapa 6 les dé forma canónica. Pendiente: que la VM deje de decidir en runtime la representación de la clave (`map_keys.rs`), `new Map(entradas)` / `new Set(elementos)`, `readonly T[]` y las vistas.
 6. **TIR y emisor**: forma canónica del record, `Resolution::ShapeSlot`, selector de interfaz; borrar `ByName` y `DynReason::{Shape, Interface}`.
 7. **Borde dinámico**: `CONFORM`/`DECODE` y natives entregan forma canónica.
-8. **Extensiones sobre records.**
+8. **HECHA.** Extensiones sobre records.
+9. **HECHA** (enmienda, §11). Coma en tipos, spread entre fuentes, actualización de campo de valor por su lugar, `float` como clave, literal de `Map`.
 
 ## 9. Verificación
 
@@ -259,6 +262,22 @@ import { a } from "std:test"    export    namespace N { }
 - `vn debug -p bytecode tests/main.vn`: `GetProperty` por nombre sobre records e interfaces cae a ~0. Línea base: 1348 `GetProperty` frente a 1821 `GetFixedField`.
 - Microbench de lectura sobre record e interfaz ≈ lectura sobre clase (hoy ≈ 2,5× más lenta).
 - Antes de la etapa 3, medir en el corpus cuántos sitios mutan un campo de record.
+
+## 11. Enmienda (Leyes 20 y 21): cómo lo habría hecho Anders sin retrocompatibilidad
+
+Criterio: TypeScript es el puente de sintaxis, no el modelo de semántica. Varn conserva lo que se resuelve en compilación (Ley 20) y se aleja de TypeScript solo donde la semántica estática lo exige, con la comparación escrita.
+
+| Punto | Decisión | Comparación y razón |
+|---|---|---|
+| Record y struct inmutables | Se mantienen como valores. `place.campo = v` se reescribe en compilación a `place = place with { campo: v }`, recursivo hasta una variable, un campo de clase o un elemento. El binding debe ser `let`, `var` o parámetro; `const` es profundo. El lugar no puede contener llamadas (se lee y se escribe) | C#: el tipo valor mutable es una trampa y `record` es inmutable con `with`; refusa mutar la copia de un getter (CS1612). Swift: `var p = P(); p.x = 1` copia y `let` lo prohíbe, el modelo adoptado. Kotlin: solo `copy`. Rust: `let mut`. TypeScript: el objeto es una referencia compartida y `const` no protege sus campos; esa es la distancia, a cambio de que un record pueda ser clave de `Map` y no tenga alias |
+| Spread de literales | Entre fuentes spread gana la última. Un campo explícito repetido, o explícito más spread, sigue siendo `VN3035` | `with` comprueba que el campo exista y conserva el tipo (C# `with`, Kotlin `copy`); `{ ...u, nmae: 1 }` en JavaScript crea un record distinto sin avisar. Fusionar configuraciones con spread es el idioma de TypeScript y `with` no lo expresa |
+| Separador en tipos | `;`, `,` o salto de línea | TypeScript los acepta; Rust usa coma; Kotlin y Swift salto de línea. Es léxico y no crea una segunda ruta semántica |
+| `float` como clave | Hashable con `SameValueZero` | JavaScript `Map` usa `SameValueZero`; C# `Double.Equals` y Java `Double.equals` igualan NaN consigo mismo. Rust lo rechaza solo porque `Hash` y `Eq` son rasgos. La VM ya compara claves por `sameValue` |
+| Dict → `Map` | Literal `{ k: v }` tipado por el `Map` esperado, `m[k]`, `m[k] = v` y `k in m` | Kotlin `mapOf`, Swift `[k: v]`: el literal toma su tipo del contexto. Cumple la condición de la Ley 20: misma comodidad que el diccionario |
+| Interfaz de solo lectura salvo `mut` | Se mantiene | C# (`{ get; }` frente a `{ get; set; }`), Swift (`{ get }` frente a `{ get set }`) y Kotlin (`val` frente a `var`) declaran la escritura en el contrato; da covarianza segura. TypeScript añadió `readonly` tarde |
+| `===`, `switch`, `instanceof`, `typeof` como valor | Se mantienen las sustituciones (`==` estricto, `match`, `is`, `x::type`) | Decisión del propietario: Varn no reconstruye TypeScript. `==` no coacciona, así que no hay dos significados; `match` exhaustivo sustituye a `switch` con más poder; `is` cubre `instanceof` y los tipos que no son clases |
+| Tuplas con paréntesis | Se mantienen | Es la sintaxis de C#, Kotlin y Swift |
+| Uniones `A \| B` | Siguen fuera de alcance, y son el siguiente ADR | La Ley 20 pide conservarlas y resolverlas en compilación: unión anónima con etiqueta insertada por el compilador (Rust, Swift) y estrechamiento estático, sin `DynReason::Union` |
 
 ## 10. Puntos que aún requieren comprobación
 
