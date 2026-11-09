@@ -36,3 +36,24 @@ export declare class Array<T> {
     toString(): str;
 
 }
+
+/**
+ * Read-only view of an `Array<T>`, covariant in `T`. What it returns is also read-only.
+ * `includes`, `indexOf` and `lastIndexOf` take a `T` and are extensions.
+ */
+export interface ReadonlyArray<out T> {
+    length: int;
+    join(separator?: str): str;
+    slice(start?: int, end?: int): ReadonlyArray<T>;
+    at(index: int): T?;
+    filter(predicate: (item: T, index: int, array: ReadonlyArray<T>) => bool): ReadonlyArray<T>;
+    find(predicate: (item: T, index: int, array: ReadonlyArray<T>) => bool): T?;
+    findIndex(predicate: (item: T, index: int, array: ReadonlyArray<T>) => bool): int?;
+    flatMap<U>(callback: (item: T, index: int, array: ReadonlyArray<T>) => U[]): U[];
+    forEach(callback: (item: T, index: int, array: ReadonlyArray<T>) => void): void;
+    map<U>(callback: (item: T, index: int, array: ReadonlyArray<T>) => U): U[];
+    reduce<U>(callback: (acc: U, item: T, index: int, array: ReadonlyArray<T>) => U, initial?: U): U;
+    every(predicate: (item: T, index: int, array: ReadonlyArray<T>) => bool): bool;
+    some(predicate: (item: T, index: int, array: ReadonlyArray<T>) => bool): bool;
+    toString(): str;
+}

@@ -10,8 +10,7 @@ use varn_sem::types::Type;
 
 impl<'r> Checker<'r> {
     fn map_key_type(&self, ty: &Type) -> Option<Type> {
-        ty.is_builtin(varn_core::BuiltinType::Map, &self.ty_table)
-            .then(|| ty.builtin_arg(0, &self.ty_table))
+        ty.keyed_collection(&self.ty_table).map(|(key, _)| key)
     }
 
     pub(super) fn check_binary_operands(

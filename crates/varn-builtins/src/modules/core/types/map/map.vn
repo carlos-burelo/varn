@@ -1,3 +1,4 @@
+import { ReadonlyArray } from "core:types/array";
 import { Hashable } from "core:types/hashable";
 
 /**
@@ -15,4 +16,16 @@ export declare class Map<K extends Hashable, V> {
     entries(): (K, V)[];
     @throws(Error) forEach(callback: (value: V, key: K, map: Map<K, V>) => void): void;
     readonly size: int;
+}
+/**
+ * Read-only view of a `Map<K, V>`: invariant in `K`, covariant in `V`.
+ */
+export interface ReadonlyMap<K extends Hashable, out V> {
+    size: int;
+    get(key: K): V?;
+    has(key: K): bool;
+    keys(): ReadonlyArray<K>;
+    values(): ReadonlyArray<V>;
+    entries(): ReadonlyArray<(K, V)>;
+    forEach(callback: (value: V, key: K, map: ReadonlyMap<K, V>) => void): void;
 }

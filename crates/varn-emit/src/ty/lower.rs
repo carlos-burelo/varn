@@ -312,14 +312,16 @@ fn lower_builtin(
         tt.intern(lowered)
     };
     match (b, args.as_slice()) {
-        (BuiltinType::Map, [k, v]) => BackendTy::Map(lower(k, tt), lower(v, tt)),
-        (BuiltinType::Map, _) => {
+        (BuiltinType::Map | BuiltinType::ReadonlyMap, [k, v]) => {
+            BackendTy::Map(lower(k, tt), lower(v, tt))
+        }
+        (BuiltinType::Map | BuiltinType::ReadonlyMap, _) => {
             let d = tt.intern(bare());
             BackendTy::Map(d, d)
         }
-        (BuiltinType::Set, [el]) => BackendTy::Set(lower(el, tt)),
-        (BuiltinType::Set, _) => BackendTy::Set(tt.intern(bare())),
-        (BuiltinType::Array, [el]) => BackendTy::Array(lower(el, tt)),
+        (BuiltinType::Set | BuiltinType::ReadonlySet, [el]) => BackendTy::Set(lower(el, tt)),
+        (BuiltinType::Set | BuiltinType::ReadonlySet, _) => BackendTy::Set(tt.intern(bare())),
+        (BuiltinType::Array | BuiltinType::ReadonlyArray, [el]) => BackendTy::Array(lower(el, tt)),
         (BuiltinType::Task, [result]) => {
             BackendTy::Dynamic(DynReason::Awaitable(lower(result, tt)))
         }
@@ -336,6 +338,7 @@ fn lower_builtin(
         (BuiltinType::Bytes, _) => BackendTy::Bytes,
         (
             BuiltinType::Array
+            | BuiltinType::ReadonlyArray
             | BuiltinType::Range
             | BuiltinType::Task
             | BuiltinType::TaskHandle

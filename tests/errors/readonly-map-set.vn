@@ -1,0 +1,4 @@
+// expect: error[VN3004]
+const m: Map<str, int> = { a: 1 }
+const r: ReadonlyMap<str, int> = m
+r.set("b", 2)

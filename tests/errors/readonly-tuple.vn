@@ -1,0 +1,3 @@
+// expect: error[VN2007]
+const t: readonly (int, str) = (1, "a")
+

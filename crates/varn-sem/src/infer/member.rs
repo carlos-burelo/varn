@@ -54,7 +54,10 @@ pub(crate) fn infer_member(
         return match table.get(obj_ty.0) {
             TypeKind::Array(inner) => Type::resolved(inner),
             TypeKind::Primitive(varn_core::LangPrimitive::Str) => Type::Str,
-            TypeKind::Generic(..) if obj_ty.is_builtin(varn_core::BuiltinType::Map, table) => {
+            TypeKind::Generic(..) if obj_ty.sequence_element(table).is_some() => {
+                obj_ty.builtin_arg(0, table)
+            }
+            TypeKind::Generic(..) if obj_ty.keyed_collection(table).is_some() => {
                 obj_ty.builtin_arg(1, table)
             }
             TypeKind::Record(_) | TypeKind::Interface(_) => Type::Dynamic,

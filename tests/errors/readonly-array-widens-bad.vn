@@ -1,0 +1,4 @@
+// expect: error[VN3001]
+const ro: readonly str[] = ["a"]
+const xs: readonly int[] = ro
+

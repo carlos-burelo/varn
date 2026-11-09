@@ -53,6 +53,11 @@ impl<'r> Checker<'r> {
                 | TypeKind::EnumVariant { .. }
                 | TypeKind::TypePredicate { .. } => None,
             };
+            let immutable = immutable.or_else(|| {
+                obj_ty
+                    .is_readonly_view(&self.ty_table)
+                    .then_some("cannot assign through a read-only view: it only reads")
+            });
             if let Some(message) = immutable {
                 self.emit(
                     Diagnostic::error(ErrorCode::NotAssignable, message).with_range(target_range),

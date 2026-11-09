@@ -1,0 +1,4 @@
+// expect: error[VN3005]
+const ro: readonly int[] = [1]
+ro[0] = 2
+

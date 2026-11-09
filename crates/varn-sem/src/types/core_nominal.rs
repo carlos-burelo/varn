@@ -73,6 +73,29 @@ impl Type {
         }
     }
 
+    pub fn sequence_element(&self, table: &CheckerTyTable) -> Option<Type> {
+        matches!(
+            self.builtin_of(table),
+            Some(BuiltinType::Array | BuiltinType::ReadonlyArray)
+        )
+        .then(|| self.builtin_arg(0, table))
+    }
+
+    pub fn keyed_collection(&self, table: &CheckerTyTable) -> Option<(Type, Type)> {
+        matches!(
+            self.builtin_of(table),
+            Some(BuiltinType::Map | BuiltinType::ReadonlyMap)
+        )
+        .then(|| (self.builtin_arg(0, table), self.builtin_arg(1, table)))
+    }
+
+    pub fn is_readonly_view(&self, table: &CheckerTyTable) -> bool {
+        matches!(
+            self.builtin_of(table),
+            Some(BuiltinType::ReadonlyArray | BuiltinType::ReadonlyMap | BuiltinType::ReadonlySet)
+        )
+    }
+
     pub fn core_sum(&self, table: &CheckerTyTable) -> Option<(CoreSum, Vec<Type>)> {
         let TypeKind::Generic(name, args, origin) = table.get(self.0) else {
             return None;

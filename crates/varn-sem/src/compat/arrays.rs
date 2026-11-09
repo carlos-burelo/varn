@@ -26,8 +26,24 @@ pub(super) fn array_arms(
             in_progress,
             table,
         )),
-        (TypeKind::Generic(..), TypeKind::Array(_))
-        | (TypeKind::Array(_), TypeKind::Generic(..)) => Some(false),
+        (TypeKind::Generic(name, args, origin), TypeKind::Array(inf_elem)) => {
+            let is_view = varn_core::BuiltinType::identify(name, origin)
+                == Some(varn_core::BuiltinType::ReadonlyArray);
+            Some(
+                is_view
+                    && table.get_list(args).first().is_some_and(|&view_elem| {
+                        types_compatible_impl(
+                            &t(view_elem),
+                            &t(inf_elem),
+                            bind,
+                            cache,
+                            in_progress,
+                            table,
+                        )
+                    }),
+            )
+        }
+        (TypeKind::Array(_), TypeKind::Generic(..)) => Some(false),
         _ => None,
     }
 }

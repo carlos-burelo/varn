@@ -183,6 +183,9 @@ impl<'r> Checker<'r> {
                 let arg_ty = self.infer_type(rec, *expr, bind);
                 let spread_inner = match self.ty_table.get(arg_ty.0) {
                     TypeKind::Array(inner) => Some(Type::resolved(inner)),
+                    TypeKind::Generic(..) if arg_ty.sequence_element(&self.ty_table).is_some() => {
+                        arg_ty.sequence_element(&self.ty_table)
+                    }
                     TypeKind::Tuple(elements) => {
                         return Ok(Supplied::Each(
                             self.ty_table

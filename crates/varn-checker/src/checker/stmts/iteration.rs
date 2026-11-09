@@ -57,7 +57,7 @@ impl Checker<'_> {
         }
         if let Some(builtin) = source.builtin_of(&self.ty_table) {
             match builtin {
-                BuiltinType::Map => {
+                BuiltinType::Map | BuiltinType::ReadonlyMap => {
                     let key = source.builtin_arg(0, &self.ty_table);
                     let value = source.builtin_arg(1, &self.ty_table);
                     let table = std::sync::Arc::make_mut(&mut self.ty_table);
@@ -71,7 +71,11 @@ impl Checker<'_> {
                         entry,
                     ));
                 }
-                BuiltinType::Set => {
+                BuiltinType::ReadonlyArray => {
+                    let elem = source.builtin_arg(0, &self.ty_table);
+                    return Some((ForOfPlan::Collection { method: None, elem }, elem));
+                }
+                BuiltinType::Set | BuiltinType::ReadonlySet => {
                     let elem = source.builtin_arg(0, &self.ty_table);
                     return Some((
                         ForOfPlan::Collection {

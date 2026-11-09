@@ -469,6 +469,7 @@ impl Checker<'_> {
                 None
             };
         let value_is_array = matches!(self.ty_table.get(value_ty.0), varn_core::TypeKind::Array(_));
+        let is_readonly_sequence = value_ty.sequence_element(&self.ty_table).is_some();
         let not_sequence = match self.ty_table.get(value_ty.0) {
             varn_core::TypeKind::Primitive(p) => !matches!(
                 p,
@@ -481,7 +482,7 @@ impl Checker<'_> {
             | varn_core::TypeKind::Record(_)
             | varn_core::TypeKind::Interface(_)
             | varn_core::TypeKind::Fn(_)
-            | varn_core::TypeKind::EnumVariant { .. } => true,
+            | varn_core::TypeKind::EnumVariant { .. } => !is_readonly_sequence,
             varn_core::TypeKind::Literal(_)
             | varn_core::TypeKind::This
             | varn_core::TypeKind::Array(_)

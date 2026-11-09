@@ -51,7 +51,7 @@ impl<'r> Checker<'r> {
         let builtin = obj_ty.builtin_of(&self.ty_table);
         let keyed = match obj_kind {
             TypeKind::Generic(..) | TypeKind::Named(..) => {
-                builtin == Some(varn_core::BuiltinType::Map)
+                obj_ty.keyed_collection(&self.ty_table).is_some()
             }
             TypeKind::Record(_)
             | TypeKind::Interface(_)
@@ -123,8 +123,13 @@ impl<'r> Checker<'r> {
             {
                 Type::Int
             }
+            TypeKind::Generic(..)
+                if prop_ty.is_int() && obj_ty.sequence_element(&self.ty_table).is_some() =>
+            {
+                obj_ty.builtin_arg(0, &self.ty_table)
+            }
             TypeKind::Generic(..) | TypeKind::Named(..)
-                if builtin == Some(varn_core::BuiltinType::Map) =>
+                if obj_ty.keyed_collection(&self.ty_table).is_some() =>
             {
                 obj_ty.builtin_arg(1, &self.ty_table)
             }

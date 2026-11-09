@@ -119,13 +119,19 @@ pub enum BuiltinType {
     Generator,
     AsyncGenerator,
     Class,
+    ReadonlyArray,
+    ReadonlyMap,
+    ReadonlySet,
 }
 
 impl BuiltinType {
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 13] = [
         Self::Array,
         Self::Map,
         Self::Set,
+        Self::ReadonlyArray,
+        Self::ReadonlyMap,
+        Self::ReadonlySet,
         Self::Range,
         Self::Bytes,
         Self::Task,
@@ -147,11 +153,14 @@ impl BuiltinType {
             Self::Generator => "Generator",
             Self::AsyncGenerator => "AsyncGenerator",
             Self::Class => "Class",
+            Self::ReadonlyArray => "ReadonlyArray",
+            Self::ReadonlyMap => "ReadonlyMap",
+            Self::ReadonlySet => "ReadonlySet",
         }
     }
 
-    const IDENTITY: [(Atom, Atom, Self); 10] = {
-        let mut out = [(Atom::of_const(""), Atom::of_const(""), Self::Array); 10];
+    const IDENTITY: [(Atom, Atom, Self); 13] = {
+        let mut out = [(Atom::of_const(""), Atom::of_const(""), Self::Array); 13];
         let mut i = 0;
         while i < Self::ALL.len() {
             let b = Self::ALL[i];
@@ -182,14 +191,35 @@ impl BuiltinType {
             Self::Generator => K::Generator,
             Self::AsyncGenerator => K::AsyncGenerator,
             Self::Class => K::Class,
+            Self::ReadonlyArray => K::Array,
+            Self::ReadonlyMap => K::Map,
+            Self::ReadonlySet => K::Set,
+        }
+    }
+
+    pub const fn mutable_counterpart(self) -> Option<Self> {
+        match self {
+            Self::ReadonlyArray => Some(Self::Array),
+            Self::ReadonlyMap => Some(Self::Map),
+            Self::ReadonlySet => Some(Self::Set),
+            Self::Array
+            | Self::Map
+            | Self::Set
+            | Self::Range
+            | Self::Bytes
+            | Self::Task
+            | Self::TaskHandle
+            | Self::Generator
+            | Self::AsyncGenerator
+            | Self::Class => None,
         }
     }
 
     pub const fn core_module(self) -> &'static str {
         match self {
-            Self::Array => "core:types/array",
-            Self::Map => "core:types/map",
-            Self::Set => "core:types/set",
+            Self::Array | Self::ReadonlyArray => "core:types/array",
+            Self::Map | Self::ReadonlyMap => "core:types/map",
+            Self::Set | Self::ReadonlySet => "core:types/set",
             Self::Range => "core:types/range",
             Self::Bytes => "core:types/bytes",
             Self::Class => "core:types/class",

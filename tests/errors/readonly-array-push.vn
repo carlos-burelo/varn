@@ -1,0 +1,4 @@
+// expect: error[VN3004]
+const ro: readonly int[] = [1]
+ro.push(2)
+

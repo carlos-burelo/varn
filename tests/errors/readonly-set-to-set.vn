@@ -1,0 +1,4 @@
+// expect: error[VN3001]
+const s = new Set([1])
+const r: ReadonlySet<int> = s
+const back: Set<int> = r

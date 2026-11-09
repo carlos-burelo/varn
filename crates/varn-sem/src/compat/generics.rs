@@ -110,6 +110,21 @@ pub(super) fn generic_arms(
                     table,
                 ));
             }
+            let views_given = varn_core::BuiltinType::identify(n1, o1)
+                .and_then(varn_core::BuiltinType::mutable_counterpart)
+                .is_some_and(|mutable| varn_core::BuiltinType::identify(n2, o2) == Some(mutable));
+            if views_given {
+                return Some(args_fit(
+                    bind,
+                    n1,
+                    o1,
+                    &declared,
+                    &given,
+                    cache,
+                    in_progress,
+                    table,
+                ));
+            }
             let up = upcast_to(bind, (n1, o1), (n2, o2, &given), table);
             Some(up.is_some_and(|up| {
                 args_fit(bind, n1, o1, &declared, &up, cache, in_progress, table)

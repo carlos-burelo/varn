@@ -94,29 +94,7 @@ impl Type {
     }
 
     pub fn get_array_element_type(&self, table: &CheckerTyTable) -> Type {
-        match table.get(self.0) {
-            TypeKind::Array(inner) => Type::resolved(inner),
-            TypeKind::Primitive(_)
-            | TypeKind::Literal(_)
-            | TypeKind::This
-            | TypeKind::Union(_)
-            | TypeKind::Intersection(_)
-            | TypeKind::Tuple(_)
-            | TypeKind::Named(..)
-            | TypeKind::Generic(..)
-            | TypeKind::TemplateLiteral(_)
-            | TypeKind::Fn(_)
-            | TypeKind::Record(_)
-            | TypeKind::Interface(_)
-            | TypeKind::Typeof(_)
-            | TypeKind::KeyOf(_)
-            | TypeKind::IndexedAccess { .. }
-            | TypeKind::Mapped { .. }
-            | TypeKind::Conditional { .. }
-            | TypeKind::Infer(_)
-            | TypeKind::EnumVariant { .. }
-            | TypeKind::TypePredicate { .. } => Type::Dynamic,
-        }
+        self.sequence_element(table).unwrap_or(Type::Dynamic)
     }
 
     pub fn fn_(f: FunctionType, table: &mut CheckerTyTable) -> Self {
