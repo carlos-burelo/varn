@@ -254,6 +254,8 @@ import { a } from "std:test"    export    namespace N { }
 7. **Borde dinámico**: `CONFORM`/`DECODE` y natives entregan forma canónica.
 8. **HECHA.** Extensiones sobre records.
 9. **HECHA** (enmienda, §11). Coma en tipos, spread entre fuentes, actualización de campo de valor por su lugar, `float` como clave, literal de `Map`.
+10. **HECHA** (`543c2ee7`). Vistas de solo lectura: `readonly T[]` (`ReadonlyArray<T>`), `ReadonlyMap<K, out V>`, `ReadonlySet<T>`. Una colección es asignable a su vista y no al revés; la vista no tiene `push`, `set` ni `add`; baja al tipo del backend de su colección. Una vista devuelve vistas, por lo que su covarianza es sólida.
+11. **PENDIENTE**. Extensiones genéricas: `extension Nombre<T> on readonly T[]`, con parámetros de tipo en la declaración y propagación de las extensiones declaradas en un módulo core. Hoy solo existen extensiones sobre un tipo concreto. Con ellas entran en la vista `includes`, `indexOf`, `lastIndexOf` y `flat`, que no caben como miembros de una interfaz `out T` porque reciben `T` o devuelven un tipo condicional sobre `T`, invariante por correcto.
 
 ## 9. Verificación
 
