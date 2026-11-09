@@ -19,7 +19,7 @@ impl Checker<'_> {
             self.emit(
                 varn_core::Diagnostic::error(
                     varn_core::ErrorCode::DuplicateRecordField,
-                    format!("field '{name}' is given more than once: a record field is replaced with `with`, not by repeating it"),
+                    format!("field '{name}' is given more than once: a record field is replaced with `with`, and when two spread records share it the later one wins"),
                 )
                 .with_range(range),
             );
@@ -35,6 +35,7 @@ impl Checker<'_> {
     ) -> (Vec<ObjectTypeMember>, Vec<String>) {
         let mut members = Vec::new();
         let mut duplicates = Vec::new();
+        let mut from_spread: Vec<bool> = Vec::new();
         for prop in properties {
             match prop {
                 varn_core::ast::ObjectProp::Property { key, value, .. } => {
@@ -45,6 +46,8 @@ impl Checker<'_> {
                     put_member(
                         &mut members,
                         &mut duplicates,
+                        &mut from_spread,
+                        false,
                         ObjectTypeMember::Property {
                             name,
                             ty: ty.0,
@@ -84,6 +87,8 @@ impl Checker<'_> {
                     put_member(
                         &mut members,
                         &mut duplicates,
+                        &mut from_spread,
+                        false,
                         ObjectTypeMember::Method {
                             name,
                             params,
@@ -104,7 +109,7 @@ impl Checker<'_> {
                             if let ObjectTypeMember::Property { readonly, .. } = &mut m {
                                 *readonly = false;
                             }
-                            put_member(&mut members, &mut duplicates, m);
+                            put_member(&mut members, &mut duplicates, &mut from_spread, true, m);
                         }
                     } else if let varn_core::TypeKind::Named(name, origin) = spread_kind {
                         let name_str = bind.interner.resolve(name).to_string();
@@ -117,6 +122,8 @@ impl Checker<'_> {
                                     put_member(
                                         &mut members,
                                         &mut duplicates,
+                                        &mut from_spread,
+                                        true,
                                         ObjectTypeMember::Property {
                                             name: cm.name.clone(),
                                             ty: cm.ty.0,
@@ -157,6 +164,8 @@ fn member_name(member: &ObjectTypeMember) -> Option<&Arc<str>> {
 fn put_member(
     members: &mut Vec<ObjectTypeMember>,
     duplicates: &mut Vec<String>,
+    from_spread: &mut Vec<bool>,
+    spread: bool,
     member: ObjectTypeMember,
 ) {
     let existing = member_name(&member)
@@ -164,11 +173,15 @@ fn put_member(
     match existing {
         Some(at) => {
             let name = member_name(&member).map(|n| n.to_string());
+            if !(spread && from_spread[at]) {
+                duplicates.extend(name);
+            }
             members[at] = member;
-            duplicates.extend(name);
+            from_spread[at] = spread;
         }
         None => {
             members.push(member);
+            from_spread.push(spread);
         }
     }
 }

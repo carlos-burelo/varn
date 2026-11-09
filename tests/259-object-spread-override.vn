@@ -10,6 +10,18 @@ await describe("259 record spread merges", async () => {
         expect(merged.z.length).toBe(1);
     });
 
+    await it("when two spread records share a field the later one wins", () => {
+        const defaults = { retries: 3, name: "a", verbose: false };
+        const given = { retries: 5, name: "b" };
+        const merged = { ...defaults, ...given };
+        expect(merged.retries).toBe(5);
+        expect(merged.name).toBe("b");
+        expect(merged.verbose).toBe(false);
+        const retyped = { ...defaults, ...{ retries: "many" } };
+        expect(retyped.retries).toBe("many");
+        expect(defaults.retries).toBe(3);
+    });
+
     await it("with replaces a field, keeps the type and leaves the original", () => {
         const base = { x: 1, y: 2 };
         const next = base with { x: 5 };
