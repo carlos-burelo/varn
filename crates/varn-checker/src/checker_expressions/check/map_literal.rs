@@ -2,7 +2,7 @@ use crate::checker::recorder::Recorder;
 use crate::checker::Checker;
 use varn_core::ast::expr::PropKey;
 use varn_core::ast::{ExprId, ObjectProp};
-use varn_core::{BuiltinType, Diagnostic, ErrorCode};
+use varn_core::{Diagnostic, ErrorCode};
 use varn_sem::bind::BindResult;
 use varn_sem::types::Type;
 
@@ -10,13 +10,8 @@ impl<'r> Checker<'r> {
     pub(crate) fn expected_map(&mut self, expr: ExprId) -> Option<(Type, Type, Type)> {
         let expected = self.expected_for(expr)?;
         let map = expected.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
-        map.is_builtin(BuiltinType::Map, &self.ty_table).then(|| {
-            (
-                map,
-                map.builtin_arg(0, &self.ty_table),
-                map.builtin_arg(1, &self.ty_table),
-            )
-        })
+        map.keyed_collection(&self.ty_table)
+            .map(|(key, value)| (map, key, value))
     }
 
     pub(super) fn check_map_literal(

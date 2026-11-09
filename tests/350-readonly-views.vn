@@ -83,6 +83,12 @@ await describe("350 read-only views", async () => {
         expect(sum).toBe(6)
     })
 
+    await it("a key-value literal can build a read-only map directly", () => {
+        const view: ReadonlyMap<str, int> = { a: 1, b: 2 }
+        expect(view.size).toBe(2)
+        expect(view.get("b")).toBe(2)
+    })
+
     await it("a view of values is covariant and a view of keys is not", () => {
         const dogs: Map<str, Dog> = { rex: new Dog() }
         const animals: ReadonlyMap<str, Animal> = dogs
