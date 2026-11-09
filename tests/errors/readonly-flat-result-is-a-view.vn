@@ -1,0 +1,3 @@
+// expect: error[VN3004]
+const nested: readonly int[][] = [[1], [2]]
+nested.flat().push(3)

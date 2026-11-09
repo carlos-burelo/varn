@@ -51,6 +51,35 @@ await describe("350 read-only views", async () => {
         expect(ro.entries().length).toBe(2)
     })
 
+    await it("includes, indexOf, lastIndexOf and flat read through a view", () => {
+        const ro: readonly int[] = [1, 2, 3, 2]
+        expect(ro.includes(2)).toBe(true)
+        expect(ro.includes(9)).toBe(false)
+        expect(ro.indexOf(3)).toBe(2)
+        expect(ro.indexOf(9)).toBe(null)
+        expect(ro.lastIndexOf(2)).toBe(3)
+        const nested: readonly int[][] = [[1], [2, 3]]
+        expect(nested.flat().length).toBe(3)
+        expect(nested.flat()[2]).toBe(3)
+    })
+
+    await it("a view searches with the equality of ==", () => {
+        const nan = 0.0 / 0.0
+        const floats: readonly float[] = [nan, 1.5]
+        expect(floats.includes(nan)).toBe(false)
+        expect(floats.indexOf(1.5)).toBe(1)
+        const pairs: readonly (int, int)[] = [(1, 2), (3, 4)]
+        expect(pairs.indexOf((3, 4))).toBe(1)
+    })
+
+    await it("a search through a covariant view takes the supertype", () => {
+        const rex = new Dog()
+        const dogs: Dog[] = [rex]
+        const animals: readonly Animal[] = dogs
+        expect(animals.includes(rex)).toBe(true)
+        expect(animals.indexOf(new Animal())).toBe(null)
+    })
+
     await it("a view of nested arrays is a view of the outer one", () => {
         const nested: readonly int[][] = [[1], [2, 3]]
         expect(nested[1].length).toBe(2)

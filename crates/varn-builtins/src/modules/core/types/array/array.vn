@@ -38,6 +38,17 @@ export declare class Array<T> {
 }
 
 /**
+ * The members of a view that receive a `T`, or return a type computed from `T`, cannot be
+ * members of an `out T` interface. They forward to the array of the same name.
+ */
+export extension<T> on ReadonlyArray<T> {
+    declare includes(search: T): bool;
+    declare indexOf(search: T): int?;
+    declare lastIndexOf(search: T): int?;
+    declare flat(): ReadonlyArray<Flattened<T>>;
+}
+
+/**
  * Read-only view of an `Array<T>`, covariant in `T`. What it returns is also read-only.
  * `includes`, `indexOf` and `lastIndexOf` take a `T` and are extensions.
  */
