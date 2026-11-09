@@ -36,7 +36,9 @@ impl<'r> Checker<'r> {
         let Some(method_map) = bind.extensions.methods.get(tn.as_ref()) else {
             return;
         };
-        if let Some(mangled) = method_map.get(bind.interner.resolve(*method_name)) {
+        if let Some(mangled) = method_map.get(bind.interner.resolve(*method_name))
+            && !bind.extensions.forwarded.contains(mangled)
+        {
             rec.desugar
                 .extension_calls
                 .insert(range.start.offset, mangled.clone());

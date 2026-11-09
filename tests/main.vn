@@ -341,6 +341,7 @@ import "./349-foreign-variance.vn"
 import "./350-readonly-views.vn"
 import "./351-generic-extensions.vn"
 import "./352-extensions-across-modules.vn"
+import "./353-forwarded-extension-members.vn"
 
 await describe("main.vn import.meta.main", async () => {
     await it("the entry module is main", async () => {

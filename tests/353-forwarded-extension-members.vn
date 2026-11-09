@@ -1,0 +1,25 @@
+import { describe, it, expect } from "std:test";
+
+extension<T> on readonly T[] {
+    declare lastIndexOf(search: T): int?;
+}
+
+extension<T extends Hashable> on Set<T> {
+    declare has(value: T): bool;
+}
+
+await describe("353 forwarded extension members", async () => {
+    await it("a declared member takes the type of the extension and the behaviour of the receiver", () => {
+        const ro: readonly int[] = [1, 2, 3, 2]
+        expect(ro.lastIndexOf(2)).toBe(3)
+        expect(ro.lastIndexOf(9)).toBe(null)
+        const names: readonly str[] = ["a", "b", "a"]
+        expect(names.lastIndexOf("a")).toBe(2)
+    })
+
+    await it("the receiver keeps its own member when the extension declares the same name", () => {
+        const items = new Set([1, 2])
+        expect(items.has(2)).toBe(true)
+        expect(items.has(5)).toBe(false)
+    })
+})

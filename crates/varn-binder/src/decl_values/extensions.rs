@@ -125,6 +125,11 @@ impl<'r> super::super::Binder<'r> {
                     sym.is_async = method.modifiers.is_async;
                     sym.is_generator = method.modifiers.is_generator;
                     self.define_outside(outer, mangled_atom, sym);
+                    if method.modifiers.is_declare {
+                        self.extensions
+                            .forwarded
+                            .insert(Arc::from(mangled.as_str()));
+                    }
                     self.extensions
                         .methods
                         .entry(Arc::from(type_name.as_str()))

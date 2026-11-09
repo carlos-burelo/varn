@@ -64,6 +64,7 @@ pub fn parse_extension_decl(s: &mut TokenStream) -> PResult<ExtensionDecl> {
 
 fn parse_extension_member(s: &mut TokenStream) -> PResult<ExtensionMember> {
     let range = s.range();
+    let is_declare = s.eat(TokenKind::Declare);
     let is_async = s.eat(TokenKind::Async);
     let is_generator = s.eat(TokenKind::Star);
 
@@ -81,6 +82,19 @@ fn parse_extension_member(s: &mut TokenStream) -> PResult<ExtensionMember> {
             && nk != TokenKind::Semicolon
             && nk != TokenKind::Colon
     };
+
+    if is_declare && (is_get || is_set) {
+        s.advance();
+        s.expect_id()?;
+        super::super::params::parse_params(s)?;
+        if s.eat(TokenKind::Colon) {
+            parse_type(s)?;
+        }
+        s.eat_semicolon();
+        return Err(ParseError::invalid(
+            "`declare` applies to extension methods: a getter or setter has a body".to_owned(),
+        ));
+    }
 
     if is_get {
         if is_async || is_generator {
@@ -143,7 +157,17 @@ fn parse_extension_member(s: &mut TokenStream) -> PResult<ExtensionMember> {
     } else {
         None
     };
-    let body = super::super::stmts::parse_block(s)?;
+    let body = if is_declare {
+        if s.check(TokenKind::LBrace) {
+            return Err(ParseError::invalid(
+                "a `declare` extension method forwards to the receiver and has no body".to_owned(),
+            ));
+        }
+        s.eat_semicolon();
+        s.stmt(s.range(), varn_core::ast::StmtKind::Empty)
+    } else {
+        super::super::stmts::parse_block(s)?
+    };
 
     let full_range = s.span_from(range);
     Ok(ExtensionMember::Method(FunctionDecl {
@@ -157,6 +181,7 @@ fn parse_extension_member(s: &mut TokenStream) -> PResult<ExtensionMember> {
         modifiers: Modifiers {
             is_async,
             is_generator,
+            is_declare,
             ..Default::default()
         },
         decorators: vec![],

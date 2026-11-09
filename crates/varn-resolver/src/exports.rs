@@ -39,6 +39,9 @@ fn export_extension(
         out.insert(name.mangled.to_string(), exported);
         out.extensions
             .record(name.kind, &label, &name.member, &name.mangled);
+        if bind.extensions.forwarded.contains(&name.mangled) {
+            out.extensions.forwarded.insert(name.mangled.clone());
+        }
     }
 }
 

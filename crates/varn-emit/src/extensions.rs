@@ -69,6 +69,7 @@ pub(super) fn collect_extension_names(
         };
         for member in &ext.members {
             let name: Arc<str> = match member {
+                ExtensionMember::Method(f) if f.modifiers.is_declare => continue,
                 ExtensionMember::Method(f) => {
                     Arc::from(ExtensionKind::Method.mangled(&label, interner.resolve(f.id)))
                 }
@@ -114,7 +115,8 @@ pub(super) fn exported_extension_names(
         out.extend(
             varn_sem::bind::extension_names(ext, &label, &bind.interner)
                 .into_iter()
-                .map(|name| name.mangled),
+                .map(|name| name.mangled)
+                .filter(|mangled| !bind.extensions.forwarded.contains(mangled)),
         );
     }
     out
@@ -219,6 +221,9 @@ pub(super) fn emit_extensions(
             | BackendTy::Dynamic(_) => None,
         };
         for member in &ext.members {
+            if matches!(member, ExtensionMember::Method(f) if f.modifiers.is_declare) {
+                continue;
+            }
             let (mangled, params, body): (Arc<str>, Vec<Arc<str>>, StmtId) = match member {
                 ExtensionMember::Method(f) => (
                     Arc::from(ExtensionKind::Method.mangled(&label, ctx.interner.resolve(f.id))),

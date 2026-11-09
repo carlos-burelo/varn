@@ -1,0 +1,4 @@
+// expect: error[VN2007]
+extension<T> on readonly T[] {
+    declare includes(search: T): bool { return true }
+}

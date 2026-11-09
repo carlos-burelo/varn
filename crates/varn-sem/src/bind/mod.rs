@@ -67,10 +67,13 @@ pub struct Extensions {
     pub getters: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Arc<str>>>,
     #[serde(serialize_with = "crate::portable::canonical::sorted_nested")]
     pub setters: FxHashMap<Arc<str>, FxHashMap<Arc<str>, Arc<str>>>,
+    #[serde(default)]
+    pub forwarded: std::collections::BTreeSet<Arc<str>>,
 }
 
 impl Extensions {
     pub fn absorb(&mut self, other: &Extensions) {
+        self.forwarded.extend(other.forwarded.iter().cloned());
         for (mine, theirs) in [
             (&mut self.methods, &other.methods),
             (&mut self.getters, &other.getters),

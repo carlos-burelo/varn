@@ -1,0 +1,6 @@
+// expect: error[VN3001]
+extension<T> on readonly T[] {
+    declare lastIndexOf(search: T): int?;
+}
+const names: readonly str[] = ["a"]
+names.lastIndexOf(1)

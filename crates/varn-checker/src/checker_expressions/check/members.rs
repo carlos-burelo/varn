@@ -127,6 +127,7 @@ impl<'r> Checker<'r> {
                 }
             } else if let Some(method_map) = bind.extensions.methods.get(tn.as_ref())
                 && let Some(mangled) = method_map.get(prop_name)
+                && !bind.extensions.forwarded.contains(mangled)
             {
                 rec.desugar
                     .extension_members
