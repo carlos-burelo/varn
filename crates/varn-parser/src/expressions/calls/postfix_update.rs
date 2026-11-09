@@ -9,6 +9,11 @@ pub(super) fn parse_postfix_expr(s: &mut TokenStream) -> PResult<ExprId> {
     let mut expr = parse_call_expr(s)?;
 
     loop {
+        if matches!(s.kind(), TokenKind::PlusPlus | TokenKind::MinusMinus)
+            && s.line() > s.prev_line()
+        {
+            break;
+        }
         let op_range = s.range();
         match s.kind() {
             TokenKind::PlusPlus => {
