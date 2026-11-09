@@ -70,7 +70,7 @@ fn hash_dir(dir: &Path, hash: &mut u64) {
     for p in paths {
         if p.is_dir() {
             hash_dir(&p, hash);
-        } else if p.extension().and_then(|e| e.to_str()) == Some("rs") {
+        } else if matches!(p.extension().and_then(|e| e.to_str()), Some("rs" | "vn")) {
             fnv1a(p.file_name().unwrap().to_string_lossy().as_bytes(), hash);
             if let Ok(bytes) = std::fs::read(&p) {
                 fnv1a(&bytes, hash);
