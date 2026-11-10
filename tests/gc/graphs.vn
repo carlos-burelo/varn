@@ -1,0 +1,49 @@
+class Node {
+    id: int
+    label: str
+    links: Node[]
+    constructor(id: int) {
+        this.id = id
+        this.label = ""
+        this.links = []
+    }
+}
+
+let seed = 123456789
+function nextSeed(): int {
+    seed = (seed * 1103515245 + 12345) % 2147483648
+    return seed
+}
+
+let checksum = 0
+for (let round = 0; round < 8; round = round + 1) {
+    const count = 2000 + (nextSeed() % 3000)
+    const nodes: Node[] = []
+    for (let i = 0; i < count; i = i + 1) {
+        nodes.push(new Node(i))
+    }
+    for (let i = 0; i < count; i = i + 1) {
+        const parent = nodes[i]
+        const edges = nextSeed() % 4
+        for (let e = 0; e < edges; e = e + 1) {
+            parent.links.push(nodes[nextSeed() % count])
+        }
+        if (nextSeed() % 16 == 0) {
+            const holder: Map<int, Node> = new Map()
+            holder.set(i, parent)
+            holder.set(i + count, nodes[nextSeed() % count])
+            parent.label = "r" + (holder.size + (i % 97)).toString()
+        }
+    }
+    let sum = 0
+    for (let i = 0; i < count; i = i + 1) {
+        const node = nodes[i]
+        sum = (sum * 17 + node.id + node.links.length + node.label.length) % 1000000007
+        for (let e = 0; e < node.links.length; e = e + 1) {
+            sum = (sum * 17 + node.links[e].id) % 1000000007
+        }
+    }
+    checksum = (checksum * 131 + sum) % 1000000007
+    print(sum)
+}
+print(checksum)
