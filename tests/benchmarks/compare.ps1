@@ -25,11 +25,46 @@ function Resolve-Executable($name) {
     return $null
 }
 
+function Measure-Median($exePath, $argvList) {
+    $samples = @()
+    for ($i = 0; $i -lt ($Warmup + $Runs); $i = $i + 1) {
+        $psi = New-Object Diagnostics.ProcessStartInfo
+        $psi.FileName = $exePath
+        $psi.Arguments = $argvList -join ' '
+        $psi.UseShellExecute = $false
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $clock = [Diagnostics.Stopwatch]::StartNew()
+        $p = [Diagnostics.Process]::Start($psi)
+        $null = $p.StandardOutput.ReadToEndAsync()
+        $null = $p.StandardError.ReadToEndAsync()
+        $p.WaitForExit()
+        $clock.Stop()
+        if ($p.ExitCode -ne 0) { throw "$exePath $($argvList -join ' ') exited with $($p.ExitCode)" }
+        if ($i -ge $Warmup) { $samples += $clock.Elapsed.TotalMilliseconds }
+    }
+    $sorted = @($samples | Sort-Object)
+    [math]::Round($sorted[[int](($sorted.Count - 1) / 2)], 1)
+}
+
 $exe = @{ varn = $vn }
 foreach ($name in @('bun', 'node', 'python')) {
     if ($Runtimes -contains $name) {
         $found = Resolve-Executable $name
         if ($found) { $exe[$name] = $found } else { Write-Warning "$name is not a runnable executable; skipped" }
+    }
+}
+
+$extension = @{ bun = 'js'; node = 'js'; python = 'py' }
+$startup = @{}
+foreach ($name in $exe.Keys) {
+    $ext = if ($name -eq 'varn') { 'vn' } else { $extension[$name] }
+    $file = Join-Path (Join-Path $root 'startup') "empty.$ext"
+    if (-not (Test-Path $file)) { continue }
+    if ($name -eq 'varn') {
+        $startup[$name] = Measure-Median $exe[$name] @('run', "`"$file`"")
+    } else {
+        $startup[$name] = Measure-Median $exe[$name] @("`"$file`"")
     }
 }
 
@@ -39,46 +74,41 @@ $cases = @(Get-ChildItem (Join-Path $root 'vn') -Filter 'bench_*.vn' | ForEach-O
 if ($Only.Count -gt 0) { $cases = @($cases | Where-Object { $Only -contains $_.Name }) }
 if ($cases.Count -eq 0) { throw "no benchmarks selected (wanted: $($Only -join ', '))" }
 
-$extension = @{ bun = 'js'; node = 'js'; python = 'py' }
 $rows = foreach ($case in $cases) {
     $row = [ordered]@{ Workload = $case.Name }
     foreach ($name in $exe.Keys) {
         if ($name -eq 'varn') {
-            $file = $case.Varn
-            $argv = @('run', "`"$file`"")
+            $argv = @('run', "`"$($case.Varn)`"")
         } else {
-            $file = Join-Path (Join-Path $root $extension[$name]) "$($case.Name).$($extension[$name])"
+            $ext = $extension[$name]
+            $file = Join-Path (Join-Path $root $ext) "$($case.Name).$ext"
             if (-not (Test-Path $file)) { continue }
             $argv = @("`"$file`"")
         }
-        $samples = @()
-        for ($i = 0; $i -lt ($Warmup + $Runs); $i = $i + 1) {
-            $psi = New-Object Diagnostics.ProcessStartInfo
-            $psi.FileName = $exe[$name]
-            $psi.Arguments = $argv -join ' '
-            $psi.UseShellExecute = $false
-            $psi.RedirectStandardOutput = $true
-            $psi.RedirectStandardError = $true
-            $clock = [Diagnostics.Stopwatch]::StartNew()
-            $p = [Diagnostics.Process]::Start($psi)
-            $null = $p.StandardOutput.ReadToEndAsync()
-            $null = $p.StandardError.ReadToEndAsync()
-            $p.WaitForExit()
-            $clock.Stop()
-            if ($p.ExitCode -ne 0) { throw "$name failed on $($case.Name) with exit code $($p.ExitCode)" }
-            if ($i -ge $Warmup) { $samples += $clock.Elapsed.TotalMilliseconds }
-        }
-        $sorted = @($samples | Sort-Object)
-        $row[$name] = [math]::Round($sorted[[int](($sorted.Count - 1) / 2)], 1)
+        $row[$name] = Measure-Median $exe[$name] $argv
     }
     [pscustomobject]$row
 }
 
 $names = @($exe.Keys)
-$header = 'Workload'.PadRight(24) + (($names | ForEach-Object { "$_ ms".PadLeft(10) }) -join '')
-Write-Host $header
-foreach ($row in $rows) {
-    $line = "$($row.Workload)".PadRight(24)
-    foreach ($name in $names) { $line += "$($row.$name)".PadLeft(10) }
-    Write-Host $line
+function Print-Table($title, $selector) {
+    Write-Host ""
+    Write-Host $title
+    $header = 'Workload'.PadRight(24) + (($names | ForEach-Object { "$_".PadLeft(10) }) -join '')
+    Write-Host $header
+    foreach ($row in $rows) {
+        $line = "$($row.Workload)".PadRight(24)
+        foreach ($name in $names) {
+            $value = $row.$name
+            if ($null -eq $value) { $line += '-'.PadLeft(10); continue }
+            $line += ("{0:N1}" -f (& $selector $value $name)).PadLeft(10)
+        }
+        Write-Host $line
+    }
+}
+
+Print-Table 'Wall per process (ms, median)' { param($value, $name) $value }
+Print-Table 'Steady state (wall minus startup, ms)' {
+    param($value, $name)
+    [math]::Max(0, $value - $startup[$name])
 }
