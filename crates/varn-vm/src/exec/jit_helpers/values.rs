@@ -226,7 +226,10 @@ pub(crate) extern "C" fn jit_store_upvalue(
         let val = VmValue::from_raw_parts(val_tag, val_payload);
         if let Err(e) = closure_ref.upvalues[uv_idx].write(val, &mut ctx_ref.stack) {
             super::construct::jit_propagate_error(ctx_ref, e);
+            return;
         }
+        let owner = closure_ref.upvalues[uv_idx].owner();
+        ctx_ref.heap.write_upvalue_barrier(owner, val);
     }
 }
 

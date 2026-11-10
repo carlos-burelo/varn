@@ -54,7 +54,6 @@ pub struct HeapInner {
     pub(super) char_interner: FxHashMap<char, HeapRef>,
     pub(super) major_work: Vec<HeapRef>,
     pub hotspot: Option<Rc<RefCell<HotspotCounters>>>,
-    pub(super) scan_roots: Vec<HeapRef>,
     pub(super) identity_index: FxHashMap<usize, HeapRef>,
     pub(crate) verify_gc: bool,
 }
@@ -92,7 +91,6 @@ impl HeapInner {
             live_bytes_after_major: 0,
             young: YoungGen::new(),
             hotspot: None,
-            scan_roots: Vec::new(),
             identity_index: FxHashMap::default(),
             verify_gc: settings.gc_verify,
         }
@@ -124,18 +122,6 @@ impl HeapInner {
             | HeapObj::Char(_)
             | HeapObj::Spread(_) => None,
         }
-    }
-
-    #[inline(always)]
-    pub(super) fn needs_minor_scan(obj: &HeapObj) -> bool {
-        matches!(
-            obj,
-            HeapObj::VmClosure(_)
-                | HeapObj::BoundMethod(_)
-                | HeapObj::Class(_)
-                | HeapObj::Module(_)
-                | HeapObj::Generator(_)
-        )
     }
 
     #[inline(always)]

@@ -77,15 +77,12 @@ impl HeapInner {
     }
 
     fn alloc_old(&mut self, obj: HeapObj) -> HeapRef {
-        let track = Self::needs_minor_scan(&obj);
         let identity = Self::identity_key(&obj);
         let idx = self.cells.alloc(obj, SlotState::Old);
-        if track {
-            self.scan_roots.push(idx);
-        }
         if let Some(key) = identity {
             self.identity_index.insert(key, idx);
         }
+        self.remember(idx);
         idx
     }
 }

@@ -176,6 +176,7 @@ pub(crate) fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Hea
         }
         Some(HeapObj::Class(c)) => {
             c.add_static(key, val);
+            heap.write_barrier(idx, val);
             Ok(())
         }
         Some(

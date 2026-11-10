@@ -17,6 +17,9 @@ impl HeapInner {
 
         let mut remembered = std::mem::take(&mut self.young.remembered);
         for &r in &remembered {
+            if self.cells.state(r) == SlotState::Free {
+                continue;
+            }
             if self.cells.state(r) == SlotState::Remembered {
                 self.cells.set_state(r, SlotState::Old);
             }
@@ -25,11 +28,13 @@ impl HeapInner {
         remembered.clear();
         self.young.remembered = remembered;
 
-        let scan_roots = std::mem::take(&mut self.scan_roots);
-        for &r in &scan_roots {
-            self.mark_children(r, &mut work);
+        let mut edges = std::mem::take(&mut self.young.edges);
+        for &(parent, child) in &edges {
+            if self.cells.state(parent) == SlotState::Free {
+                continue;
+            }
+            CellSpace::mark_young(child, &mut work);
         }
-        self.scan_roots = scan_roots;
 
         for cell in std::mem::take(&mut self.young_cells) {
             cell.trace_cells(&mut |c| mark_young_value(c.get(), &mut work));
@@ -44,6 +49,13 @@ impl HeapInner {
         self.young.worklist = work;
 
         self.sweep_young();
+
+        edges.retain(|&(parent, child)| {
+            self.cells.state(parent) != SlotState::Free
+                && self.cells.state(child) == SlotState::Young
+        });
+        self.young.edges = edges;
+
         let grown = varn_types::memory::ExternalLedger::total();
         self.alloc_since_major += self.young.bytes + grown;
         varn_types::memory::ExternalLedger::reset();
@@ -77,16 +89,11 @@ impl HeapInner {
                 SlotState::Marked => {
                     self.cells.promote(r);
                     self.young.minor_gc_promoted += 1;
-                    let (track, identity) = match self.instance(r) {
-                        Some(_) => (false, None),
-                        None => {
-                            let obj = self.cells.get(r);
-                            (Self::needs_minor_scan(obj), Self::identity_key(obj))
-                        }
+                    let identity = if self.instance(r).is_some() {
+                        None
+                    } else {
+                        Self::identity_key(self.cells.get(r))
                     };
-                    if track {
-                        self.scan_roots.push(r);
-                    }
                     if let Some(key) = identity {
                         self.identity_index.insert(key, r);
                     }

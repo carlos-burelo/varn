@@ -116,6 +116,8 @@ impl ExecCtx {
                 let (uv, src) = (hi(w1), lo(w1));
                 let val = self.stack.box_reg(base, src);
                 closure.upvalues[uv].write(val, &mut self.stack)?;
+                let owner = closure.upvalues[uv].owner();
+                self.heap.write_upvalue_barrier(owner, val);
             }
             OpCode::CloseUpvalue => {
                 let w1 = code[*ip];

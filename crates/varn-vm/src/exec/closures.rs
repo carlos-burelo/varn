@@ -87,6 +87,13 @@ impl ExecCtx {
 
         closure.module_base = parent.module_base;
         let val = self.heap.alloc_vm_closure(Rc::new(closure));
+        if val.is_heap()
+            && let Some(crate::heap::HeapObj::VmClosure(c)) = self.heap.get(val.as_heap())
+        {
+            for uv in &c.upvalues {
+                uv.set_owner(val.as_heap());
+            }
+        }
         if is_static {
             unsafe { &mut *self.static_closures.get() }.insert(proto_ptr, (proto, val));
         }

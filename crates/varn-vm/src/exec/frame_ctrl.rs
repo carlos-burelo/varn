@@ -11,7 +11,13 @@ impl ExecCtx {
         current_class: Option<std::rc::Rc<varn_types::ClassObj>>,
     ) -> VmValue {
         let state = crate::generator::GenState::new(closure, args, current_class);
-        VmValue::from_heap(self.heap.alloc(crate::heap::HeapObj::Generator(state)))
+        let value = VmValue::from_heap(self.heap.alloc(crate::heap::HeapObj::Generator(state)));
+        if value.is_heap()
+            && let Some(crate::heap::HeapObj::Generator(g)) = self.heap.get(value.as_heap())
+        {
+            g.set_owner(value.as_heap());
+        }
+        value
     }
 }
 

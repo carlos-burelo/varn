@@ -107,6 +107,7 @@ impl ExecCtx {
         if let Some(crate::heap::HeapObj::Module(m)) = self.heap.get_mut(exports_nv.as_heap()) {
             let m = std::rc::Rc::make_mut(m);
             m.set_slot(slot_idx, val_nv);
+            self.heap.write_barrier(exports_nv.as_heap(), val_nv);
         } else {
             return Err(crate::error::RuntimeError::new(
                 "OpStoreModuleSlot: active module object is not a ModuleObj".to_string(),

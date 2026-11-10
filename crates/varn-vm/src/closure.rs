@@ -14,6 +14,7 @@ pub struct VmUpvalue {
 pub struct VmUpvalueInner {
     pub value: VmValue,
     pub stack_slot: Option<SlotAddr>,
+    pub owner: std::cell::Cell<u64>,
 }
 
 impl VmUpvalue {
@@ -22,6 +23,7 @@ impl VmUpvalue {
             inner: Rc::new(RefCell::new(VmUpvalueInner {
                 value: VmValue::null(),
                 stack_slot: Some(stack_slot),
+                owner: std::cell::Cell::new(0),
             })),
         }
     }
@@ -31,8 +33,17 @@ impl VmUpvalue {
             inner: Rc::new(RefCell::new(VmUpvalueInner {
                 value,
                 stack_slot: None,
+                owner: std::cell::Cell::new(0),
             })),
         }
+    }
+
+    pub(crate) fn set_owner(&self, owner: varn_types::HeapRef) {
+        self.inner.borrow().owner.set(owner.addr());
+    }
+
+    pub(crate) fn owner(&self) -> u64 {
+        self.inner.borrow().owner.get()
     }
 
     pub(crate) fn read(&self, store: &FrameStore) -> VmValue {

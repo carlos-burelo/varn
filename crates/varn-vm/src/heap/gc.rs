@@ -4,18 +4,6 @@ use crate::value::VmValue;
 use varn_types::HeapRef;
 
 impl HeapInner {
-    pub(crate) fn rebuild_scan_roots(&mut self) {
-        self.scan_roots.clear();
-        for r in self.cells.refs() {
-            if self.cells.header_kind(r) == varn_types::cell::CELL_KIND_INSTANCE {
-                continue;
-            }
-            if Self::needs_minor_scan(self.cells.get(r)) {
-                self.scan_roots.push(r);
-            }
-        }
-    }
-
     #[inline(always)]
     pub(crate) fn needs_minor_gc(&self) -> bool {
         self.young.is_full()
@@ -26,11 +14,54 @@ impl HeapInner {
         v.is_heap() && self.cells.state(v.as_heap()) == SlotState::Young
     }
 
+    #[inline]
+    fn remembers_whole(&self, parent: HeapRef) -> bool {
+        if self.cells.header_kind(parent) == varn_types::cell::CELL_KIND_INSTANCE {
+            return true;
+        }
+        !matches!(
+            self.cells.get(parent),
+            super::obj::HeapObj::Map(_) | super::obj::HeapObj::Set(_)
+        )
+    }
+
     #[inline(always)]
     pub(crate) fn write_barrier(&mut self, parent: HeapRef, new_val: VmValue) {
-        if self.cells.state(parent) == SlotState::Old && self.is_young(new_val) {
+        if !new_val.is_heap() {
+            return;
+        }
+        let child = new_val.as_heap();
+        if self.cells.state(child) != SlotState::Young {
+            return;
+        }
+        let state = self.cells.state(parent);
+        if state == SlotState::Young {
+            return;
+        }
+        const EDGE_CAP: usize = 1 << 16;
+        if self.remembers_whole(parent) || self.young.edges.len() >= EDGE_CAP {
+            if state != SlotState::Remembered {
+                self.cells.set_state(parent, SlotState::Remembered);
+                self.young.remembered.push(parent);
+            }
+        } else {
+            self.young.edges.push((parent, child));
+        }
+    }
+
+    #[inline]
+    pub(crate) fn remember(&mut self, parent: HeapRef) {
+        let state = self.cells.state(parent);
+        if state != SlotState::Young && state != SlotState::Remembered {
             self.cells.set_state(parent, SlotState::Remembered);
             self.young.remembered.push(parent);
+        }
+    }
+
+    #[inline(always)]
+    pub(crate) fn write_upvalue_barrier(&mut self, owner: u64, val: VmValue) {
+        if owner != 0 {
+            self.write_barrier(unsafe { HeapRef::from_addr_unchecked(owner) }, val);
         }
     }
 
@@ -67,11 +98,11 @@ impl HeapInner {
         self.young.retired += self.young.born.len() as u64;
         self.young.born.clear();
         self.young.remembered.clear();
+        self.young.edges.clear();
         self.young_cells.clear();
         self.young_lazies.clear();
         self.young.bytes = 0;
         self.compact_interners();
-        self.rebuild_scan_roots();
         self.verify_heap(super::verify::Phase::Major);
         self.gc_collections += 1;
         self.gc_total_freed += freed as u64;

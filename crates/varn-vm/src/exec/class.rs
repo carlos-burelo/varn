@@ -18,6 +18,9 @@ pub(crate) fn op_method(
 ) -> VmResult<()> {
     let cls = get_class_arc(class_nv, heap)?;
     cls.add_method_with_owner(name, method_nv, Some(cls.clone()));
+    if class_nv.is_heap() {
+        heap.write_barrier(class_nv.as_heap(), method_nv);
+    }
     Ok(())
 }
 
@@ -35,6 +38,9 @@ pub(crate) fn op_define_static(
         ev.enum_class_id = Some(cls.id);
     }
     cls.add_static(name, val_nv);
+    if class_nv.is_heap() {
+        heap.write_barrier(class_nv.as_heap(), val_nv);
+    }
     Ok(())
 }
 
@@ -54,10 +60,11 @@ pub(crate) fn op_inherit(
         *sub.method_map.borrow_mut() = superclass.method_map.borrow().clone();
 
         sub.set_layout(superclass.layout());
-
-        return Ok(());
+    } else {
+        return Err(RuntimeError::new("OpInherit: not a class"));
     }
-    Err(RuntimeError::new("OpInherit: not a class"))
+    heap.remember(subclass_nv.as_heap());
+    Ok(())
 }
 
 pub(crate) fn op_declare_layout(
@@ -119,6 +126,9 @@ pub(crate) fn op_define_getter(
         closure_nv,
         Some(cls.clone()),
     );
+    if class_nv.is_heap() {
+        heap.write_barrier(class_nv.as_heap(), closure_nv);
+    }
     Ok(())
 }
 
@@ -135,6 +145,9 @@ pub(crate) fn op_define_setter(
         closure_nv,
         Some(cls.clone()),
     );
+    if class_nv.is_heap() {
+        heap.write_barrier(class_nv.as_heap(), closure_nv);
+    }
     Ok(())
 }
 
@@ -146,6 +159,9 @@ pub(crate) fn op_define_static_getter(
 ) -> VmResult<()> {
     let cls = get_class_arc(class_nv, heap)?;
     cls.add_static_getter(name, closure_nv);
+    if class_nv.is_heap() {
+        heap.write_barrier(class_nv.as_heap(), closure_nv);
+    }
     Ok(())
 }
 
@@ -157,6 +173,9 @@ pub(crate) fn op_define_static_setter(
 ) -> VmResult<()> {
     let cls = get_class_arc(class_nv, heap)?;
     cls.add_static_setter(name, closure_nv);
+    if class_nv.is_heap() {
+        heap.write_barrier(class_nv.as_heap(), closure_nv);
+    }
     Ok(())
 }
 

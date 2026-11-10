@@ -182,6 +182,7 @@ pub(crate) fn set_fixed_field(
                 let name = cls.static_fields.borrow().get(slot).cloned();
                 if let Some(name) = name {
                     cls.statics.borrow_mut().insert(name, val);
+                    heap.write_barrier(heap_idx, val);
                     return Ok(());
                 }
             }

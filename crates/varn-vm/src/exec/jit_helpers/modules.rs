@@ -90,6 +90,7 @@ pub(crate) extern "C" fn jit_store_module_slot(
         if let Some(crate::heap::HeapObj::Module(m)) = ctx_ref.heap.get_mut(exports_nv.as_heap()) {
             let m = std::rc::Rc::make_mut(m);
             m.set_slot(slot_idx, val_nv);
+            ctx_ref.heap.write_barrier(exports_nv.as_heap(), val_nv);
         } else {
             panic!("OpStoreModuleSlot: active module object is not a ModuleObj");
         }

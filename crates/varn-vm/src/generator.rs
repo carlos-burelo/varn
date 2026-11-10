@@ -27,6 +27,7 @@ pub struct GenState {
     spare: RefCell<FrameBuffers>,
     pub(crate) is_async: bool,
     closing: std::cell::Cell<bool>,
+    owner: std::cell::Cell<u64>,
 }
 
 impl std::fmt::Debug for GenState {
@@ -51,7 +52,16 @@ impl GenState {
             spare: RefCell::new(FrameBuffers::default()),
             is_async,
             closing: std::cell::Cell::new(false),
+            owner: std::cell::Cell::new(0),
         })
+    }
+
+    pub(crate) fn set_owner(&self, owner: varn_types::HeapRef) {
+        self.owner.set(owner.addr());
+    }
+
+    pub(crate) fn owner(&self) -> u64 {
+        self.owner.get()
     }
 
     pub(crate) fn is_suspended(&self) -> bool {
@@ -276,6 +286,10 @@ impl ExecCtx {
         self.frames.pop();
         self.stack.pop_frame();
         *generator.phase.borrow_mut() = Phase::Suspended { frame, dest_reg };
+        if generator.owner() != 0 {
+            self.heap
+                .remember(unsafe { varn_types::HeapRef::from_addr_unchecked(generator.owner()) });
+        }
         Ok(value)
     }
 
