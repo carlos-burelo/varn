@@ -3,7 +3,8 @@ param(
     [int]$Runs = 5,
     [int]$Warmup = 2,
     [string[]]$Only = @(),
-    [string[]]$Runtimes = @('varn', 'bun', 'node')
+    [string[]]$Runtimes = @('varn', 'bun', 'node', 'python'),
+    [switch]$List
 )
 
 $ErrorActionPreference = 'Stop'
@@ -73,6 +74,7 @@ $cases = @(Get-ChildItem (Join-Path $root 'vn') -Filter 'bench_*.vn' | ForEach-O
     })
 if ($Only.Count -gt 0) { $cases = @($cases | Where-Object { $Only -contains $_.Name }) }
 if ($cases.Count -eq 0) { throw "no benchmarks selected (wanted: $($Only -join ', '))" }
+if ($List) { $cases | ForEach-Object { $_.Name }; exit 0 }
 
 $rows = foreach ($case in $cases) {
     $row = [ordered]@{ Workload = $case.Name }
