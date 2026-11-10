@@ -1,5 +1,5 @@
 use super::cells::{CellSpace, SlotState};
-use super::children::{for_each_child, Reach};
+use super::children::for_each_child;
 use super::structs::HeapInner;
 
 const MAX_REPORTED: usize = 24;
@@ -81,36 +81,33 @@ impl HeapInner {
             if CellSpace::is_marked(r) {
                 problems.push(format!("cell {r:?} keeps the major mark"));
             }
-            if state == SlotState::Marked {
+            if CellSpace::is_minor_marked(r) {
                 problems.push(format!("cell {r:?} keeps the minor mark"));
             }
             if state == SlotState::Young {
+                problems.push(format!(
+                    "young {} {r:?} survived a minor collection unmarked (raw {:#x})",
+                    describe_kind(self.cells.header_kind(r)),
+                    CellSpace::raw_state(r)
+                ));
+            }
+            if state == SlotState::Young || state == SlotState::Survivor {
                 young += 1;
             }
-            for_each_child(
-                &self.cells,
-                r,
-                &self.identity_index,
-                Reach::Major,
-                &mut |child| {
-                    let child_state = self.cells.state(child);
-                    if child_state == SlotState::Free {
-                        problems.push(format!(
-                            "live {} `{}` {r:?} points to freed {} {child:?}",
-                            describe_kind(self.cells.header_kind(r)),
-                            self.describe_name(r),
-                            describe_kind(self.cells.header_kind(child))
-                        ));
-                    } else if phase == Phase::Minor
-                        && matches!(state, SlotState::Old | SlotState::Remembered)
-                        && matches!(child_state, SlotState::Young | SlotState::Marked)
-                    {
-                        problems.push(format!(
-                            "old cell {r:?} reaches young cell {child:?} with no barrier"
-                        ));
-                    }
-                },
-            );
+            for_each_child(&self.cells, r, &self.identity_index, None, &mut |child| {
+                let child_state = self.cells.state(child);
+                if child_state == SlotState::Free {
+                    problems.push(format!(
+                        "live {} `{}` {r:?} (state {}) points to freed {} {child:?} [remembered={} edge={}]",
+                        describe_kind(self.cells.header_kind(r)),
+                        self.describe_name(r),
+                        state as u8,
+                        describe_kind(self.cells.header_kind(child)),
+                        self.young.remembered.contains(&r),
+                        self.young.edges.iter().any(|&(p, _)| p == r)
+                    ));
+                }
+            });
         }
         if phase == Phase::Major && young > 0 {
             problems.push(format!("{young} young cells outlived a major collection"));

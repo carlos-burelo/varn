@@ -88,16 +88,6 @@ impl VmArray {
             ArrayRepr::I64(_) | ArrayRepr::F64(_) => None,
         }
     }
-
-    pub fn scan_dirty(&self, mut f: impl FnMut(VmValue)) {
-        if let ArrayRepr::Boxed(b) = self.repr_mut() {
-            let from = (b.clean_prefix as usize).min(b.items.len());
-            for &v in &b.items[from..] {
-                f(v);
-            }
-            b.clean_prefix = b.items.len() as u32;
-        }
-    }
 }
 
 impl PartialEq for VmArray {

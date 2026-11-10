@@ -142,6 +142,7 @@ pub(crate) fn map_set_index(
         if let Some(m) = maybe_m {
             let k = heap.canonical_map_key(key);
             m.write().insert(k, val);
+            heap.write_barrier(heap_idx, k.0);
             heap.write_barrier(heap_idx, val);
             return Ok(());
         }
@@ -350,6 +351,7 @@ pub(crate) fn set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Hea
             let m = *m;
             let k = heap.canonical_map_key(key);
             m.write().insert(k, val);
+            heap.write_barrier(heap_idx, k.0);
             heap.write_barrier(heap_idx, val);
             Ok(())
         }

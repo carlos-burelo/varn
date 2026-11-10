@@ -25,7 +25,7 @@ impl Heap {
             alloc_count: young.alloc_count() + inner.cells.old_births,
             gc_collections: inner.gc_collections,
             gc_total_freed: inner.gc_total_freed,
-            gc_alloc_since_collect: inner.alloc_since_major,
+            gc_alloc_since_collect: inner.cells.old_bytes,
             gc_threshold: inner.gc_threshold,
         };
 
@@ -46,7 +46,7 @@ impl Heap {
             };
             let row = counts.entry(name).or_default();
             match state {
-                SlotState::Young | SlotState::Marked => row.0 += 1,
+                SlotState::Young | SlotState::Survivor => row.0 += 1,
                 SlotState::Old | SlotState::Remembered => row.1 += 1,
                 SlotState::Free => {}
             }

@@ -113,6 +113,7 @@ impl ClassObj {
     }
 
     pub fn set_layout(self: &Rc<Self>, layout: Rc<varn_core::layout::ClassLayout>) {
+        super::instance::invalidate_layout_cache();
         let properties: HashMap<RuntimeString, usize> = layout
             .fields
             .iter()

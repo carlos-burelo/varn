@@ -13,6 +13,9 @@ use varn_types::cell::{
 use varn_types::HeapRef;
 
 const MAJOR_MARK: u8 = 0x80;
+const MINOR_MARK: u8 = 0x40;
+const TRACED: u8 = 0x20;
+const STATE_MASK: u8 = 0x0F;
 
 const _: () = assert!(HEADER_BYTES == 8);
 const _: () = assert!(HEADER_BYTES == std::mem::size_of::<ObjHeader>());
@@ -36,20 +39,30 @@ pub(crate) enum SlotState {
     Old = 1,
     Remembered = 2,
     Young = 3,
-    Marked = 4,
+    Survivor = 4,
 }
 
 impl SlotState {
     #[inline(always)]
     fn from_byte(b: u8) -> Self {
-        match b & !MAJOR_MARK {
+        match b & STATE_MASK {
             1 => Self::Old,
             2 => Self::Remembered,
             3 => Self::Young,
-            4 => Self::Marked,
+            4 => Self::Survivor,
             _ => Self::Free,
         }
     }
+}
+
+#[inline(always)]
+fn instance_has_references(r: HeapRef) -> bool {
+    let inst = unsafe {
+        varn_types::value::InstanceRef::from_data_ptr(
+            (r.addr() as usize + varn_types::cell::INST_CELL_DATA_OFF) as *mut u8,
+        )
+    };
+    inst.has_gc_references()
 }
 
 #[inline(always)]
@@ -69,7 +82,7 @@ pub(crate) struct CellSpace {
     pub(in crate::heap) native_roots: Vec<HeapRef>,
     pub(crate) old_births: u64,
     pub(crate) survivors: usize,
-    pub(crate) live_bytes: u64,
+    pub(crate) old_bytes: u64,
     pub(crate) abandon_objects: bool,
 }
 
@@ -82,7 +95,7 @@ impl Default for CellSpace {
             native_roots: Vec::new(),
             old_births: 0,
             survivors: 0,
-            live_bytes: 0,
+            old_bytes: 0,
             abandon_objects: false,
         }
     }
@@ -165,10 +178,6 @@ impl CellSpace {
         header(r).state = state as u8;
     }
 
-    pub(crate) fn promote(&mut self, r: HeapRef) {
-        self.set_state(r, SlotState::Old);
-    }
-
     #[inline(always)]
     pub(crate) fn cell_bytes(&self, r: HeapRef) -> u64 {
         let h = header(r);
@@ -182,6 +191,11 @@ impl CellSpace {
     pub(crate) fn release(&mut self, r: HeapRef) {
         let h = header(r);
         let class = h.class;
+        let state = SlotState::from_byte(h.state);
+        if matches!(state, SlotState::Old | SlotState::Remembered) {
+            let bytes = self.cell_bytes(r) + crate::heap::bytes::external_bytes(self, r);
+            self.old_bytes = self.old_bytes.saturating_sub(bytes);
+        }
         if h.kind != varn_types::cell::CELL_KIND_INSTANCE {
             unsafe { Self::drop_object(r) };
         }
@@ -202,8 +216,15 @@ impl CellSpace {
     #[inline(always)]
     pub(crate) fn mark_young(r: HeapRef, work: &mut Vec<HeapRef>) {
         let h = header(r);
-        if h.state == SlotState::Young as u8 {
-            h.state = SlotState::Marked as u8;
+        if h.state & MINOR_MARK != 0 {
+            return;
+        }
+        let state = h.state & STATE_MASK;
+        if state == SlotState::Young as u8 || state == SlotState::Survivor as u8 {
+            h.state |= MINOR_MARK;
+            if h.kind == varn_types::cell::CELL_KIND_INSTANCE && !instance_has_references(r) {
+                return;
+            }
             work.push(r);
         }
     }
@@ -215,7 +236,7 @@ impl CellSpace {
             return false;
         }
         h.state |= MAJOR_MARK;
-        true
+        h.kind != varn_types::cell::CELL_KIND_INSTANCE || instance_has_references(r)
     }
 
     #[inline(always)]
@@ -271,6 +292,36 @@ impl CellSpace {
         self.refs().count()
     }
 
+    #[inline(always)]
+    pub(crate) fn is_minor_marked(r: HeapRef) -> bool {
+        header(r).state & MINOR_MARK != 0
+    }
+
+    #[inline(always)]
+    pub(crate) fn set_state_raw(r: HeapRef, state: SlotState) {
+        header(r).state = state as u8;
+    }
+
+    #[inline(always)]
+    pub(crate) fn take_traced(r: HeapRef) -> bool {
+        let h = header(r);
+        if h.state & TRACED != 0 {
+            return false;
+        }
+        h.state |= TRACED;
+        true
+    }
+
+    #[inline(always)]
+    pub(crate) fn clear_traced(r: HeapRef) {
+        header(r).state &= !TRACED;
+    }
+
+    #[inline(always)]
+    pub(crate) fn raw_state(r: HeapRef) -> u8 {
+        header(r).state
+    }
+
     pub(crate) fn free_len(&self) -> usize {
         self.classes.iter().map(SizeClass::free_len).sum()
     }
@@ -296,26 +347,16 @@ impl CellSpace {
     pub(crate) fn sweep_major(&mut self) -> usize {
         let mut dead: Vec<HeapRef> = Vec::new();
         let mut survivors = 0;
-        let mut live_bytes = 0u64;
         for r in self.refs() {
             let h = header(r);
             if h.state & MAJOR_MARK != 0 {
                 h.state = SlotState::Old as u8;
                 survivors += 1;
-                live_bytes += if h.class == CELL_CLASS_LARGE {
-                    h._aux as u64
-                } else {
-                    (unsafe { *CELL_CLASSES.get_unchecked(h.class as usize) }) as u64
-                };
-                if h.kind != varn_types::cell::CELL_KIND_INSTANCE {
-                    live_bytes += crate::heap::bytes::external_bytes(self, r);
-                }
             } else {
                 dead.push(r);
             }
         }
         self.survivors = survivors;
-        self.live_bytes = live_bytes;
         for &r in &dead {
             self.release(r);
         }

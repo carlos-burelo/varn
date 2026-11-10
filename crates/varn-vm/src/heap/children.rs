@@ -5,17 +5,11 @@ use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_types::HeapRef;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Reach {
-    Minor,
-    Major,
-}
-
 pub(crate) fn for_each_child(
     cells: &CellSpace,
     r: HeapRef,
     identity: &FxHashMap<usize, HeapRef>,
-    reach: Reach,
+    minor: Option<u32>,
     f: &mut impl FnMut(HeapRef),
 ) {
     if cells.header_kind(r) == varn_types::cell::CELL_KIND_INSTANCE {
@@ -30,18 +24,20 @@ pub(crate) fn for_each_child(
             }
         };
         inst.for_each_reference(&mut value);
-        if let Some(cls) = varn_types::ClassObj::find_by_id(inst.class_id) {
+        if minor.is_none()
+            && let Some(cls) = varn_types::ClassObj::find_by_id(inst.class_id)
+        {
             class_child(&cls, identity, &mut value);
         }
         return;
     }
-    for_each_heap_child(cells.get(r), identity, reach, f)
+    for_each_heap_child(cells.get(r), identity, minor, f)
 }
 
 fn for_each_heap_child(
     obj: &HeapObj,
     identity: &FxHashMap<usize, HeapRef>,
-    reach: Reach,
+    minor: Option<u32>,
     f: &mut impl FnMut(HeapRef),
 ) {
     let mut value = |v: VmValue| {
@@ -59,18 +55,17 @@ fn for_each_heap_child(
         | HeapObj::FrozenModule(_)
         | HeapObj::Buffer(_) => {}
         HeapObj::Module(m) => m.exports.iter().for_each(|&v| value(v)),
-        HeapObj::Array(arr) | HeapObj::Tuple(arr) => match reach {
-            Reach::Minor => arr.scan_dirty(value),
-            Reach::Major => {
-                if let Some(items) = arr.as_boxed() {
-                    items.iter().for_each(|&v| value(v));
-                }
+        HeapObj::Array(arr) | HeapObj::Tuple(arr) => {
+            if let Some(items) = arr.as_boxed() {
+                items.iter().for_each(|&v| value(v));
             }
-        },
+        }
         HeapObj::Object(obj_ref) => {
             let guard = obj_ref.borrow();
             guard.for_each_field(|_, v| value(v));
-            if let Some(cls) = guard.class() {
+            if minor.is_none()
+                && let Some(cls) = guard.class()
+            {
                 class_child(&cls, identity, &mut value);
             }
         }
@@ -84,7 +79,9 @@ fn for_each_heap_child(
         }
         HeapObj::Class(cls) => {
             cls.for_each_value_mut(&mut |v| value(*v));
-            if let Some(parent) = cls.superclass.borrow().as_ref() {
+            if minor.is_none()
+                && let Some(parent) = cls.superclass.borrow().as_ref()
+            {
                 class_child(parent, identity, &mut value);
             }
         }

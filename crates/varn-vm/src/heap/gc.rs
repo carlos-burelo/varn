@@ -11,11 +11,17 @@ impl HeapInner {
 
     #[inline(always)]
     pub(crate) fn is_young(&self, v: VmValue) -> bool {
-        v.is_heap() && self.cells.state(v.as_heap()) == SlotState::Young
+        if !v.is_heap() {
+            return false;
+        }
+        matches!(
+            self.cells.state(v.as_heap()),
+            SlotState::Young | SlotState::Survivor
+        )
     }
 
     #[inline]
-    fn remembers_whole(&self, parent: HeapRef) -> bool {
+    pub(crate) fn remembers_whole(&self, parent: HeapRef) -> bool {
         if self.cells.header_kind(parent) == varn_types::cell::CELL_KIND_INSTANCE {
             return true;
         }
@@ -31,11 +37,11 @@ impl HeapInner {
             return;
         }
         let child = new_val.as_heap();
-        if self.cells.state(child) != SlotState::Young {
+        if !self.is_young(new_val) {
             return;
         }
         let state = self.cells.state(parent);
-        if state == SlotState::Young {
+        if matches!(state, SlotState::Young | SlotState::Survivor) {
             return;
         }
         const EDGE_CAP: usize = 1 << 16;
@@ -67,7 +73,7 @@ impl HeapInner {
 
     #[inline(always)]
     pub(crate) fn needs_gc(&self) -> bool {
-        self.alloc_since_major >= self.gc_threshold
+        self.cells.old_bytes >= self.gc_threshold
     }
 
     pub(crate) fn recompute_young_limit(&mut self) {
@@ -97,6 +103,7 @@ impl HeapInner {
         let freed = self.mark_and_sweep(roots);
         self.young.retired += self.young.born.len() as u64;
         self.young.born.clear();
+        self.young.survivors.clear();
         self.young.remembered.clear();
         self.young.edges.clear();
         self.young_cells.clear();
@@ -106,9 +113,7 @@ impl HeapInner {
         self.verify_heap(super::verify::Phase::Major);
         self.gc_collections += 1;
         self.gc_total_freed += freed as u64;
-        let alloc_since_major = self.alloc_since_major;
-        self.alloc_since_major = 0;
-        self.live_bytes_after_major = self.cells.live_bytes;
+        self.live_bytes_after_major = self.cells.old_bytes;
         self.gc_threshold = (2 * self.live_bytes_after_major).max(2 * self.nursery_bytes);
         varn_types::memory::ExternalLedger::reset();
         self.recompute_young_limit();
@@ -117,7 +122,7 @@ impl HeapInner {
                 self.gc_collections,
                 freed,
                 self.live_bytes_after_major,
-                alloc_since_major,
+                self.gc_threshold,
                 started.elapsed(),
             );
         }

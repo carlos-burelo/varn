@@ -1,5 +1,5 @@
 use super::cells::CellSpace;
-use super::children::{for_each_child, Reach};
+use super::children::for_each_child;
 use super::structs::HeapInner;
 use varn_types::HeapRef;
 
@@ -13,17 +13,11 @@ impl HeapInner {
             }
         }
         while let Some(r) = work.pop() {
-            for_each_child(
-                &self.cells,
-                r,
-                &self.identity_index,
-                Reach::Major,
-                &mut |child| {
-                    if CellSpace::mark_major(child) {
-                        work.push(child);
-                    }
-                },
-            );
+            for_each_child(&self.cells, r, &self.identity_index, None, &mut |child| {
+                if CellSpace::mark_major(child) {
+                    work.push(child);
+                }
+            });
         }
         self.major_work = work;
         self.cells.sweep_major()

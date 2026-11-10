@@ -28,7 +28,6 @@ impl VmArray {
                 ArrayRepr::Boxed(v) => {
                     return if idx < v.items.len() {
                         v.items[idx] = val;
-                        v.clean_prefix = v.clean_prefix.min(idx as u32);
                         true
                     } else {
                         false
@@ -109,11 +108,7 @@ impl VmArray {
     #[inline]
     pub fn pop_vm(&self) -> Option<VmValue> {
         match self.repr_mut() {
-            ArrayRepr::Boxed(v) => {
-                let popped = v.items.pop();
-                v.clean_prefix = v.clean_prefix.min(v.items.len() as u32);
-                popped
-            }
+            ArrayRepr::Boxed(v) => v.items.pop(),
             ArrayRepr::I64(v) => v.pop().map(VmValue::from_int),
             ArrayRepr::F64(v) => v.pop().map(VmValue::from_f64),
         }
@@ -135,10 +130,7 @@ impl VmArray {
             }
         }
         match self.repr_mut() {
-            ArrayRepr::Boxed(v) => {
-                v.clean_prefix = 0;
-                &mut v.items
-            }
+            ArrayRepr::Boxed(v) => &mut v.items,
             ArrayRepr::I64(_) | ArrayRepr::F64(_) => unreachable!(),
         }
     }

@@ -34,6 +34,7 @@ pub fn note_end(
     promoted_after: u64,
     cells_bytes: u64,
     external_bytes: u64,
+    phases: (std::time::Duration, std::time::Duration),
 ) {
     if !enabled() {
         return;
@@ -42,8 +43,10 @@ pub fn note_end(
     let promoted_this = promoted_after - before.promoted_before;
     let reclaimed = before.objects_before.saturating_sub(promoted_this as usize);
     eprintln!(
-        "[gc] minor #{collection_no}: in={} cells={cells_bytes}B external={external_bytes}B promoted={promoted_this} reclaimed={reclaimed} took={:.3}ms",
+        "[gc] minor #{collection_no}: in={} cells={cells_bytes}B external={external_bytes}B promoted={promoted_this} reclaimed={reclaimed} mark={:.3}ms sweep={:.3}ms took={:.3}ms",
         before.objects_before,
+        phases.0.as_secs_f64() * 1000.0,
+        phases.1.as_secs_f64() * 1000.0,
         elapsed.as_secs_f64() * 1000.0,
     );
 }
@@ -52,14 +55,14 @@ pub fn major(
     collection_no: u64,
     freed: usize,
     live_bytes: u64,
-    alloc_since_major: u64,
+    threshold: u64,
     took: std::time::Duration,
 ) {
     if !enabled() {
         return;
     }
     eprintln!(
-        "[gc] major #{collection_no}: freed={freed} live={live_bytes}B alloc_since_major={alloc_since_major}B took={:.3}ms",
+        "[gc] major #{collection_no}: freed={freed} old={live_bytes}B next={threshold}B took={:.3}ms",
         took.as_secs_f64() * 1000.0,
     );
 }

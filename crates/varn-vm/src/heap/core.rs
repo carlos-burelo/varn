@@ -79,10 +79,16 @@ impl HeapInner {
     fn alloc_old(&mut self, obj: HeapObj) -> HeapRef {
         let identity = Self::identity_key(&obj);
         let idx = self.cells.alloc(obj, SlotState::Old);
+        self.note_old(idx);
         if let Some(key) = identity {
             self.identity_index.insert(key, idx);
         }
         self.remember(idx);
         idx
+    }
+
+    pub(crate) fn note_old(&mut self, r: HeapRef) {
+        self.cells.old_bytes +=
+            self.cells.cell_bytes(r) + super::bytes::external_bytes(&self.cells, r);
     }
 }

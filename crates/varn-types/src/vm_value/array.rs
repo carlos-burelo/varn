@@ -14,16 +14,12 @@ pub enum ArrayRepr {
 #[derive(Debug)]
 pub struct BoxedElems {
     pub(super) items: Vec<VmValue>,
-    pub(super) clean_prefix: u32,
 }
 
 impl BoxedElems {
     #[inline(always)]
     pub fn new(items: Vec<VmValue>) -> Self {
-        Self {
-            items,
-            clean_prefix: 0,
-        }
+        Self { items }
     }
 
     #[inline(always)]

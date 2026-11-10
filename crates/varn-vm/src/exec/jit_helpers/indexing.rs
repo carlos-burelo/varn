@@ -173,6 +173,7 @@ pub(crate) unsafe extern "C" fn jit_array_set_fast(
             let m = *m;
             let k = ctx_ref.heap.canonical_map_key(key);
             m.write().insert(k, val);
+            ctx_ref.heap.write_barrier(heap_idx, k.0);
             ctx_ref.heap.write_barrier(heap_idx, val);
             return;
         }

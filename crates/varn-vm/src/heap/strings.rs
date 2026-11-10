@@ -54,6 +54,7 @@ impl HeapInner {
         let idx = self
             .cells
             .alloc(HeapObj::Str(HeapStr::shared(rs.clone())), SlotState::Old);
+        self.note_old(idx);
         if let HeapObj::Str(hs) = self.cells.get(idx) {
             hs.mark_interned();
         }

@@ -1,9 +1,17 @@
 use super::ClassObj;
 use crate::vm_value::VmValue;
-use std::cell::UnsafeCell;
+use std::cell::{RefCell, UnsafeCell};
 use std::ptr;
 use std::rc::Rc;
 use varn_core::layout::{ClassLayout, FieldLayout, ScalarRepr, TypeLayout, COMPACT_REF_NULL};
+
+thread_local! {
+    static LAYOUT_CACHE: RefCell<Option<(u32, Rc<ClassLayout>)>> = const { RefCell::new(None) };
+}
+
+pub(crate) fn invalidate_layout_cache() {
+    LAYOUT_CACHE.with(|cache| *cache.borrow_mut() = None);
+}
 
 #[repr(C, align(8))]
 pub struct InstanceData<T: ?Sized = [UnsafeCell<u8>]> {
@@ -87,7 +95,19 @@ impl InstanceData {
 
     #[inline]
     fn layout(&self) -> Option<Rc<ClassLayout>> {
-        ClassObj::find_by_id(self.class_id).map(|c| c.layout())
+        let id = self.class_id;
+        if let Some(cached) = LAYOUT_CACHE.with(|cache| {
+            cache
+                .borrow()
+                .as_ref()
+                .filter(|(cached_id, _)| *cached_id == id)
+                .map(|(_, layout)| Rc::clone(layout))
+        }) {
+            return Some(cached);
+        }
+        let layout = ClassObj::find_by_id(id).map(|c| c.layout())?;
+        LAYOUT_CACHE.with(|cache| *cache.borrow_mut() = Some((id, Rc::clone(&layout))));
+        Some(layout)
     }
 
     #[inline]
@@ -222,6 +242,11 @@ impl InstanceData {
             }
         }
         Ok(())
+    }
+
+    pub fn has_gc_references(&self) -> bool {
+        self.layout()
+            .is_some_and(|layout| !layout.gc.slots.is_empty())
     }
 
     pub fn for_each_reference(&self, mut f: impl FnMut(VmValue)) {
