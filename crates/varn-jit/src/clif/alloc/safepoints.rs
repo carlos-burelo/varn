@@ -129,11 +129,13 @@ pub(crate) fn emit_gc_poll(
         rcbox,
         h.young_len_offset as i32,
     );
-    let over = b.ins().icmp_imm_u(
-        IntCC::UnsignedGreaterThanOrEqual,
-        len,
-        h.young_threshold as i64,
+    let limit = b.ins().load(
+        types::I64,
+        cranelift_codegen::ir::MemFlagsData::trusted(),
+        rcbox,
+        h.young_limit_offset as i32,
     );
+    let over = b.ins().icmp(IntCC::UnsignedGreaterThanOrEqual, len, limit);
     let slow = b.create_block();
     let cont = b.create_block();
     b.ins().brif(over, slow, &[], cont, &[]);

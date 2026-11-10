@@ -168,6 +168,11 @@ impl ExecCtx {
                 self.heap.young.len(),
                 "JIT safepoint: young length offset chain is stale"
             );
+            let limit = *(rcbox.add(Heap::young_limit_byte_offset_from_rcbox()) as *const u64);
+            assert_eq!(
+                limit, self.heap.young.limit_cells,
+                "JIT safepoint: young limit offset chain is stale"
+            );
         }
     }
 

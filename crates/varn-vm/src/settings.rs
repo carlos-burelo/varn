@@ -19,15 +19,19 @@ impl ExecSettings {
     const OSR_BACKEDGES: u32 = 1000;
     const TIER_LOOP: u32 = 1;
     const TIER_STRAIGHT: u32 = 128;
-    const YOUNG_THRESHOLD: usize = 786432;
-    const OLD_FLOOR: u64 = Self::YOUNG_THRESHOLD as u64;
+    const NURSERY_BYTES: u64 = 16 << 20;
+    const STRESS_CELL_BYTES: u64 = 24;
 
-    pub fn young_threshold(&self) -> usize {
-        self.gc_stress.unwrap_or(Self::YOUNG_THRESHOLD)
+    pub fn nursery_bytes(&self) -> u64 {
+        self.gc_stress
+            .map_or(Self::NURSERY_BYTES, |cells| {
+                (cells as u64).saturating_mul(Self::STRESS_CELL_BYTES)
+            })
+            .max(Self::STRESS_CELL_BYTES)
     }
 
-    pub fn old_floor(&self) -> u64 {
-        self.gc_stress.map_or(Self::OLD_FLOOR, |cells| cells as u64)
+    pub fn stress_cells(&self) -> Option<u64> {
+        self.gc_stress.map(|cells| cells as u64)
     }
 
     pub fn of(settings: &varn_core::env::Settings, trace: bool) -> Self {

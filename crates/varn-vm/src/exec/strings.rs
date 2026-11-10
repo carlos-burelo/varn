@@ -113,6 +113,8 @@ fn str_concat_unchecked(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
         if target_len > cur_cap {
             let new_cap = (cur_cap * 2).max(target_len).max(64);
             unsafe { (*buf.get()).reserve(new_cap - len) };
+            let grown = unsafe { (&*buf.get()).capacity() } - cur_cap;
+            varn_types::memory::ExternalLedger::grow(grown);
         }
         unsafe { (*buf.get()).push_str(&sb) };
         return heap.alloc_str_view(HeapStr::ext(buf, target_len, flag));
@@ -222,6 +224,8 @@ fn try_append_tip(heap: &mut Heap, first: VmValue, rest: &[VmValue]) -> Option<V
     if target_len > cur_cap {
         let new_cap = (cur_cap * 2).max(target_len).max(64);
         unsafe { (*buf.get()).reserve(new_cap - len) };
+        let grown = unsafe { (&*buf.get()).capacity() } - cur_cap;
+        varn_types::memory::ExternalLedger::grow(grown);
     }
     unsafe { (*buf.get()).push_str(&sb) };
     Some(heap.alloc_str_view(HeapStr::ext(buf, target_len, flag)))

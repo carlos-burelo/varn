@@ -37,12 +37,11 @@ fn mode() -> Mode {
 
 fn key(
     proto: &FunctionProto,
-    helpers: &varn_jit::JitHelpers,
+    _helpers: &varn_jit::JitHelpers,
     osr: Option<varn_types::ssa::OsrRequest>,
 ) -> Option<u64> {
     let mut bytes = postcard::to_allocvec(proto).ok()?;
     bytes.extend_from_slice(&varn_jit::isa_identity().to_le_bytes());
-    bytes.extend_from_slice(&(helpers.young_threshold as u64).to_le_bytes());
     bytes.extend_from_slice(&varn_jit::JIT_HELPERS_VERSION.to_le_bytes());
     if let Some(req) = osr {
         bytes.extend_from_slice(&(req.ip as u64).to_le_bytes());

@@ -1,4 +1,15 @@
 use super::{ArrayRepr, BoxedElems, VmArray, VmValue};
+use crate::memory::ExternalLedger;
+
+#[inline(always)]
+fn push_vec<T>(v: &mut Vec<T>, val: T) {
+    let cap_before = v.capacity();
+    let grows = v.len() == cap_before;
+    v.push(val);
+    if grows {
+        ExternalLedger::grow((v.capacity() - cap_before) * std::mem::size_of::<T>());
+    }
+}
 
 impl VmArray {
     #[inline]
@@ -54,19 +65,19 @@ impl VmArray {
             match self.repr_mut() {
                 ArrayRepr::Boxed(v) => {
                     if !v.items.is_empty() {
-                        v.items.push(val);
+                        push_vec(&mut v.items, val);
                         return;
                     }
                 }
                 ArrayRepr::I64(v) => {
                     if val.is_int() {
-                        v.push(val.as_int());
+                        push_vec(v, val.as_int());
                         return;
                     }
                 }
                 ArrayRepr::F64(v) => {
                     if val.is_f64() {
-                        v.push(val.as_f64());
+                        push_vec(v, val.as_f64());
                         return;
                     }
                 }
@@ -79,8 +90,10 @@ impl VmArray {
     fn push_repr_change(&self, val: VmValue) {
         if matches!(self.repr(), ArrayRepr::Boxed(_)) {
             if val.is_int() {
+                ExternalLedger::grow(std::mem::size_of::<i64>());
                 *self.repr_mut() = ArrayRepr::I64(vec![val.as_int()]);
             } else if val.is_f64() {
+                ExternalLedger::grow(std::mem::size_of::<f64>());
                 *self.repr_mut() = ArrayRepr::F64(vec![val.as_f64()]);
             } else {
                 match self.repr_mut() {
@@ -117,6 +130,7 @@ impl VmArray {
                     ArrayRepr::F64(v) => v.iter().map(|&f| VmValue::from_f64(f)).collect(),
                     ArrayRepr::Boxed(_) => unreachable!(),
                 };
+                ExternalLedger::grow(boxed.capacity() * std::mem::size_of::<VmValue>());
                 *repr = ArrayRepr::Boxed(BoxedElems::new(boxed));
             }
         }

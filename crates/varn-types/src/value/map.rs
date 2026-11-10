@@ -52,6 +52,10 @@ impl ValueSet {
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &MapKey> + '_ {
         self.0.keys()
     }
+
+    pub fn heap_bytes(&self) -> u64 {
+        self.0.heap_bytes()
+    }
 }
 
 pub struct CellTable<T>(NonNull<UnsafeCell<T>>);

@@ -15,6 +15,12 @@ impl Heap {
             + super::young::YoungGen::born_len_byte_offset()
     }
 
+    pub(crate) fn young_limit_byte_offset_from_rcbox() -> usize {
+        RCBOX_PREFIX
+            + std::mem::offset_of!(HeapInner, young)
+            + super::young::YoungGen::limit_byte_offset()
+    }
+
     pub(crate) fn rcbox_ptr_for_validation(&self) -> *const u8 {
         (Rc::as_ptr(&self.inner) as *const u8).wrapping_sub(2 * std::mem::size_of::<usize>())
     }

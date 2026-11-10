@@ -24,6 +24,7 @@ impl ObjData<[Cell<VmValue>]> {
                 return;
             }
 
+            self.reserve_overflow(slot - self.inline_len() + 1);
             let overflow = self.overflow_mut();
             overflow.resize(slot - self.inline_len() + 1, VmValue::null());
             overflow[slot - self.inline_len()] = value;
@@ -39,11 +40,13 @@ impl ObjData<[Cell<VmValue>]> {
             self.values[slot].set(value);
             return;
         }
-        let overflow = self.overflow_mut();
-        if slot - base >= overflow.len() {
-            overflow.resize(slot - base + 1, VmValue::null());
+        let needs = slot - base + 1;
+        let len = self.overflow().map_or(0, |o| o.len());
+        if needs > len {
+            self.reserve_overflow(needs);
+            self.overflow_mut().resize(needs, VmValue::null());
         }
-        overflow[slot - base] = value;
+        self.overflow_mut()[slot - base] = value;
     }
 
     pub fn remove(&self, name: &str) -> Option<VmValue> {
@@ -71,6 +74,7 @@ impl ObjData<[Cell<VmValue>]> {
         self.set_shape(new_shape);
 
         let base = self.inline_len();
+        self.reserve_overflow(remaining.len().saturating_sub(base));
         let overflow = self.overflow_mut();
         overflow.clear();
         for (i, (_, v)) in remaining.iter().enumerate() {
@@ -177,6 +181,7 @@ impl ObjData<[Cell<VmValue>]> {
             if self.set_field_at(slot, value) {
                 return;
             }
+            self.reserve_overflow(slot - self.inline_len() + 1);
             let overflow = self.overflow_mut();
             overflow.resize(slot - self.inline_len() + 1, VmValue::null());
             overflow[slot - self.inline_len()] = value;
@@ -192,10 +197,12 @@ impl ObjData<[Cell<VmValue>]> {
             self.values[slot].set(value);
             return;
         }
-        let overflow = self.overflow_mut();
-        if slot - base >= overflow.len() {
-            overflow.resize(slot - base + 1, VmValue::null());
+        let needs = slot - base + 1;
+        let len = self.overflow().map_or(0, |o| o.len());
+        if needs > len {
+            self.reserve_overflow(needs);
+            self.overflow_mut().resize(needs, VmValue::null());
         }
-        overflow[slot - base] = value;
+        self.overflow_mut()[slot - base] = value;
     }
 }

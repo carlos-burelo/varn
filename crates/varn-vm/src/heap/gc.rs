@@ -36,7 +36,19 @@ impl HeapInner {
 
     #[inline(always)]
     pub(crate) fn needs_gc(&self) -> bool {
-        self.cells.old_growth >= self.gc_threshold
+        self.alloc_since_major >= self.gc_threshold
+    }
+
+    pub(crate) fn recompute_young_limit(&mut self) {
+        const MIN_LIMIT: u64 = 1024;
+        const UNKNOWN_CELL_BYTES: u64 = 24;
+        let avg = if self.young.len() == 0 {
+            UNKNOWN_CELL_BYTES
+        } else {
+            (self.young.bytes / self.young.len() as u64).max(1)
+        };
+        let limit = (self.nursery_bytes / avg).max(MIN_LIMIT);
+        self.young.limit_cells = self.stress_cells.map_or(limit, |cells| limit.min(cells));
     }
 
     pub(crate) fn compact_interners(&mut self) {
@@ -50,20 +62,34 @@ impl HeapInner {
     }
 
     pub(crate) fn collect(&mut self, roots: &[HeapRef]) -> usize {
+        let started = crate::gc_trace::enabled().then(std::time::Instant::now);
         let freed = self.mark_and_sweep(roots);
         self.young.retired += self.young.born.len() as u64;
         self.young.born.clear();
         self.young.remembered.clear();
         self.young_cells.clear();
         self.young_lazies.clear();
+        self.young.bytes = 0;
         self.compact_interners();
         self.rebuild_scan_roots();
         self.verify_heap(super::verify::Phase::Major);
         self.gc_collections += 1;
         self.gc_total_freed += freed as u64;
-        self.cells.old_growth = 0;
-        let live = self.cells.survivors as u64;
-        self.gc_threshold = (live * 2).max(self.gc_floor);
+        let alloc_since_major = self.alloc_since_major;
+        self.alloc_since_major = 0;
+        self.live_bytes_after_major = self.cells.live_bytes;
+        self.gc_threshold = (2 * self.live_bytes_after_major).max(2 * self.nursery_bytes);
+        varn_types::memory::ExternalLedger::reset();
+        self.recompute_young_limit();
+        if let Some(started) = started {
+            crate::gc_trace::major(
+                self.gc_collections,
+                freed,
+                self.live_bytes_after_major,
+                alloc_since_major,
+                started.elapsed(),
+            );
+        }
         freed
     }
 

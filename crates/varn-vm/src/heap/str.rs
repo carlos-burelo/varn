@@ -222,6 +222,26 @@ impl HeapStr {
             HeapStr::Shared(..) | HeapStr::Inline { .. } | HeapStr::View { .. } => false,
         }
     }
+
+    pub(crate) fn external_bytes(&self) -> u64 {
+        match self {
+            HeapStr::Shared(s, _) => {
+                if std::sync::Arc::strong_count(s) == 1 {
+                    s.len() as u64
+                } else {
+                    0
+                }
+            }
+            HeapStr::Ext { buf, .. } => {
+                if Rc::strong_count(buf) == 1 {
+                    unsafe { (&*buf.get()).capacity() as u64 }
+                } else {
+                    0
+                }
+            }
+            HeapStr::Inline { .. } | HeapStr::View { .. } => 0,
+        }
+    }
 }
 
 impl std::fmt::Debug for HeapStr {

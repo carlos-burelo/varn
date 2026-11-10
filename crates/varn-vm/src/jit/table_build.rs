@@ -13,7 +13,7 @@ macro_rules! fill_tail {
             instance_alloc: crate::heap::Heap::jit_instance_alloc(),
             heap_field_offset: std::mem::offset_of!(ctx::ExecCtx, heap),
             young_len_offset: crate::heap::Heap::young_len_byte_offset_from_rcbox(),
-            young_threshold: 0,
+            young_limit_offset: crate::heap::Heap::young_limit_byte_offset_from_rcbox(),
             jit_native_result_offset: std::mem::offset_of!(ctx::ExecCtx, jit_native_result),
             jit_error_flag_offset: std::mem::offset_of!(ctx::ExecCtx, jit_error_flag),
             jit_site_ip_offset: std::mem::offset_of!(ctx::ExecCtx, frames)
@@ -43,12 +43,12 @@ macro_rules! fill_tail {
 pub fn build_jit_helpers(settings: &crate::settings::ExecSettings) -> varn_jit::JitHelpers {
     assert_eq!(
         varn_jit::JIT_HELPERS_VERSION,
-        12,
+        13,
         "JitHelpers ABI version mismatch: review offset_of layout after varn-jit-abi change"
     );
     static HELPERS: std::sync::OnceLock<varn_jit::JitHelpers> = std::sync::OnceLock::new();
-    let mut helpers = *HELPERS.get_or_init(|| jit_helper_table!(fill, "src/exec/jit_helpers"));
-    helpers.young_threshold = settings.young_threshold();
+    let helpers = *HELPERS.get_or_init(|| jit_helper_table!(fill, "src/exec/jit_helpers"));
+    let _ = settings;
     helpers
 }
 

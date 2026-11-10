@@ -68,6 +68,14 @@ impl ArrayRepr {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    pub fn heap_bytes(&self) -> u64 {
+        match self {
+            ArrayRepr::Boxed(v) => (v.items.capacity() * std::mem::size_of::<VmValue>()) as u64,
+            ArrayRepr::I64(v) => (v.capacity() * std::mem::size_of::<i64>()) as u64,
+            ArrayRepr::F64(v) => (v.capacity() * std::mem::size_of::<f64>()) as u64,
+        }
+    }
 }
 
 const _: () = {

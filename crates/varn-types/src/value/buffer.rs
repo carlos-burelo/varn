@@ -71,4 +71,12 @@ impl VmBuffer {
             }
         })
     }
+
+    pub fn heap_bytes(&self) -> u64 {
+        if Rc::strong_count(&self.data) == 1 {
+            self.data.borrow().capacity() as u64
+        } else {
+            0
+        }
+    }
 }

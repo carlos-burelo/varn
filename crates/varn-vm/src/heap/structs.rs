@@ -39,7 +39,10 @@ pub struct HeapInner {
     pub gc_collections: u64,
     pub gc_total_freed: u64,
     pub gc_threshold: u64,
-    pub(crate) gc_floor: u64,
+    pub(crate) nursery_bytes: u64,
+    pub(crate) stress_cells: Option<u64>,
+    pub(crate) alloc_since_major: u64,
+    pub(crate) live_bytes_after_major: u64,
     pub(crate) young: YoungGen,
     pub(crate) cells: CellSpace,
     pub(super) string_interner: FxHashMap<RuntimeString, HeapRef>,
@@ -58,12 +61,14 @@ pub struct HeapInner {
 
 impl Drop for HeapInner {
     fn drop(&mut self) {
+        varn_types::memory::ExternalLedger::detach();
         crate::clif_link::invalidate_epoch(self.jit_epoch);
     }
 }
 
 impl HeapInner {
     pub(crate) fn new(settings: &crate::settings::ExecSettings) -> Self {
+        let nursery_bytes = settings.nursery_bytes();
         Self {
             jit_epoch: crate::clif_link::next_epoch(),
             cells: CellSpace::default(),
@@ -80,9 +85,12 @@ impl HeapInner {
             gc_collections: 0,
             gc_time: GcTime::default(),
             gc_total_freed: 0,
-            gc_threshold: settings.old_floor(),
-            gc_floor: settings.old_floor(),
-            young: YoungGen::new(settings.young_threshold()),
+            gc_threshold: (2 * nursery_bytes).max(nursery_bytes),
+            nursery_bytes,
+            stress_cells: settings.stress_cells(),
+            alloc_since_major: 0,
+            live_bytes_after_major: 0,
+            young: YoungGen::new(),
             hotspot: None,
             scan_roots: Vec::new(),
             identity_index: FxHashMap::default(),
@@ -200,9 +208,12 @@ pub struct Heap {
 
 impl Heap {
     pub(crate) fn new(settings: &crate::settings::ExecSettings) -> Self {
-        Self {
-            inner: Rc::new(std::cell::UnsafeCell::new(HeapInner::new(settings))),
-        }
+        let inner = Rc::new(std::cell::UnsafeCell::new(HeapInner::new(settings)));
+        let limit = unsafe { std::ptr::addr_of_mut!((*inner.get()).young.limit_cells) };
+        varn_types::memory::ExternalLedger::attach(limit, settings.nursery_bytes());
+        let heap = Self { inner };
+        unsafe { (*heap.inner.get()).recompute_young_limit() };
+        heap
     }
 
     #[inline(always)]
@@ -216,7 +227,6 @@ impl Heap {
         unsafe { &mut *self.inner.get() }
     }
 }
-
 impl std::ops::Deref for Heap {
     type Target = HeapInner;
     #[inline(always)]

@@ -20,7 +20,13 @@ impl HeapInner {
         }
         let idx = self.cells.alloc(obj, SlotState::Young);
         self.young.born.push(idx);
+        self.note_new_cell(idx);
         idx
+    }
+
+    pub(crate) fn note_new_cell(&mut self, r: HeapRef) {
+        let external = super::bytes::external_bytes(&self.cells, r);
+        varn_types::memory::ExternalLedger::grow(external as usize);
     }
 
     pub(crate) fn alloc_instance(&mut self, class: &ClassObj) -> (HeapRef, InstanceRef) {
@@ -58,6 +64,7 @@ impl HeapInner {
         }
         let r = self.cells.alloc_array(tuple, repr, SlotState::Young);
         self.young.born.push(r);
+        self.note_new_cell(r);
         VmValue::from_heap(r)
     }
 

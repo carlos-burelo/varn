@@ -44,11 +44,17 @@ impl HeapInner {
         self.young.worklist = work;
 
         self.sweep_young();
+        let grown = varn_types::memory::ExternalLedger::total();
+        self.alloc_since_major += self.young.bytes + grown;
+        varn_types::memory::ExternalLedger::reset();
+        self.recompute_young_limit();
         self.verify_heap(super::verify::Phase::Minor);
         crate::gc_trace::note_end(
             trace,
             self.young.minor_gc_count,
             self.young.minor_gc_promoted,
+            self.young.bytes,
+            grown,
         );
     }
 
@@ -64,7 +70,9 @@ impl HeapInner {
 
     fn sweep_young(&mut self) {
         let mut born = std::mem::take(&mut self.young.born);
+        let mut bytes = 0u64;
         for &r in &born {
+            bytes += self.cells.cell_bytes(r);
             match self.cells.state(r) {
                 SlotState::Marked => {
                     self.cells.promote(r);
@@ -88,6 +96,7 @@ impl HeapInner {
             }
         }
         self.young.retired += born.len() as u64;
+        self.young.bytes = bytes;
         born.clear();
         self.young.born = born;
     }

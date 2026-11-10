@@ -10,8 +10,9 @@ impl Heap {
         let young = &inner.young;
 
         let young_report = YoungReport {
-            threshold: young.threshold,
+            threshold: young.limit_cells as usize,
             live: young.len(),
+            bytes: young.bytes,
             alloc_count: young.alloc_count(),
             minor_gc_count: young.minor_gc_count,
             minor_gc_promoted: young.minor_gc_promoted,
@@ -24,7 +25,7 @@ impl Heap {
             alloc_count: young.alloc_count() + inner.cells.old_births,
             gc_collections: inner.gc_collections,
             gc_total_freed: inner.gc_total_freed,
-            gc_alloc_since_collect: inner.cells.old_growth,
+            gc_alloc_since_collect: inner.alloc_since_major,
             gc_threshold: inner.gc_threshold,
         };
 

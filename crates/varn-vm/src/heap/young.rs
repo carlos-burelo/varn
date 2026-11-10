@@ -1,7 +1,8 @@
 use varn_types::HeapRef;
 
 pub struct YoungGen {
-    pub(crate) threshold: usize,
+    pub(crate) limit_cells: u64,
+    pub(crate) bytes: u64,
     pub(crate) born: Vec<HeapRef>,
     pub(crate) remembered: Vec<HeapRef>,
     pub(super) worklist: Vec<HeapRef>,
@@ -11,9 +12,10 @@ pub struct YoungGen {
 }
 
 impl YoungGen {
-    pub(crate) fn new(threshold: usize) -> Self {
+    pub(crate) fn new() -> Self {
         Self {
-            threshold,
+            limit_cells: 0,
+            bytes: 0,
             born: Vec::new(),
             remembered: Vec::new(),
             worklist: Vec::new(),
@@ -31,7 +33,7 @@ impl YoungGen {
 
     #[inline(always)]
     pub(crate) fn is_full(&self) -> bool {
-        self.born.len() >= self.threshold
+        self.born.len() as u64 >= self.limit_cells
     }
 
     #[inline(always)]
@@ -41,6 +43,10 @@ impl YoungGen {
 
     pub(crate) fn born_len_byte_offset() -> usize {
         std::mem::offset_of!(YoungGen, born) + varn_types::cell::VEC_LEN_OFF
+    }
+
+    pub(crate) fn limit_byte_offset() -> usize {
+        std::mem::offset_of!(YoungGen, limit_cells)
     }
 
     pub(crate) fn probe_born_layout() {

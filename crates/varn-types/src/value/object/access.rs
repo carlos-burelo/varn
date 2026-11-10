@@ -1,4 +1,5 @@
 use super::*;
+use crate::memory::ExternalLedger;
 
 impl ObjData<[Cell<VmValue>]> {
     #[inline(always)]
@@ -30,6 +31,24 @@ impl ObjData<[Cell<VmValue>]> {
     #[inline]
     pub(super) fn overflow_mut(&self) -> &mut Vec<VmValue> {
         unsafe { (*self.overflow.get()).get_or_insert_with(Box::default) }
+    }
+
+    pub(super) fn reserve_overflow(&self, len: usize) {
+        let overflow = self.overflow_mut();
+        if overflow.capacity() < len {
+            let before = overflow.capacity();
+            overflow.reserve(len - overflow.len());
+            let after = overflow.capacity();
+            if after != before {
+                ExternalLedger::grow((after - before) * std::mem::size_of::<VmValue>());
+            }
+        }
+    }
+
+    pub fn heap_bytes(&self) -> u64 {
+        self.overflow().map_or(0, |o| {
+            (o.capacity() * std::mem::size_of::<VmValue>()) as u64
+        })
     }
 
     #[inline]

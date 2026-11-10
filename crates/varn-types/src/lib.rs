@@ -6,6 +6,7 @@ pub mod cell;
 pub mod chunk;
 pub mod loop_analysis;
 pub mod marshal;
+pub mod memory;
 pub mod module_graph;
 pub mod native;
 pub mod native_ctx;

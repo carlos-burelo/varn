@@ -1,9 +1,14 @@
 use super::map::MapKey;
+use crate::memory::ExternalLedger;
 use crate::vm_value::VmValue;
 use rustc_hash::FxHashMap;
 
 const LINEAR_MAX: usize = 8;
 const TOMBSTONE: MapKey = MapKey(VmValue::from_raw_parts(u64::MAX, 1));
+
+fn index_bytes(capacity: usize) -> usize {
+    capacity * (std::mem::size_of::<(MapKey, u32)>() + 1)
+}
 
 #[derive(Clone, Debug)]
 pub struct OrderedTable<V> {
@@ -78,6 +83,9 @@ impl<V> OrderedTable<V> {
         if let Some(p) = self.position(&key) {
             return Some(std::mem::replace(&mut self.entries[p].1, val));
         }
+        let cap_before = self.entries.capacity();
+        let grows = self.entries.len() == cap_before;
+        let index_before = self.index.as_ref().map_or(0, |i| i.capacity());
         let pos = self.entries.len() as u32;
         self.entries.push((key, val));
         self.live += 1;
@@ -88,7 +96,21 @@ impl<V> OrderedTable<V> {
             None if self.entries.len() > LINEAR_MAX => self.rebuild_index(),
             None => {}
         }
+        if grows {
+            ExternalLedger::grow(
+                (self.entries.capacity() - cap_before) * std::mem::size_of::<(MapKey, V)>(),
+            );
+        }
+        ExternalLedger::grow(
+            index_bytes(self.index.as_ref().map_or(0, |i| i.capacity()))
+                - index_bytes(index_before),
+        );
         None
+    }
+
+    pub fn heap_bytes(&self) -> u64 {
+        (self.entries.capacity() * std::mem::size_of::<(MapKey, V)>()
+            + index_bytes(self.index.as_ref().map_or(0, |i| i.capacity()))) as u64
     }
 
     pub fn remove(&mut self, key: &MapKey) -> Option<V>

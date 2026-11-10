@@ -68,8 +68,8 @@ pub(crate) struct CellSpace {
     pub(crate) native: bool,
     pub(in crate::heap) native_roots: Vec<HeapRef>,
     pub(crate) old_births: u64,
-    pub(crate) old_growth: u64,
     pub(crate) survivors: usize,
+    pub(crate) live_bytes: u64,
     pub(crate) abandon_objects: bool,
 }
 
@@ -81,8 +81,8 @@ impl Default for CellSpace {
             native: false,
             native_roots: Vec::new(),
             old_births: 0,
-            old_growth: 0,
             survivors: 0,
+            live_bytes: 0,
             abandon_objects: false,
         }
     }
@@ -97,6 +97,10 @@ impl CellSpace {
         state: SlotState,
     ) -> HeapRef {
         let bytes = HEADER_BYTES + body_bytes;
+        assert!(
+            bytes <= u32::MAX as usize,
+            "a single cell over 4 GiB is not supported"
+        );
         let (r, class) = match class_for(bytes) {
             Some(class) => (self.classes[class].take(CELL_CLASSES[class]), class as u8),
             None => {
@@ -113,11 +117,10 @@ impl CellSpace {
             kind,
             class,
             _pad: 0,
-            _aux: 0,
+            _aux: bytes as u32,
         };
         if state == SlotState::Old {
             self.old_births += 1;
-            self.old_growth += 1;
         }
         if self.native {
             self.native_roots.push(r);
@@ -164,7 +167,16 @@ impl CellSpace {
 
     pub(crate) fn promote(&mut self, r: HeapRef) {
         self.set_state(r, SlotState::Old);
-        self.old_growth += 1;
+    }
+
+    #[inline(always)]
+    pub(crate) fn cell_bytes(&self, r: HeapRef) -> u64 {
+        let h = header(r);
+        if h.class == CELL_CLASS_LARGE {
+            h._aux as u64
+        } else {
+            CELL_CLASSES[h.class as usize] as u64
+        }
     }
 
     pub(crate) fn release(&mut self, r: HeapRef) {
@@ -284,16 +296,26 @@ impl CellSpace {
     pub(crate) fn sweep_major(&mut self) -> usize {
         let mut dead: Vec<HeapRef> = Vec::new();
         let mut survivors = 0;
+        let mut live_bytes = 0u64;
         for r in self.refs() {
             let h = header(r);
             if h.state & MAJOR_MARK != 0 {
                 h.state = SlotState::Old as u8;
                 survivors += 1;
+                live_bytes += if h.class == CELL_CLASS_LARGE {
+                    h._aux as u64
+                } else {
+                    (unsafe { *CELL_CLASSES.get_unchecked(h.class as usize) }) as u64
+                };
+                if h.kind != varn_types::cell::CELL_KIND_INSTANCE {
+                    live_bytes += crate::heap::bytes::external_bytes(self, r);
+                }
             } else {
                 dead.push(r);
             }
         }
         self.survivors = survivors;
+        self.live_bytes = live_bytes;
         for &r in &dead {
             self.release(r);
         }

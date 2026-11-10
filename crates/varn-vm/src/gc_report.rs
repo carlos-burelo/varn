@@ -3,6 +3,8 @@ pub struct YoungReport {
 
     pub live: usize,
 
+    pub bytes: u64,
+
     pub alloc_count: u64,
 
     pub minor_gc_count: u64,
@@ -67,7 +69,11 @@ impl std::fmt::Display for GcReport {
         let n = &self.young;
         writeln!(f, "gc ─────────────────────────────────────")?;
         writeln!(f, "young")?;
-        writeln!(f, "  live={} (minor GC at {})", n.live, n.threshold)?;
+        writeln!(
+            f,
+            "  live={} bytes={} (minor GC at {} cells)",
+            n.live, n.bytes, n.threshold
+        )?;
         writeln!(
             f,
             "  alloc_count={}  minor_gc_count={}  promoted={} ({:.1}%)  reclaimed={}",
@@ -93,7 +99,7 @@ impl std::fmt::Display for GcReport {
         )?;
         writeln!(
             f,
-            "  alloc_count={}  gc_collections={}  gc_total_freed={}  gc_alloc_since_collect={}/{}",
+            "  alloc_count={}  gc_collections={}  gc_total_freed={}  bytes_since_major={}/{}",
             o.alloc_count,
             o.gc_collections,
             o.gc_total_freed,
