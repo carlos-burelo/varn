@@ -12,6 +12,7 @@ Copy-Item "$PSScriptRoot\go\*" "$work\go" -Force
 Copy-Item "$PSScriptRoot\net\*" "$work\net" -Force
 
 $runtimes = [ordered]@{}
+$benchJs = Join-Path $PSScriptRoot 'gcbench.js'
 $bun = Get-Command bun -ErrorAction SilentlyContinue
 $bunExe = $null
 if ($bun) {
@@ -23,9 +24,9 @@ if ($bun) {
         if (Test-Path $candidate) { $bunExe = $candidate }
     }
 }
-if ($bunExe) { $runtimes['bun'] = { param($w) @($bunExe, "run", "`"$PSScriptRoot\gcbench.js`" $w") } }
+if ($bunExe) { $runtimes['bun'] = { param($w) @($bunExe, "`"$benchJs`" $w") } }
 $node = Get-Command node -ErrorAction SilentlyContinue
-if ($node) { $runtimes['node'] = { param($w) @($node.Source, "`"$PSScriptRoot\gcbench.js`" $w") } }
+if ($node) { $runtimes['node'] = { param($w) @($node.Source, "`"$benchJs`" $w") } }
 if (Get-Command go -ErrorAction SilentlyContinue) {
     Push-Location "$work\go"; go build -o gcbench.exe .; Pop-Location
     $runtimes['go'] = { param($w) @("$work\go\gcbench.exe", $w) }
@@ -44,12 +45,19 @@ function Invoke-Measured($exe, $arguments) {
     $psi.RedirectStandardError = $true
     $psi.UseShellExecute = $false
     $p = [Diagnostics.Process]::Start($psi)
+    $stdout = $p.StandardOutput.ReadToEndAsync()
+    $stderr = $p.StandardError.ReadToEndAsync()
+    $clock = [Diagnostics.Stopwatch]::StartNew()
     $peak = 0
     while (-not $p.HasExited) {
         try { $p.Refresh(); if ($p.PeakWorkingSet64 -gt $peak) { $peak = $p.PeakWorkingSet64 } } catch {}
+        if ($clock.Elapsed.TotalMinutes -gt 5) {
+            try { $p.Kill($true) } catch {}
+            throw "the measured process did not finish in five minutes: $exe $arguments"
+        }
         Start-Sleep -Milliseconds 15
     }
-    [pscustomobject]@{ Out = $p.StandardOutput.ReadToEnd().Trim(); PeakMb = [math]::Round($peak / 1MB) }
+    [pscustomobject]@{ Out = $stdout.Result.Trim(); PeakMb = [math]::Round($peak / 1MB) }
 }
 
 function Get-Median($values) {
@@ -62,7 +70,11 @@ $rows = foreach ($w in $Workloads) {
         $samples = 1..$Runs | ForEach-Object {
             $cmd = & $runtimes[$name] $w
             $r = Invoke-Measured $cmd[0] $cmd[1]
-            $j = $r.Out | ConvertFrom-Json
+            $j = try {
+                $r.Out | ConvertFrom-Json
+            } catch {
+                throw "runtime '$name' on '$w' did not print JSON: $($r.Out)"
+            }
             $maxPause = if ($null -ne $j.pause_max_ms) { $j.pause_max_ms } elseif ($null -ne $j.major_max_ms) { [math]::Max($j.major_max_ms, $j.minor_max_ms) } else { $null }
             $gcs = if ($null -ne $j.gcs) { $j.gcs } else { [int]$j.gc0 + [int]$j.gc1 + [int]$j.gc2 }
             [pscustomobject]@{ Wall = $j.wall_ms; Peak = $r.PeakMb; Pause = [double]$j.pause_total_ms; MaxPause = $maxPause; Gcs = $gcs }
