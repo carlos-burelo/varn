@@ -1,3 +1,6 @@
+import os, sys
+_here = os.path.dirname(os.path.abspath(__file__))
+sys.path = [p for p in sys.path if os.path.abspath(p) != _here]
 import json
 
 raw = []
@@ -27,7 +30,7 @@ for i in range(5000):
             {"event": "api_call", "endpoint": "/v1/data", "status": "success", "ts": 1724241605},
         ],
     }
-    raw.append(json.dumps(doc))
+    raw.append(json.dumps(doc, separators=(chr(44), chr(58))))
 
 total_audit = total_logins = enterprise = total_features = 0
 for text in raw:
