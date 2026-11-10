@@ -120,6 +120,10 @@ fn emit_build_object_inline(
     let end = b.ins().load(types::I64, flags, lane, LANE_END_OFF as i32);
 
     let guard = b.ins().bor(c_hot, c_nat);
+    let born_full = b
+        .ins()
+        .icmp(IntCC::UnsignedGreaterThanOrEqual, born_len, born_cap);
+    let guard = b.ins().bor(guard, born_full);
     let force_slow = crate::config::config().alloc_slow;
     if force_slow {
         b.ins().jump(slow_blk, &[]);
@@ -148,11 +152,7 @@ fn emit_build_object_inline(
     b.switch_to_block(header_blk);
     let r = b.block_params(header_blk)[0];
     emit_build_object_body(b, ctx, &vals, shape_idx, count, class_idx, r);
-
-    let full = b
-        .ins()
-        .icmp(IntCC::UnsignedGreaterThanOrEqual, born_len, born_cap);
-    b.ins().brif(full, slow_blk, &[], born_ok_blk, &[]);
+    b.ins().jump(born_ok_blk, &[]);
 
     b.switch_to_block(born_ok_blk);
     let slot_off = b.ins().ishl_imm_u(born_len, 3);
@@ -184,7 +184,9 @@ fn emit_build_object_body(
 ) {
     let olay = &ctx.helpers.object_layout;
     let flags = cranelift_codegen::ir::MemFlagsData::trusted();
-    let header_imm = 3i64 | ((olay.object_tag as i64) << 8) | ((class_idx as i64) << 16);
+    let header_imm = (3i64 | (varn_types::cell::STATE_NEEDS_DROP as i64))
+        | ((olay.object_tag as i64) << 8)
+        | ((class_idx as i64) << 16);
     let header_v = b.ins().iconst(types::I64, header_imm);
     b.ins().store(flags, header_v, r, 0);
     let body = b.ins().iadd_imm_u(r, varn_types::cell::HEADER_BYTES as i64);

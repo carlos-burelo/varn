@@ -39,7 +39,74 @@ pub enum HeapObj {
     Spread(VmValue),
 }
 
+pub(crate) enum DeadEntry {
+    Identity(usize),
+    Interned(crate::heap::cells::SweptInterned),
+}
+
 impl HeapObj {
+    pub(crate) fn dead_entry(&self) -> Option<DeadEntry> {
+        match self {
+            HeapObj::Class(c) => Some(DeadEntry::Identity(Rc::as_ptr(c) as usize)),
+            HeapObj::Generator(g) => Some(DeadEntry::Identity(Rc::as_ptr(g) as usize)),
+            HeapObj::VmClosure(c) => Some(DeadEntry::Identity(Rc::as_ptr(c) as usize)),
+            HeapObj::Str(s) if s.is_interned() => Some(DeadEntry::Interned(
+                crate::heap::cells::SweptInterned::Str(s.to_shared()),
+            )),
+            HeapObj::Char(c) => Some(DeadEntry::Interned(
+                crate::heap::cells::SweptInterned::Char(*c),
+            )),
+            HeapObj::BigInt(n) => Some(DeadEntry::Interned(
+                crate::heap::cells::SweptInterned::BigInt(n.clone()),
+            )),
+            HeapObj::Decimal(d) => Some(DeadEntry::Interned(
+                crate::heap::cells::SweptInterned::Decimal(d.clone()),
+            )),
+            HeapObj::Str(_)
+            | HeapObj::Array(_)
+            | HeapObj::Tuple(_)
+            | HeapObj::Object(_)
+            | HeapObj::Buffer(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::NativeFn(..)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::Map(_)
+            | HeapObj::Set(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::Range(_)
+            | HeapObj::EnumVariant(_)
+            | HeapObj::Spread(_) => None,
+        }
+    }
+
+    pub(crate) fn header_bits(&self) -> u8 {
+        use varn_types::cell::{STATE_NEEDS_DROP, STATE_SIDE_TABLE};
+        match self {
+            HeapObj::Class(_) | HeapObj::Generator(_) | HeapObj::VmClosure(_) | HeapObj::Str(_) => {
+                STATE_NEEDS_DROP | STATE_SIDE_TABLE
+            }
+            HeapObj::Char(_) => STATE_SIDE_TABLE,
+            HeapObj::BigInt(_)
+            | HeapObj::Decimal(_)
+            | HeapObj::Array(_)
+            | HeapObj::Tuple(_)
+            | HeapObj::Object(_)
+            | HeapObj::Buffer(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::Map(_)
+            | HeapObj::Set(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::Range(_)
+            | HeapObj::EnumVariant(_) => STATE_NEEDS_DROP,
+            HeapObj::NativeFn(..) | HeapObj::Spread(_) => 0,
+        }
+    }
+
     pub(crate) fn tag(&self) -> varn_core::RuntimeKind {
         use varn_core::RuntimeKind;
         match self {

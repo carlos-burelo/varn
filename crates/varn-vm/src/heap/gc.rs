@@ -90,12 +90,12 @@ impl HeapInner {
 
     pub(crate) fn compact_interners(&mut self) {
         let cells = &self.cells;
-        let live = |r: &mut HeapRef| cells.state(*r) != SlotState::Free;
-        self.string_interner.retain(|_, idx| live(idx));
-        self.char_interner.retain(|_, idx| live(idx));
-        self.bigint_interner.retain(|_, idx| live(idx));
-        self.decimal_interner.retain(|_, idx| live(idx));
-        self.identity_index.retain(|_, idx| live(idx));
+        let doomed = |r: &mut HeapRef| cells.state(*r) == SlotState::Free || cells.will_die(*r);
+        self.string_interner.retain(|_, idx| !doomed(idx));
+        self.char_interner.retain(|_, idx| !doomed(idx));
+        self.bigint_interner.retain(|_, idx| !doomed(idx));
+        self.decimal_interner.retain(|_, idx| !doomed(idx));
+        self.identity_index.retain(|_, idx| !doomed(idx));
     }
 
     pub(crate) fn collect(&mut self, roots: &[HeapRef]) -> usize {
@@ -109,14 +109,14 @@ impl HeapInner {
         self.young_cells.clear();
         self.young_lazies.clear();
         self.young.bytes = 0;
-        self.compact_interners();
-        self.verify_heap(super::verify::Phase::Major);
         self.gc_collections += 1;
         self.gc_total_freed += freed as u64;
         self.live_bytes_after_major = self.cells.old_bytes;
         self.gc_threshold = (2 * self.live_bytes_after_major).max(2 * self.nursery_bytes);
+        self.recalibrate_threshold = self.cells.dirty_blocks() > 0;
         varn_types::memory::ExternalLedger::reset();
         self.recompute_young_limit();
+        self.verify_heap(super::verify::Phase::Major, roots);
         if let Some(started) = started {
             crate::gc_trace::major(
                 self.gc_collections,
@@ -127,6 +127,46 @@ impl HeapInner {
             );
         }
         freed
+    }
+
+    pub(crate) fn settle_sweeps(&mut self, budget: usize) {
+        let done = self.cells.sweep_some(budget);
+        if done > 0 {
+            crate::gc_trace::sweeps(
+                done,
+                self.cells.dirty_blocks(),
+                self.cells.block_bytes(),
+                self.cells.old_bytes,
+            );
+        }
+        self.forget_swept();
+        if self.recalibrate_threshold && self.cells.dirty_blocks() == 0 {
+            self.recalibrate_threshold = false;
+            self.live_bytes_after_major = self.cells.old_bytes;
+            self.gc_threshold = (2 * self.live_bytes_after_major).max(2 * self.nursery_bytes);
+        }
+    }
+
+    pub(crate) fn forget_swept(&mut self) {
+        for key in self.cells.take_swept_identities() {
+            self.identity_index.remove(&key);
+        }
+        for key in self.cells.take_swept_interned() {
+            match key {
+                super::cells::SweptInterned::Str(s) => {
+                    self.string_interner.remove(&s);
+                }
+                super::cells::SweptInterned::Char(c) => {
+                    self.char_interner.remove(&c);
+                }
+                super::cells::SweptInterned::BigInt(n) => {
+                    self.bigint_interner.remove(&n);
+                }
+                super::cells::SweptInterned::Decimal(d) => {
+                    self.decimal_interner.remove(&d);
+                }
+            }
+        }
     }
 
     pub(crate) fn live_count(&self) -> usize {

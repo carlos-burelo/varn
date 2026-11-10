@@ -1,9 +1,14 @@
+mod alloc;
 mod blocks;
+mod mark;
 mod native;
+mod osmem;
+mod stats;
+mod sweep;
 mod typed;
 
 use super::obj::HeapObj;
-use blocks::{block_layout, large_layout, SizeClass};
+use blocks::{block_of, cells_span, large_layout, Block, SizeClass};
 use std::alloc::{alloc_zeroed, dealloc};
 use std::ptr::NonNull;
 use varn_types::cell::{
@@ -15,7 +20,9 @@ use varn_types::HeapRef;
 const MAJOR_MARK: u8 = 0x80;
 const MINOR_MARK: u8 = 0x40;
 const TRACED: u8 = 0x20;
-const STATE_MASK: u8 = 0x0F;
+const NEEDS_DROP: u8 = varn_types::cell::STATE_NEEDS_DROP;
+const SIDE_TABLE: u8 = varn_types::cell::STATE_SIDE_TABLE;
+const STATE_MASK: u8 = 0x07;
 
 const _: () = assert!(HEADER_BYTES == 8);
 const _: () = assert!(HEADER_BYTES == std::mem::size_of::<ObjHeader>());
@@ -55,6 +62,13 @@ impl SlotState {
     }
 }
 
+pub(crate) enum SweptInterned {
+    Str(varn_types::RuntimeString),
+    Char(char),
+    BigInt(Box<num_bigint::BigInt>),
+    Decimal(Box<bigdecimal::BigDecimal>),
+}
+
 #[inline(always)]
 fn instance_has_references(r: HeapRef) -> bool {
     let inst = unsafe {
@@ -75,72 +89,57 @@ pub(in crate::heap) fn body<T>(r: HeapRef) -> *mut T {
     (r.addr() as usize + HEADER_BYTES) as *mut T
 }
 
+#[inline(always)]
+fn set_age(r: HeapRef, age: SlotState) {
+    let h = header(r);
+    h.state = (h.state & !(STATE_MASK | MINOR_MARK)) | age as u8;
+}
+
+#[inline(always)]
+fn block_ref(block: NonNull<Block>) -> &'static Block {
+    unsafe { &*block.as_ptr() }
+}
+
+#[inline(always)]
+fn block_ref_mut(block: NonNull<Block>) -> &'static mut Block {
+    unsafe { &mut *block.as_ptr() }
+}
+
 pub(crate) struct CellSpace {
     pub(crate) classes: Vec<SizeClass>,
     large: Vec<(HeapRef, usize)>,
     pub(crate) native: bool,
     pub(in crate::heap) native_roots: Vec<HeapRef>,
     pub(crate) old_births: u64,
-    pub(crate) survivors: usize,
     pub(crate) old_bytes: u64,
+    pub(crate) nursery_bytes: u64,
+    pub(crate) swept_freed: u64,
+    pub(crate) swept_identities: Vec<usize>,
+    pub(crate) swept_interned: Vec<SweptInterned>,
+    pub(crate) check_allocs: bool,
     pub(crate) abandon_objects: bool,
 }
 
 impl Default for CellSpace {
     fn default() -> Self {
         Self {
-            classes: CELL_CLASSES.iter().map(|_| SizeClass::default()).collect(),
+            classes: CELL_CLASSES.iter().map(|_| SizeClass::new()).collect(),
             large: Vec::new(),
             native: false,
             native_roots: Vec::new(),
             old_births: 0,
-            survivors: 0,
             old_bytes: 0,
+            nursery_bytes: 0,
+            swept_freed: 0,
+            swept_identities: Vec::new(),
+            swept_interned: Vec::new(),
+            check_allocs: false,
             abandon_objects: false,
         }
     }
 }
 
 impl CellSpace {
-    #[inline]
-    pub(in crate::heap) fn take_cell(
-        &mut self,
-        body_bytes: usize,
-        kind: u8,
-        state: SlotState,
-    ) -> HeapRef {
-        let bytes = HEADER_BYTES + body_bytes;
-        assert!(
-            bytes <= u32::MAX as usize,
-            "a single cell over 4 GiB is not supported"
-        );
-        let (r, class) = match class_for(bytes) {
-            Some(class) => (self.classes[class].take(CELL_CLASSES[class]), class as u8),
-            None => {
-                let ptr = unsafe { alloc_zeroed(large_layout(bytes)) };
-                let ptr = NonNull::new(ptr)
-                    .unwrap_or_else(|| std::alloc::handle_alloc_error(large_layout(bytes)));
-                let r = unsafe { HeapRef::from_addr_unchecked(ptr.as_ptr() as u64) };
-                self.large.push((r, bytes));
-                (r, CELL_CLASS_LARGE)
-            }
-        };
-        *header(r) = ObjHeader {
-            state: state as u8,
-            kind,
-            class,
-            _pad: 0,
-            _aux: bytes as u32,
-        };
-        if state == SlotState::Old {
-            self.old_births += 1;
-        }
-        if self.native {
-            self.native_roots.push(r);
-        }
-        r
-    }
-
     #[inline(always)]
     pub(crate) fn get(&self, r: HeapRef) -> &HeapObj {
         debug_assert_ne!(self.state(r), SlotState::Free, "reference to a freed cell");
@@ -175,7 +174,8 @@ impl CellSpace {
 
     #[inline(always)]
     pub(crate) fn set_state(&mut self, r: HeapRef, state: SlotState) {
-        header(r).state = state as u8;
+        let h = header(r);
+        h.state = (h.state & !STATE_MASK) | state as u8;
     }
 
     #[inline(always)]
@@ -188,200 +188,15 @@ impl CellSpace {
         }
     }
 
-    pub(crate) fn release(&mut self, r: HeapRef) {
-        let h = header(r);
-        let class = h.class;
-        let state = SlotState::from_byte(h.state);
-        if matches!(state, SlotState::Old | SlotState::Remembered) {
-            let bytes = self.cell_bytes(r) + crate::heap::bytes::external_bytes(self, r);
-            self.old_bytes = self.old_bytes.saturating_sub(bytes);
-        }
-        if h.kind != varn_types::cell::CELL_KIND_INSTANCE {
-            unsafe { Self::drop_object(r) };
-        }
-        h.state = SlotState::Free as u8;
-        if class == CELL_CLASS_LARGE {
-            let at = self
-                .large
-                .iter()
-                .position(|&(l, _)| l == r)
-                .expect("a large cell");
-            let (_, bytes) = self.large.swap_remove(at);
-            unsafe { dealloc(r.as_ptr::<u8>(), large_layout(bytes)) };
-        } else {
-            self.classes[class as usize].give_back(r);
-        }
-    }
-
-    #[inline(always)]
-    pub(crate) fn mark_young(r: HeapRef, work: &mut Vec<HeapRef>) {
-        let h = header(r);
-        if h.state & MINOR_MARK != 0 {
+    fn record_dead(&mut self, r: HeapRef) {
+        use super::obj::DeadEntry;
+        if header(r).kind == varn_types::cell::CELL_KIND_INSTANCE {
             return;
         }
-        let state = h.state & STATE_MASK;
-        if state == SlotState::Young as u8 || state == SlotState::Survivor as u8 {
-            h.state |= MINOR_MARK;
-            if h.kind == varn_types::cell::CELL_KIND_INSTANCE && !instance_has_references(r) {
-                return;
-            }
-            work.push(r);
-        }
-    }
-
-    #[inline(always)]
-    pub(crate) fn mark_major(r: HeapRef) -> bool {
-        let h = header(r);
-        if h.state == SlotState::Free as u8 || h.state & MAJOR_MARK != 0 {
-            return false;
-        }
-        h.state |= MAJOR_MARK;
-        h.kind != varn_types::cell::CELL_KIND_INSTANCE || instance_has_references(r)
-    }
-
-    #[inline(always)]
-    pub(crate) fn is_marked(r: HeapRef) -> bool {
-        header(r).state & MAJOR_MARK != 0
-    }
-
-    pub(crate) fn used_cells(&self) -> usize {
-        self.classes
-            .iter()
-            .zip(CELL_CLASSES)
-            .map(|(c, cell)| c.used(cell))
-            .sum::<usize>()
-            + self.large.len()
-    }
-
-    pub(crate) fn free_list_problems(&self, problems: &mut Vec<String>) -> usize {
-        let mut total = 0;
-        for (class, cell) in self.classes.iter().zip(CELL_CLASSES) {
-            let bound = class.blocks.len() * cells_per_block(cell);
-            let mut addr = class.free_head();
-            let mut seen = 0;
-            while addr != 0 {
-                if seen == bound {
-                    problems.push(format!(
-                        "free list of class {cell} loops after {bound} cells"
-                    ));
-                    break;
-                }
-                if !class.contains_addr(addr, cell) {
-                    problems.push(format!(
-                        "free list of class {cell} holds {addr:#x}, outside its blocks"
-                    ));
-                    break;
-                }
-                let h = header(unsafe { HeapRef::from_addr_unchecked(addr) });
-                if h.state != SlotState::Free as u8 {
-                    problems.push(format!(
-                        "free list of class {cell} holds live cell {addr:#x} (state {})",
-                        h.state
-                    ));
-                    break;
-                }
-                addr = blocks::SizeClass::free_next(addr);
-                seen += 1;
-            }
-            total += seen;
-        }
-        total
-    }
-
-    pub(crate) fn live_count(&self) -> usize {
-        self.refs().count()
-    }
-
-    #[inline(always)]
-    pub(crate) fn is_minor_marked(r: HeapRef) -> bool {
-        header(r).state & MINOR_MARK != 0
-    }
-
-    #[inline(always)]
-    pub(crate) fn set_state_raw(r: HeapRef, state: SlotState) {
-        header(r).state = state as u8;
-    }
-
-    #[inline(always)]
-    pub(crate) fn take_traced(r: HeapRef) -> bool {
-        let h = header(r);
-        if h.state & TRACED != 0 {
-            return false;
-        }
-        h.state |= TRACED;
-        true
-    }
-
-    #[inline(always)]
-    pub(crate) fn clear_traced(r: HeapRef) {
-        header(r).state &= !TRACED;
-    }
-
-    #[inline(always)]
-    pub(crate) fn raw_state(r: HeapRef) -> u8 {
-        header(r).state
-    }
-
-    pub(crate) fn free_len(&self) -> usize {
-        self.classes.iter().map(SizeClass::free_len).sum()
-    }
-
-    pub(crate) fn capacity(&self) -> usize {
-        self.classes
-            .iter()
-            .zip(CELL_CLASSES)
-            .map(|(c, cell)| c.blocks.len() * cells_per_block(cell))
-            .sum::<usize>()
-            + self.large.len()
-    }
-
-    pub(crate) fn refs(&self) -> impl Iterator<Item = HeapRef> + '_ {
-        self.classes
-            .iter()
-            .zip(CELL_CLASSES)
-            .flat_map(|(c, cell)| c.cells(cell))
-            .chain(self.large.iter().map(|&(r, _)| r))
-            .filter(|&r| header(r).state != SlotState::Free as u8)
-    }
-
-    pub(crate) fn sweep_major(&mut self) -> usize {
-        let mut dead: Vec<HeapRef> = Vec::new();
-        let mut survivors = 0;
-        for r in self.refs() {
-            let h = header(r);
-            if h.state & MAJOR_MARK != 0 {
-                h.state = SlotState::Old as u8;
-                survivors += 1;
-            } else {
-                dead.push(r);
-            }
-        }
-        self.survivors = survivors;
-        for &r in &dead {
-            self.release(r);
-        }
-        dead.len()
-    }
-}
-
-impl Drop for CellSpace {
-    fn drop(&mut self) {
-        if !self.abandon_objects {
-            let live: Vec<HeapRef> = self.refs().collect();
-            for r in live {
-                if header(r).kind == varn_types::cell::CELL_KIND_INSTANCE {
-                    continue;
-                }
-                unsafe { Self::drop_object(r) };
-            }
-        }
-        for class in &self.classes {
-            for block in &class.blocks {
-                unsafe { dealloc(block.as_ptr(), block_layout()) };
-            }
-        }
-        for &(r, bytes) in &self.large {
-            unsafe { dealloc(r.as_ptr::<u8>(), large_layout(bytes)) };
+        match self.get(r).dead_entry() {
+            Some(DeadEntry::Identity(key)) => self.swept_identities.push(key),
+            Some(DeadEntry::Interned(key)) => self.swept_interned.push(key),
+            None => {}
         }
     }
 }

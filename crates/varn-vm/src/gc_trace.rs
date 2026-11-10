@@ -51,6 +51,24 @@ pub fn note_end(
     );
 }
 
+pub fn major_phases(marked: std::time::Duration, swept: std::time::Duration) {
+    if !enabled() {
+        return;
+    }
+    eprintln!(
+        "[gc] major phases: mark={:.3}ms sweep={:.3}ms",
+        marked.as_secs_f64() * 1000.0,
+        swept.as_secs_f64() * 1000.0,
+    );
+}
+
+pub fn sweeps(done: usize, dirty: usize, bytes: u64, old: u64) {
+    if !enabled() {
+        return;
+    }
+    eprintln!("[gc] sweep: blocks={done} dirty={dirty} arena={bytes}B old={old}B");
+}
+
 pub fn major(
     collection_no: u64,
     freed: usize,

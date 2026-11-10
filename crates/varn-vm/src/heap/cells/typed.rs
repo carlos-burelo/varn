@@ -125,7 +125,10 @@ impl CellSpace {
 
     #[inline(always)]
     fn place(r: HeapRef, obj: HeapObj) {
-        header(r).kind = unsafe { *(&obj as *const HeapObj as *const u8) };
+        let kind = unsafe { *(&obj as *const HeapObj as *const u8) };
+        let h = header(r);
+        h.kind = kind;
+        h.state |= obj.header_bits();
         unsafe { std::ptr::write(body::<HeapObj>(r), obj) };
     }
 }

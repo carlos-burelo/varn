@@ -51,11 +51,11 @@ impl Phase {
 }
 
 impl HeapInner {
-    pub(crate) fn verify_heap(&self, phase: Phase) {
+    pub(crate) fn verify_heap(&mut self, phase: Phase, roots: &[varn_types::HeapRef]) {
         if !self.verify_gc {
             return;
         }
-        let problems = self.heap_problems(phase);
+        let problems = self.heap_problems(phase, roots);
         if problems.is_empty() {
             return;
         }
@@ -71,14 +71,26 @@ impl HeapInner {
         panic!("{message}");
     }
 
-    fn heap_problems(&self, phase: Phase) -> Vec<String> {
+    fn heap_problems(&mut self, phase: Phase, roots: &[varn_types::HeapRef]) -> Vec<String> {
+        if self.verify_gc {
+            self.cells.force_sweep();
+            self.forget_swept();
+            let cells = &self.cells;
+            self.identity_index
+                .retain(|_, r| cells.state(*r) != SlotState::Free);
+        }
         let mut problems = Vec::new();
+        for (index, root) in roots.iter().enumerate() {
+            if self.cells.state(*root) == SlotState::Free {
+                problems.push(format!("root {index} {root:?} points to a freed cell"));
+            }
+        }
         let mut live = 0usize;
         let mut young = 0usize;
         for r in self.cells.refs() {
             live += 1;
             let state = self.cells.state(r);
-            if CellSpace::is_marked(r) {
+            if self.cells.is_marked(r) {
                 problems.push(format!("cell {r:?} keeps the major mark"));
             }
             if CellSpace::is_minor_marked(r) {

@@ -96,7 +96,9 @@ impl HeapInner {
         let grown = varn_types::memory::ExternalLedger::total();
         varn_types::memory::ExternalLedger::reset();
         self.recompute_young_limit();
-        self.verify_heap(super::verify::Phase::Minor);
+        let sweep_budget = (self.nursery_bytes / varn_types::cell::BLOCK_BYTES as u64).max(16);
+        self.settle_sweeps(sweep_budget as usize);
+        self.verify_heap(super::verify::Phase::Minor, roots);
         crate::gc_trace::note_end(
             trace,
             self.young.minor_gc_count,

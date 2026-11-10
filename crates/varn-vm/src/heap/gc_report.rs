@@ -6,7 +6,9 @@ use rustc_hash::FxHashMap;
 
 impl Heap {
     pub fn gc_report(&self) -> GcReport {
-        let inner = unsafe { &*self.inner.get() };
+        let inner = unsafe { &mut *self.inner.get() };
+        inner.cells.force_sweep();
+        inner.forget_swept();
         let young = &inner.young;
 
         let young_report = YoungReport {

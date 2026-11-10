@@ -42,6 +42,7 @@ pub struct HeapInner {
     pub(crate) nursery_bytes: u64,
     pub(crate) stress_cells: Option<u64>,
     pub(crate) live_bytes_after_major: u64,
+    pub(crate) recalibrate_threshold: bool,
     pub(crate) young: YoungGen,
     pub(crate) cells: CellSpace,
     pub(super) string_interner: FxHashMap<RuntimeString, HeapRef>,
@@ -67,9 +68,12 @@ impl Drop for HeapInner {
 impl HeapInner {
     pub(crate) fn new(settings: &crate::settings::ExecSettings) -> Self {
         let nursery_bytes = settings.nursery_bytes();
+        let mut cells = CellSpace::default();
+        cells.nursery_bytes = nursery_bytes;
+        cells.check_allocs = settings.gc_verify;
         Self {
             jit_epoch: crate::clif_link::next_epoch(),
-            cells: CellSpace::default(),
+            cells,
             intrinsic_classes: FxHashMap::default(),
             kind_classes: Default::default(),
             string_interner: FxHashMap::default(),
@@ -87,6 +91,7 @@ impl HeapInner {
             nursery_bytes,
             stress_cells: settings.stress_cells(),
             live_bytes_after_major: 0,
+            recalibrate_threshold: false,
             young: YoungGen::new(),
             hotspot: None,
             identity_index: FxHashMap::default(),
