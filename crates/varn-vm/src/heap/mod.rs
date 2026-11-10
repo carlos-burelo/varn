@@ -17,6 +17,7 @@ pub(crate) mod str;
 pub(crate) mod strings;
 pub(crate) mod structs;
 pub(crate) mod values;
+pub(crate) mod verify;
 pub(crate) mod young;
 
 pub use obj::*;

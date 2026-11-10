@@ -44,6 +44,7 @@ impl HeapInner {
         self.young.worklist = work;
 
         self.sweep_young();
+        self.verify_heap(super::verify::Phase::Minor);
         crate::gc_trace::note_end(
             trace,
             self.young.minor_gc_count,

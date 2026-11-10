@@ -119,6 +119,12 @@ jobs:
           VARN_NO_JIT: "1"
         run: ${{ matrix.bin_path }} run ./tests/main.vn
 
+      - name: Quadrant 5 (GC stress 256 + verifier)
+        env:
+          VARN_GC_STRESS: "256"
+          VARN_GC_VERIFY: "1"
+        run: ${{ matrix.bin_path }} run ./tests/main.vn
+
 
       - name: Stability Benchmark
         run: ${{ matrix.bin_path }} bench ./tests/benchmarks/vn/bench_fib.vn -v

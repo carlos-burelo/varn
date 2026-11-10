@@ -60,7 +60,8 @@ env_vars! {
     AllocSlow => "VARN_ALLOC_SLOW", Debug, "bandera: fuerza la ruta lenta de asignación";
     AllocProfile => "VARN_ALLOC_PROFILE", Debug, "nivel del perfilador de asignaciones (0 apagado)";
     HomeTrace => "VARN_HOME_TRACE", Debug, "bandera: traza las llamadas nativas con receptor";
-    GcTrace => "VARN_GC_TRACE", Debug, "bandera: una línea por colección menor";
+    GcTrace => "VARN_GC_TRACE", Debug, "bandera: una línea por colección";
+    GcVerify => "VARN_GC_VERIFY", Debug, "bandera: verifica los invariantes del heap tras cada colección";
     GcStress => "VARN_GC_STRESS", Debug, "objetos jóvenes entre colecciones (N pequeño caza raíces perdidas)";
     LspDebug => "VARN_LSP_DEBUG", Debug, "bandera: registro detallado del servidor de lenguaje";
     ShadowTarget => "VARN_SHADOW_TARGET", Debug, "ejecutable que lanza vn-shadow";

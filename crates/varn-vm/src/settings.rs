@@ -11,6 +11,8 @@ pub struct ExecSettings {
     pub tier_straight: u32,
 
     pub gc_stress: Option<usize>,
+
+    pub gc_verify: bool,
 }
 
 impl ExecSettings {
@@ -36,6 +38,7 @@ impl ExecSettings {
             tier_loop: settings.jit_tier.unwrap_or(Self::TIER_LOOP),
             tier_straight: settings.jit_tier_straight.unwrap_or(Self::TIER_STRAIGHT),
             gc_stress: settings.gc_stress,
+            gc_verify: settings.gc_verify,
         }
     }
 }

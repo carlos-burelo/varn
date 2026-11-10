@@ -67,6 +67,7 @@ pub struct Settings {
     pub alloc_profile: u8,
     pub home_trace: bool,
     pub gc_trace: bool,
+    pub gc_verify: bool,
     pub gc_stress: Option<usize>,
     pub lsp_debug: bool,
 }
@@ -192,6 +193,7 @@ impl Settings {
             alloc_profile: r.number(EnvVar::AllocProfile).unwrap_or(0),
             home_trace: r.flag(EnvVar::HomeTrace),
             gc_trace: r.flag(EnvVar::GcTrace),
+            gc_verify: r.flag(EnvVar::GcVerify),
             gc_stress: r
                 .number::<usize>(EnvVar::GcStress)
                 .filter(|cells| *cells > 0),

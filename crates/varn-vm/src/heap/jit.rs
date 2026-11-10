@@ -9,6 +9,7 @@ const RCBOX_PREFIX: usize = 2 * std::mem::size_of::<usize>();
 
 impl Heap {
     pub(crate) fn young_len_byte_offset_from_rcbox() -> usize {
+        super::young::YoungGen::probe_born_layout();
         RCBOX_PREFIX
             + std::mem::offset_of!(HeapInner, young)
             + super::young::YoungGen::born_len_byte_offset()
@@ -328,6 +329,7 @@ impl Heap {
     }
 
     pub(crate) fn jit_instance_alloc() -> varn_jit::JitInstanceAlloc {
+        super::young::YoungGen::probe_born_layout();
         let cls = std::rc::Rc::new(varn_types::ClassObj::new("jit-probe"));
         let cls_id = cls.id;
         let cls_val = std::rc::Rc::as_ptr(&cls) as usize;

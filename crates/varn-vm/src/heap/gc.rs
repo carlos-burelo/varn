@@ -58,6 +58,7 @@ impl HeapInner {
         self.young_lazies.clear();
         self.compact_interners();
         self.rebuild_scan_roots();
+        self.verify_heap(super::verify::Phase::Major);
         self.gc_collections += 1;
         self.gc_total_freed += freed as u64;
         self.cells.old_growth = 0;

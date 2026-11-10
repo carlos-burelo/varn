@@ -9,7 +9,8 @@
     3. Auditoría de gobernanza de tamaño de archivos
     4. Compilación del binario de producción (cargo build --release --bin vn)
     5. Suite tests/main.vn: el camino de producción (@embedded + JIT) con -Fast,
-       la matriz completa de 5 cuadrantes sin banderas
+       la matriz completa de 5 cuadrantes sin banderas, y el cuadrante de estrés
+       del GC (VARN_GC_STRESS=256 + verificador de invariantes)
     6. Benchmark de estabilidad (opcional con -Fast)
 
 .PARAMETER Fast
@@ -215,6 +216,13 @@ if (-not $q4) { $failedSteps += "Cuadrante 4 (@embedded + No-JIT)" }
 $q5 = Run-Quadrant "5: [cache JIT] + [VARN_JIT_CACHE=verify]" @{ "VARN_JIT_CACHE" = "verify" } @("run", "tests/main.vn")
 if (-not $q5) { $failedSteps += "Cuadrante 5 (cache JIT verify)" }
 }
+}
+
+# 5c. Estres del GC con verificador: la red de seguridad de todo cambio en el heap
+if (-not $Quick) {
+    Write-StepHeader "5c: Estres del GC (VARN_GC_STRESS=256 + VARN_GC_VERIFY=1)"
+    $qs = Run-Quadrant "[estres GC 256] + [verificador de invariantes]" @{ "VARN_GC_STRESS" = "256"; "VARN_GC_VERIFY" = "1" } @("run", "tests/main.vn")
+    if (-not $qs) { $failedSteps += "Estres del GC (256 + verificador)" }
 }
 
 # 5b. Corpus de errores (lo ejecuta el CI; sin esto un fixture obsoleto solo falla alli)

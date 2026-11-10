@@ -206,6 +206,55 @@ impl CellSpace {
         true
     }
 
+    #[inline(always)]
+    pub(crate) fn is_marked(r: HeapRef) -> bool {
+        header(r).state & MAJOR_MARK != 0
+    }
+
+    pub(crate) fn used_cells(&self) -> usize {
+        self.classes
+            .iter()
+            .zip(CELL_CLASSES)
+            .map(|(c, cell)| c.used(cell))
+            .sum::<usize>()
+            + self.large.len()
+    }
+
+    pub(crate) fn free_list_problems(&self, problems: &mut Vec<String>) -> usize {
+        let mut total = 0;
+        for (class, cell) in self.classes.iter().zip(CELL_CLASSES) {
+            let bound = class.blocks.len() * cells_per_block(cell);
+            let mut addr = class.free_head();
+            let mut seen = 0;
+            while addr != 0 {
+                if seen == bound {
+                    problems.push(format!(
+                        "free list of class {cell} loops after {bound} cells"
+                    ));
+                    break;
+                }
+                if !class.contains_addr(addr, cell) {
+                    problems.push(format!(
+                        "free list of class {cell} holds {addr:#x}, outside its blocks"
+                    ));
+                    break;
+                }
+                let h = header(unsafe { HeapRef::from_addr_unchecked(addr) });
+                if h.state != SlotState::Free as u8 {
+                    problems.push(format!(
+                        "free list of class {cell} holds live cell {addr:#x} (state {})",
+                        h.state
+                    ));
+                    break;
+                }
+                addr = blocks::SizeClass::free_next(addr);
+                seen += 1;
+            }
+            total += seen;
+        }
+        total
+    }
+
     pub(crate) fn live_count(&self) -> usize {
         self.refs().count()
     }

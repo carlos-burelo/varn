@@ -53,6 +53,7 @@ pub struct HeapInner {
     pub hotspot: Option<Rc<RefCell<HotspotCounters>>>,
     pub(super) scan_roots: Vec<HeapRef>,
     pub(super) identity_index: FxHashMap<usize, HeapRef>,
+    pub(crate) verify_gc: bool,
 }
 
 impl Drop for HeapInner {
@@ -85,6 +86,7 @@ impl HeapInner {
             hotspot: None,
             scan_roots: Vec::new(),
             identity_index: FxHashMap::default(),
+            verify_gc: settings.gc_verify,
         }
     }
 

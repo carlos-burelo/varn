@@ -78,6 +78,37 @@ impl SizeClass {
         n
     }
 
+    pub(super) fn free_head(&self) -> u64 {
+        self.lane.free
+    }
+
+    pub(super) fn free_next(addr: u64) -> u64 {
+        unsafe { *next_free(addr) }
+    }
+
+    pub(super) fn contains_addr(&self, addr: u64, cell: usize) -> bool {
+        let span = (cells_per_block(cell) * cell) as u64;
+        self.blocks.iter().any(|block| {
+            let base = block.as_ptr() as u64;
+            addr >= base && addr < base + span && (addr - base).is_multiple_of(cell as u64)
+        })
+    }
+
+    pub(super) fn used(&self, cell: usize) -> usize {
+        let last = self.blocks.len().saturating_sub(1);
+        self.blocks
+            .iter()
+            .enumerate()
+            .map(|(bi, block)| {
+                if bi == last {
+                    (self.lane.bump as usize).saturating_sub(block.as_ptr() as usize) / cell
+                } else {
+                    cells_per_block(cell)
+                }
+            })
+            .sum()
+    }
+
     pub(super) fn cells(&self, cell: usize) -> impl Iterator<Item = HeapRef> + '_ {
         let last = self.blocks.len().saturating_sub(1);
         self.blocks.iter().enumerate().flat_map(move |(bi, block)| {
