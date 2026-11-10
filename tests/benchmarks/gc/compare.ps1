@@ -12,6 +12,18 @@ Copy-Item "$PSScriptRoot\go\*" "$work\go" -Force
 Copy-Item "$PSScriptRoot\net\*" "$work\net" -Force
 
 $runtimes = [ordered]@{}
+$bun = Get-Command bun -ErrorAction SilentlyContinue
+$bunExe = $null
+if ($bun) {
+    $src = $bun.Source
+    if ($src -match '\.exe$') {
+        $bunExe = $src
+    } else {
+        $candidate = Join-Path (Split-Path $src) 'node_modules\bun\bin\bun.exe'
+        if (Test-Path $candidate) { $bunExe = $candidate }
+    }
+}
+if ($bunExe) { $runtimes['bun'] = { param($w) @($bunExe, "run", "`"$PSScriptRoot\gcbench.js`" $w") } }
 $node = Get-Command node -ErrorAction SilentlyContinue
 if ($node) { $runtimes['node'] = { param($w) @($node.Source, "`"$PSScriptRoot\gcbench.js`" $w") } }
 if (Get-Command go -ErrorAction SilentlyContinue) {
