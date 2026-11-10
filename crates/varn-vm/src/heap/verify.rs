@@ -115,6 +115,15 @@ impl HeapInner {
         if phase == Phase::Major && young > 0 {
             problems.push(format!("{young} young cells outlived a major collection"));
         }
+        if phase == Phase::Minor {
+            for r in self.cells.refs() {
+                if self.cells.state(r) == SlotState::Young {
+                    problems.push(format!(
+                        "young cell {r:?} survived a minor collection unmarked"
+                    ));
+                }
+            }
+        }
         self.free_space_problems(live, &mut problems);
         self.tracking_problems(&mut problems);
         problems

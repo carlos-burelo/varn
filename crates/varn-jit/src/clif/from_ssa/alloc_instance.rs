@@ -121,6 +121,10 @@ pub(super) fn emit_alloc_instance(
 
     let guard = b.ins().bor(c_hot, c_nat);
     let guard = b.ins().bor(guard, c_tag);
+    let born_full = b
+        .ins()
+        .icmp(IntCC::UnsignedGreaterThanOrEqual, born_len, born_cap);
+    let guard = b.ins().bor(guard, born_full);
     let force_slow = crate::config::config().alloc_slow;
     if force_slow {
         b.ins().jump(slow_blk, &[]);
@@ -192,10 +196,7 @@ pub(super) fn emit_alloc_instance(
     if rem >= 1 {
         b.ins().store(flags, zero8, data, rem_off as i32);
     }
-    let full = b
-        .ins()
-        .icmp(IntCC::UnsignedGreaterThanOrEqual, born_len, born_cap);
-    b.ins().brif(full, slow_blk, &[], born_ok_blk, &[]);
+    b.ins().jump(born_ok_blk, &[]);
 
     b.switch_to_block(born_ok_blk);
     let slot_off = b.ins().ishl_imm_u(born_len, 3);

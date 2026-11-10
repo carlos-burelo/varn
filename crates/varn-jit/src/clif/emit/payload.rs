@@ -262,6 +262,9 @@ pub(in crate::clif) fn is_young(
 ) -> cranelift_codegen::ir::Value {
     let m = cranelift_codegen::ir::MemFlagsData::trusted();
     let state = b.ins().uload8(types::I64, m, addr, alay.state_off as i32);
-    b.ins()
-        .icmp_imm_u(IntCC::Equal, state, alay.young_state as i64)
+    b.ins().icmp_imm_u(
+        IntCC::UnsignedGreaterThanOrEqual,
+        state,
+        alay.young_state as i64,
+    )
 }
