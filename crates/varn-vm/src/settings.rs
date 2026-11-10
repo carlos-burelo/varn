@@ -18,7 +18,7 @@ impl ExecSettings {
     const TIER_LOOP: u32 = 1;
     const TIER_STRAIGHT: u32 = 128;
     const YOUNG_THRESHOLD: usize = 786432;
-    const OLD_FLOOR: u64 = 65536;
+    const OLD_FLOOR: u64 = Self::YOUNG_THRESHOLD as u64;
 
     pub fn young_threshold(&self) -> usize {
         self.gc_stress.unwrap_or(Self::YOUNG_THRESHOLD)
