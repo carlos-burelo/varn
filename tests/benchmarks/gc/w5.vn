@@ -1,0 +1,13 @@
+class Node {
+    id: int
+    constructor(id: int) { this.id = id }
+}
+const size = 500000
+const window: Node[] = []
+for (let i = 0; i < size; i = i + 1) { window.push(new Node(i)) }
+let sink = 0
+for (let i = 0; i < 6000000; i = i + 1) {
+    window[i % size] = new Node(i)
+    sink = sink + window[(i + 7) % size].id
+}
+print(sink)

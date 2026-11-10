@@ -1,0 +1,10 @@
+class Node {
+    id: int
+    constructor(id: int) { this.id = id }
+}
+const ring: Node[] = []
+for (let i = 0; i < 1024; i = i + 1) { ring.push(new Node(0)) }
+let keep: Node[] = []
+for (let i = 0; i < 4000000; i = i + 1) { keep.push(new Node(i)) }
+for (let i = 0; i < 4000000; i = i + 1) { ring[i & 1023] = new Node(i) }
+print(keep.length + ring[5].id)

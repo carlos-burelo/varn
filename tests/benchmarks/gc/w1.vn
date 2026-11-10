@@ -1,0 +1,6 @@
+let total = 0
+for (let i = 0; i < 300; i = i + 1) {
+    const a = Array.filled(500000, i)
+    total = total + a.length
+}
+print(total)
