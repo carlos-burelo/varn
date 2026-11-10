@@ -380,6 +380,22 @@ Etapas adicionales (se suman a la sección 7; **S6 se concreta en S9**):
 
 Orden recomendado: **S0 → S1 → S3 → S2 → S4 → S8 → S7 → S9**, con S10 y S11 en paralelo desde S0. Primero se cierran las brechas medidas (54× de memoria en w1, 66 % de GC en w5); luego los diferenciadores, empezando por V1 por ser lo que más celdas elimina.
 
+### 12.1 Estado medido
+
+| Etapa | Estado | Medida |
+|---|---|---|
+| S0 | Entra (`c693a661`) | Suite verde con `VARN_GC_STRESS=256` y verificador; sonda de `born` activa |
+| S1 | Entra (`d687480a`) | Ritmo en bytes y ledger externo; sin umbral fijo en celdas |
+| S2 | Entra (`2fa6b617`) | E4: 7,5 ms → 2,2 ms; E7: 3,8 ms → 2,1 ms |
+| S3 | Entra (`b70254d0`) | E5: promovidos 4,0 M → 42; mayores 4 → 1; GC 134 ms → 57 ms |
+| S4 | Entra (`54cb85fb`) | E3 4 M: 61,6 ms → 16,5 ms; E2c: 232 MB → 86-107 MB; E5 GC 49,2 ms |
+| S5 | Pendiente de medida | El barrido joven es el 90 % de la menor (E4: 2,5 ms de 2,7 ms); falta el A/B por bloques |
+| S6 | Sin definir | Depende de D1 (objetivo de pausa); se concreta en S9 |
+| S8 | **No entra** | El *noscan* ya está: marcar 4 M instancias escalares cuesta 16,2 ms y encolarlas costaría 130,5 ms (8×). El mapa de punteros es `GcLayout.gc.slots`. Memorizar el «sin referencias» en la cabecera y quitar el clon del `Rc` de layout no bajaron de 16 ms, así que no hay un 20 % que ganar; las barreras sobre almacenes inmutables no crean aristas viejo→joven (padre joven) y el JIT ya no las emite al construir |
+| S7 | Pendiente | Depende de ADR-0026 (valores en línea) |
+| S9 | Pendiente | Requiere W7 y D1 |
+| S10, S11 | Pendientes | `vn heap` y verificación diferencial |
+
 ## 13. Riesgos y límites
 
 - **No se puede prometer lo que depende de la medición.** El criterio 10.1 puede fallar en alguna carga; la etapa correspondiente no entra y se documenta.
