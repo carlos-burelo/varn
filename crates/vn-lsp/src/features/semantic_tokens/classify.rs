@@ -93,7 +93,12 @@ pub fn resolve_token(state: &DocumentState, tok: &TokenRecord, ctx: &TokenContex
             .filter(|id| *id < state.db.bind.arena.len())
             .is_some_and(|id| state.name(state.db.bind.arena.get(id).name) == state.lexeme(tok));
 
-    if tok.kind.is_keyword() && !ctx.prev_is_dot && !ctx.getset_as_ident && !names_a_symbol {
+    if tok.kind.is_keyword()
+        && !ctx.prev_is_dot
+        && !ctx.getset_as_ident
+        && !ctx.soft_as_identifier
+        && !names_a_symbol
+    {
         return Some(TT_KEYWORD);
     }
 

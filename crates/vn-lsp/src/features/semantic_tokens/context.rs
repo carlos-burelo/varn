@@ -16,6 +16,7 @@ pub struct TokenContext {
     pub function_type_parameter: bool,
     pub enum_member_declaration: bool,
     pub declared: Option<SymbolId>,
+    pub soft_as_identifier: bool,
     pub specifier_kind: Option<SymbolKind>,
     pub prev_is_colon_colon: bool,
     pub pattern: Option<super::roles::PatternRole>,
@@ -59,6 +60,7 @@ impl TokenContext {
             function_type_parameter: function_type_parameter(state, index),
             enum_member_declaration: declarations.is_enum_member(tok.offset),
             declared: declarations.symbol_at(tok.offset),
+            soft_as_identifier: soft_as_identifier(tok.kind, next, kind_at(Some(index + 2))),
             specifier_kind,
             prev_is_colon_colon: prev == Some(TokenKind::ColonColon),
             pattern: declarations.pattern_role(tok.offset),
@@ -178,4 +180,61 @@ fn exported_kind(state: &DocumentState, index: usize) -> Option<SymbolKind> {
         state.resolver.module_exports(&resolved, &mut Vec::new())
     };
     exports.get(name).map(|symbol| symbol.kind)
+}
+
+fn soft_as_identifier(
+    kind: TokenKind,
+    next: Option<TokenKind>,
+    after_next: Option<TokenKind>,
+) -> bool {
+    let reserved_value = matches!(
+        kind,
+        TokenKind::True | TokenKind::False | TokenKind::Null | TokenKind::This | TokenKind::Super
+    );
+    if reserved_value || !(kind.is_keyword() || matches!(kind, TokenKind::Mut | TokenKind::Out)) {
+        return false;
+    }
+    let labelled = next == Some(TokenKind::Colon)
+        || (next == Some(TokenKind::Question) && after_next == Some(TokenKind::Colon));
+    let contextual = matches!(
+        kind,
+        TokenKind::From
+            | TokenKind::As
+            | TokenKind::Of
+            | TokenKind::In
+            | TokenKind::Is
+            | TokenKind::On
+            | TokenKind::Get
+            | TokenKind::Set
+            | TokenKind::Out
+            | TokenKind::Mut
+            | TokenKind::Module
+            | TokenKind::Type
+            | TokenKind::Declare
+            | TokenKind::Native
+            | TokenKind::Readonly
+            | TokenKind::Abstract
+            | TokenKind::Override
+            | TokenKind::Async
+            | TokenKind::Using
+            | TokenKind::Extension
+            | TokenKind::Namespace
+    );
+    let used_as_value = contextual
+        && matches!(
+            next,
+            Some(
+                TokenKind::Comma
+                    | TokenKind::RParen
+                    | TokenKind::RBrace
+                    | TokenKind::RBracket
+                    | TokenKind::Semicolon
+                    | TokenKind::Dot
+                    | TokenKind::QuestionDot
+                    | TokenKind::Eq
+                    | TokenKind::FatArrow
+                    | TokenKind::LBracket
+            )
+        );
+    labelled || used_as_value
 }
