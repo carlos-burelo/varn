@@ -12,6 +12,7 @@ pub struct TokenContext {
     pub next_is_colon: bool,
     pub getset_as_ident: bool,
     pub in_specifier_list: bool,
+    pub function_type_parameter: bool,
     pub enum_member_declaration: bool,
     pub declared: Option<SymbolId>,
 }
@@ -42,10 +43,72 @@ impl TokenContext {
                 && !prev_is_dot
                 && next != Some(TokenKind::Identifier),
             in_specifier_list: in_specifier_list(state, index),
+            function_type_parameter: function_type_parameter(state, index),
             enum_member_declaration: declarations.is_enum_member(tok.offset),
             declared: declarations.symbol_at(tok.offset),
         }
     }
+}
+
+fn function_type_parameter(state: &DocumentState, index: usize) -> bool {
+    let tokens = &state.tokens;
+    let labelled = |i: usize| {
+        let kind_at = |j: usize| tokens.get(j).map(|t| t.kind);
+        kind_at(i + 1) == Some(TokenKind::Colon)
+            || (kind_at(i + 1) == Some(TokenKind::Question)
+                && kind_at(i + 2) == Some(TokenKind::Colon))
+    };
+    let after_open_or_comma = index
+        .checked_sub(1)
+        .and_then(|j| tokens.get(j))
+        .is_some_and(|t| matches!(t.kind, TokenKind::LParen | TokenKind::Comma));
+    if tokens[index].kind != TokenKind::Identifier || !labelled(index) || !after_open_or_comma {
+        return false;
+    }
+
+    let mut depth = 0usize;
+    let mut open = None;
+    for j in (0..index).rev() {
+        let kind = tokens[j].kind;
+        if matches!(
+            kind,
+            TokenKind::RParen | TokenKind::RBracket | TokenKind::RBrace
+        ) {
+            depth += 1;
+        } else if matches!(
+            kind,
+            TokenKind::LParen | TokenKind::LBracket | TokenKind::LBrace
+        ) {
+            if depth > 0 {
+                depth -= 1;
+            } else if kind == TokenKind::LParen {
+                open = Some(j);
+                break;
+            } else {
+                return false;
+            }
+        }
+    }
+    let Some(open) = open else {
+        return false;
+    };
+
+    let mut depth = 0usize;
+    for (offset, tok) in tokens[open..].iter().enumerate() {
+        if tok.kind == TokenKind::LParen {
+            depth += 1;
+        }
+        if tok.kind == TokenKind::RParen {
+            depth -= 1;
+            if depth == 0 {
+                return matches!(
+                    tokens.get(open + offset + 1).map(|t| t.kind),
+                    Some(TokenKind::FatArrow | TokenKind::Arrow)
+                );
+            }
+        }
+    }
+    false
 }
 
 fn in_specifier_list(state: &DocumentState, index: usize) -> bool {

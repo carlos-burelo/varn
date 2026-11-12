@@ -46,6 +46,10 @@ pub fn resolve_token(state: &DocumentState, tok: &TokenRecord, ctx: &TokenContex
         return Some(TT_ENUM_MEMBER);
     }
 
+    if ctx.function_type_parameter {
+        return Some(TT_PARAMETER);
+    }
+
     if let Some(id) = ctx.declared {
         return Some(declared_tt(state, state.db.bind.arena.get(id)));
     }
@@ -178,13 +182,7 @@ fn symbol_tt(state: &DocumentState, kind: SymbolKind, ty: Option<&Type>, prev_is
         SymbolKind::Enum => TT_ENUM,
         SymbolKind::EnumMember => TT_ENUM_MEMBER,
         SymbolKind::TypeParameter => TT_TYPE_PARAMETER,
-        SymbolKind::Parameter => {
-            if is_fn {
-                TT_FUNCTION
-            } else {
-                TT_PARAMETER
-            }
-        }
+        SymbolKind::Parameter => TT_PARAMETER,
         SymbolKind::Property => {
             if prev_is_dot && ty.is_some_and(|ty| is_enum_type(state, ty)) {
                 TT_ENUM_MEMBER
