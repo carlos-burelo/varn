@@ -15,6 +15,8 @@ vn-tir      = { path = "../vn-tir" }
 vn-sem      = { path = "../vn-sem" }
 vn-resolver = { path = "../vn-resolver" }
 vn-pipeline = { path = "../vn-pipeline" }
+vn-debug    = { path = "../vn-debug", features = ["clif"] }
+vn-vm       = { path = "../vn-vm", features = ["clif"] }
 
 tower-lsp-f  = { workspace = true }
 tokio      = { workspace = true }

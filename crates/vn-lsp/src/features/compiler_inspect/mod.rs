@@ -32,6 +32,14 @@ pub fn execute_command(
         "vn.showSSA" => Ok(Some(serde_json::Value::String(compile_and_dump_ssa(
             &*document()?,
         )?))),
+        "vn.showMachineCode" => Ok(Some(serde_json::Value::String(compile_machine_code(
+            &*document()?,
+            MachineView::Assembly,
+        )?))),
+        "vn.showClif" => Ok(Some(serde_json::Value::String(compile_machine_code(
+            &*document()?,
+            MachineView::Clif,
+        )?))),
         "vn.getCFG" => Ok(Some(compile_and_get_cfg_json(&*document()?)?)),
         "vn.memoryStats" => Ok(Some(memory_stats(workspace))),
         "vn.stdList" => Ok(Some(std_list())),
@@ -167,14 +175,10 @@ fn build_ssa(state: &DocumentState) -> Result<Vec<vn_compiler::ssa::ir::SsaFunc>
 }
 
 pub fn compile_and_disassemble(state: &DocumentState) -> Result<String, String> {
-    let proto = vn_compiler::from_tir::compile_module(
-        &emit_tir(state)?,
-        Vec::new(),
-        &state.source,
-        false,
-    )
-    .0
-    .map_err(|e| format!("Compilation failed: {e:?}"))?;
+    let proto =
+        vn_compiler::from_tir::compile_module(&emit_tir(state)?, Vec::new(), &state.source, false)
+            .0
+            .map_err(|e| format!("Compilation failed: {e:?}"))?;
     Ok(vn_types::bytecode::disasm::render(&proto))
 }
 
@@ -190,4 +194,25 @@ pub fn compile_and_dump_ssa(state: &DocumentState) -> Result<String, String> {
         out.push('\n');
     }
     Ok(out)
+}
+
+enum MachineView {
+    Assembly,
+    Clif,
+}
+
+fn compile_machine_code(state: &DocumentState, view: MachineView) -> Result<String, String> {
+    let proto =
+        vn_compiler::from_tir::compile_module(&emit_tir(state)?, Vec::new(), &state.source, false)
+            .0
+            .map_err(|e| format!("Compilation failed: {e:?}"))?;
+    let helpers = vn_vm::jit::table_build::build_jit_helpers(&vn_vm::ExecSettings::default());
+    let functions = vn_debug::machine::collect(&proto, &helpers);
+    if functions.is_empty() {
+        return Err("the host has no Cranelift target".to_string());
+    }
+    Ok(match view {
+        MachineView::Assembly => vn_debug::machine::render_machine_code(&functions),
+        MachineView::Clif => vn_debug::machine::render_clif(&functions),
+    })
 }

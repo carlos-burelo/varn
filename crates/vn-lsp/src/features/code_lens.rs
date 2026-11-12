@@ -73,6 +73,26 @@ pub fn build_code_lenses(
         data: None,
     });
 
+    lenses.push(CodeLens {
+        range: Range {
+            start: Position {
+                line: 0,
+                character: 0,
+            },
+            end: Position {
+                line: 0,
+                character: 0,
+            },
+        },
+        command: Some(Command {
+            title: "View Machine Code".to_string(),
+            tooltip: None,
+            command: "vn.showMachineCode".to_string(),
+            arguments: Some(vec![uri_arg()]),
+        }),
+        data: None,
+    });
+
     for range in entry_guards(analysis) {
         lenses.push(CodeLens {
             range,
@@ -87,7 +107,7 @@ pub fn build_code_lenses(
         lenses.push(CodeLens {
             range,
             command: Some(Command {
-                title: "⏱️ Benchmark".to_string(),
+                title: "Benchmark".to_string(),
                 tooltip: None,
                 command: "vn.runBenchmark".to_string(),
                 arguments: Some(vec![uri_arg()]),

@@ -68,6 +68,8 @@ pub fn server_capabilities() -> ServerCapabilities {
                 "vn.syntaxTree".to_string(),
                 "vn.showBytecode".to_string(),
                 "vn.showSSA".to_string(),
+                "vn.showMachineCode".to_string(),
+                "vn.showClif".to_string(),
                 "vn.getCFG".to_string(),
                 "vn.memoryStats".to_string(),
                 "vn.stdList".to_string(),
