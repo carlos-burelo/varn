@@ -154,9 +154,13 @@ pub fn resolve_token(state: &DocumentState, tok: &TokenRecord, ctx: &TokenContex
     }
 
     if ctx.in_specifier_list
-        && let Some(kind) = state.symbol_map.get(state.lexeme(tok))
+        && let Some(kind) = state
+            .symbol_map
+            .get(state.lexeme(tok))
+            .copied()
+            .or(ctx.specifier_kind)
     {
-        return Some(symbol_tt(state, *kind, None, false));
+        return Some(symbol_tt(state, kind, None, false));
     }
 
     if LangPrimitive::from_str(state.lexeme(tok)).is_some() {

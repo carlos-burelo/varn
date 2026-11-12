@@ -1,4 +1,5 @@
 use vn_core::TokenKind;
+use vn_sem::resolver::ImportResolver;
 use vn_sem::symbol::{SymbolId, SymbolKind};
 
 use super::modifiers::DeclarationIndex;
@@ -15,6 +16,7 @@ pub struct TokenContext {
     pub function_type_parameter: bool,
     pub enum_member_declaration: bool,
     pub declared: Option<SymbolId>,
+    pub specifier_kind: Option<SymbolKind>,
     pub prev_is_colon_colon: bool,
     pub pattern: Option<super::roles::PatternRole>,
     pub member: Option<super::roles::MemberRole>,
@@ -28,6 +30,14 @@ impl TokenContext {
         let prev = kind_at(index.checked_sub(1));
         let next = kind_at(Some(index + 1));
         let prev_is_dot = prev == Some(TokenKind::Dot);
+
+        let in_specifier_list = in_specifier_list(state, index);
+        let specifier_kind =
+            if in_specifier_list && !state.symbol_map.contains_key(state.lexeme(tok)) {
+                exported_kind(state, index)
+            } else {
+                None
+            };
 
         Self {
             prev_is_dot,
@@ -45,10 +55,11 @@ impl TokenContext {
             getset_as_ident: matches!(tok.kind, TokenKind::Get | TokenKind::Set)
                 && !prev_is_dot
                 && next != Some(TokenKind::Identifier),
-            in_specifier_list: in_specifier_list(state, index),
+            in_specifier_list,
             function_type_parameter: function_type_parameter(state, index),
             enum_member_declaration: declarations.is_enum_member(tok.offset),
             declared: declarations.symbol_at(tok.offset),
+            specifier_kind,
             prev_is_colon_colon: prev == Some(TokenKind::ColonColon),
             pattern: declarations.pattern_role(tok.offset),
             member: declarations.member_role(tok.offset),
@@ -142,4 +153,29 @@ fn in_specifier_list(state: &DocumentState, index: usize) -> bool {
         return matches!(before, Some(TokenKind::Import | TokenKind::Export));
     }
     false
+}
+
+fn exported_kind(state: &DocumentState, index: usize) -> Option<SymbolKind> {
+    let tokens = &state.tokens;
+    let close = tokens[index..]
+        .iter()
+        .position(|t| t.kind == TokenKind::RBrace)?
+        + index;
+    let from = tokens
+        .get(close + 1)
+        .filter(|t| t.kind == TokenKind::From)?;
+    let literal = tokens
+        .get(close + 2)
+        .filter(|t| t.kind == TokenKind::Str && t.offset > from.offset)?;
+    let specifier = state.lexeme(literal).trim_matches(['"', '\'']);
+    let name = state.lexeme(&tokens[index]);
+    let exports = if specifier.starts_with("std:") {
+        state.resolver.stdlib_exports(specifier)
+    } else {
+        let path = crate::document::uri_to_path(&state.uri);
+        let base = std::path::Path::new(&path).parent()?;
+        let resolved = state.resolver.resolve_specifier(base, specifier)?;
+        state.resolver.module_exports(&resolved, &mut Vec::new())
+    };
+    exports.get(name).map(|symbol| symbol.kind)
 }
