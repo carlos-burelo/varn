@@ -14,7 +14,8 @@ pub fn resolve_token(state: &DocumentState, tok: &TokenRecord, ctx: &TokenContex
     use TokenKind::*;
 
     match tok.kind {
-        True | False | Null => return Some(TT_KEYWORD),
+        True | False => return Some(TT_NUMBER),
+        Null => return Some(TT_KEYWORD),
         This => return Some(TT_VARIABLE),
         Void => return Some(TT_TYPE),
         RegularExpression => return Some(TT_REGEXP),
@@ -40,6 +41,14 @@ pub fn resolve_token(state: &DocumentState, tok: &TokenRecord, ctx: &TokenContex
         | Extends | Implements | Get | Set | Constructor | Destructor | Match | At | Hash
         | Backslash | Dollar | Backtick | Newline | Whitespace | DocComment | Placeholder
         | Spawn | Parallel | Start | RawStr => {}
+    }
+
+    if tok.kind == Identifier
+        && !ctx.prev_is_dot
+        && vn_core::abi::FLOAT_CONSTANTS.contains(&state.lexeme(tok))
+        && !declared_by_user(state, tok)
+    {
+        return Some(TT_NUMBER);
     }
 
     if ctx.enum_member_declaration {
@@ -182,6 +191,18 @@ fn member_tt(state: &DocumentState, ty: &Type) -> u32 {
     } else {
         TT_PROPERTY
     }
+}
+
+fn declared_by_user(state: &DocumentState, tok: &TokenRecord) -> bool {
+    state
+        .db
+        .resolve_at(state.lexeme(tok), tok.offset)
+        .is_some_and(|(id, _)| {
+            id < state.db.bind.arena.len() && {
+                let symbol = state.db.bind.arena.get(id);
+                symbol.origin_module.is_none() && symbol.line != u32::MAX
+            }
+        })
 }
 
 fn tt_from_symbol(state: &DocumentState, kind: SymbolKind, ty: &Type, prev_is_dot: bool) -> u32 {
