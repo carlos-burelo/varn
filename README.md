@@ -47,7 +47,7 @@ await describe("formas", async () => {
 Requiere Rust (la toolchain está fijada en `rust-toolchain.toml`; rustup la instala sola).
 
 ```bash
-git clone https://github.com/carlos-burelo/varn
+git clone https://github.com/varn-lang/varn
 cd varn
 cargo build --profile quick --bin vn
 

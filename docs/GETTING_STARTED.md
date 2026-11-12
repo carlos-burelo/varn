@@ -3,7 +3,7 @@
 ## 1. Compilar `vn`
 
 ```bash
-git clone https://github.com/carlos-burelo/varn
+git clone https://github.com/varn-lang/varn
 cd varn
 cargo build --profile quick --bin vn      # ~3 min; binario en target/quick/vn
 ```

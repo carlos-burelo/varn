@@ -9,7 +9,7 @@ Código manda. Fuentes: `Cargo.toml`, `rust-toolchain.toml`, `crates/varn-cli/sr
 - Linker: `cc`/`gcc`/`clang` en Unix; MSVC o `rust-lld` en Windows.
 
 ```bash
-git clone https://github.com/carlos-burelo/varn
+git clone https://github.com/varn-lang/varn
 cd varn
 ```
 
