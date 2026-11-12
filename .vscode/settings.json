@@ -2,14 +2,14 @@
   "terminal.integrated.env.windows": {
     "PATH": "${workspaceFolder}\\target\\debug;${workspaceFolder}\\target\\release;${env:PATH}"
   },
-  "Varn.run.verbose": false,
-  "Varn.run.debugPhases": [],
-  "Varn.codeLens.enabled": true,
-  "Varn.buildMode": "debug",
+  "vn.run.verbose": false,
+  "vn.run.debugPhases": [],
+  "vn.codeLens.enabled": true,
+  "vn.buildMode": "debug",
   "editor.semanticHighlighting.enabled": true,
   "[vn]": {
     "editor.semanticHighlighting.enabled": true,
     "editor.inlayHints.enabled": "off"
   },
-  "Varn.inlayHints.enabled": false,
+  "vn.inlayHints.enabled": false,
 }
