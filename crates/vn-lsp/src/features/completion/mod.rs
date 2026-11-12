@@ -2,6 +2,7 @@ mod autoimport;
 mod calls;
 mod imports;
 mod keywords;
+mod lexical;
 pub mod members;
 pub mod postfix;
 pub mod receiver_literals;
@@ -140,8 +141,13 @@ pub fn build_completion_response(
         );
     }
 
-    if cursor_in_string(&state.source, line, col) {
-        return (None, Some(format!("cmp {lc} trg={trig} suppressed=str")));
+    let cursor_offset = state.offset_at_line_col(line, col) as usize;
+    let context = lexical::lexical_context(&state.source, cursor_offset);
+    if context != lexical::LexicalContext::Code {
+        return (
+            None,
+            Some(format!("cmp {lc} trg={trig} suppressed={context:?}")),
+        );
     }
 
     if let Some((receiver_name, receiver_offset)) =
@@ -388,33 +394,4 @@ pub fn build_completions(
     }
 
     (items, scope_n)
-}
-
-fn cursor_in_string(source: &str, line: u32, col: u32) -> bool {
-    let src_line = match source.lines().nth(line as usize) {
-        Some(l) => l,
-        None => return false,
-    };
-    let bytes = src_line.as_bytes();
-    let col = (col as usize).min(bytes.len());
-
-    let mut in_string = false;
-    let mut quote_char = b'"';
-    let mut i = 0;
-    while i < col {
-        let c = bytes[i];
-        if !in_string {
-            if c == b'"' || c == b'\'' || c == b'`' {
-                in_string = true;
-                quote_char = c;
-            }
-        } else if c == b'\\' {
-            i += 2;
-            continue;
-        } else if c == quote_char {
-            in_string = false;
-        }
-        i += 1;
-    }
-    in_string
 }

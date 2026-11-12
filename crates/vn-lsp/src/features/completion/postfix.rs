@@ -28,26 +28,26 @@ pub static POSTFIX_TEMPLATES: &[PostfixTemplate] = &[
     PostfixTemplate {
         name: "if",
         detail: "Postfix if",
-        description: "Wrap expression in an if condition:\n```vn\nif expr {\n    $0\n}\n```",
-        snippet_format: |expr| format!("if {expr} {{\n    $0\n}}"),
+        description: "Wrap expression in an if condition:\n```vn\nif (expr) {\n    $0\n}\n```",
+        snippet_format: |expr| format!("if ({expr}) {{\n    $0\n}}"),
     },
     PostfixTemplate {
         name: "while",
         detail: "Postfix while",
-        description: "Wrap expression in a while condition:\n```vn\nwhile expr {\n    $0\n}\n```",
-        snippet_format: |expr| format!("while {expr} {{\n    $0\n}}"),
+        description: "Wrap expression in a while condition:\n```vn\nwhile (expr) {\n    $0\n}\n```",
+        snippet_format: |expr| format!("while ({expr}) {{\n    $0\n}}"),
     },
     PostfixTemplate {
         name: "for",
-        detail: "Postfix for-in",
-        description: "Iterate over collection:\n```vn\nfor item in expr {\n    $0\n}\n```",
-        snippet_format: |expr| format!("for ${{1:item}} in {expr} {{\n    $0\n}}"),
+        detail: "Postfix for-of",
+        description: "Iterate over collection:\n```vn\nfor (const item of expr) {\n    $0\n}\n```",
+        snippet_format: |expr| format!("for (const ${{1:item}} of {expr}) {{\n    $0\n}}"),
     },
     PostfixTemplate {
         name: "match",
         detail: "Postfix match",
-        description: "Pattern match on expression:\n```vn\nmatch expr {\n    $0\n}\n```",
-        snippet_format: |expr| format!("match {expr} {{\n    $0\n}}"),
+        description: "Pattern match on expression:\n```vn\nmatch (expr) {\n    $0\n}\n```",
+        snippet_format: |expr| format!("match ({expr}) {{\n    $0\n}}"),
     },
     PostfixTemplate {
         name: "return",
@@ -63,15 +63,15 @@ pub static POSTFIX_TEMPLATES: &[PostfixTemplate] = &[
     },
     PostfixTemplate {
         name: "dbg",
-        detail: "Postfix println (debug)",
-        description: "Print expression to console:\n```vn\nprintln(expr);\n```",
-        snippet_format: |expr| format!("println({expr});$0"),
+        detail: "Postfix print (debug)",
+        description: "Print expression to console:\n```vn\nprint(expr);\n```",
+        snippet_format: |expr| format!("print({expr});$0"),
     },
     PostfixTemplate {
         name: "log",
-        detail: "Postfix println",
-        description: "Print expression to console:\n```vn\nprintln(expr);\n```",
-        snippet_format: |expr| format!("println({expr});$0"),
+        detail: "Postfix print",
+        description: "Print expression to console:\n```vn\nprint(expr);\n```",
+        snippet_format: |expr| format!("print({expr});$0"),
     },
     PostfixTemplate {
         name: "not",
@@ -105,6 +105,14 @@ pub fn build_postfix_completions(
         None => return Vec::new(),
     };
 
+    let typed = &prefix[dot_pos + 1..];
+    if !typed.chars().all(|c| c.is_alphanumeric() || c == '_') {
+        return Vec::new();
+    }
+    let before_dot = prefix[..dot_pos].as_bytes();
+    if before_dot.last().is_some_and(|b| matches!(b, b'.' | b'?')) {
+        return Vec::new();
+    }
     let expr_str = prefix[..dot_pos].trim();
     if expr_str.is_empty() {
         return Vec::new();
@@ -112,7 +120,7 @@ pub fn build_postfix_completions(
 
     let expr_start_col = find_expr_start(prefix, dot_pos);
     let target_expr = prefix[expr_start_col..dot_pos].trim();
-    if target_expr.is_empty() {
+    if target_expr.is_empty() || target_expr.chars().all(|c| c.is_ascii_digit() || c == '_') {
         return Vec::new();
     }
 
