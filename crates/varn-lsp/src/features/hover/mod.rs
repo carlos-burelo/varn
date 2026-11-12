@@ -143,7 +143,7 @@ pub(crate) fn make_lang_hover(
     Hover {
         contents: Contents::MarkupContent(MarkupContent {
             kind: MarkupKind::Markdown,
-            value: format!("```varn\n{value}\n```"),
+            value: format!("```vn\n{value}\n```"),
         }),
         range,
     }
@@ -154,7 +154,7 @@ fn make_member_hover(
     doc: Option<&str>,
     range: Option<tower_lsp_f::lsp_types::Range>,
 ) -> Hover {
-    let mut value = format!("```varn\n{sig}\n```");
+    let mut value = format!("```vn\n{sig}\n```");
     symbols::push_doc(&mut value, doc);
     Hover {
         contents: Contents::MarkupContent(MarkupContent {

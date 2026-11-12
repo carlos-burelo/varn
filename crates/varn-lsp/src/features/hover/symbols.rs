@@ -5,7 +5,7 @@ use crate::document::{DocumentState, SymbolView};
 use super::format::format_signature;
 
 pub fn symbol_hover(state: &DocumentState, sym: SymbolView<'_>) -> Hover {
-    let mut value = format!("```varn\n{}\n```", format_signature(state, sym));
+    let mut value = format!("```vn\n{}\n```", format_signature(state, sym));
 
     if let Some(origin) = &sym.origin() {
         value.push_str(&format!("\n*(from {})*", origin));

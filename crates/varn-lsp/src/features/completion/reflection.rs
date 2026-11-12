@@ -29,14 +29,14 @@ pub static META_PROPERTIES: &[MetaProperty] = &[
         name: varn_core::MemberKey::Fields.as_str(),
         kind: CompletionItemKind::Property,
         detail: "Reflection: field names (str[])",
-        doc: "Returns an array of field names declared on this type:\n```varn\nSampleUser::fields // [\"name\", \"age\", \"role\"]\n```",
+        doc: "Returns an array of field names declared on this type:\n```vn\nSampleUser::fields // [\"name\", \"age\", \"role\"]\n```",
         snippet: None,
     },
     MetaProperty {
         name: varn_core::MemberKey::Methods.as_str(),
         kind: CompletionItemKind::Property,
         detail: "Reflection: method names (str[])",
-        doc: "Returns an array of method names declared on this type:\n```varn\nSampleUser::methods // [\"greet\", \"save\"]\n```",
+        doc: "Returns an array of method names declared on this type:\n```vn\nSampleUser::methods // [\"greet\", \"save\"]\n```",
         snippet: None,
     },
     MetaProperty {

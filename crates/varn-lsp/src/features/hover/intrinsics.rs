@@ -229,7 +229,7 @@ fn make_doc_hover(sig: &str, doc: &str) -> Hover {
     Hover {
         contents: Contents::MarkupContent(MarkupContent {
             kind: MarkupKind::Markdown,
-            value: format!("```varn\n{}\n```\n***\n{}", sig, doc),
+            value: format!("```vn\n{}\n```\n***\n{}", sig, doc),
         }),
         range: None,
     }
