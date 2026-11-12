@@ -1,5 +1,5 @@
 use rustc_hash::{FxHashMap, FxHashSet};
-use vn_core::TokenKind;
+use vn_core::{TokenKind, TypeKind};
 use vn_sem::semantic_info::ResolvedMemberKind;
 use vn_sem::symbol::{SymbolId, SymbolKind};
 
@@ -9,12 +9,13 @@ use super::{
 };
 use crate::document::{DocumentState, TokenRecord};
 
-const STD_MODULE_PREFIX: &str = "std:";
+const LIBRARY_MODULE_PREFIXES: [&str; 2] = ["std:", "core:"];
 
 pub struct DeclarationIndex {
     by_offset: FxHashMap<u32, SymbolId>,
     token_of: FxHashMap<SymbolId, usize>,
     enum_members: FxHashSet<u32>,
+    imported: FxHashSet<String>,
     roles: super::roles::Roles,
 }
 
@@ -36,6 +37,7 @@ impl DeclarationIndex {
             by_offset,
             token_of,
             enum_members: enum_member_offsets(state),
+            imported: imported_names(state),
             roles: super::roles::Roles::of(state),
         }
     }
@@ -46,6 +48,10 @@ impl DeclarationIndex {
 
     pub fn member_role(&self, offset: u32) -> Option<super::roles::MemberRole> {
         self.roles.members.get(&offset).copied()
+    }
+
+    pub fn is_imported(&self, name: &str) -> bool {
+        self.imported.contains(name)
     }
 
     pub fn is_enum_member(&self, offset: u32) -> bool {
@@ -122,6 +128,41 @@ fn enum_member_offsets(state: &DocumentState) -> FxHashSet<u32> {
     members
 }
 
+fn imported_names(state: &DocumentState) -> FxHashSet<String> {
+    let tokens = &state.tokens;
+    let mut names = FxHashSet::default();
+    for (index, token) in tokens.iter().enumerate() {
+        if token.kind != TokenKind::Import {
+            continue;
+        }
+        let Some(open) = tokens
+            .get(index + 1)
+            .filter(|t| t.kind == TokenKind::LBrace)
+        else {
+            continue;
+        };
+        let open_at = open.offset;
+        let mut keep_next = true;
+        for specifier in tokens.iter().filter(|t| t.offset > open_at) {
+            if specifier.kind == TokenKind::RBrace {
+                break;
+            }
+            if specifier.kind == TokenKind::As {
+                keep_next = true;
+                continue;
+            }
+            if specifier.kind == TokenKind::Comma {
+                keep_next = true;
+                continue;
+            }
+            if specifier.kind == TokenKind::Identifier && keep_next {
+                names.insert(state.lexeme(specifier).to_owned());
+            }
+        }
+    }
+    names
+}
+
 fn is_word(kind: TokenKind) -> bool {
     kind == TokenKind::Identifier
         || kind.is_keyword()
@@ -190,10 +231,15 @@ pub fn modifiers_of(
         if symbol.deprecated.is_some() {
             bits |= MOD_DEPRECATED;
         }
-        if symbol
-            .origin_module
-            .is_some_and(|module| state.name(module).starts_with(STD_MODULE_PREFIX))
-        {
+        let from_std = symbol.line == u32::MAX
+            || symbol.origin_module.is_some_and(|module| {
+                LIBRARY_MODULE_PREFIXES
+                    .iter()
+                    .any(|prefix| state.name(module).starts_with(prefix))
+            });
+        let global_function =
+            symbol.kind == SymbolKind::Function && !declarations.is_imported(state.lexeme(tok));
+        if from_std && (global_function || symbol.kind == SymbolKind::EnumMember) {
             bits |= MOD_DEFAULT_LIBRARY;
         }
         if declared.is_none()
@@ -201,6 +247,17 @@ pub fn modifiers_of(
         {
             bits |= declaration_modifiers(state, declaration);
         }
+    }
+
+    if let Some(resolution) = state.db.member_resolutions.get(&tok.offset)
+        && resolution.member_kind == ResolvedMemberKind::EnumMember
+        && let TypeKind::Named(_, Some(origin)) | TypeKind::Generic(_, _, Some(origin)) =
+            state.db.ty_kind(&resolution.receiver_ty)
+        && LIBRARY_MODULE_PREFIXES
+            .iter()
+            .any(|prefix| state.name(origin).starts_with(prefix))
+    {
+        bits |= MOD_DEFAULT_LIBRARY;
     }
 
     if let Some(resolution) = state.db.member_resolutions.get(&tok.offset)
