@@ -1,3 +1,4 @@
 *.vn linguist-language=TypeScript
 crates/vn-pipeline/tests/fixtures/**/*.golden.txt text eol=lf
 tests/helpers/tls/* -text
+crates/vn-pipeline/tests/fixtures/debug/*.vn text eol=lf
