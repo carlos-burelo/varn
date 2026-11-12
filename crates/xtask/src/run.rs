@@ -61,26 +61,54 @@ pub(super) fn discover_runtimes(opts: &Opts, target_vn: &Path) -> Vec<RuntimeInf
 }
 
 pub(super) fn find_binary(cmd: &str) -> Option<PathBuf> {
-    if let Ok(path_var) = std::env::var("PATH") {
-        for dir in std::env::split_paths(&path_var) {
-            let candidate = dir.join(cmd);
-            if candidate.is_file() {
-                return Some(candidate);
-            }
-            #[cfg(windows)]
-            {
-                let candidate_exe = dir.join(format!("{cmd}.exe"));
-                if candidate_exe.is_file() {
-                    return Some(candidate_exe);
-                }
-                let candidate_cmd = dir.join(format!("{cmd}.cmd"));
-                if candidate_cmd.is_file() {
-                    return Some(candidate_cmd);
-                }
-            }
+    let path_var = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&path_var) {
+        let Some(candidate) = resolve_in_dir(&dir, cmd) else {
+            continue;
+        };
+        if runs_version(&candidate) {
+            return Some(candidate);
         }
+        eprintln!(
+            "warning: {} does not run `--version`; {cmd} skipped",
+            candidate.display()
+        );
+        return None;
     }
     None
+}
+
+#[cfg(windows)]
+fn resolve_in_dir(dir: &Path, cmd: &str) -> Option<PathBuf> {
+    let exe = dir.join(format!("{cmd}.exe"));
+    if exe.is_file() {
+        return Some(exe);
+    }
+    let is_shim = [cmd.to_string(), format!("{cmd}.cmd"), format!("{cmd}.ps1")]
+        .iter()
+        .any(|name| dir.join(name).is_file());
+    if !is_shim {
+        return None;
+    }
+    let real = dir
+        .join("node_modules")
+        .join(cmd)
+        .join("bin")
+        .join(format!("{cmd}.exe"));
+    real.is_file().then_some(real)
+}
+
+#[cfg(not(windows))]
+fn resolve_in_dir(dir: &Path, cmd: &str) -> Option<PathBuf> {
+    let candidate = dir.join(cmd);
+    candidate.is_file().then_some(candidate)
+}
+
+fn runs_version(bin: &Path) -> bool {
+    Command::new(bin)
+        .arg("--version")
+        .output()
+        .is_ok_and(|out| out.status.success())
 }
 
 pub(super) fn invoke_once(
