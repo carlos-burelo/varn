@@ -55,4 +55,4 @@ for (let i = 0; i < parsed.length; i = i + 1) {
 
 let serializedExport = Csv.stringify(completedSales);
 
-print(`CSV Pipeline: Completed Sales = ${completedSales.length}, Total Revenue = $${totalRevenue}, Export bytes = ${serializedExport.length}`);
+print(`CSV Pipeline: Completed Sales = ${completedSales.length}, Total Revenue = $${totalRevenue as int}, Export bytes = ${serializedExport.length}`);
