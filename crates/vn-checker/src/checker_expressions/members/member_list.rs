@@ -146,6 +146,8 @@ pub fn get_members_of_type(
             } else {
                 Vec::new()
             };
+            let origin_modules: Vec<String> = origin.iter().map(|o| o.to_string()).collect();
+            let is_enum = super::is_enum_type(resolver, bind, &cn, &origin_modules);
             list_nominal(
                 resolver,
                 bind,
@@ -156,6 +158,25 @@ pub fn get_members_of_type(
                 &mut results,
                 &mut seen,
             );
+            if is_enum {
+                for (key, ty) in [
+                    (vn_core::MemberKey::Name, Type::Str),
+                    (vn_core::MemberKey::VariantName, Type::Str),
+                    (vn_core::MemberKey::Tag, Type::Int),
+                    (vn_core::MemberKey::RawValue, Type::Int),
+                ] {
+                    add_member(
+                        &mut results,
+                        &mut seen,
+                        Arc::from(key.as_str()),
+                        ty,
+                        vn_sem::semantic_info::ResolvedMemberKind::Property,
+                        false,
+                        false,
+                        true,
+                    );
+                }
+            }
         }
         TypeKind::Primitive(vn_core::LangPrimitive::Str) => {
             add_member(
@@ -230,7 +251,7 @@ pub fn get_members_of_type(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn list_nominal(
+fn list_declared(
     resolver: &dyn vn_sem::resolver::ImportResolver,
     bind: &BindResult,
     table: &mut CheckerTyTable,
@@ -300,17 +321,106 @@ fn list_nominal(
         }
     }
 
-    let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
-    if let Some(ext_bind) = resolver.find_bind_for_type(&cn, &origin_modules)
-        && let Some(entry) = ext_bind.type_members.classes.get(&cn)
-    {
-        table.absorb(&ext_bind.ty_table);
-        for m in &entry.members {
+    if let Some(members) = bind.type_members.flattened.get(&cn) {
+        for m in members {
             let kind = super::member_kind::map_class_member_kind(m.kind);
             let mapped = map_ty(&m.ty, table);
             add_declared(results, seen, &cn, m, mapped, kind);
         }
     }
+
+    let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
+    if let Some(ext_bind) = resolver.find_bind_for_type(&cn, &origin_modules) {
+        table.absorb(&ext_bind.ty_table);
+        let external = &ext_bind.type_members;
+        let declared = external
+            .classes
+            .get(&cn)
+            .map(|entry| entry.members.as_slice())
+            .into_iter()
+            .chain(external.interfaces.get(&cn).map(Vec::as_slice))
+            .chain(external.enums.get(&cn).map(Vec::as_slice))
+            .chain(external.namespaces.get(&cn).map(Vec::as_slice))
+            .chain(external.flattened.get(&cn).map(Vec::as_slice));
+        for members in declared {
+            for m in members {
+                let kind = super::member_kind::map_class_member_kind(m.kind);
+                let mapped = map_ty(&m.ty, table);
+                add_declared(results, seen, &cn, m, mapped, kind);
+            }
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn list_nominal(
+    resolver: &dyn vn_sem::resolver::ImportResolver,
+    bind: &BindResult,
+    table: &mut CheckerTyTable,
+    cn: Arc<str>,
+    origin: Option<Arc<str>>,
+    args: &[Type],
+    results: &mut Vec<vn_sem::semantic_info::ResolvedMemberSummary>,
+    seen: &mut rustc_hash::FxHashSet<Arc<str>>,
+) {
+    list_declared(
+        resolver,
+        bind,
+        table,
+        cn.clone(),
+        origin.clone(),
+        args,
+        results,
+        seen,
+    );
+
+    let mut visited = vec![cn.clone()];
+    let mut current = parent_of(resolver, bind, &cn, origin.as_ref());
+    while let Some(parent) = current {
+        if visited.contains(&parent.name) {
+            break;
+        }
+        visited.push(parent.name.clone());
+        list_declared(
+            resolver,
+            bind,
+            table,
+            parent.name.clone(),
+            parent.origin.clone(),
+            &[],
+            results,
+            seen,
+        );
+        current = parent_of(resolver, bind, &parent.name, parent.origin.as_ref());
+    }
+}
+
+fn parent_of(
+    resolver: &dyn vn_sem::resolver::ImportResolver,
+    bind: &BindResult,
+    class: &Arc<str>,
+    origin: Option<&Arc<str>>,
+) -> Option<vn_sem::bind::ClassParent> {
+    if let Some(parent) = bind.get_class_parent(class) {
+        return Some(parent.clone());
+    }
+    let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
+    if let Some(ext_bind) = resolver.find_bind_for_type(class, &origin_modules)
+        && let Some(parent) = ext_bind.get_class_parent(class)
+    {
+        return Some(vn_sem::bind::ClassParent {
+            name: parent.name.clone(),
+            origin: parent.origin.clone().or_else(|| origin.cloned()),
+            args: Vec::new(),
+        });
+    }
+    let core = bind.core.as_ref()?;
+    let parent = core.class_parents.get(class.as_ref())?;
+    Some(vn_sem::bind::ClassParent {
+        name: parent.name.clone(),
+        origin: parent.origin.clone(),
+        args: Vec::new(),
+    })
 }
 
 fn add_declared(
