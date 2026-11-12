@@ -11,8 +11,8 @@ function makeCounter(): () => int {
 }
 
 const add5 = makeAdder(5)
-if (add5(3) !== 8) throw new Error("closure add5")
+if (add5(3) != 8) throw new Error("closure add5")
 const counter = makeCounter()
-if (counter() !== 1) throw new Error("closure counter 1")
-if (counter() !== 2) throw new Error("closure counter 2")
+if (counter() != 1) throw new Error("closure counter 1")
+if (counter() != 2) throw new Error("closure counter 2")
 print("closure ok")

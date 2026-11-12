@@ -13,19 +13,19 @@
 10 | 9:18 | int
 11 | 9:11 | int
 12 | 10:5 | int
-13 | 10:11 | int
+13 | 10:10 | int
 14 | 10:5 | bool
-15 | 10:24 | Class<Error>
-16 | 10:30 | str
-17 | 10:20 | Error
+15 | 10:23 | Class<Error>
+16 | 10:29 | str
+17 | 10:19 | Error
 18 | 11:5 | (x: int) => int
 19 | 11:11 | int
 20 | 11:5 | int
-21 | 11:19 | int
+21 | 11:18 | int
 22 | 11:5 | bool
-23 | 11:33 | Class<Error>
-24 | 11:39 | str
-25 | 11:29 | Error
+23 | 11:32 | Class<Error>
+24 | 11:38 | str
+25 | 11:28 | Error
 26 | 12:1 | (...args: dynamic[]) => void
 27 | 12:7 | str
 28 | 12:1 | void
