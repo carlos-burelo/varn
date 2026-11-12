@@ -43,7 +43,7 @@ fn osr_entries_resume_from_ssa() {
 }
 
 fn tempfile_dir() -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("varn-osr-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("vn-osr-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("cache dir");
     dir
 }

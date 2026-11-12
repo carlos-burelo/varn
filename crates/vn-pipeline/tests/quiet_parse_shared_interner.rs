@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 fn scratch_dir(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
-        "varn-task7e-fix1-{tag}-{}-{}",
+        "vn-task7e-fix1-{tag}-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

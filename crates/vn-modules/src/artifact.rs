@@ -26,7 +26,7 @@ pub fn producer_fingerprint() -> u32 {
                 }
             }
 
-            Err(_) => stamp.extend_from_slice(b"varn-unknown-producer"),
+            Err(_) => stamp.extend_from_slice(b"vn-unknown-producer"),
         }
         let hash = fingerprint(&stamp);
         (hash ^ (hash >> 32)) as u32

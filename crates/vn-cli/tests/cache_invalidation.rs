@@ -14,7 +14,7 @@ impl Project {
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |d| d.as_nanos());
         let root =
-            std::env::temp_dir().join(format!("varn-cache-{name}-{}-{stamp}", std::process::id()));
+            std::env::temp_dir().join(format!("vn-cache-{name}-{}-{stamp}", std::process::id()));
         let cache = root.join(".cache");
         std::fs::create_dir_all(&root).expect("project dir");
         std::fs::create_dir_all(&cache).expect("cache dir");

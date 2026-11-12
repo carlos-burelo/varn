@@ -7,7 +7,7 @@
   "Varn.codeLens.enabled": true,
   "Varn.buildMode": "debug",
   "editor.semanticHighlighting.enabled": true,
-  "[varn]": {
+  "[vn]": {
     "editor.semanticHighlighting.enabled": true,
     "editor.inlayHints.enabled": "off"
   },

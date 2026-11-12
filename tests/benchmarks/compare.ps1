@@ -3,7 +3,7 @@ param(
     [int]$Runs = 5,
     [int]$Warmup = 2,
     [string[]]$Only = @(),
-    [string[]]$Runtimes = @('varn', 'bun', 'node', 'python'),
+    [string[]]$Runtimes = @('vn', 'bun', 'node', 'python'),
     [switch]$List
 )
 
@@ -48,7 +48,7 @@ function Measure-Median($exePath, $argvList) {
     [math]::Round($sorted[[int](($sorted.Count - 1) / 2)], 1)
 }
 
-$exe = @{ varn = $vn }
+$exe = @{ vn = $vn }
 foreach ($name in @('bun', 'node', 'python')) {
     if ($Runtimes -contains $name) {
         $found = Resolve-Executable $name
@@ -59,10 +59,10 @@ foreach ($name in @('bun', 'node', 'python')) {
 $extension = @{ bun = 'js'; node = 'js'; python = 'py' }
 $startup = @{}
 foreach ($name in $exe.Keys) {
-    $ext = if ($name -eq 'varn') { 'vn' } else { $extension[$name] }
+    $ext = if ($name -eq 'vn') { 'vn' } else { $extension[$name] }
     $file = Join-Path (Join-Path $root 'startup') "empty.$ext"
     if (-not (Test-Path $file)) { continue }
-    if ($name -eq 'varn') {
+    if ($name -eq 'vn') {
         $startup[$name] = Measure-Median $exe[$name] @('run', "`"$file`"")
     } else {
         $startup[$name] = Measure-Median $exe[$name] @("`"$file`"")
@@ -79,7 +79,7 @@ if ($List) { $cases | ForEach-Object { $_.Name }; exit 0 }
 $rows = foreach ($case in $cases) {
     $row = [ordered]@{ Workload = $case.Name }
     foreach ($name in $exe.Keys) {
-        if ($name -eq 'varn') {
+        if ($name -eq 'vn') {
             $argv = @('run', "`"$($case.Varn)`"")
         } else {
             $ext = $extension[$name]

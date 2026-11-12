@@ -81,7 +81,7 @@ fn submit(job: Job) {
     };
     if spawn {
         std::thread::Builder::new()
-            .name("varn-blocking".to_string())
+            .name("vn-blocking".to_string())
             .spawn(worker)
             .unwrap_or_else(|e| panic!("cannot start a blocking worker: {e}"));
     } else {

@@ -5,7 +5,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$work = Join-Path ([IO.Path]::GetTempPath()) 'varn-gc-compare'
+$work = Join-Path ([IO.Path]::GetTempPath()) 'vn-gc-compare'
 Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force "$work\go", "$work\net" | Out-Null
 Copy-Item "$PSScriptRoot\go\*" "$work\go" -Force
@@ -101,7 +101,7 @@ $rows = foreach ($w in $Workloads) {
             }
         }
         [pscustomobject]@{
-            Workload = $w; Runtime = 'varn'
+            Workload = $w; Runtime = 'vn'
             WallMs = [math]::Round((Get-Median $samples.Wall)); PeakMb = Get-Median $samples.Peak
             PauseTotalMs = [math]::Round((Get-Median $samples.Pause), 1)
             MaxPauseMs = [math]::Round((Get-Median $samples.MaxPause), 1)

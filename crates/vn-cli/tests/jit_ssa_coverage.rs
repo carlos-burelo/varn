@@ -13,7 +13,7 @@ fn repo_root() -> PathBuf {
 #[test]
 fn every_compiled_function_lowers_from_ssa() {
     let root = repo_root();
-    let cache = std::env::temp_dir().join(format!("varn-ssa-cov-{}", std::process::id()));
+    let cache = std::env::temp_dir().join(format!("vn-ssa-cov-{}", std::process::id()));
     std::fs::create_dir_all(&cache).expect("cache dir");
     let out = Command::new(env!("CARGO_BIN_EXE_vn"))
         .arg("run")

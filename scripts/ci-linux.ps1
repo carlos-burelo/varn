@@ -51,8 +51,8 @@ New-Item -ItemType Directory -Force $tmp | Out-Null
 
 docker run --rm `
     -v "${repo}:/work" `
-    -v varn-ci-target:/target `
-    -v varn-ci-cargo:/usr/local/cargo/registry `
+    -v vn-ci-target:/target `
+    -v vn-ci-cargo:/usr/local/cargo/registry `
     -e CARGO_TARGET_DIR=/target `
     -e VN_STD=/work/std `
     -w /work "rust:$toolchain" bash /work/target/tmp/ci-linux.sh

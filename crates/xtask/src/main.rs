@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let runtimes = run::discover_runtimes(&opts, &target_vn);
     let benchmarks = benches::select_benchmarks(&opts.only)?;
 
-    let temp_root = std::env::temp_dir().join(format!("varn-bench-{}", std::process::id()));
+    let temp_root = std::env::temp_dir().join(format!("vn-bench-{}", std::process::id()));
     let cache_root = temp_root.join("caches");
     std::fs::create_dir_all(&cache_root)?;
 

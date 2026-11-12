@@ -241,7 +241,7 @@ impl IoDriver {
         let run_clone = Arc::clone(&is_running);
 
         std::thread::Builder::new()
-            .name("varn-io-driver".into())
+            .name("vn-io-driver".into())
             .spawn(move || {
                 Self::run_event_loop(poll, cmd_rx, reg_clone, run_clone);
             })?;

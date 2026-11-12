@@ -157,7 +157,7 @@ OPTIONS:
     -r, --runs <N>         Total runs per benchmark per runtime (default: 7, min: 3)
     -w, --warmup <N>       Warmup runs discarded before sampling (default: 2)
     -o, --only <NAMES>     Comma-separated list of benchmarks to run (e.g. fib,matrix,str_ops)
-    -b, --baseline <PATH>  Path to baseline vn executable to compare against as 'varn-base'
+    -b, --baseline <PATH>  Path to baseline vn executable to compare against as 'vn-base'
     -sp, --skip-python     Skip Python execution even if installed
     -c, --compact          Compact visual table with relative progress bars
     -m, --markdown         Print results as a Markdown table

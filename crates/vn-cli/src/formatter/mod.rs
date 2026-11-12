@@ -83,7 +83,7 @@ pub fn run_fmt(project: &vn_project::Project, args: FmtArgs) -> Result<(), CliEr
     } else {
         println!(
             "\n  {} · {} file{} checked, {} formatted ({:.2?})\n",
-            chalk("varn fmt").cyan().bold(),
+            chalk("vn fmt").cyan().bold(),
             files.len(),
             plural(files.len()),
             changed,

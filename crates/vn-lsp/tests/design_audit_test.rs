@@ -180,7 +180,7 @@ fn h10b_module_bind_rederives_after_evict() {
     use vn_resolver::ModuleResolver;
     use vn_sem::resolver::ImportResolver;
 
-    let dir = std::env::temp_dir().join(format!("varn-h10b-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("vn-h10b-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("rederive_marker.vn");
     std::fs::write(&path, "function rederived_marker(): int { return 7; }\n").unwrap();

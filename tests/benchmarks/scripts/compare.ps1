@@ -15,7 +15,7 @@
   Run just the named benchmarks, e.g. -Only fib,matrix,dto.
 
 .PARAMETER Baseline
-  Path to a second vn.exe, measured as its own runtime named `varn-base`.
+  Path to a second vn.exe, measured as its own runtime named `vn-base`.
 
 .PARAMETER SkipPython
   Skip Python benchmark execution.

@@ -58,7 +58,7 @@ pub fn run_tests(session: Arc<pipeline::Session>, args: TestArgs) -> Result<(), 
             .unwrap_or(4)
     });
 
-    Section::new("varn test")
+    Section::new("vn test")
         .subtitle(format!(
             "{total_suites} suite{} · {num_workers} worker{}",
             if total_suites == 1 { "" } else { "s" },

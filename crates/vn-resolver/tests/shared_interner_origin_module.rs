@@ -7,7 +7,7 @@ use vn_sem::resolver::ImportResolver;
 
 fn scratch_dir(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
-        "varn-task7e-{tag}-{}-{}",
+        "vn-task7e-{tag}-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

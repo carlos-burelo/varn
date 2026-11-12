@@ -156,7 +156,7 @@ fn check_fixture(path: &Path, cache: &Path) -> Result<(), String> {
 #[test]
 fn every_error_fixture_is_rejected_as_declared() {
     let root = repo_root();
-    let cache = std::env::temp_dir().join(format!("varn-error-corpus-{}", std::process::id()));
+    let cache = std::env::temp_dir().join(format!("vn-error-corpus-{}", std::process::id()));
     let mut fixtures: Vec<PathBuf> = std::fs::read_dir(root.join("tests/errors"))
         .expect("tests/errors")
         .map(|e| e.expect("entry").path())
