@@ -235,6 +235,16 @@ if ($LASTEXITCODE -ne 0) {
     Write-Success "Corpus de errores correcto."
 }
 
+# 5d. Goldens de vn debug (tokens, ast, tir, bytecode...). Sin esto un fixture obsoleto no lo ve nadie.
+Write-StepHeader "5d: Goldens de vn debug (cargo test -p vn-cli --test debug_golden)"
+cargo test --profile $BuildProfile -p vn-cli --test debug_golden
+if ($LASTEXITCODE -ne 0) {
+    Write-Failure "Los goldens de vn debug fallaron."
+    $failedSteps += "Goldens de vn debug"
+} else {
+    Write-Success "Goldens de vn debug correctos."
+}
+
 # 6. Benchmark de Estabilidad
 if (-not $Fast) {
     Write-StepHeader "6/6: Benchmark de Estabilidad (vn bench tests/benchmarks/vn/bench_fib.vn -v)"
