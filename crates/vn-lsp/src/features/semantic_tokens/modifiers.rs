@@ -1,4 +1,4 @@
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use vn_core::TokenKind;
 use vn_sem::semantic_info::ResolvedMemberKind;
 use vn_sem::symbol::{SymbolId, SymbolKind};
@@ -14,6 +14,7 @@ const STD_MODULE_PREFIX: &str = "std:";
 pub struct DeclarationIndex {
     by_offset: FxHashMap<u32, SymbolId>,
     token_of: FxHashMap<SymbolId, usize>,
+    enum_members: FxHashSet<u32>,
 }
 
 impl DeclarationIndex {
@@ -33,7 +34,12 @@ impl DeclarationIndex {
         Self {
             by_offset,
             token_of,
+            enum_members: enum_member_offsets(state),
         }
+    }
+
+    pub fn is_enum_member(&self, offset: u32) -> bool {
+        self.enum_members.contains(&offset)
     }
 
     pub fn symbol_at(&self, offset: u32) -> Option<SymbolId> {
@@ -51,15 +57,65 @@ fn declared_name_token(state: &DocumentState, first: usize, name: &str) -> Optio
             if tokens.get(i).map(|t| t.kind) == Some(TokenKind::LParen) {
                 i = skip_parens(state, i);
             }
-        } else if kind == TokenKind::Identifier {
-            return (state.lexeme(&tokens[i]) == name).then_some(i);
-        } else if kind.is_keyword() || kind == TokenKind::Dot {
+        } else if is_word(kind) && state.lexeme(&tokens[i]) == name {
+            return Some(i);
+        } else if is_word(kind) || kind == TokenKind::Dot {
             i += 1;
         } else {
             return None;
         }
     }
     None
+}
+
+fn enum_member_offsets(state: &DocumentState) -> FxHashSet<u32> {
+    let tokens = &state.tokens;
+    let mut members = FxHashSet::default();
+    for (start, tok) in tokens.iter().enumerate() {
+        if tok.kind != TokenKind::Enum {
+            continue;
+        }
+        let Some(open) = tokens[start..]
+            .iter()
+            .take_while(|t| t.kind != TokenKind::Semicolon)
+            .position(|t| t.kind == TokenKind::LBrace)
+            .map(|p| start + p)
+        else {
+            continue;
+        };
+        let mut depth = 0usize;
+        for i in open + 1..tokens.len() {
+            let kind = tokens[i].kind;
+            if matches!(
+                kind,
+                TokenKind::LParen | TokenKind::LBracket | TokenKind::LBrace
+            ) {
+                depth += 1;
+            } else if kind == TokenKind::RBrace && depth == 0 {
+                break;
+            } else if matches!(
+                kind,
+                TokenKind::RParen | TokenKind::RBracket | TokenKind::RBrace
+            ) {
+                depth = depth.saturating_sub(1);
+            } else if kind == TokenKind::Identifier
+                && depth == 0
+                && matches!(
+                    tokens[i - 1].kind,
+                    TokenKind::LBrace | TokenKind::Comma | TokenKind::Semicolon
+                )
+            {
+                members.insert(tokens[i].offset);
+            }
+        }
+    }
+    members
+}
+
+fn is_word(kind: TokenKind) -> bool {
+    kind == TokenKind::Identifier
+        || kind.is_keyword()
+        || matches!(kind, TokenKind::Mut | TokenKind::Out)
 }
 
 fn skip_parens(state: &DocumentState, open: usize) -> usize {
@@ -90,6 +146,9 @@ pub fn modifiers_of(
 
     let mut bits = 0;
     let declared = declarations.symbol_at(tok.offset);
+    if declarations.is_enum_member(tok.offset) {
+        return MOD_DECLARATION;
+    }
     let referenced = state
         .db
         .expr_types

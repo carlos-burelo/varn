@@ -1,10 +1,10 @@
 mod classify;
+mod context;
 mod modifiers;
 
 use once_cell::sync::Lazy;
 use tower_lsp_f::lsp_types::{SemanticTokenModifiers, SemanticTokenTypes, SemanticTokensLegend};
 use vn_core::TokenKind;
-use vn_sem::symbol::SymbolKind;
 
 use crate::document::DocumentState;
 
@@ -75,6 +75,7 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
     for (i, tok) in tokens.iter().enumerate() {
         let colorable = tok.kind == TokenKind::Identifier
             || tok.kind.is_keyword()
+            || matches!(tok.kind, TokenKind::Mut | TokenKind::Out)
             || tok.kind.is_literal()
             || tok.kind == TokenKind::RegularExpression
             || matches!(
@@ -85,51 +86,8 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
             continue;
         }
 
-        let next_is_lparen = tokens
-            .get(i + 1)
-            .map(|t| t.kind == TokenKind::LParen)
-            .unwrap_or(false);
-        let prev_is_dot = i
-            .checked_sub(1)
-            .and_then(|j| tokens.get(j))
-            .map(|t| t.kind == TokenKind::Dot)
-            .unwrap_or(false);
-
-        let prev_is_at = i
-            .checked_sub(1)
-            .and_then(|j| tokens.get(j))
-            .map(|t| t.kind == TokenKind::At)
-            .unwrap_or(false);
-
-        let next_is_colon = tokens
-            .get(i + 1)
-            .map(|t| t.kind == TokenKind::Colon)
-            .unwrap_or(false);
-
-        let prev2_is_enum = prev_is_dot
-            && i >= 2
-            && matches!(
-                state.symbol_map.get(state.lexeme(&tokens[i - 2])),
-                Some(SymbolKind::Enum)
-            );
-
-        let getset_as_ident = matches!(tok.kind, TokenKind::Get | TokenKind::Set)
-            && !prev_is_dot
-            && tokens
-                .get(i + 1)
-                .map(|t| t.kind != TokenKind::Identifier)
-                .unwrap_or(true);
-
-        let resolved = classify::resolve_token(
-            state,
-            tok,
-            prev_is_dot,
-            prev_is_at,
-            prev2_is_enum,
-            next_is_lparen,
-            next_is_colon,
-            getset_as_ident,
-        );
+        let context = context::TokenContext::of(state, &declarations, i);
+        let resolved = classify::resolve_token(state, tok, &context);
         let token_type = match resolved {
             Some(token_type) => token_type,
             None => match declarations.symbol_at(tok.offset) {

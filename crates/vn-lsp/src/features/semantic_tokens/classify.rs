@@ -2,6 +2,7 @@ use vn_core::{LangPrimitive, TokenKind, TypeKind};
 use vn_sem::symbol::SymbolKind;
 use vn_sem::types::Type;
 
+use super::context::TokenContext;
 use super::{
     TT_CLASS, TT_DECORATOR, TT_ENUM, TT_ENUM_MEMBER, TT_FUNCTION, TT_INTERFACE, TT_KEYWORD,
     TT_METHOD, TT_NAMESPACE, TT_NUMBER, TT_PARAMETER, TT_PROPERTY, TT_REGEXP, TT_STRING, TT_TYPE,
@@ -9,16 +10,7 @@ use super::{
 };
 use crate::document::{DocumentState, TokenRecord};
 
-pub fn resolve_token(
-    state: &DocumentState,
-    tok: &TokenRecord,
-    prev_is_dot: bool,
-    prev_is_at: bool,
-    prev2_is_enum: bool,
-    next_is_lparen: bool,
-    next_is_colon: bool,
-    getset_as_ident: bool,
-) -> Option<u32> {
+pub fn resolve_token(state: &DocumentState, tok: &TokenRecord, ctx: &TokenContext) -> Option<u32> {
     use TokenKind::*;
 
     match tok.kind {
@@ -50,15 +42,32 @@ pub fn resolve_token(
         | Spawn | Parallel | Start | RawStr => {}
     }
 
-    if prev_is_at && tok.kind == Identifier {
+    if ctx.enum_member_declaration {
+        return Some(TT_ENUM_MEMBER);
+    }
+
+    if let Some(id) = ctx.declared {
+        return Some(declared_tt(state, state.db.bind.arena.get(id)));
+    }
+
+    if ctx.prev_is_at && tok.kind == Identifier {
         return Some(TT_DECORATOR);
     }
 
-    if tok.kind.is_keyword() && !prev_is_dot && !getset_as_ident {
+    let names_a_symbol = tok.kind.is_keyword()
+        && state
+            .db
+            .expr_types
+            .get(&tok.offset)
+            .and_then(|info| info.symbol_id)
+            .filter(|id| *id < state.db.bind.arena.len())
+            .is_some_and(|id| state.name(state.db.bind.arena.get(id).name) == state.lexeme(tok));
+
+    if tok.kind.is_keyword() && !ctx.prev_is_dot && !ctx.getset_as_ident && !names_a_symbol {
         return Some(TT_KEYWORD);
     }
 
-    if prev_is_dot && prev2_is_enum {
+    if ctx.prev_is_dot && ctx.prev2_is_enum {
         return Some(TT_ENUM_MEMBER);
     }
 
@@ -89,25 +98,25 @@ pub fn resolve_token(
             let sym = state.db.bind.arena.get(sid);
 
             if state.name(sym.name) == state.lexeme(tok) {
-                return Some(tt_from_symbol(state, sym.kind, &info.ty, prev_is_dot));
+                return Some(tt_from_symbol(state, sym.kind, &info.ty, ctx.prev_is_dot));
             }
-            if prev_is_dot {
+            if ctx.prev_is_dot {
                 return Some(member_tt(state, &info.ty));
             }
-        } else if prev_is_dot {
+        } else if ctx.prev_is_dot {
             return Some(member_tt(state, &info.ty));
         }
     }
 
-    if prev_is_dot {
-        return Some(if next_is_lparen {
+    if ctx.prev_is_dot {
+        return Some(if ctx.next_is_lparen {
             TT_METHOD
         } else {
             TT_PROPERTY
         });
     }
 
-    if next_is_colon {
+    if ctx.next_is_colon {
         return Some(TT_PROPERTY);
     }
 
@@ -118,8 +127,14 @@ pub fn resolve_token(
             state,
             state.db.bind.arena.get(sid).kind,
             &ty,
-            prev_is_dot,
+            ctx.prev_is_dot,
         ));
+    }
+
+    if ctx.in_specifier_list
+        && let Some(kind) = state.symbol_map.get(state.lexeme(tok))
+    {
+        return Some(symbol_tt(state, *kind, None, false));
     }
 
     if LangPrimitive::from_str(state.lexeme(tok)).is_some() {
