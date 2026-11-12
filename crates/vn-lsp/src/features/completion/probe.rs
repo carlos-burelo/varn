@@ -5,6 +5,7 @@ use vn_sem::symbol::SymbolKind;
 pub const PROBE_NAME: &str = "__vn_probe__";
 const PROBE_DECLARATION: &str = "function __vn_probe__<T>(value: T): T { return value } ";
 pub const MEMBER_PLACEHOLDER: &str = "__vn_member__";
+pub const WORD_PLACEHOLDER: &str = "__vn_word__";
 
 pub struct ProbedSource {
     pub text: String,

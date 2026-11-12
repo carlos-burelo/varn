@@ -56,7 +56,7 @@ impl SemanticDB {
         for span in &self.scope_spans {
             if cursor_offset >= span.start && cursor_offset <= span.end {
                 let span_len = span.end.saturating_sub(span.start);
-                if span_len < best_span_len {
+                if span_len <= best_span_len {
                     best_span_len = span_len;
                     best_scope = span.scope;
                 }

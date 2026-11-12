@@ -237,17 +237,40 @@ fn dot_receiver_source_fallback(
 }
 
 pub fn pattern_receiver(state: &DocumentState, line: u32, col: u32) -> Option<ReceiverInfo> {
-    let line_toks: Vec<_> = state.tokens.iter().filter(|t| t.line == line).collect();
-
-    line_toks
+    let tokens = &state.tokens;
+    let line_toks: Vec<(usize, &TokenRecord)> = tokens
         .iter()
-        .rposition(|t| t.kind == TokenKind::LBrace && t.col < col)?;
+        .enumerate()
+        .filter(|(_, t)| t.line == line)
+        .collect();
 
-    let eq_idx = line_toks
+    let open_pos = line_toks
         .iter()
-        .position(|t| t.kind == TokenKind::Eq && t.col >= col)?;
+        .rposition(|(_, t)| t.kind == TokenKind::LBrace && t.col < col)?;
+    let open_idx = line_toks[open_pos].0;
+    let binding = open_idx.checked_sub(1).map(|k| tokens[k].kind);
+    if !matches!(
+        binding,
+        Some(TokenKind::Const | TokenKind::Let | TokenKind::Var | TokenKind::Using)
+    ) {
+        return None;
+    }
+    let only_pattern_tokens = line_toks[open_pos + 1..]
+        .iter()
+        .take_while(|(_, t)| t.col < col)
+        .all(|(_, t)| {
+            matches!(t.kind, TokenKind::Comma | TokenKind::Colon)
+                || t.kind == TokenKind::Identifier
+                || t.kind.can_be_identifier()
+        });
+    if !only_pattern_tokens {
+        return None;
+    }
 
-    let rhs_tok = line_toks.get(eq_idx + 1)?;
+    let eq_pos = line_toks
+        .iter()
+        .position(|(_, t)| t.kind == TokenKind::Eq && t.col >= col)?;
+    let (_, rhs_tok) = line_toks.get(eq_pos + 1)?;
     let info = state.expr_info_at_token(rhs_tok)?;
     Some(ReceiverInfo {
         ty: state.db.non_null(&info.ty),

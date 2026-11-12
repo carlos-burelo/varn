@@ -70,6 +70,54 @@ pub fn patched_source_for_member(
     })
 }
 
+pub fn patched_source_for_word(
+    state: &DocumentState,
+    line: u32,
+    col: u32,
+) -> Option<probe::ProbedSource> {
+    let cursor = state.offset_at_line_col(line, col);
+    if !matches!(
+        site::completion_site(state, cursor),
+        site::CompletionSite::Expression | site::CompletionSite::Statement
+    ) {
+        return None;
+    }
+    let cursor = cursor as usize;
+    let before = state.source.get(..cursor)?;
+    let after = state.source.get(cursor..)?;
+    if before.ends_with('.') || before.ends_with("?.") {
+        return None;
+    }
+    if after
+        .chars()
+        .next()
+        .is_some_and(|c| c.is_alphanumeric() || c == '_')
+    {
+        return None;
+    }
+    let word_is_keyword = state
+        .tokens
+        .iter()
+        .rfind(|t| t.offset < cursor as u32 && t.end >= cursor as u32)
+        .is_some_and(|t| t.kind.is_keyword());
+    let word_is_empty = !before
+        .chars()
+        .next_back()
+        .is_some_and(|c| c.is_alphanumeric() || c == '_');
+    let broken_here = state
+        .diagnostics
+        .iter()
+        .any(|d| d.kind == vn_core::DiagnosticKind::Error && d.line <= line && line <= d.end_line);
+    if !(word_is_keyword || (word_is_empty && broken_here)) {
+        return None;
+    }
+    Some(probe::ProbedSource {
+        text: format!("{before}{}{after}", probe::WORD_PLACEHOLDER),
+        line,
+        character: col,
+    })
+}
+
 pub fn build_completion_response(
     state: &DocumentState,
     resolver: &vn_resolver::ModuleResolver,
@@ -264,6 +312,9 @@ pub fn build_completion_response(
     let (mut items, scope_n) = build_completions(state, line, col, cursor_offset as u32);
     let (items_kept, scope_n) = restrict_to_site(items, scope_n, &site);
     items = items_kept;
+    if site == site::CompletionSite::Type {
+        append_primitive_types(&mut items);
+    }
     let named_n = named_arguments.as_ref().map_or(0, Vec::len);
     if let Some(named) = named_arguments {
         items.splice(0..0, named);
@@ -384,6 +435,22 @@ fn get_word_prefix(source: &str, line: u32, col: u32) -> Option<String> {
         None
     } else {
         Some(word.to_string())
+    }
+}
+
+fn append_primitive_types(items: &mut Vec<CompletionItem>) {
+    for primitive in vn_core::LangPrimitive::ALL {
+        let name = primitive.name();
+        if items.iter().any(|item| item.label == name) {
+            continue;
+        }
+        items.push(CompletionItem {
+            label: name.to_owned(),
+            kind: Some(CompletionItemKind::Keyword),
+            detail: Some("primitive type".to_owned()),
+            sort_text: Some(format!("2_0_{name}")),
+            ..Default::default()
+        });
     }
 }
 
