@@ -10,6 +10,7 @@ pub struct CodeBytes {
     pub raw_off: usize,
     pub raw_len: usize,
     pub entry_off: usize,
+    pub locations: Vec<(u32, u32)>,
 }
 
 #[derive(Debug, Default)]
@@ -61,6 +62,7 @@ pub(super) fn capture_code(
     code: &[u8],
     raw_len: usize,
     wrapper_off: usize,
+    locations: &[(u32, u32)],
 ) {
     if let Some(sink) = debug.as_deref_mut() {
         sink.code = Some(CodeBytes {
@@ -68,6 +70,7 @@ pub(super) fn capture_code(
             raw_off: 0,
             raw_len,
             entry_off: wrapper_off,
+            locations: locations.to_vec(),
         });
     }
 }

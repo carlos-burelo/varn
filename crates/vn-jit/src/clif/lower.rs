@@ -187,6 +187,7 @@ pub fn try_compile(
                 &image.code,
                 image.raw_len(),
                 image.wrapper_off as usize,
+                &image.locations,
             );
             Ok(image)
         }

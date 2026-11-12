@@ -54,6 +54,7 @@ pub mod clif {
             pub raw_off: usize,
             pub raw_len: usize,
             pub entry_off: usize,
+            pub locations: Vec<(u32, u32)>,
         }
 
         #[derive(Debug, Default)]

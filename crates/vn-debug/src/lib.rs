@@ -10,6 +10,7 @@ pub mod expr;
 pub mod flags;
 pub mod fmt;
 pub mod loop_diagnostics;
+pub mod machine;
 pub mod modules;
 pub mod phase;
 pub mod phases;
