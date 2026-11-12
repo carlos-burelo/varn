@@ -20,7 +20,7 @@ pub fn resolve_token(
     use TokenKind::*;
 
     match tok.kind {
-        True | False | Null => return Some(TT_NUMBER),
+        True | False | Null => return Some(TT_KEYWORD),
         This => return Some(TT_VARIABLE),
         Void => return Some(TT_TYPE),
         Arrow | FatArrow | PipeGt => return Some(TT_KEYWORD),
