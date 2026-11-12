@@ -14,8 +14,7 @@ pub fn resolve_token(state: &DocumentState, tok: &TokenRecord, ctx: &TokenContex
     use TokenKind::*;
 
     match tok.kind {
-        True | False => return Some(TT_NUMBER),
-        Null => return Some(TT_KEYWORD),
+        True | False | Null => return Some(TT_NUMBER),
         This => return Some(TT_VARIABLE),
         Void => return Some(TT_TYPE),
         RegularExpression => return Some(TT_REGEXP),
