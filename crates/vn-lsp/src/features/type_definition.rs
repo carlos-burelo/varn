@@ -1,0 +1,122 @@
+use crate::document::DocumentState;
+use crate::index::ProjectIndex;
+use tower_lsp_f::lsp_types::{Definition, Location, Position, Range, Uri};
+use vn_core::TypeKind;
+use vn_sem::symbol::SymbolKind;
+pub fn build_goto_type_definition(
+    state: &DocumentState,
+    index: Option<&ProjectIndex>,
+    line: u32,
+    col: u32,
+) -> Option<Definition> {
+    let token = state.identifier_token_at(line, col)?;
+    let target_type = if let Some(sid) = state.checker_symbol_id_at_token(token) {
+        state
+            .db
+            .symbol_types
+            .get(&sid)
+            .cloned()
+            .or_else(|| state.db.bind.arena.get(sid).ty)
+    } else {
+        state.db.expr_types.get(&token.offset).map(|info| info.ty)
+    }?;
+    let type_name = extract_type_identifier(state, &target_type)?;
+    for sym in state.symbols() {
+        if sym.name() == type_name
+            && matches!(
+                sym.kind(),
+                SymbolKind::Class
+                    | SymbolKind::Interface
+                    | SymbolKind::Enum
+                    | SymbolKind::TypeAlias
+            )
+            && sym.line() != u32::MAX
+        {
+            let uri = Uri::parse(&state.uri).ok()?;
+            let loc = Location::new(
+                uri,
+                Range {
+                    start: Position {
+                        line: sym.line(),
+                        character: sym.col(),
+                    },
+                    end: Position {
+                        line: sym.end_line(),
+                        character: sym.end_col(),
+                    },
+                },
+            );
+            return Some(Definition::Location(loc));
+        }
+    }
+    if let Some(idx) = index {
+        let defs = idx.definitions_of(&type_name);
+        let locs: Vec<Location> = defs
+            .iter()
+            .filter_map(|entry| {
+                let uri = Uri::parse(&entry.uri).ok()?;
+                Some(Location::new(
+                    uri,
+                    Range {
+                        start: Position {
+                            line: entry.line,
+                            character: entry.col,
+                        },
+                        end: Position {
+                            line: entry.line,
+                            character: entry.col + type_name.len() as u32,
+                        },
+                    },
+                ))
+            })
+            .collect();
+        if !locs.is_empty() {
+            return Some(if locs.len() == 1 {
+                let mut locs = locs;
+                Definition::Location(locs.swap_remove(0))
+            } else {
+                Definition::LocationList(locs)
+            });
+        }
+    }
+    None
+}
+fn extract_type_identifier(state: &DocumentState, ty: &vn_sem::types::Type) -> Option<String> {
+    match state.db.ty_kind(ty) {
+        TypeKind::Named(name, _) | TypeKind::Generic(name, _, _) => {
+            Some(state.name(name).to_owned())
+        }
+        TypeKind::Array(elem) => {
+            extract_type_identifier(state, &vn_sem::types::Type::resolved(elem))
+        }
+        TypeKind::Union(list) => {
+            let named: Vec<String> = state
+                .db
+                .ty_list(list)
+                .iter()
+                .filter_map(|t| extract_type_identifier(state, t))
+                .collect();
+            match named.as_slice() {
+                [only] => Some(only.clone()),
+                _ => None,
+            }
+        }
+        TypeKind::Primitive(_)
+        | TypeKind::Literal(_)
+        | TypeKind::This
+        | TypeKind::Intersection(_)
+        | TypeKind::Tuple(_)
+        | TypeKind::TemplateLiteral(_)
+        | TypeKind::Fn(_)
+        | TypeKind::Record(_)
+        | TypeKind::Interface(_)
+        | TypeKind::Typeof(_)
+        | TypeKind::KeyOf(_)
+        | TypeKind::IndexedAccess { .. }
+        | TypeKind::Mapped { .. }
+        | TypeKind::Conditional { .. }
+        | TypeKind::Infer(_)
+        | TypeKind::EnumVariant { .. }
+        | TypeKind::TypePredicate { .. } => None,
+    }
+}

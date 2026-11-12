@@ -1,0 +1,320 @@
+mod assign;
+mod binary_ops;
+mod calls;
+mod closures;
+mod const_int;
+mod contextual;
+mod control;
+mod destructure_assign;
+mod dynamic_use;
+mod exhaustiveness;
+mod is_target;
+mod map_literal;
+mod match_arm;
+pub(crate) mod member_index;
+mod member_side;
+pub(crate) mod members;
+pub(crate) mod members_assign;
+mod misc;
+mod namespace_use;
+mod operator_capability;
+mod ops;
+mod pattern_cover;
+mod pattern_matrix;
+mod value_update;
+
+use crate::checker::recorder::Recorder;
+use crate::checker::Checker;
+use vn_core::ast::{ExprId, ExprKind, TemplatePart};
+use vn_sem::bind::BindResult;
+
+impl<'r> Checker<'r> {
+    pub(crate) fn check_expr(&mut self, rec: &mut Recorder, expr: ExprId, bind: &BindResult) {
+        if self.expected_pending {
+            self.expected_pending = false;
+            self.expected_owner = Some(expr.index());
+            self.expected_forwarded = self.forwarded_operands(expr);
+        }
+        let arena = self.ast_arena;
+        self.check_expr_no_record(rec, expr, bind);
+        self.require_namespace_member_use(rec, expr, bind);
+        let range = arena.expr(expr).range;
+        let start = range.start.offset;
+        let end = range.end.offset.saturating_sub(1);
+
+        if rec.enabled {
+            rec.node_scopes.insert(start, self.current_scope);
+        }
+        let ty = self.infer_type(rec, expr, bind);
+
+        let symbol_id = match (&arena.expr(expr).kind, rec.enabled) {
+            (ExprKind::Identifier { name }, true) => {
+                let scope = bind.scopes.get(self.current_scope);
+                scope.resolve(*name, &bind.scopes)
+            }
+            _ => None,
+        };
+
+        let is_discard_target = !self.in_pipeline_rhs
+            && matches!(&arena.expr(expr).kind, ExprKind::Identifier { name }
+                if bind.interner.resolve(*name) == vn_core::TokenKind::Placeholder.as_str());
+        if is_discard_target {
+            return;
+        }
+
+        let seq = rec.next_seq();
+
+        rec.expr_table.insert(
+            expr.index(),
+            vn_sem::output::TypeEntry {
+                ty,
+                symbol_id,
+                start,
+                end,
+                seq,
+            },
+        );
+    }
+
+    fn check_expr_no_record(&mut self, rec: &mut Recorder, expr: ExprId, bind: &BindResult) {
+        let arena = self.ast_arena;
+        let range = arena.expr(expr).range;
+        match &arena.expr(expr).kind {
+            ExprKind::Missing => {}
+            ExprKind::Arrow {
+                params,
+                return_type,
+                body,
+                is_async,
+                ..
+            } => self.check_arrow(rec, params, return_type, body, *is_async, range, bind),
+            ExprKind::Function {
+                params,
+                return_type,
+                body,
+                is_async,
+                is_generator,
+                ..
+            } => self.check_function_expr(
+                rec,
+                params,
+                return_type,
+                *body,
+                *is_async,
+                *is_generator,
+                range,
+                bind,
+            ),
+            ExprKind::As {
+                expression,
+                type_ann,
+            } => {
+                self.check_type_names(type_ann, bind);
+                self.check_expr(rec, *expression, bind);
+                self.check_as_cast(rec, expr, *expression, type_ann, range, bind)
+            }
+            ExprKind::Is {
+                expression,
+                type_ann,
+            } => {
+                self.check_expr(rec, *expression, bind);
+                self.check_is_target(type_ann, range, bind)
+            }
+            ExprKind::Satisfies {
+                expression,
+                type_ann,
+            } => self.check_satisfies(rec, *expression, type_ann, range, bind),
+            ExprKind::Await { argument } => self.check_await(rec, *argument, range, bind),
+            ExprKind::Spawn { argument } => {
+                if self.pure_scope.is_some() {
+                    self.forbid_pure("spawn tasks (pure functions are synchronous)", range);
+                }
+                self.check_expr(rec, *argument, bind)
+            }
+            ExprKind::Try { expression } => self.check_try(rec, *expression, range, bind),
+            ExprKind::Yield { argument, .. } => self.check_yield(rec, *argument, range, bind),
+            ExprKind::Unary { op, operand, .. } => {
+                self.check_unary(rec, expr, *op, *operand, arena, bind)
+            }
+            ExprKind::Binary { left, right, op } => {
+                self.check_binary(rec, expr, *left, *right, *op, range, arena, bind)
+            }
+            ExprKind::Logical { left, right, op } => {
+                let (left, right) = (*left, *right);
+                self.check_expr(rec, left, bind);
+                match op {
+                    vn_core::ast::LogicalOp::And | vn_core::ast::LogicalOp::Or => {
+                        self.require_condition(rec, left, bind)
+                    }
+                    vn_core::ast::LogicalOp::Nullish => {
+                        self.require_nullable(rec, left, "'??'", bind)
+                    }
+                }
+                match op {
+                    vn_core::ast::LogicalOp::And => {
+                        self.in_branch(rec, left, bind, true, |c, rec| {
+                            c.check_expr(rec, right, bind)
+                        })
+                    }
+                    vn_core::ast::LogicalOp::Or => {
+                        let expected = self.fallback_expected(rec, left, right, bind);
+                        self.in_branch(rec, left, bind, false, |c, rec| {
+                            c.with_expected(expected, |c| c.check_expr(rec, right, bind))
+                        })
+                    }
+                    vn_core::ast::LogicalOp::Nullish => {
+                        let expected = self.fallback_expected(rec, left, right, bind);
+                        self.with_expected(expected, |c| c.check_expr(rec, right, bind))
+                    }
+                }
+            }
+            ExprKind::Assign { target, value, op } => {
+                self.check_assign(rec, *op, *target, *value, range, bind);
+                self.forget_assigned_target(rec, *target, bind)
+            }
+            ExprKind::Call {
+                callee,
+                args,
+                type_args,
+                ..
+            } => {
+                let (callee, args, type_args) = (*callee, args.clone(), type_args.clone());
+                self.check_call_expr(rec, callee, &args, &type_args, &range, expr.index(), bind)
+            }
+            ExprKind::New { callee, args, .. } => {
+                self.check_new(rec, expr, *callee, args, range, arena, bind)
+            }
+
+            ExprKind::Conditional {
+                test,
+                consequent,
+                alternate,
+            } => {
+                let (test, consequent, alternate) = (*test, *consequent, *alternate);
+                self.check_expr(rec, test, bind);
+                self.require_condition(rec, test, bind);
+                self.in_branch(rec, test, bind, true, |c, rec| {
+                    c.check_expr(rec, consequent, bind)
+                });
+                self.in_branch(rec, test, bind, false, |c, rec| {
+                    c.check_expr(rec, alternate, bind)
+                });
+            }
+
+            ExprKind::Member {
+                object,
+                property,
+                computed,
+                optional,
+            } => {
+                let (object, property, computed, optional) =
+                    (*object, *property, *computed, *optional);
+                self.check_member_expr(
+                    rec, expr, object, property, computed, optional, &range, bind,
+                )
+            }
+
+            ExprKind::Paren { expression } => self.check_expr(rec, *expression, bind),
+            ExprKind::NonNull { expression } => {
+                self.check_expr(rec, *expression, bind);
+                self.require_nullable(rec, *expression, "'!'", bind)
+            }
+
+            ExprKind::Array { elements } => {
+                let elements = elements.clone();
+                self.check_array_with_context(rec, expr, &elements, bind)
+            }
+
+            ExprKind::Tuple { elements } => {
+                for e in elements.clone() {
+                    self.check_expr(rec, e, bind);
+                }
+            }
+
+            ExprKind::Object { properties } => {
+                let properties = properties.clone();
+                self.check_object_with_context(rec, expr, &properties, bind)
+            }
+
+            ExprKind::Template { parts } => {
+                for p in parts.clone() {
+                    if let TemplatePart::Interpolation(e) = p {
+                        self.check_expr(rec, e, bind);
+                    }
+                }
+            }
+
+            ExprKind::Sequence { expressions } => {
+                for e in expressions.clone() {
+                    self.check_expr(rec, e, bind);
+                }
+            }
+
+            ExprKind::ClassExpr { declaration } => {
+                let declaration = declaration.clone();
+                self.check_decl(
+                    rec,
+                    &vn_core::ast::Decl::Class((*declaration).clone()),
+                    bind,
+                );
+            }
+
+            ExprKind::Match { subject, cases } => {
+                self.check_match(rec, *subject, cases, expr, range, bind)
+            }
+
+            ExprKind::Update { operand, .. } => self.check_update(rec, *operand, bind),
+            ExprKind::Spread { argument } => self.check_expr(rec, *argument, bind),
+
+            ExprKind::Pipeline { left, right } => self.check_pipeline(rec, *left, *right, bind),
+
+            ExprKind::Range { start, end, .. } => self.check_range(rec, *start, *end, range, bind),
+
+            ExprKind::TaggedTemplate { tag, template, .. } => {
+                self.check_tagged_template(rec, *tag, *template, range, bind)
+            }
+
+            ExprKind::With { object, properties } => {
+                self.check_with_object(rec, *object, properties, range, bind)
+            }
+
+            ExprKind::MetaAccess { target, .. } => {
+                self.check_meta_access(rec, *target, expr, range, bind)
+            }
+
+            ExprKind::Identifier { name } => self.check_identifier(rec, *name, range, bind),
+
+            ExprKind::IntLiteral { .. }
+            | ExprKind::FloatLiteral { .. }
+            | ExprKind::DecimalLiteral { .. }
+            | ExprKind::BigIntLiteral { .. }
+            | ExprKind::StrLiteral { .. }
+            | ExprKind::CharLiteral { .. }
+            | ExprKind::BoolLiteral { .. }
+            | ExprKind::NullLiteral
+            | ExprKind::ImportMeta(_) => {}
+            ExprKind::This => {
+                if self.current_class.is_none() && self.extension_self.is_none() {
+                    self.emit(
+                        vn_core::Diagnostic::error(
+                            vn_core::ErrorCode::ThisOutsideInstance,
+                            "'this' can only be used inside a class, an enum or an extension; an object literal has no receiver, declare a class",
+                        )
+                        .with_range(range),
+                    );
+                }
+            }
+            ExprKind::Super => {
+                if !self.super_reachable {
+                    self.emit(
+                        vn_core::Diagnostic::error(
+                            vn_core::ErrorCode::SuperOutsideMethod,
+                            "'super' can only be used in a method or constructor of a class, or in an arrow written inside one",
+                        )
+                        .with_range(range),
+                    );
+                }
+            }
+        }
+    }
+}

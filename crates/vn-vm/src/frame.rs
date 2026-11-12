@@ -1,0 +1,84 @@
+use crate::closure::VmClosure;
+use std::rc::Rc;
+
+pub const MAX_CALL_DEPTH: usize = 10000;
+
+pub const VM_STACK_BYTES: usize = 64 << 20;
+
+const NATIVE_STACK_HEADROOM: usize = 8 << 20;
+
+pub fn call_depth_exceeded() -> crate::error::RuntimeError {
+    crate::error::RuntimeError::new(format!(
+        "stack overflow: call depth exceeded {MAX_CALL_DEPTH}"
+    ))
+}
+
+pub fn native_stack_exhausted() -> crate::error::RuntimeError {
+    crate::error::RuntimeError::new("stack overflow: native stack exhausted")
+}
+
+pub fn native_stack_low(floor: u64) -> bool {
+    let marker = 0u8;
+    (std::ptr::addr_of!(marker) as u64) < floor
+}
+
+pub fn native_stack_floor() -> u64 {
+    let marker = 0u8;
+    let here = std::ptr::addr_of!(marker) as u64;
+    here.saturating_sub((VM_STACK_BYTES - NATIVE_STACK_HEADROOM) as u64)
+}
+
+#[repr(C)]
+pub struct CallFrame {
+    pub closure_ptr: *const VmClosure,
+    pub _owned_closure: Option<Rc<VmClosure>>,
+    pub ip: usize,
+    pub base: usize,
+    pub current_class: Option<Rc<vn_types::ClassObj>>,
+
+    pub return_reg: u16,
+
+    pub awaited: bool,
+}
+
+impl CallFrame {
+    pub const NO_RETURN_REG: u16 = u16::MAX;
+
+    pub const NO_ACTIVATION: usize = usize::MAX;
+
+    pub(crate) fn new(closure: &VmClosure, base: usize) -> Self {
+        Self {
+            closure_ptr: closure as *const VmClosure,
+            _owned_closure: None,
+            ip: 0,
+            base,
+            current_class: None,
+            return_reg: Self::NO_RETURN_REG,
+            awaited: false,
+        }
+    }
+
+    pub(crate) fn new_owned(closure: Rc<VmClosure>, base: usize) -> Self {
+        Self {
+            closure_ptr: Rc::as_ptr(&closure),
+            _owned_closure: Some(closure),
+            ip: 0,
+            base,
+            current_class: None,
+            return_reg: Self::NO_RETURN_REG,
+            awaited: false,
+        }
+    }
+
+    #[inline(always)]
+    pub(crate) fn closure(&self) -> &VmClosure {
+        unsafe { &*self.closure_ptr }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TryHandler {
+    pub catch_ip: usize,
+    pub frame_depth: usize,
+    pub err_reg: u8,
+}

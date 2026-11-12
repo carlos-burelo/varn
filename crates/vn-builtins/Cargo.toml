@@ -1,0 +1,78 @@
+[package]
+name = "vn-builtins"
+version.workspace = true
+edition.workspace = true
+
+[features]
+runtime = [
+    "dep:vn-macros",
+    "dep:vn-gpu",
+    "dep:vn-text",
+    "dep:vn-ui",
+    "dep:parking_lot",
+    "dep:bigdecimal",
+    "dep:num-bigint",
+    "dep:num-traits",
+    "dep:rand",
+    "dep:sha2",
+    "dep:hmac",
+    "dep:uuid",
+    "dep:base64",
+    "dep:hex",
+    "dep:urlencoding",
+    "dep:chrono",
+    "dep:libloading",
+    "dep:mio",
+    "dep:socket2",
+    "dep:rustls",
+    "dep:webpki-roots",
+    "dep:httparse",
+    "dep:flate2",
+    "dep:rusqlite",
+    "dep:tar",
+    "dep:zip",
+    "dep:sha1",
+]
+
+[dependencies]
+vn-core      = { path = "../vn-core" }
+vn-types     = { path = "../vn-types" }
+vn-modules   = { path = "../vn-modules" }
+vn-macros    = { path = "../vn-macros", optional = true }
+vn-gpu       = { path = "../vn-gpu", optional = true }
+vn-text      = { path = "../vn-text", optional = true }
+vn-ui        = { path = "../vn-ui", optional = true }
+
+bigdecimal   = { workspace = true, optional = true }
+num-bigint   = { workspace = true, optional = true }
+num-traits   = { workspace = true, optional = true }
+rand         = { version = "0.8", optional = true }
+sha2         = { workspace = true, optional = true }
+hmac         = { version = "0.12", optional = true }
+uuid         = { version = "1", features = ["v4", "v7"], optional = true }
+base64       = { version = "0.21", optional = true }
+hex          = { workspace = true, optional = true }
+urlencoding  = { version = "2", optional = true }
+chrono       = { version = "0.4", optional = true }
+regex        = { workspace = true }
+flate2       = { workspace = true, optional = true }
+rusqlite     = { workspace = true, optional = true }
+tar          = { workspace = true, optional = true }
+zip          = { workspace = true, optional = true }
+sha1         = { version = "0.10", optional = true }
+libloading   = { version = "0.8", optional = true }
+mio          = { workspace = true, optional = true }
+socket2      = { workspace = true, optional = true }
+httparse     = { workspace = true, optional = true }
+rustls       = { version = "0.23", default-features = false, features = ["std", "ring", "tls12"], optional = true }
+webpki-roots = { version = "1", optional = true }
+rustc-hash   = { workspace = true }
+parking_lot  = { workspace = true, optional = true }
+
+[build-dependencies]
+vn-core   = { path = "../vn-core" }
+vn-lexer  = { path = "../vn-lexer" }
+vn-parser = { path = "../vn-parser" }
+
+[lints]
+workspace = true

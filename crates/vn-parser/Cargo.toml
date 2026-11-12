@@ -1,0 +1,16 @@
+[package]
+name = "vn-parser"
+version.workspace = true
+edition.workspace = true
+
+[features]
+profiling = []
+
+[dependencies]
+vn-core = { path = "../vn-core" }
+
+[dev-dependencies]
+vn-lexer = { path = "../vn-lexer" }
+
+[lints]
+workspace = true

@@ -1,4 +1,4 @@
-> Estado verificado 2026-10-13: PARCIAL — base compartida `Arc<CheckerTyBase>` (`crates/varn-sem/src/types/interned/table.rs:19`) + nombres `Arc<str>` vigentes; tabla completa no es `Arc` único; ids migrados a content-hash (ADR-0013).
+> Estado verificado 2026-10-13: PARCIAL — base compartida `Arc<CheckerTyBase>` (`crates/vn-sem/src/types/interned/table.rs:19`) + nombres `Arc<str>` vigentes; tabla completa no es `Arc` único; ids migrados a content-hash (ADR-0013).
 >
 > Histórico. No spec vigente. Código manda. Revalidar antes de usar.
 

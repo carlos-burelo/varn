@@ -1,0 +1,191 @@
+use super::context::FnEmitter;
+use super::small_utils::pattern_lead;
+use std::sync::Arc;
+use vn_core::ast::{ExprId, StmtId};
+use vn_tir::{
+    BackendTy, DynReason, Resolution, SigId, Span, TirExpr, TirExprKind, TirFunction, TirStmt,
+};
+
+pub(super) enum ClosureBody {
+    Expr(ExprId),
+    Stmt(StmtId),
+}
+
+impl<'a> FnEmitter<'a> {
+    pub(super) fn lower_closure(
+        &mut self,
+        params: &[vn_core::ast::Param],
+        body: ClosureBody,
+        is_async: bool,
+        is_generator: bool,
+        ty: BackendTy,
+        fn_ty: Option<vn_sem::types::Type>,
+        span: Span,
+    ) -> TirExpr {
+        let func_id = vn_tir::FnId(self.closure_base + self.out_closures.len() as u32);
+        let (sig, param_tys, declared) = self.closure_signature(fn_ty, params.len());
+        let return_ty = if is_async || is_generator {
+            BackendTy::Dynamic(DynReason::Unrecorded)
+        } else {
+            declared
+        };
+
+        self.out_closures.push(TirFunction {
+            name: Arc::from("<closure>"),
+            sig: SigId(0),
+            params: vec![],
+            return_ty: BackendTy::Dynamic(DynReason::Unrecorded),
+            locals: vec![],
+            body: vec![],
+            has_this: false,
+            this_class: None,
+            is_async,
+            is_generator,
+            has_rest: params.last().is_some_and(|p| p.is_rest),
+            force_inline: false,
+        });
+        let slot = self.out_closures.len() - 1;
+
+        let param_names: Vec<Arc<str>> = params
+            .iter()
+            .map(|p| pattern_lead(&p.pattern, self.m.interner))
+            .collect();
+        let mut outer_names = self.outer_names.clone();
+        for scope in &self.scopes {
+            outer_names.extend(scope.keys().cloned());
+        }
+        outer_names.extend(self.params.iter().cloned());
+        let lexical_this = self.has_own_this() || self.lexical_this;
+        if lexical_this {
+            outer_names.insert(Arc::from(vn_core::TokenKind::This.as_str()));
+        }
+
+        let mut sub = FnEmitter::new(
+            self.ast_arena,
+            self.expr_table,
+            &mut *self.tt,
+            self.m,
+            &mut *self.signatures,
+            &mut *self.out_closures,
+            self.closure_base,
+            param_names,
+        );
+        sub.outer_names = outer_names;
+        sub.lexical_this = lexical_this;
+        sub.this_class = self.this_class;
+        sub.this_enum = self.this_enum;
+        sub.home_class = self.home_class;
+        sub.namespace = self.namespace.clone();
+        sub.expect_results(declared, is_async, is_generator);
+        let mut stmts = sub.destructure_params(params, &param_tys);
+        stmts.extend(match body {
+            ClosureBody::Stmt(s) => sub.lower_stmt_as_block(s),
+            ClosureBody::Expr(e) => {
+                let te = sub.lower_expr(e);
+                let te = sub.guard_dynamic(te, sub.return_ty);
+                let mut b = std::mem::take(&mut sub.pending);
+                b.push(TirStmt::Return(Some(te)));
+                b
+            }
+        });
+        let locals = sub.locals;
+        let captures = std::mem::take(&mut sub.captures);
+
+        self.out_closures[slot] = TirFunction {
+            name: Arc::from("<closure>"),
+            sig,
+            params: param_tys,
+            return_ty,
+            locals,
+            body: stmts,
+            has_this: false,
+            this_class: None,
+            is_async,
+            is_generator,
+            has_rest: params.last().is_some_and(|p| p.is_rest),
+            force_inline: false,
+        };
+
+        let this_name = vn_core::TokenKind::This.as_str();
+        if self.has_own_this()
+            && captures.iter().any(|c| c.as_ref() == this_name)
+            && !matches!(self.resolve_name(this_name), Resolution::Local(_))
+        {
+            let receiver = self.this_var(span);
+            let ty = receiver.ty;
+            let local = self.bind_local(Arc::from(this_name), ty);
+            self.pending.push(TirStmt::Let {
+                local,
+                ty,
+                init: Some(receiver),
+            });
+        }
+
+        let upvalues: Vec<vn_tir::TirUpvalue> = captures
+            .iter()
+            .map(|name| match self.resolve_name(name) {
+                Resolution::Local(id) => {
+                    self.captured_locals.insert(id.0);
+                    vn_tir::TirUpvalue::ParentLocal(id.0)
+                }
+                Resolution::Param(i) => vn_tir::TirUpvalue::ParentParam(i),
+                Resolution::Upvalue(i) => vn_tir::TirUpvalue::ParentUpvalue(i),
+
+                Resolution::None
+                | Resolution::GlobalSlot(_)
+                | Resolution::NativeGlobal(_)
+                | Resolution::ModuleSlot { .. }
+                | Resolution::FieldSlot(_)
+                | Resolution::StaticField(_)
+                | Resolution::VtableSlot(_)
+                | Resolution::DirectFn(_)
+                | Resolution::Intrinsic(_)
+                | Resolution::NativeOp(_)
+                | Resolution::EnumVariant { .. }
+                | Resolution::ByName { .. } => vn_tir::TirUpvalue::ParentUpvalue(0),
+            })
+            .collect();
+
+        TirExpr {
+            kind: TirExprKind::Closure {
+                func: func_id,
+                upvalues,
+            },
+            ty,
+            res: Resolution::None,
+            span,
+        }
+    }
+}
+
+impl FnEmitter<'_> {
+    fn closure_signature(
+        &mut self,
+        fn_ty: Option<vn_sem::types::Type>,
+        arity: usize,
+    ) -> (SigId, Vec<BackendTy>, BackendTy) {
+        let dynamic = BackendTy::Dynamic(DynReason::Unrecorded);
+        let fn_ty =
+            fn_ty.filter(|t| matches!(self.m.checker_table.get(t.0), vn_core::TypeKind::Fn(_)));
+        let sig = fn_ty.map(|t| {
+            crate::tables::intern_signature(
+                &t,
+                self.m.checker_table,
+                self.m.interner,
+                self.tt,
+                self.m.names,
+                self.signatures,
+            )
+        });
+        let checked = sig.and_then(|sig| {
+            self.signatures
+                .get(sig.0 as usize)
+                .filter(|s| s.params.len() == arity)
+                .map(|s| (sig, s))
+        });
+        match checked {
+            Some((sig, s)) => (sig, s.params.clone(), s.return_ty),
+            None => (SigId(0), vec![dynamic; arity], dynamic),
+        }
+    }
+}

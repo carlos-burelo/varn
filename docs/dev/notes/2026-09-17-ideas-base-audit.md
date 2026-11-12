@@ -11,12 +11,12 @@ Leyenda: ✅ ya-implementado · 🟡 parcial/compromiso distinto · ❌ ausente.
 
 | # | Punto | Estado | Evidencia / gap |
 |---|---|---|---|
-| 1 | Pipeline con tipos preservados end-to-end | ✅ | `varn-tir/src/ty.rs` (`TyId`/`ClassId`), `from_tir/build.rs:1728-1745` propaga `BackendTy` hasta CLIF |
+| 1 | Pipeline con tipos preservados end-to-end | ✅ | `vn-tir/src/ty.rs` (`TyId`/`ClassId`), `from_tir/build.rs:1728-1745` propaga `BackendTy` hasta CLIF |
 | 2 | No NaN-boxing | 🟡 | `vm_value.rs:1-28`: par `tag:u64, payload:u64` (16 bytes), **no** valores nativos sin tag como pide el ideal — es un compromiso distinto, documentado y deliberado en el propio código |
 | 3 | Separación valor vs objeto | 🟡 | `KIND_HEAP` referencia índice de tabla (no puntero directo todavía); ints/floats siguen ocupando el mismo VmValue de 16 bytes que un heap ref |
 | 4 | Struct = valor real, Class = puntero+layout | ❌ | `StructDecl` existe en parser/checker pero compila por el mismo camino `ClassLayout`/heap que `class` — no hay paso-por-valor en registros |
 | 5/6 | Layout fijo, property access → offset | ✅ | `class_layout.rs:86-152` offsets estáticos; `GetFixedField`/`SetFixedField` en VM+JIT+CSE/LICM. **Refuta memoria previa** de "herencia nativa rompe GetFixedField" — es diseño deliberado (campos heredados aplanados, `skip(inherited)`), con un workaround hardcodeado puntual para clases nativas tipo `Error` |
-| 20 | TypeId no es runtime hot-path | ✅ | No aparece en `varn-vm`/`varn-jit`, solo checker/tir |
+| 20 | TypeId no es runtime hot-path | ✅ | No aparece en `vn-vm`/`vn-jit`, solo checker/tir |
 | 38/39 | Sin `undefined`, null eficiente | 🟡 | `null()` es tag explícito distinto (bien, sin colisión), pero no hay niche-optimization pointer=0 — sigue pesando 16 bytes |
 | 40 | Representation selection propia | ❌ | La colocación registro/stack es la de Cranelift para marshaling de llamadas, no una política propia de Varn |
 
@@ -25,7 +25,7 @@ Leyenda: ✅ ya-implementado · 🟡 parcial/compromiso distinto · ❌ ausente.
 | # | Punto | Estado | Evidencia / gap |
 |---|---|---|---|
 | 7 | Virtual solo si necesario | ✅ | `ssa/emit/values.rs:210-223`: `InvokeVirtual` si tipo de clase conocido, `CallMethod` (lookup) si no. Gap: `InvokeVirtual` sigue indexando vtable, no hay llamada 100% directa sin indirección |
-| 8 | Monomorfización agresiva | ❌ | **Gap grande.** `checker_generics.rs:41-46`: type param sin inferencia → `Type::Dynamic`. No existe instanciación/especialización de funciones genéricas en `varn-compiler` |
+| 8 | Monomorfización agresiva | ❌ | **Gap grande.** `checker_generics.rs:41-46`: type param sin inferencia → `Type::Dynamic`. No existe instanciación/especialización de funciones genéricas en `vn-compiler` |
 | 9 | Arrays tipados | 🟡 | `ArrayRepr` (`vm_value.rs:472-495`) cubre primitivos homogéneos sin heap refs — bien. Pero `User[]` (clases) sigue siendo `Boxed(Vec<VmValue>)` |
 | 10 | Bounds-check elimination | ✅ | `clif/vars.rs:145-157` + `clif/arrays.rs:265-270`, solo en loops JIT read-only con bound hoisteable |
 | 11 | Strings byte/codepoint/grapheme | 🟡 | `str_util.rs:6-35` distingue byte vs codepoint con fast path ASCII. No hay grapheme cluster |
@@ -58,9 +58,9 @@ Leyenda: ✅ ya-implementado · 🟡 parcial/compromiso distinto · ❌ ausente.
 | 32 | Cache locality (AoS/SoA) | ❌ | Nada |
 | 41 | SIMD intrínseco | ❌ | Nada (`f32x4` etc. no existen) |
 | 42 | Allocator reemplazable en std | — | No auditado (requiere revisar `std/` del lenguaje, no Rust) |
-| 43 | Arenas internas del compilador | ❌ | Sin `bumpalo`/`typed-arena`. AST (`varn-core/src/ast`) sigue con `Box<Expr>` recursivo — **inconsistente** con SSA/TIR que sí son data-oriented (`Vec<Block>`, `BlockId(u32)`) |
+| 43 | Arenas internas del compilador | ❌ | Sin `bumpalo`/`typed-arena`. AST (`vn-core/src/ast`) sigue con `Box<Expr>` recursivo — **inconsistente** con SSA/TIR que sí son data-oriented (`Vec<Block>`, `BlockId(u32)`) |
 | 44/45 | IDs densos + interning con SymbolId comparable | 🟡 | TIR/SSA ya son ID-based. AST tiene `AstId` pero sigue usando `Box` para la relación padre-hijo (el id no reemplaza el puntero). Interning de strings da `Rc<str>` (comparación por contenido/puntero), no `SymbolId(u32)` |
-| 46 | Compiler data-oriented (poco Rc/RefCell/dyn) | 🟡 | SSA/TIR limpios. **`varn-checker` es la excepción**: 334 usos de `Rc<`, 4 `RefCell<`, 1 `Box<dyn>` — el crate más alejado del ideal |
+| 46 | Compiler data-oriented (poco Rc/RefCell/dyn) | 🟡 | SSA/TIR limpios. **`vn-checker` es la excepción**: 334 usos de `Rc<`, 4 `RefCell<`, 1 `Box<dyn>` — el crate más alejado del ideal |
 | 47 | Hash maps especializados | ✅ | `rustc-hash` (FxHashMap) en casi todo el workspace |
 | 48 | Parallel compilation | ❌ | Sin `rayon`, nada paralelizado |
 | 49 | Incremental compilation | 🟡 | Cache por hash de ruta+contenido (`pipeline/cache.rs`), no un grafo `ModuleId`→hash de dependencias transitivas |
@@ -81,7 +81,7 @@ Leyenda: ✅ ya-implementado · 🟡 parcial/compromiso distinto · ❌ ausente.
 - **#33/34/35 deopt**: falta el mecanismo de reversión ante especulación fallida — sin esto, cualquier especialización agresiva futura (ej. profiling de tipos) es arriesgada.
 
 **Gaps de infraestructura del compilador (no visibles al usuario, pero condicionan todo lo demás):**
-- **#43/44/45 AST con Box recursivo + `varn-checker` cargado de `Rc<>`**: el front-end no sigue el mismo patrón data-oriented que TIR/SSA. Si se va a invertir en más pases de optimización, esta inconsistencia se paga en cada uno.
+- **#43/44/45 AST con Box recursivo + `vn-checker` cargado de `Rc<>`**: el front-end no sigue el mismo patrón data-oriented que TIR/SSA. Si se va a invertir en más pases de optimización, esta inconsistencia se paga en cada uno.
 - **#18/19 GVN global + range analysis**: el optimizer tiene buena base (CSE/DCE/LICM/escape) pero le faltan dos pases centrales para bounds-check elimination más agresivo y folding de rangos.
 
 **Gaps de baja prioridad (nice-to-have, sin evidencia de que bloqueen algo hoy):**

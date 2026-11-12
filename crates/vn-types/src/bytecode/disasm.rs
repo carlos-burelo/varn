@@ -1,0 +1,247 @@
+use std::fmt::Write;
+
+use vn_core::OpCode;
+
+use super::opcode_infix::infix;
+use super::opcode_nullary::implied;
+use super::opcode_prefix::prefix;
+use super::{layout, Access, At, Byte, ImmKind, Layout, Operand};
+use crate::chunk::{Chunk, Literal, PoolEntry};
+use crate::FunctionProto;
+
+#[derive(Clone, Debug)]
+pub struct Instr {
+    pub offset: usize,
+
+    pub line: u32,
+
+    pub op: Option<OpCode>,
+    pub len: usize,
+
+    pub text: String,
+
+    pub constants: Vec<usize>,
+}
+
+pub fn instructions(chunk: &Chunk) -> impl Iterator<Item = Instr> + '_ {
+    let code = &chunk.code;
+    let mut offset = 0;
+    std::iter::from_fn(move || {
+        if offset >= code.len() {
+            return None;
+        }
+        let line = chunk.lines.get_line(offset);
+        let instr = match layout(code, offset, &chunk.constants) {
+            Some(l) => Instr {
+                offset,
+                line,
+                op: Some(l.op),
+                len: l.len,
+                text: operands_text(&l, code, offset),
+                constants: l
+                    .operands
+                    .iter()
+                    .filter_map(|o| match *o {
+                        Operand::Const { word, .. } => {
+                            Some(At::Word(word).read(code, offset) as usize)
+                        }
+                        Operand::Reg { .. }
+                        | Operand::Run { .. }
+                        | Operand::Fixed { .. }
+                        | Operand::Imm { .. }
+                        | Operand::Jump { .. } => None,
+                    })
+                    .collect(),
+            },
+            None => Instr {
+                offset,
+                line,
+                op: None,
+                len: 1,
+                text: format!("raw {:#06x}", code[offset]),
+                constants: Vec::new(),
+            },
+        };
+        offset += instr.len;
+        Some(instr)
+    })
+}
+
+pub fn render(proto: &FunctionProto) -> String {
+    let mut out = String::new();
+    render_into(proto, &mut out);
+    out
+}
+
+fn render_into(proto: &FunctionProto, out: &mut String) {
+    let name = proto.name.as_deref().unwrap_or("<anonymous>");
+    let flags: Vec<&str> = [
+        proto.is_async.then_some("async"),
+        proto.is_generator.then_some("generator"),
+        proto.has_this.then_some("this"),
+        proto.has_rest.then_some("rest"),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    let _ = write!(
+        out,
+        "fn {name} (arity {}, registers {}, upvalues {})",
+        proto.arity, proto.register_count, proto.upvalue_count
+    );
+    if !flags.is_empty() {
+        let _ = write!(out, " [{}]", flags.join(", "));
+    }
+    out.push('\n');
+
+    let constants = &proto.chunk.constants;
+    if !constants.is_empty() {
+        out.push_str("  constants\n");
+        for (i, c) in constants.iter().enumerate() {
+            let _ = writeln!(out, "    #{i:<3} {}", constant_text(c));
+        }
+    }
+    let _ = writeln!(out, "  code ({} words)", proto.chunk.code.len());
+    for instr in instructions(&proto.chunk) {
+        let op = instr
+            .op
+            .map_or_else(|| "???".to_owned(), |op| format!("{op:?}"));
+        let _ = write!(
+            out,
+            "    {:04}  {:>4}  {op:<20} {}",
+            instr.offset, instr.line, instr.text
+        );
+        let notes: Vec<String> = instr
+            .constants
+            .iter()
+            .filter_map(|&i| constants.get(i).map(constant_text))
+            .collect();
+        if !notes.is_empty() {
+            let _ = write!(out, "  ; {}", notes.join(", "));
+        }
+        out.push('\n');
+    }
+    out.push('\n');
+
+    for c in constants {
+        if let PoolEntry::Function(nested) = c {
+            render_into(nested, out);
+        }
+    }
+}
+
+pub fn constant_text(entry: &PoolEntry) -> String {
+    match entry {
+        PoolEntry::Literal(lit) => match lit {
+            Literal::Null => "null".to_owned(),
+            Literal::Bool(b) => b.to_string(),
+            Literal::Int(n) => n.to_string(),
+            Literal::Float(f) => format!("{f:?}"),
+            Literal::Str(s) => format!("{s:?}"),
+            Literal::BigInt(n) => format!("{n}n"),
+            Literal::Decimal(d) => format!("{d}d"),
+            Literal::Char(c) => format!("{c:?}"),
+        },
+        PoolEntry::Function(f) => format!("fn {}", f.name.as_deref().unwrap_or("<anonymous>")),
+        PoolEntry::Shape(keys) => format!("shape {{{}}}", keys.join(", ")),
+        PoolEntry::Layout(layout) => format!(
+            "layout {{{}}}",
+            layout
+                .fields
+                .iter()
+                .map(|f| format!("{}@{}", f.name, f.offset))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        PoolEntry::Variant(def) => format!(
+            "variant {}.{}({})",
+            def.enum_name,
+            def.variant_name,
+            def.fields.join(", ")
+        ),
+    }
+}
+
+pub fn operands_text(layout: &Layout, code: &[u16], offset: usize) -> String {
+    let reg = |at: Byte| format!("r{}", at.read(code, offset));
+    let mut dest = None;
+    let mut args: Vec<String> = Vec::new();
+    for operand in &layout.operands {
+        match *operand {
+            Operand::Reg { at, access } => {
+                if access != Access::Read {
+                    dest = Some(reg(at));
+                }
+                if access != Access::Write {
+                    args.push(reg(at));
+                }
+            }
+            Operand::Fixed { reg, access } => {
+                if access != Access::Read {
+                    dest = Some(format!("r{reg}"));
+                }
+                if access != Access::Write {
+                    args.push(format!("r{reg}"));
+                }
+            }
+            Operand::Run { start, count, .. } => {
+                let first = start.read(code, offset) as usize;
+                args.push(match count {
+                    0 => "()".to_owned(),
+                    1 => format!("(r{first})"),
+                    n => format!("(r{first}..r{})", first + n - 1),
+                });
+            }
+            Operand::Const { word, .. } => {
+                args.push(format!("#{}", At::Word(word).read(code, offset)));
+            }
+            Operand::Imm { at, kind } => args.extend(imm_text(at, kind, code, offset)),
+            Operand::Jump { .. } => {
+                if let Some(target) = layout.jump_target(code, offset) {
+                    args.push(format!("→ {target:04}"));
+                }
+            }
+        }
+    }
+
+    let body = match (implied(layout.op), infix(layout.op), prefix(layout.op)) {
+        (Some(value), _, _) => value.to_owned(),
+        (_, Some(sym), _) if args.len() == 2 => format!("{} {sym} {}", args[0], args[1]),
+        (_, _, Some(sym)) if args.len() == 1 => format!("{sym}{}", args[0]),
+        _ => args.join(", "),
+    };
+    match dest {
+        Some(d) if body.is_empty() => d,
+        Some(d) => format!("{d} = {body}"),
+        None => body,
+    }
+}
+
+fn imm_text(at: At, kind: ImmKind, code: &[u16], offset: usize) -> Option<String> {
+    let v = at.read(code, offset);
+    Some(match kind {
+        ImmKind::Int => match at {
+            At::Byte(_) => (v as u8 as i8).to_string(),
+            At::Word(_) => (v as i16).to_string(),
+        },
+
+        ImmKind::Count => return None,
+        ImmKind::Upvalue => format!("uv{v}"),
+        ImmKind::CallSite => format!("ic{v}"),
+        ImmKind::GlobalSlot => format!("global@{v}"),
+        ImmKind::NativeGlobalSlot => format!("native@{v}"),
+        ImmKind::ModuleSlot => format!("slot{v}"),
+        ImmKind::FieldSlot => format!("field{v}"),
+        ImmKind::FieldOffset => format!("+{v}"),
+        ImmKind::Tag => match vn_core::RuntimeKind::from_u8(v as u8) {
+            Some(kind) => format!(":{}", kind.name()),
+            None => ":dynamic".to_owned(),
+        },
+        ImmKind::Conv => match vn_core::ValueConv::from_u8(v as u8) {
+            Some(conv) => format!("{conv:?}"),
+            None => format!("conv{v}"),
+        },
+        ImmKind::Intrinsic => format!("math{v:#04x}"),
+        ImmKind::Flag => format!("flag{v}"),
+    })
+}

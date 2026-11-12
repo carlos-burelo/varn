@@ -36,7 +36,7 @@ fn valid_class(name: &str) -> bool {
 fn module_rs(mod_name: &str, classes: &[String]) -> String {
     let struct_name = format!("{}Runtime", pascal(mod_name));
     let mut out = format!(
-        "use varn_macros::varn_contract;\nuse varn_types::NativeCtx;\n\npub struct {struct_name};\n"
+        "use vn_macros::varn_contract;\nuse vn_types::NativeCtx;\n\npub struct {struct_name};\n"
     );
     for class in classes {
         out.push_str(&format!("pub struct {class}Impl;\n"));
@@ -46,7 +46,7 @@ fn module_rs(mod_name: &str, classes: &[String]) -> String {
     ));
     for class in classes {
         out.push_str(&format!(
-            "\n    class: \"{class}\",\n    impl {class}Impl {{\n        fn constructor(\n            _ctx: &mut dyn NativeCtx,\n            this: varn_types::VmValue,\n        ) -> varn_types::VmValue {{\n            this\n        }}\n    }}\n"
+            "\n    class: \"{class}\",\n    impl {class}Impl {{\n        fn constructor(\n            _ctx: &mut dyn NativeCtx,\n            this: vn_types::VmValue,\n        ) -> vn_types::VmValue {{\n            this\n        }}\n    }}\n"
         ));
     }
     out.push_str("}\n");
@@ -83,7 +83,7 @@ fn registry_entry(line: &str) -> Option<&str> {
 }
 
 fn apply_registry(root: &Path, mod_name: &str) -> Result<(String, String), String> {
-    let path = root.join("crates/varn-builtins/src/modules/mod.rs");
+    let path = root.join("crates/vn-builtins/src/modules/mod.rs");
     let text = std::fs::read_to_string(&path)
         .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
     let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
@@ -148,7 +148,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
         .to_path_buf();
 
     let rs_dir = root.join(format!(
-        "crates/varn-builtins/src/modules/runtime/{mod_name}"
+        "crates/vn-builtins/src/modules/runtime/{mod_name}"
     ));
     let rs_file = rs_dir.join(format!("{mod_name}.rs"));
     let vn_file = rs_dir.join(format!("{mod_name}_runtime.vn"));
@@ -181,12 +181,12 @@ pub fn run(args: &[String]) -> Result<(), String> {
     std::fs::write(&vn_file, contract).map_err(|e| format!("write {}: {e}", vn_file.display()))?;
     std::fs::write(&std_file, std_mod).map_err(|e| format!("write {}: {e}", std_file.display()))?;
     std::fs::write(
-        root.join("crates/varn-builtins/src/modules/mod.rs"),
+        root.join("crates/vn-builtins/src/modules/mod.rs"),
         new_registry,
     )
     .map_err(|e| format!("write registry: {e}"))?;
 
     println!("scaffolded std:{mod_name} (runtime:{mod_name})");
-    println!("next: cargo check -p varn-builtins, then extend the contract");
+    println!("next: cargo check -p vn-builtins, then extend the contract");
     Ok(())
 }

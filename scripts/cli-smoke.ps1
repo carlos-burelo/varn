@@ -186,7 +186,7 @@ Check "eval-honors-permissions" {
     $denied.Code -ne 0 -and $denied.Out -match "PERMISSION" -and $granted.Code -eq 0 -and $granted.Out -match "true"
 }
 
-if (Test-Path (Join-Path (Split-Path $vn) "varn_rt.lib")) {
+if (Test-Path (Join-Path (Split-Path $vn) "vn_rt.lib")) {
     Check "build-native-links-and-runs" {
         $f = Write-Vn "native\hello.vn" 'print("native-ok");'
         $out = Join-Path $work "native\hello.exe"
@@ -195,7 +195,7 @@ if (Test-Path (Join-Path (Split-Path $vn) "varn_rt.lib")) {
         $built.Code -eq 0 -and $ran.Trim() -eq "native-ok"
     }
 } else {
-    Write-Host "SKIP build-native-links-and-runs (varn_rt.lib not built)"
+    Write-Host "SKIP build-native-links-and-runs (vn_rt.lib not built)"
 }
 
 Check "exe-runs-elsewhere" {
@@ -260,7 +260,7 @@ b = ["task a"]
 }
 
 Check "debug-all-phases-on-a-generic-program" {
-    $r = Vn debug (Join-Path $RootDir "crates/varn-pipeline/tests/fixtures/debug/generics.vn") -p all
+    $r = Vn debug (Join-Path $RootDir "crates/vn-pipeline/tests/fixtures/debug/generics.vn") -p all
     $r.Code -eq 0 -and $r.Out -notmatch "panicked"
 }
 

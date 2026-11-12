@@ -1,4 +1,4 @@
-> Estado verificado 2026-10-13: VIGENTE — `num_bigint::BigInt` + `bigdecimal::BigDecimal` en `crates/varn-core/src/numeric_big.rs:2-3`, división 34 dígitos half-even; `tests/35-decimal-bigint.vn`, `tests/124-bigint-arbitrary.vn`.
+> Estado verificado 2026-10-13: VIGENTE — `num_bigint::BigInt` + `bigdecimal::BigDecimal` en `crates/vn-core/src/numeric_big.rs:2-3`, división 34 dígitos half-even; `tests/35-decimal-bigint.vn`, `tests/124-bigint-arbitrary.vn`.
 >
 > Histórico. No spec vigente. Código manda. Revalidar antes de usar.
 

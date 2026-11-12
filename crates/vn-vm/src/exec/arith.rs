@@ -1,0 +1,351 @@
+use crate::error::{RuntimeError, VmResult};
+use crate::heap::{Heap, HeapObj};
+use crate::value::VmValue;
+use bigdecimal::BigDecimal as Decimal;
+use num_traits::Zero;
+use vn_core::{
+    add_int, mul_int, neg_int, pow_int, shl_int, shr_int, sub_int, ushr_int, INT_MAX, INT_MIN,
+    SHIFT_MAX,
+};
+
+#[cold]
+#[inline(never)]
+fn overflow(op: &str, a: i64, b: i64) -> RuntimeError {
+    RuntimeError::integer_overflow(format!(
+        "integer overflow: {a} {op} {b} is outside int ({INT_MIN}..={INT_MAX})"
+    ))
+}
+
+#[cold]
+#[inline(never)]
+fn overflow_neg(a: i64) -> RuntimeError {
+    RuntimeError::integer_overflow(format!(
+        "integer overflow: -({a}) is outside int ({INT_MIN}..={INT_MAX})"
+    ))
+}
+
+#[cold]
+#[inline(never)]
+pub(crate) fn int_div_fault(
+    fault: vn_core::IntDivFault,
+    op: &str,
+    a: i64,
+    b: i64,
+) -> RuntimeError {
+    match fault {
+        vn_core::IntDivFault::DivisionByZero => RuntimeError::division_by_zero(if op == "%" {
+            "modulo by zero"
+        } else {
+            "division by zero"
+        }),
+        vn_core::IntDivFault::Overflow => overflow(op, a, b),
+    }
+}
+
+#[inline(always)]
+fn decimal_of(v: VmValue, heap: &Heap) -> Option<Decimal> {
+    if !v.is_heap() {
+        return None;
+    }
+    match heap.get(v.as_heap()) {
+        Some(HeapObj::Decimal(d)) => Some((**d).clone()),
+        Some(
+            HeapObj::Str(_)
+            | HeapObj::Array(_)
+            | HeapObj::Tuple(_)
+            | HeapObj::Object(_)
+            | HeapObj::Buffer(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::VmClosure(_)
+            | HeapObj::Class(_)
+            | HeapObj::NativeFn(..)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::Map(_)
+            | HeapObj::Set(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::Range(_)
+            | HeapObj::EnumVariant(_)
+            | HeapObj::BigInt(_)
+            | HeapObj::Char(_)
+            | HeapObj::Generator(_)
+            | HeapObj::Spread(_),
+        )
+        | None => None,
+    }
+}
+
+#[cold]
+fn decimal_pair(a: VmValue, b: VmValue, heap: &Heap) -> Option<(Decimal, Decimal)> {
+    match (decimal_of(a, heap), decimal_of(b, heap)) {
+        (Some(x), Some(y)) => Some((x, y)),
+        (Some(x), None) if heap.is_int(b) => Some((x, Decimal::from(heap.as_int(b)))),
+        (None, Some(y)) if heap.is_int(a) => Some((Decimal::from(heap.as_int(a)), y)),
+        _ => None,
+    }
+}
+
+#[inline(always)]
+pub(crate) fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+    if heap.is_int(a) && heap.is_int(b) {
+        let (x, y) = (heap.as_int(a), heap.as_int(b));
+        return match add_int(x, y) {
+            Some(r) => Ok(VmValue::from_int(r)),
+            None => Err(overflow("+", x, y)),
+        };
+    }
+
+    if (a.is_f64() || heap.is_int(a)) && (b.is_f64() || heap.is_int(b)) {
+        return Ok(VmValue::from_f64(heap.to_f64_val(a) + heap.to_f64_val(b)));
+    }
+
+    if a.is_sso() || b.is_sso() {
+        return crate::exec::strings::str_concat(a, b, heap);
+    }
+    if a.is_heap() || b.is_heap() {
+        let a_is_str = a.is_heap() && matches!(heap.get(a.as_heap()), Some(HeapObj::Str(_)));
+        let b_is_str = b.is_heap() && matches!(heap.get(b.as_heap()), Some(HeapObj::Str(_)));
+        if a_is_str || b_is_str {
+            return crate::exec::strings::str_concat(a, b, heap);
+        }
+        if let Some(r) =
+            crate::exec::arith_big::binary(crate::exec::arith_big::BigOp::Add, a, b, heap)
+        {
+            return r;
+        }
+
+        if let Some((x, y)) = decimal_pair(a, b, heap) {
+            return Ok(heap.alloc_decimal(x + y));
+        }
+    }
+    Ok(VmValue::from_f64(heap.to_f64_val(a) + heap.to_f64_val(b)))
+}
+
+#[inline(always)]
+pub(crate) fn sub(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+    if heap.is_int(a) && heap.is_int(b) {
+        let (x, y) = (heap.as_int(a), heap.as_int(b));
+        return match sub_int(x, y) {
+            Some(r) => Ok(VmValue::from_int(r)),
+            None => Err(overflow("-", x, y)),
+        };
+    }
+    if a.is_heap() || b.is_heap() {
+        if let Some(r) =
+            crate::exec::arith_big::binary(crate::exec::arith_big::BigOp::Sub, a, b, heap)
+        {
+            return r;
+        }
+        if let Some((x, y)) = decimal_pair(a, b, heap) {
+            return Ok(heap.alloc_decimal(x - y));
+        }
+    }
+    Ok(VmValue::from_f64(heap.to_f64_val(a) - heap.to_f64_val(b)))
+}
+
+#[inline(always)]
+pub(crate) fn mul(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+    if heap.is_int(a) && heap.is_int(b) {
+        let (x, y) = (heap.as_int(a), heap.as_int(b));
+        return match mul_int(x, y) {
+            Some(r) => Ok(VmValue::from_int(r)),
+            None => Err(overflow("*", x, y)),
+        };
+    }
+    if a.is_heap() || b.is_heap() {
+        if let Some(r) =
+            crate::exec::arith_big::binary(crate::exec::arith_big::BigOp::Mul, a, b, heap)
+        {
+            return r;
+        }
+        if let Some((x, y)) = decimal_pair(a, b, heap) {
+            return Ok(heap.alloc_decimal(vn_core::numeric_big::mul_decimal(&x, &y)));
+        }
+    }
+    Ok(VmValue::from_f64(heap.to_f64_val(a) * heap.to_f64_val(b)))
+}
+
+#[inline(always)]
+pub(crate) fn div(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+    if heap.is_int(a) && heap.is_int(b) {
+        let (x, y) = (heap.as_int(a), heap.as_int(b));
+        return vn_core::div_int(x, y)
+            .map(VmValue::from_int)
+            .map_err(|f| int_div_fault(f, "/", x, y));
+    }
+    if a.is_heap() || b.is_heap() {
+        if let Some(r) =
+            crate::exec::arith_big::binary(crate::exec::arith_big::BigOp::Div, a, b, heap)
+        {
+            return r;
+        }
+        if let Some((x, y)) = decimal_pair(a, b, heap) {
+            if y.is_zero() {
+                return Err(RuntimeError::division_by_zero("division by zero"));
+            }
+            let q = vn_core::numeric_big::div_decimal(&x, &y)
+                .map_err(|f| int_div_fault(f, "/", 0, 0))?;
+            return Ok(heap.alloc_decimal(q));
+        }
+    }
+    Ok(VmValue::from_f64(heap.to_f64_val(a) / heap.to_f64_val(b)))
+}
+
+#[inline(always)]
+pub(crate) fn modulo(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+    if heap.is_int(a) && heap.is_int(b) {
+        let (x, y) = (heap.as_int(a), heap.as_int(b));
+        return vn_core::rem_int(x, y)
+            .map(|r| heap.make_int(r))
+            .map_err(|f| int_div_fault(f, "%", x, y));
+    }
+    if a.is_heap() || b.is_heap() {
+        if let Some(r) =
+            crate::exec::arith_big::binary(crate::exec::arith_big::BigOp::Rem, a, b, heap)
+        {
+            return r;
+        }
+        if let Some((x, y)) = decimal_pair(a, b, heap) {
+            if y.is_zero() {
+                return Err(RuntimeError::division_by_zero("modulo by zero"));
+            }
+            return Ok(heap.alloc_decimal(x % y));
+        }
+    }
+    Ok(VmValue::from_f64(heap.to_f64_val(a) % heap.to_f64_val(b)))
+}
+
+#[inline(always)]
+pub(crate) fn pow(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+    if heap.is_int(a) && heap.is_int(b) {
+        let exp = heap.as_int(b);
+        if exp < 0 {
+            return Err(negative_exponent(exp));
+        }
+        let base = heap.as_int(a);
+        return match pow_int(base, exp as u64) {
+            Some(r) => Ok(VmValue::from_int(r)),
+            None => Err(overflow("**", base, exp)),
+        };
+    }
+    if let Some(r) = crate::exec::arith_big::binary(crate::exec::arith_big::BigOp::Pow, a, b, heap)
+    {
+        return r;
+    }
+    if let Some((x, y)) = decimal_pair(a, b, heap) {
+        return vn_core::numeric_big::pow_decimal(&x, &y)
+            .map(|r| heap.alloc_decimal(r))
+            .map_err(decimal_pow_fault);
+    }
+    Ok(VmValue::from_f64(
+        heap.to_f64_val(a).powf(heap.to_f64_val(b)),
+    ))
+}
+
+#[inline(always)]
+pub(crate) fn negate(a: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+    if heap.is_int(a) {
+        let x = heap.as_int(a);
+        return match neg_int(x) {
+            Some(r) => Ok(VmValue::from_int(r)),
+            None => Err(overflow_neg(x)),
+        };
+    }
+    if a.is_f64() {
+        return Ok(VmValue::from_f64(-a.as_f64()));
+    }
+    if let Some(d) = decimal_of(a, &*heap) {
+        return Ok(heap.alloc_decimal(-d));
+    }
+    if let Some(r) = crate::exec::arith_big::negate(a, heap) {
+        return Ok(r);
+    }
+    Ok(VmValue::from_f64(-heap.to_f64_val(a)))
+}
+
+#[inline(always)]
+pub(crate) fn bit_and(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+    let r = heap.as_int(a) & heap.as_int(b);
+    heap.make_int(r)
+}
+
+#[inline(always)]
+pub(crate) fn bit_or(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+    let r = heap.as_int(a) | heap.as_int(b);
+    heap.make_int(r)
+}
+
+#[inline(always)]
+pub(crate) fn bit_xor(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+    let r = heap.as_int(a) ^ heap.as_int(b);
+    heap.make_int(r)
+}
+
+#[cold]
+#[inline(never)]
+fn shift_out_of_range(op: &str, a: i64, n: i64) -> RuntimeError {
+    RuntimeError::range_error(format!(
+        "{a} {op} {n}: the shift amount must be within 0..={SHIFT_MAX}"
+    ))
+}
+
+#[cold]
+#[inline(never)]
+pub(crate) fn negative_exponent_big(exp: &num_bigint::BigInt) -> RuntimeError {
+    RuntimeError::range_error(format!(
+        "the exponent of a bigint power must not be negative, got {exp}"
+    ))
+}
+
+#[cold]
+#[inline(never)]
+fn decimal_pow_fault(fault: vn_core::numeric_big::DecimalPowFault) -> RuntimeError {
+    use vn_core::numeric_big::DecimalPowFault;
+    match fault {
+        DecimalPowFault::NonIntegral => {
+            RuntimeError::range_error("the exponent of a decimal power must be an integer")
+        }
+        DecimalPowFault::TooLarge => {
+            RuntimeError::range_error("the result of this decimal power would have too many digits")
+        }
+        DecimalPowFault::ZeroToNegative => {
+            RuntimeError::division_by_zero("zero cannot be raised to a negative power")
+        }
+    }
+}
+
+#[cold]
+#[inline(never)]
+pub(crate) fn negative_exponent(exp: i64) -> RuntimeError {
+    RuntimeError::range_error(format!(
+        "the exponent of an integer power must not be negative, got {exp}"
+    ))
+}
+
+fn shift(
+    a: VmValue,
+    b: VmValue,
+    heap: &mut Heap,
+    op: &str,
+    apply: fn(i64, i64) -> Option<i64>,
+) -> VmResult<VmValue> {
+    let (lhs, count) = (heap.as_int(a), heap.as_int(b));
+    let r = apply(lhs, count).ok_or_else(|| shift_out_of_range(op, lhs, count))?;
+    Ok(VmValue::from_int_wrapping(r))
+}
+
+#[inline(always)]
+pub(crate) fn shl(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+    shift(a, b, heap, "<<", shl_int)
+}
+
+#[inline(always)]
+pub(crate) fn shr(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+    shift(a, b, heap, ">>", shr_int)
+}
+
+#[inline(always)]
+pub(crate) fn ushr(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+    shift(a, b, heap, ">>>", ushr_int)
+}

@@ -109,7 +109,7 @@ function lanzaYCapturaTrasBreak(): bool {
 // que el pase no sabe reescribir. El bloque quedaba con bookkeeping de preds
 // mentiroso; `merge_blocks` confiaba en él para fusionar de más, y el
 // verificador de SSA lo cazaba más adelante. Arreglado en el propio pase:
-// ver comentario de `jump_forwarding` en crates/varn-compiler/src/passes/cfg.rs.
+// ver comentario de `jump_forwarding` en crates/vn-compiler/src/passes/cfg.rs.
 
 function vacioConBreak(): int {
     let pasos = 0;

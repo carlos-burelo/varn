@@ -53,7 +53,7 @@ iteración.
   fronteras de loop.
 - La detección de back-edges YA existe pero solo en el backend
   (`varn-backend/regalloc_post.rs::collect_back_edges`, vía
-  `varn_types::bytecode::decode`). Devuelve `Vec<(target_instr, loop_instr)>`.
+  `vn_types::bytecode::decode`). Devuelve `Vec<(target_instr, loop_instr)>`.
 - `register_meta`/`SlotKind` da el tipo estático de cada registro
   (Int/Float/Bool/Str/Ref/Dynamic).
 
@@ -92,7 +92,7 @@ cambios.
 ### Pasos de implementación
 
 1. **Exponer el análisis de loops.** Mover/compartir `collect_back_edges`
-   (ya en `varn_types::bytecode` idealmente) y construir loops naturales:
+   (ya en `vn_types::bytecode` idealmente) y construir loops naturales:
    para cada back-edge `(header, latch)`, el cuerpo = instrucciones en
    `[header, latch]` (los loops de Varn son reducibles, un solo back-edge
    por header — verificar contra el emisor SSA).
@@ -227,8 +227,8 @@ el cache (predicho perfectamente tras la primera iteración, ya que la
 invariancia del registro implica que el resultado del guard es idéntico en
 cada iteración de una misma ejecución del loop).
 
-Archivos: `varn-types/src/loop_analysis.rs` (análisis compartido con el
-backend), `varn-jit/src/loop_hoist.rs` (planificación de hoists +
+Archivos: `vn-types/src/loop_analysis.rs` (análisis compartido con el
+backend), `vn-jit/src/loop_hoist.rs` (planificación de hoists +
 allowlist de opcodes libres de allocación), `codegen/array_fast.rs`
 (`emit_resolve_into_cache`, `emit_cached_or_fallthrough`),
 `codegen/indexing.rs` + `codegen/arrays.rs` (sitios cacheados),
@@ -291,7 +291,7 @@ siguiente uso inmediatamente vuelve a operar sobre bits boxed.
 `REG_INT_TAG` = `QNAN|TAG_INT` = `0x7FFC_0000_0000_0000`, en R15.
 `SlotKind::Int` ya marca qué registros son estáticamente enteros
 (`slot_kinds.rs`), y la semántica i48 con wrap ya está unificada
-(`varn-core/numeric.rs`, ver [[varn-int-semantics-i48]]).
+(`vn-core/numeric.rs`, ver [[varn-int-semantics-i48]]).
 
 ### Diseño
 
@@ -304,7 +304,7 @@ de ops enteras, re-empaquetando solo en las fronteras:
 - **Cadena de ops:** `AddInt`/`SubInt`/`MulInt` sobre regs untagged son
   1 instrucción (`add`/`sub`/`imul`), sin mask/tag. Overflow: wrap i48 vía
   un `shl 16; sar 16` diferido, o un check `jo` → deopt/rebox. La semántica
-  es wrap (varn-core), así que basta con enmascarar al re-empaquetar.
+  es wrap (vn-core), así que basta con enmascarar al re-empaquetar.
 - **Frontera de salida:** al almacenar a un slot que espera boxed, o pasar
   a un op que no es int-untagged (llamada, comparación que necesita el
   valor boxed, store a memoria heap), re-empaquetar: `shl 16; shr 16; or
@@ -318,7 +318,7 @@ nunca, si el loop-carry se mantiene untagged entre iteraciones).
 
 - `SlotKind::Int` por registro (ya derivado, `slot_kinds.rs`).
 - `register_meta` ya guía el flush-skipping del JIT
-  (ver [[varn-jit-register-meta-contract]]).
+  (ver [[vn-jit-register-meta-contract]]).
 - Semántica de wrap i48 unificada — el re-empaque es `shl/shr/or`.
 
 ### Diseño del ABI de registros untagged
@@ -417,6 +417,6 @@ Ambos comparten prerequisito: **análisis de loops naturales en el JIT**
 (hoy solo existe en el backend). Implementarlo una vez, reusar en ambos.
 
 Relacionado: `docs/internals/VM_ARCHITECTURE.md`, `docs/internals/COMPILER_ARCHITECTURE.md`,
-memorias [[varn-int-semantics-i48]] [[varn-jit-register-meta-contract]]
-[[varn-jit-inline-heap-layout]].
+memorias [[varn-int-semantics-i48]] [[vn-jit-register-meta-contract]]
+[[vn-jit-inline-heap-layout]].
 

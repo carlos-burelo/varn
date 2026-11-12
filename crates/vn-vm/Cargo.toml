@@ -1,0 +1,32 @@
+[package]
+name = "vn-vm"
+version.workspace = true
+edition.workspace = true
+
+[features]
+profiling = []
+clif = ["vn-jit/clif"]
+
+[dependencies]
+vn-macros = { path = "../vn-macros" }
+vn-types    = { path = "../vn-types" }
+vn-core     = { path = "../vn-core" }
+vn-builtins = { path = "../vn-builtins", features = ["runtime"] }
+vn-modules  = { path = "../vn-modules" }
+bigdecimal    = { workspace = true }
+num-bigint    = { workspace = true }
+num-traits    = { workspace = true }
+rustc-hash    = { workspace = true }
+vn-jit      = { path = "../vn-jit" }
+postcard      = { workspace = true }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+ryu           = { workspace = true }
+memchr        = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+libc          = { workspace = true }
+
+
+[lints]
+workspace = true

@@ -1,0 +1,19 @@
+[package]
+name = "vn-compiler"
+version.workspace = true
+edition.workspace = true
+
+# The compiler: AST -> HIR -> SSA -> opt passes -> bytecode (FunctionProto).
+# Depends only on the AST (vn-core) and the bytecode/proto types (vn-types).
+# `compile_module` is the front door; the VM/JIT consume the FunctionProto it
+# emits.
+[dependencies]
+vn-core  = { path = "../vn-core" }
+vn-tir   = { path = "../vn-tir" }
+vn-types = { path = "../vn-types" }
+rustc-hash = { workspace = true }
+bigdecimal   = { workspace = true }
+num-bigint   = { workspace = true }
+
+[lints]
+workspace = true

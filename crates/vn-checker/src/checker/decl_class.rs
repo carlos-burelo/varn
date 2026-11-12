@@ -1,0 +1,131 @@
+use super::foreign_classes::OwnerRef;
+use super::recorder::Recorder;
+use super::Checker;
+use std::sync::Arc;
+use vn_core::ast::ClassMember;
+use vn_core::{Diagnostic, ErrorCode};
+use vn_sem::bind::BindResult;
+use vn_sem::types::ClassMemberKind;
+
+impl<'r> Checker<'r> {
+    pub(super) fn check_class(
+        &mut self,
+        rec: &mut Recorder,
+        c: &vn_core::ast::ClassDecl,
+        bind: &BindResult,
+    ) {
+        if c.modifiers.is_abstract
+            && let Some(id) = &c.id
+        {
+            let declared = self.declared_type_name(bind, *id, c.ast_id);
+            self.abstract_classes.insert(declared);
+        }
+        let name =
+            c.id.map(|id| self.declared_type_name(bind, id, c.ast_id))
+                .unwrap_or_else(|| Arc::from("<anon>"));
+        let saved_class = self.current_class.replace(name);
+        let saved_scope = self.current_scope;
+        if let Some(cls_scope) = self.next_child_scope(bind) {
+            self.current_scope = cls_scope;
+        }
+
+        let mut superclass_members = Vec::new();
+        if let Some(cls_id) = c.id.as_ref() {
+            let class_name = bind.interner.resolve(*cls_id);
+            let chain = self.foreign_chain(class_name, OwnerRef::Current(bind));
+            for level in chain.iter().skip(1) {
+                let Some(entry) = level.owner.get().get_class_entry(&level.name) else {
+                    continue;
+                };
+                for member in &entry.members {
+                    let mut member = member.clone();
+                    member.ty = self.reintern_foreign_ty(level.owner.get(), member.ty);
+                    superclass_members.push(member);
+                }
+            }
+        }
+
+        self.check_class_type_names(c, bind);
+        self.check_class_decorators(rec, c, bind);
+        self.check_class_overrides(c, &superclass_members, bind);
+        self.check_implements(c, bind);
+        self.check_member_names(c, bind);
+        self.check_abstract_members(c, &superclass_members, bind);
+        let outer_super = std::mem::replace(&mut self.super_reachable, true);
+        self.check_class_members(rec, c, bind);
+        self.super_reachable = outer_super;
+
+        self.current_scope = saved_scope;
+        self.current_class = saved_class;
+    }
+
+    fn check_class_overrides(
+        &mut self,
+        c: &vn_core::ast::ClassDecl,
+        superclass_members: &[vn_sem::types::ClassMemberInfo],
+        bind: &BindResult,
+    ) {
+        for member in &c.body {
+            match member {
+                ClassMember::Method {
+                    key,
+                    modifiers,
+                    range,
+                    ..
+                }
+                | ClassMember::Getter {
+                    key,
+                    modifiers,
+                    range,
+                    ..
+                }
+                | ClassMember::Setter {
+                    key,
+                    modifiers,
+                    range,
+                    ..
+                } => {
+                    let is_override = modifiers.is_override;
+                    let key_str = bind.interner.resolve(*key);
+                    let exists_in_superclass = superclass_members.iter().any(|m| {
+                        m.name.as_ref() == key_str && m.kind != ClassMemberKind::Constructor
+                    });
+                    if exists_in_superclass {
+                        if let (true, ClassMember::Method { .. }, Some(class)) =
+                            (is_override, member, self.current_class.clone())
+                        {
+                            self.check_override_signature(
+                                &class,
+                                key_str,
+                                superclass_members,
+                                *range,
+                                bind,
+                            );
+                        }
+                        if !is_override {
+                            self.emit(
+                                Diagnostic::error(
+                                    ErrorCode::MissingOverride,
+                                    format!("member '{}' overrides a member in the superclass but is missing the 'override' modifier", key_str),
+                                )
+                                .with_range(*range),
+                            );
+                        }
+                    } else if is_override {
+                        self.emit(
+                            Diagnostic::error(
+                                ErrorCode::SpuriousOverride,
+                                format!("member '{}' is marked as override but does not override any member in the superclass", key_str),
+                            )
+                            .with_range(*range),
+                        );
+                    }
+                }
+                ClassMember::Constructor { .. }
+                | ClassMember::Destructor { .. }
+                | ClassMember::Property { .. }
+                | ClassMember::StaticBlock { .. } => {}
+            }
+        }
+    }
+}

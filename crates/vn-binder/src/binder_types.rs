@@ -1,0 +1,126 @@
+use super::Binder;
+use vn_core::ast::TypeNode;
+use vn_sem::infer::infer_expr_type;
+use vn_sem::resolve::resolve_type_node;
+use vn_sem::types::{Type, TypeContext};
+
+impl<'r> Binder<'r> {
+    pub(crate) fn resolve_type(&mut self, node: &TypeNode) -> Type {
+        self.reject_forbidden_type_forms(node);
+        let mut table = std::mem::take(std::sync::Arc::make_mut(&mut self.ty_table));
+        let result = resolve_type_node(node, Some(self), &mut table);
+        self.ty_table = std::sync::Arc::new(table);
+        self.annotation_types.insert(node.id, result);
+        result
+    }
+
+    pub(crate) fn reject_forbidden_type_forms(&mut self, node: &TypeNode) {
+        use vn_core::TypeKind as K;
+        let children: Vec<&TypeNode> = match &node.kind {
+            K::Generic(name, args, _) => {
+                if self.interner.try_resolve(*name) == Some(vn_core::well_known::RECORD)
+                    && self.symbol_kind(vn_core::well_known::RECORD).is_none()
+                    && self.reported_type_forms.insert(node.range.start.offset)
+                {
+                    self.emit(
+                        vn_core::Diagnostic::error(
+                            vn_core::ErrorCode::ForbiddenRecordGeneric,
+                            "`Record<K, V>` is not a type: use `Map<K, V>` for a keyed collection or `{ [key: K]: V }` for an indexable object",
+                        )
+                        .with_range(node.range),
+                    );
+                }
+                if self.reported_type_forms.insert(node.range.start.offset) {
+                    let mut table = std::mem::take(std::sync::Arc::make_mut(&mut self.ty_table));
+                    let ty = resolve_type_node(node, Some(&*self), &mut table);
+                    self.ty_table = std::sync::Arc::new(table);
+                    self.generic_type_uses.push(vn_sem::bind::GenericTypeUse {
+                        range: node.range,
+                        scope: self.current,
+                        ty,
+                    });
+                }
+                args.iter().collect()
+            }
+            K::Array(inner) | K::KeyOf(inner) => vec![inner.as_ref()],
+            K::Union(list) | K::Intersection(list) | K::Tuple(list) | K::TemplateLiteral(list) => {
+                list.iter().collect()
+            }
+            K::Fn((params, ret)) => params
+                .iter()
+                .filter_map(|p| p.constraint.as_ref())
+                .chain(std::iter::once(ret.as_ref()))
+                .collect(),
+            K::Record(members) => members.iter().flat_map(interface_member_types).collect(),
+            K::Interface(never) => match *never {},
+            K::IndexedAccess { object, index } => vec![object.as_ref(), index.as_ref()],
+            K::Mapped { source, value, .. } => vec![source.as_ref(), value.as_ref()],
+            K::Conditional {
+                check,
+                true_type,
+                false_type,
+                ..
+            } => vec![check.as_ref(), true_type.as_ref(), false_type.as_ref()],
+            K::TypePredicate { target_type, .. } => vec![target_type.as_ref()],
+            K::EnumVariant {
+                type_args,
+                payload_ty,
+                ..
+            } => type_args
+                .iter()
+                .chain(std::iter::once(payload_ty.as_ref()))
+                .collect(),
+            K::Infer(_) => {
+                if self.reported_type_forms.insert(node.range.start.offset) {
+                    self.emit(
+                        vn_core::Diagnostic::error(
+                            vn_core::ErrorCode::InferOutsideConditional,
+                            "`infer` is only valid in the `extends` clause of a conditional type",
+                        )
+                        .with_range(node.range),
+                    );
+                }
+                vec![]
+            }
+            K::Primitive(_) | K::Literal(_) | K::This | K::Named(..) | K::Typeof(_) => {
+                vec![]
+            }
+        };
+        for child in children {
+            self.reject_forbidden_type_forms(child);
+        }
+    }
+
+    pub(crate) fn infer_expr_type_self(&mut self, expr: vn_core::ast::ExprId) -> Type {
+        let mut table = std::mem::take(std::sync::Arc::make_mut(&mut self.ty_table));
+        let arena = self.ast_arena;
+        let result = infer_expr_type(expr, arena, Some(self), &mut table);
+        self.ty_table = std::sync::Arc::new(table);
+        result
+    }
+}
+
+fn interface_member_types(m: &vn_core::ast::InterfaceMember) -> Vec<&TypeNode> {
+    use vn_core::ast::InterfaceMember as M;
+    match m {
+        M::Property { type_ann, .. } => vec![type_ann],
+        M::Method {
+            params,
+            return_type,
+            ..
+        } => params
+            .iter()
+            .filter_map(|p| p.type_ann.as_ref())
+            .chain(return_type.as_ref())
+            .collect(),
+        M::Callable {
+            params,
+            return_type,
+            ..
+        } => params
+            .iter()
+            .filter_map(|p| p.type_ann.as_ref())
+            .chain(std::iter::once(return_type))
+            .collect(),
+    }
+}

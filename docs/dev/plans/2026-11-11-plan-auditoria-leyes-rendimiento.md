@@ -162,8 +162,8 @@ Nada de la Fase R empieza hasta cerrar M1–M5.
 ### M7. Mapa del repo al día
 
 - `.claude/skills/varn-repo-map/SKILL.md` cita `crates/varn-regalloc` y
-  `crates/varn-runtime`, que no existen, y omite `varn-emit`, `varn-sem`,
-  `varn-binder`, `varn-tir`, `varn-resolver`.
+  `crates/varn-runtime`, que no existen, y omite `vn-emit`, `vn-sem`,
+  `vn-binder`, `vn-tir`, `vn-resolver`.
 - Corregir la lista contra `ls crates/`. Actualizar también la línea "No tocar"
   de §2.4 del plan unificado con la tabla de §1.2.
 
@@ -176,10 +176,10 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
 
 ### R1. El presupuesto del vivero se respeta
 
-- **Evidencia:** `NURSERY_BYTES = 16 << 20` (`crates/varn-vm/src/settings.rs:22`),
+- **Evidencia:** `NURSERY_BYTES = 16 << 20` (`crates/vn-vm/src/settings.rs:22`),
   pero las colecciones menores entran con 42–55 MB de celdas. El límite se
   guarda en número de celdas: `recompute_young_limit`
-  (`crates/varn-vm/src/heap/gc.rs:79`) divide `nursery_bytes` entre el tamaño
+  (`crates/vn-vm/src/heap/gc.rs:79`) divide `nursery_bytes` entre el tamaño
   medio de la generación anterior, o entre `UNKNOWN_CELL_BYTES = 24` si está
   vacía. En `http_routing` la celda real pesa unos 80 bytes, así que el vivero
   crece 3.3 veces sobre su presupuesto.
@@ -213,7 +213,7 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
   el closure de ruta 19.5 % total en `http_routing`; `alloc_map_vm` 3.2 % más
   `host::alloc_map` 1.6 % más `Map::constructor` 0.8 %.
 - **Primer paso:** `vn debug` sobre `bench_http_routing.vn` para ver qué
-  asignaciones marca hoy `crates/varn-compiler/src/passes/escape.rs` como no
+  asignaciones marca hoy `crates/vn-compiler/src/passes/escape.rs` como no
   escapantes y cuáles no, y por qué (paso a un closure, a un `Map`, retorno).
 - **Cambio:** extender el análisis de escape a los casos que salgan de ese
   inventario, empezando por el objeto construido y consumido dentro del mismo
@@ -239,11 +239,11 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
 ### R5. JSON tipado en una sola pasada
 
 - **Evidencia:** el camino tipado hace tres recorridos:
-  1. `FastJsonParser::parse_value` (`crates/varn-vm/src/exec/ctx_json/fast.rs:47`)
+  1. `FastJsonParser::parse_value` (`crates/vn-vm/src/exec/ctx_json/fast.rs:47`)
      construye el valor genérico.
-  2. `decode::project` → `walk` (`crates/varn-vm/src/exec/decode.rs:55`) lo
+  2. `decode::project` → `walk` (`crates/vn-vm/src/exec/decode.rs:55`) lo
      reconstruye según el tipo; `rebuild` vuelve a asignar los objetos.
-  3. `conform_to` → `fit_in` (`crates/varn-vm/src/exec/conform.rs:143`) lo valida.
+  3. `conform_to` → `fit_in` (`crates/vn-vm/src/exec/conform.rs:143`) lo valida.
 
   El tipo viaja como texto: `parse_descriptor` busca el `TypeDesc` en un
   `thread_local` `FxHashMap<String, Rc<TypeDesc>>` en cada llamada. En
@@ -287,7 +287,7 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
   `guard_headroom` (puntero de pila contra `jit_stack_floor`), `enter_frameless`
   (dos cargas, suma, comparación contra 10000, escritura) y `leave_frameless`
   (carga, resta, escritura). Código en
-  `crates/varn-jit/src/clif/from_ssa/stack_exit.rs:8-48`. fib pierde 1.41x contra Bun.
+  `crates/vn-jit/src/clif/from_ssa/stack_exit.rs:8-48`. fib pierde 1.41x contra Bun.
 - **Estado: decisión cerrada.** El plan unificado (§1, "Recursión 2026-10-26")
   fijó que VM y JIT cuentan contra el mismo límite lógico de 10000. **Reabrir
   exige autorización del dueño.**
@@ -309,7 +309,7 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
 
 - **Evidencia:** la firma compilada de `fib` es `(i64, i64, i64, i64, i64)` y
   la autollamada pasa tres ceros (`v25`, `v26`, `v27`).
-- **Primer paso:** identificar en `crates/varn-jit/src/clif/from_ssa/call/` qué
+- **Primer paso:** identificar en `crates/vn-jit/src/clif/from_ssa/call/` qué
   representan esos tres parámetros y qué funciones los leen.
 - **Cambio:** firma especializada por función cuando no los usa.
 - (a) Pequeña; se ejecuta junto a R7 solo si su delta propio supera el ruido.
@@ -331,7 +331,7 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
 ### R10. `charCodeAt` en línea
 
 - **Evidencia:** `jit_str_char_code_at`
-  (`crates/varn-vm/src/exec/jit_helpers/intrinsics.rs:53`) es una llamada a
+  (`crates/vn-vm/src/exec/jit_helpers/intrinsics.rs:53`) es una llamada a
   helper: 5.5 % en `str_ops`, más `HeapStr::as_str` 3.1 %.
 - **Cambio:** en el JIT, camino rápido en línea para SSO y para `HeapStr`
   marcado ASCII: comprobar bandera, cargar byte, comparar índice. El helper
@@ -343,7 +343,7 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
 
 ### R11. `split` sin vistas intermedias
 
-- **Evidencia:** `split_ranges` (`crates/varn-types/src/str_util.rs:76`) 9.6 %,
+- **Evidencia:** `split_ranges` (`crates/vn-types/src/str_util.rs:76`) 9.6 %,
   `jit_str_split` 5.5 %, `alloc_str_view_of` 7.3 %, `core::str::from_utf8` 1.6 %
   en `str_ops`; `split_ranges` 1.3 % y `jit_str_split` 1.2 % en `http_routing`.
 - **Primer paso:** ubicar el llamador de `from_utf8` con `--profile-out`. Si
@@ -355,9 +355,9 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
 ### R12. Costo fijo por opcode del intérprete
 
 - **Evidencia:** fib tarda 3177 ms sin JIT contra unos 100 ms con JIT. En
-  `run_until_inner_raw` (`crates/varn-vm/src/exec/dispatch/mod.rs`) cada opcode paga:
+  `run_until_inner_raw` (`crates/vn-vm/src/exec/dispatch/mod.rs`) cada opcode paga:
   1. `ip >= code_len`.
-  2. `debug::check_break` (`crates/varn-vm/src/debug.rs:35`): comparación de
+  2. `debug::check_break` (`crates/vn-vm/src/debug.rs:35`): comparación de
      `debug_skip` y dos `Option`.
   3. `code[ip]` con comprobación de límites.
   4. `OpCode::from_u8` con rama de opcode desconocido.
@@ -384,7 +384,7 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
 - **Primer paso:** histograma por patrón (`Move` tras `Call`, `Move` a registro
   de argumento, `LoadNull` de inicialización de frame) sobre `debug -p bytecode`.
 - **Cambio:** fusión de copias en el emisor SSA
-  (`crates/varn-compiler/src/ssa/emit/`) para el patrón dominante.
+  (`crates/vn-compiler/src/ssa/emit/`) para el patrón dominante.
 - (a) Solo cuenta si baja el tiempo sin JIT; el conteo no es resultado.
   (b) `VARN_NO_JIT=1` en fib, matrix, collection_pipeline. (c) Nada.
 
@@ -392,7 +392,7 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
 
 - **Evidencia:** la suite tardó 112 s en la primera corrida tras recompilar y
   40 s en las siguientes. `TIER_LOOP = 1`, `TIER_STRAIGHT = 128`,
-  `OSR_BACKEDGES = 1000` (`crates/varn-vm/src/settings.rs:19-21`).
+  `OSR_BACKEDGES = 1000` (`crates/vn-vm/src/settings.rs:19-21`).
 - **Hipótesis:** los 72 s son compilación con Cranelift de funciones con bucle
   que corren una sola vez.
 - **Primer paso:** `VARN_JIT_CACHE=off vn run tests\main.vn` cronometrado, y
@@ -409,10 +409,10 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
 
 ### L1. Ley 17 y 20: la inferencia no cae a `Dynamic` en silencio
 
-- **Evidencia:** `crates/varn-sem/src/infer/ops.rs` devuelve `Type::Dynamic`
+- **Evidencia:** `crates/vn-sem/src/infer/ops.rs` devuelve `Type::Dynamic`
   con `unwrap_or(Type::Dynamic)` (líneas 28 y 35) y con `_ => Type::Dynamic`
   (línea 57) cuando los operandos no son numéricos. `SlotKind::Dynamic` es el
-  `#[default]` (`crates/varn-types/src/register_meta.rs`). `Dynamic` aparece
+  `#[default]` (`crates/vn-types/src/register_meta.rs`). `Dynamic` aparece
   481 veces fuera de tests: emit 140, compiler 110, sem 55, checker 52.
 - **Cambio:**
   1. Operación binaria sin tipo resoluble: diagnóstico en el checker, no
@@ -435,12 +435,12 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
 
 ### L3. Ley 11: tests de Rust y comentarios
 
-- **Evidencia:** 134 `#[test]`: varn-tir 72 (11 archivos), varn-lsp 32 (8),
-  varn-cli 8 (5), varn-checker 7, varn-types 5
-  (`src/bytecode/tests.rs`), varn-parser 4, varn-pipeline 3, varn-resolver 3;
-  `#[cfg(test)]` en `crates/varn-parser/src/lib.rs:9`. Nueve líneas de
-  comentario: `crates/varn-sem/src/types/context.rs:22-26` y
-  `crates/varn-pipeline/src/class_link.rs:15-18`.
+- **Evidencia:** 134 `#[test]`: vn-tir 72 (11 archivos), vn-lsp 32 (8),
+  vn-cli 8 (5), vn-checker 7, vn-types 5
+  (`src/bytecode/tests.rs`), vn-parser 4, vn-pipeline 3, vn-resolver 3;
+  `#[cfg(test)]` en `crates/vn-parser/src/lib.rs:9`. Nueve líneas de
+  comentario: `crates/vn-sem/src/types/context.rs:22-26` y
+  `crates/vn-pipeline/src/class_link.rs:15-18`.
 - **Requiere decisión del dueño**, porque la ley y el repositorio se contradicen:
   - Opción A: cumplir la ley. Por cada test, comprobar que `tests/main.vn` o
     los scripts de humo (`scripts\lsp-smoke.js`, `scripts\cli-smoke.ps1`) cubren
@@ -457,13 +457,13 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
 - **Evidencia:** 65 `panic!`/`unreachable!`/`todo!` y 265 `unwrap()`/`expect(`
   fuera de tests; el parser tiene 106 de los segundos.
 - **Sitios a tratar primero:**
-  - `crates/varn-emit/src/body/expr_node.rs:241,281`,
+  - `crates/vn-emit/src/body/expr_node.rs:241,281`,
     `expr_map_literal.rs:22,25`, `expr_assign.rs:114`,
     `expr_value_update.rs:125` (`unreachable!`).
-  - `crates/varn-compiler/src/from_tir/build/infra.rs:186`,
+  - `crates/vn-compiler/src/from_tir/build/infra.rs:186`,
     `build/ops.rs:36`, `ssa/emit/values.rs:288`.
-  - `crates/varn-sem/src/types/interned/resolution.rs:12,25,33,42` y
-    `crates/varn-core/src/atom.rs:90`: id ausente de la tabla.
+  - `crates/vn-sem/src/types/interned/resolution.rs:12,25,33,42` y
+    `crates/vn-core/src/atom.rs:90`: id ausente de la tabla.
 - **Cambio:** clasificar cada sitio. Invariante interna inalcanzable por
   entrada de usuario: se hace irrepresentable en el tipo o pasa a diagnóstico
   interno con código en el `DiagnosticBag`. Alcanzable por entrada de usuario:
@@ -475,10 +475,10 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
 
 ### L5. Ley 2: el contrato de `rehome` pasa al sistema de tipos
 
-- **Evidencia:** `crates/varn-sem/src/types/context.rs:22-26` dice que los
+- **Evidencia:** `crates/vn-sem/src/types/context.rs:22-26` dice que los
   miembros devueltos pueden llevar `Type` con ids de otra tabla y que quien los
   reciba debe pasarlos por `rehome`. Es una convención, no una garantía.
-  `CheckerTyId` aparece en varn-emit (3), varn-lsp (3) y varn-binder (1).
+  `CheckerTyId` aparece en vn-emit (3), vn-lsp (3) y vn-binder (1).
 - **Cambio:** un tipo distinto para el `Type` foráneo, sin conversión implícita
   a `Type`; la única salida es `rehome`. Los puntos canónicos
   `reintern_member_type` y `reintern_foreign_ty` pasan a ser los únicos constructores.
@@ -493,7 +493,7 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
   que los que quedan caen sobre tuplas, enteros, cadenas u `Option`.
 - **Primer paso:** clasificar cada uno. Los que cubren una tupla de enums (por
   ejemplo `match (table.get(l.0), table.get(r.0))` en `sem/infer/ops.rs` y los
-  de `crates/varn-sem/src/compat/`) esconden la misma decisión que la ley
+  de `crates/vn-sem/src/compat/`) esconden la misma decisión que la ley
   prohíbe y el lint no los ve.
 - **Cambio:** enumerar las variantes en esos; dejar los de enteros y cadenas.
 - (a) Añadir una variante de tipo obliga a decidir en cada sitio. (b) Añadir
@@ -503,9 +503,9 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
 ### L7. Ley 16: capacidades por enum
 
 - **Evidencia:** `has_capability(&self, cap: &str)` en
-  `crates/varn-types/src/capabilities.rs:62-74` decide por literales, con
+  `crates/vn-types/src/capabilities.rs:62-74` decide por literales, con
   alias duplicados (`"fs.read" | "fs:read"`, `"net.client" | "net:client" | "net.connect"`).
-- **Cambio:** enum de capacidad en `varn-core` con una única forma textual;
+- **Cambio:** enum de capacidad en `vn-core` con una única forma textual;
   el análisis del texto ocurre una vez en la frontera (CLI, manifiesto).
 - (a) Una sola tabla. (b) `scripts\cli-smoke.ps1`. (c) Los alias (Ley 8 y 10:
   no hay compatibilidad que conservar) y la comparación por cadena.
@@ -516,16 +516,16 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
 ### L8. Corolario 1: estado global
 
 - **Evidencia:** 91 `OnceLock`/`thread_local!`/`lazy_static` fuera de tests.
-  En el camino de compilación y ejecución: `varn-jit/src/config.rs:37`
-  (`CONFIG`), `varn-vm/src/jit/code_cache.rs:10,23` (`STORE`, `MODE`),
-  `varn-core/src/env/mod.rs:20` (`PROCESS`), `varn-jit/src/clif/reloc.rs:60`,
-  `varn-types/src/well_known.rs:4`, y `thread_local!` en
-  `varn-types/src/value/{shape,instance,class}.rs` y `memory.rs`.
+  En el camino de compilación y ejecución: `vn-jit/src/config.rs:37`
+  (`CONFIG`), `vn-vm/src/jit/code_cache.rs:10,23` (`STORE`, `MODE`),
+  `vn-core/src/env/mod.rs:20` (`PROCESS`), `vn-jit/src/clif/reloc.rs:60`,
+  `vn-types/src/well_known.rs:4`, y `thread_local!` en
+  `vn-types/src/value/{shape,instance,class}.rs` y `memory.rs`.
 - **Primer paso:** clasificar en (i) constantes de proceso inmutables tras
   iniciar (ISA de Cranelift, tabla de helpers), admisibles; (ii) configuración
   que debería entrar por parámetro (`CONFIG`, `MODE`, `PROCESS`); (iii) tablas
   mutables por hilo (formas, clases, libro externo).
-- **Cambio:** (ii) se pasa de forma explícita desde `varn-pipeline`/`varn-cli`.
+- **Cambio:** (ii) se pasa de forma explícita desde `vn-pipeline`/`vn-cli`.
   (iii) pasa a pertenecer al `Heap` o al `ExecCtx`, lo que además permite dos
   VMs en el mismo hilo.
 - (a) Fases re-ejecutables de forma aislada (Ley 5). (b) Suite y
@@ -535,15 +535,15 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
 
 ### L9. Matriz de fases
 
-- **Evidencia:** `varn-compiler` no importa `varn_core::ast` (cumple).
-  `crates/varn-vm/src/globals/mod.rs:64` usa
-  `varn_core::ast::MetaProperty::Main.slot()`. `varn-checker` no depende de
-  `varn-tir`; el TIR lo produce `varn-emit`, que la matriz de `AGENTS.md` no nombra.
-- **Cambio:** mover el slot de `MetaProperty::Main` a una tabla de `varn-core`
-  fuera de `ast`. Añadir `varn-emit` a la matriz de `AGENTS.md` y corregir la
-  fila de `varn-checker`.
-- (a), (b) `tgrep 'varn_core::ast' crates/varn-vm crates/varn-jit
-  crates/varn-compiler` sin resultados. (c) La dependencia.
+- **Evidencia:** `vn-compiler` no importa `vn_core::ast` (cumple).
+  `crates/vn-vm/src/globals/mod.rs:64` usa
+  `vn_core::ast::MetaProperty::Main.slot()`. `vn-checker` no depende de
+  `vn-tir`; el TIR lo produce `vn-emit`, que la matriz de `AGENTS.md` no nombra.
+- **Cambio:** mover el slot de `MetaProperty::Main` a una tabla de `vn-core`
+  fuera de `ast`. Añadir `vn-emit` a la matriz de `AGENTS.md` y corregir la
+  fila de `vn-checker`.
+- (a), (b) `tgrep 'vn_core::ast' crates/vn-vm crates/vn-jit
+  crates/vn-compiler` sin resultados. (c) La dependencia.
 
 ---
 

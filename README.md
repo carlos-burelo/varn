@@ -71,8 +71,8 @@ Referencia completa y variables de entorno: [`docs/CLI_REFERENCE.md`](docs/CLI_R
 texto → tokens → AST → check → TIR tipado → SSA → pases → bytecode → VM ⇄ JIT (Cranelift)
 ```
 
-28 crates en un workspace (`varn-lexer`, `varn-parser`, `varn-checker`, `varn-emit`,
-`varn-compiler`, `varn-vm`, `varn-jit`, `varn-builtins`, `varn-lsp`…). Cada fase
+28 crates en un workspace (`vn-lexer`, `vn-parser`, `vn-checker`, `vn-emit`,
+`vn-compiler`, `vn-vm`, `vn-jit`, `vn-builtins`, `vn-lsp`…). Cada fase
 produce un artefacto inmutable que consume la siguiente, y las dependencias van en
 una sola dirección. Mapa completo: [`docs/internals/ARCHITECTURE.md`](docs/internals/ARCHITECTURE.md).
 

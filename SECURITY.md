@@ -30,7 +30,7 @@ Reporta de forma privada (ver abajo) si encuentras:
 Envía un reporte privado a: **carlosfernandoburelo@gmail.com**
 
 Incluye:
-- Componente afectado (`varn-vm`, `varn-cli`, `varn-pm`, etc.)
+- Componente afectado (`vn-vm`, `vn-cli`, `vn-pm`, etc.)
 - Pasos mínimos de reproducción
 - Impacto esperado
 - Versión de Rust y sistema operativo

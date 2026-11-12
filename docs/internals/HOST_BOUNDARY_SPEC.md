@@ -1,6 +1,6 @@
 # Frontera host / VM
 
-Código manda. Fuentes: `crates/varn-types/src/capabilities.rs`, `crates/varn-cli/src/cli.rs`, `crates/varn-cli/src/commands/run.rs`, `crates/varn-builtins/src/dispatch/mod.rs`.
+Código manda. Fuentes: `crates/vn-types/src/capabilities.rs`, `crates/vn-cli/src/cli.rs`, `crates/vn-cli/src/commands/run.rs`, `crates/vn-builtins/src/dispatch/mod.rs`.
 
 ## Regla
 
@@ -37,7 +37,7 @@ Semántica `build_capabilities`: `--sandbox` gana a todo. Sin ningún `--allow-*
 
 ## Error
 
-Denegado en `invoke_native` (punto único, `varn-vm/src/exec/ctx_gc.rs`), tabla única `dispatch` (`fn` → capability) → `E_HOST_PERMISSION_DENIED:id=...:capability=...`. VM lo eleva a excepción recuperable `try/catch` en Varn. Sin flags host inventadas: cada módulo expone lo que su contrato declara; la frontera solo define gate + error.
+Denegado en `invoke_native` (punto único, `vn-vm/src/exec/ctx_gc.rs`), tabla única `dispatch` (`fn` → capability) → `E_HOST_PERMISSION_DENIED:id=...:capability=...`. VM lo eleva a excepción recuperable `try/catch` en Varn. Sin flags host inventadas: cada módulo expone lo que su contrato declara; la frontera solo define gate + error.
 
 ## Chequeo manual
 

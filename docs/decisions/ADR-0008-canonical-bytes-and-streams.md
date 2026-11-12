@@ -1,4 +1,4 @@
-> Estado verificado 2026-10-13: VIGENTE — `BackendTy::Bytes` en `crates/varn-tir/src/ty.rs:90`, `TypeDesc::Bytes`, `RuntimeKind::Bytes`; `tests/112-canonical-bytes-and-streams.vn`.
+> Estado verificado 2026-10-13: VIGENTE — `BackendTy::Bytes` en `crates/vn-tir/src/ty.rs:90`, `TypeDesc::Bytes`, `RuntimeKind::Bytes`; `tests/112-canonical-bytes-and-streams.vn`.
 >
 > Histórico. No spec vigente. Código manda. Revalidar antes de usar.
 
@@ -22,12 +22,12 @@ Bajo las reglas arquitectónicas del lenguaje (Regla 1: Prohibición absoluta de
 
 ### 1. `Bytes` como Tipo de Primera Clase Canónico
 - Se formalizó `Bytes` como tipo intrínseco en todo el compilador:
-  - `varn-core`: `TypeTag::Bytes`, `IntrinsicType::Bytes`, y registro en `CORE_CLASSES`.
-  - `varn-tir`: `BackendTy::Bytes`.
-  - `varn-compiler`: `HirType::Ref` con `TypeTag::Bytes` para integración con el recolector de basura y el compilador a bytecode SSA / JIT.
-  - `varn-types`: `Value::Buffer(VmBuffer)` con trait implementations de hashing, igualdad y representación.
-  - `varn-vm`: Representación en heap como `HeapObj::Buffer`, soporte de indexación directa `bytes[idx]` y `bytes[idx] = val` (0..255) y acceso a `.length`.
-  - `core:bytes` (`crates/varn-builtins/src/modules/primitives/bytes/`): Declaración nativa con despacho directo vía op-id:
+  - `vn-core`: `TypeTag::Bytes`, `IntrinsicType::Bytes`, y registro en `CORE_CLASSES`.
+  - `vn-tir`: `BackendTy::Bytes`.
+  - `vn-compiler`: `HirType::Ref` con `TypeTag::Bytes` para integración con el recolector de basura y el compilador a bytecode SSA / JIT.
+  - `vn-types`: `Value::Buffer(VmBuffer)` con trait implementations de hashing, igualdad y representación.
+  - `vn-vm`: Representación en heap como `HeapObj::Buffer`, soporte de indexación directa `bytes[idx]` y `bytes[idx] = val` (0..255) y acceso a `.length`.
+  - `core:bytes` (`crates/vn-builtins/src/modules/primitives/bytes/`): Declaración nativa con despacho directo vía op-id:
     - `.length: int`
     - `.getByte(index: int): int`
     - `.setByte(index: int, value: int): void`
@@ -42,7 +42,7 @@ Bajo las reglas arquitectónicas del lenguaje (Regla 1: Prohibición absoluta de
     - `Bytes.fromBytes(bytes: int[]): Bytes`
 
 ### 2. Eliminación de la Corrupción UTF-8 en Sockets de Red
-- En `crates/varn-builtins/src/modules/host/net/driver.rs`, se eliminó `String::from_utf8_lossy`.
+- En `crates/vn-builtins/src/modules/host/net/driver.rs`, se eliminó `String::from_utf8_lossy`.
 - Las lecturas de socket (`tcpRead$`) ahora devuelven `Value::Buffer(buf)` crudo o `Value::Null` en EOF.
 - Las escrituras (`tcpWrite$`) aceptan tanto `Bytes` como `str` (extrayendo `.as_bytes()`), enviando bytes directamente al driver del sistema operativo.
 - `TcpStream.read(size)` en `std:net` retorna `Task<Bytes?>`, garantizando transparencia binaria absoluta.

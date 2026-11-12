@@ -7,12 +7,12 @@ consumidores y brazos de match; no equivalen a valores sin tipo en ejecución.
 ## Alcance reproducible
 
 Descubrimiento inicial mediante el grafo del proyecto; su índice conservaba rutas
-anteriores a la extracción de `varn-emit`. Las búsquedas siguientes usan `tgrep`
+anteriores a la extracción de `vn-emit`. Las búsquedas siguientes usan `tgrep`
 desde la raíz. Se contrastó su índice con `--no-index` para contratos y razones
 backend; los conjuntos coincidieron.
 
 ```powershell
-tgrep --no-index -n '\bdynamic\b' . -g 'std/**/*.vn' -g 'crates/varn-builtins/**/*.vn'
+tgrep --no-index -n '\bdynamic\b' . -g 'std/**/*.vn' -g 'crates/vn-builtins/**/*.vn'
 tgrep --no-index -n -o 'DynReason::[A-Za-z_]+' . -g 'crates/**/*.rs'
 tgrep --no-index -n -o 'Type::Dynamic|LangPrimitive::Dynamic|CheckerTyId::DYNAMIC' . -g 'crates/**/*.rs'
 ```
@@ -44,7 +44,7 @@ hay que decidir su representación estática y migrar sus consumidores juntos.
 
 ## Razones backend
 
-Las 18 variantes están en `crates/varn-tir/src/ty.rs`.
+Las 18 variantes están en `crates/vn-tir/src/ty.rs`.
 
 | Familia | Variantes | Qué conserva el contrato |
 |---|---|---|
@@ -54,7 +54,7 @@ Las 18 variantes están en `crates/varn-tir/src/ty.rs`.
 | Declaración o resolución incompleta | `Declared`, `Generic`, `Unrecorded` | Sin payload de tipo concreto |
 | Fronteras y transporte | `HostBoundary`, `CoreMember`, `Spread`, `Boxed`, `Runtime` | Razón sin payload; requiere inspección del productor |
 
-`Declared` también aparece como fallback de resolución en `varn-emit/src/ty/lower.rs`;
+`Declared` también aparece como fallback de resolución en `vn-emit/src/ty/lower.rs`;
 no distingue por sí solo una anotación explícita de un tipo perdido. Una
 representación boxed tampoco demuestra por sí sola semántica dinámica.
 
@@ -88,8 +88,8 @@ print(claimed);
 ```
 
 Imprime `{ neither: true }` y `{ left: 1 }`; el segundo valor sigue siendo un
-objeto mutable. `varn-emit/src/ty/union.rs` produce `DynReason::Union` sin
-miembros, y `varn-compiler/src/from_tir/describe.rs` lo describe como `Any`.
+objeto mutable. `vn-emit/src/ty/union.rs` produce `DynReason::Union` sin
+miembros, y `vn-compiler/src/from_tir/describe.rs` lo describe como `Any`.
 
 ### Restricción literal borrada
 
@@ -99,7 +99,7 @@ type Answer = "yes";
 print(Json.parse<Answer>('"no"'));
 ```
 
-Imprime `no`. En `varn-emit/src/ty/lower.rs`, `TypeKind::Literal` baja al
+Imprime `no`. En `vn-emit/src/ty/lower.rs`, `TypeKind::Literal` baja al
 primitivo base: la igualdad con el literal no llega al descriptor.
 
 ### Índices: campos fijos y tipo de clave perdidos
@@ -141,7 +141,7 @@ print(plain);
 ```
 
 Acepta e imprime un objeto mutable. La normalización de
-`varn-sem/src/resolve/intersections.rs` conserva Record cuando todos los
+`vn-sem/src/resolve/intersections.rs` conserva Record cuando todos los
 constituyentes son records, pero mezcla esta forma como Object. No basta cambiar
 la condición a «alguno es record»: propiedades mutables y opcionales requieren
 resolver el meet semántico, incluidos los casos incompatibles.

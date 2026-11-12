@@ -1,0 +1,11 @@
+[package]
+name = "vn-tir"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+vn-core = { path = "../vn-core" }
+rustc-hash = { workspace = true }
+
+[lints]
+workspace = true

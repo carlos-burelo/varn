@@ -1,0 +1,195 @@
+use std::rc::Rc;
+
+use vn_types::value::{ClassObj, InstanceRef, ObjRef};
+
+use crate::error::{RuntimeError, VmResult};
+use crate::heap::{Heap, HeapObj};
+use crate::value::VmValue;
+
+#[inline(always)]
+pub(crate) fn get_fixed_field_at(
+    obj: VmValue,
+    offset: u32,
+    tag: Option<vn_core::RuntimeKind>,
+    heap: &Heap,
+) -> VmResult<VmValue> {
+    if obj.is_heap()
+        && let Some(inst) = heap.instance(obj.as_heap())
+        && let Some(v) = inst.read_field_at(offset, tag)
+    {
+        return Ok(v);
+    }
+    Err(RuntimeError::new(format!(
+        "OpGetFixedField: bad compact field offset {offset} on {obj:?}"
+    )))
+}
+
+pub(crate) fn set_fixed_field_at(
+    obj: VmValue,
+    offset: u32,
+    tag: Option<vn_core::RuntimeKind>,
+    val: VmValue,
+    heap: &mut Heap,
+) -> VmResult<()> {
+    if obj.is_heap()
+        && let Some(inst) = heap.instance(obj.as_heap())
+        && inst.write_field_at(offset, tag, val).is_ok()
+    {
+        heap.write_barrier(obj.as_heap(), val);
+        return Ok(());
+    }
+    Err(RuntimeError::new(format!(
+        "OpSetFixedField: bad compact field offset {offset} on {obj:?}"
+    )))
+}
+
+pub(crate) fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmResult<VmValue> {
+    if obj.is_heap() {
+        if let Some(inst) = heap.instance(obj.as_heap())
+            && let Some(v) = inst.field_at(slot)
+        {
+            return Ok(v);
+        }
+        let found = match heap.get(obj.as_heap()) {
+            Some(HeapObj::Object(o)) => o.field_at(slot),
+            Some(HeapObj::EnumVariant(ev)) => ev.slots.get(slot).copied(),
+            Some(HeapObj::Class(cls)) => {
+                let fields = cls.static_fields.borrow();
+                fields
+                    .get(slot)
+                    .and_then(|name| cls.statics.borrow().get(name).copied())
+            }
+            Some(
+                HeapObj::Str(_)
+                | HeapObj::Array(_)
+                | HeapObj::Tuple(_)
+                | HeapObj::Buffer(_)
+                | HeapObj::Module(_)
+                | HeapObj::FrozenModule(_)
+                | HeapObj::VmClosure(_)
+                | HeapObj::NativeFn(..)
+                | HeapObj::BoundMethod(_)
+                | HeapObj::Map(_)
+                | HeapObj::Set(_)
+                | HeapObj::Task(_)
+                | HeapObj::TaskHandle(_)
+                | HeapObj::Range(_)
+                | HeapObj::BigInt(_)
+                | HeapObj::Decimal(_)
+                | HeapObj::Char(_)
+                | HeapObj::Generator(_)
+                | HeapObj::Spread(_),
+            )
+            | None => None,
+        };
+        if let Some(v) = found {
+            return Ok(v);
+        }
+    }
+    let details = if obj.is_heap() {
+        match heap.get(obj.as_heap()) {
+            Some(HeapObj::Object(o)) => format!(
+                "Object[inline_len={}, slot_count={}, props={:?}]",
+                o.inline_len(),
+                o.slot_count(),
+                o.shape().property_names
+            ),
+            Some(other) => format!("{:?}", other),
+            None => "None".to_string(),
+        }
+    } else {
+        format!("{:?}", obj)
+    };
+    Err(RuntimeError::new(format!(
+        "OpGetFixedField: slot {} out of range on obj {:?} (details: {})",
+        slot, obj, details
+    )))
+}
+
+#[inline(always)]
+pub(crate) fn set_fixed_field(
+    obj: VmValue,
+    slot: usize,
+    val: VmValue,
+    heap: &mut Heap,
+) -> VmResult<()> {
+    if obj.is_heap() {
+        let heap_idx = obj.as_heap();
+
+        enum Target {
+            Instance(InstanceRef),
+            Obj(ObjRef, vn_types::HeapRef),
+            Class(Rc<ClassObj>),
+            Variant,
+        }
+
+        let target = match heap.instance(heap_idx) {
+            Some(inst) => Some(Target::Instance(inst)),
+            None => match heap.get(heap_idx) {
+                Some(HeapObj::Object(o)) => Some(Target::Obj(*o, heap_idx)),
+                Some(HeapObj::EnumVariant(_)) => Some(Target::Variant),
+                Some(HeapObj::Class(cls)) => Some(Target::Class(cls.clone())),
+                Some(
+                    HeapObj::Str(_)
+                    | HeapObj::Array(_)
+                    | HeapObj::Tuple(_)
+                    | HeapObj::Buffer(_)
+                    | HeapObj::Module(_)
+                    | HeapObj::FrozenModule(_)
+                    | HeapObj::VmClosure(_)
+                    | HeapObj::NativeFn(..)
+                    | HeapObj::BoundMethod(_)
+                    | HeapObj::Map(_)
+                    | HeapObj::Set(_)
+                    | HeapObj::Task(_)
+                    | HeapObj::TaskHandle(_)
+                    | HeapObj::Range(_)
+                    | HeapObj::BigInt(_)
+                    | HeapObj::Decimal(_)
+                    | HeapObj::Char(_)
+                    | HeapObj::Generator(_)
+                    | HeapObj::Spread(_),
+                )
+                | None => None,
+            },
+        };
+
+        match target {
+            Some(Target::Instance(inst)) => {
+                if inst.set_field_at(slot, val) {
+                    heap.write_barrier(heap_idx, val);
+                    return Ok(());
+                }
+            }
+            Some(Target::Obj(o, owner_idx)) => {
+                if o.set_field_at(slot, val) {
+                    heap.write_barrier(owner_idx, val);
+                    return Ok(());
+                }
+            }
+            Some(Target::Variant) => {
+                let stored = if let Some(HeapObj::EnumVariant(ev)) = heap.get_mut(heap_idx) {
+                    ev.slots.get_mut(slot).map(|s| *s = val)
+                } else {
+                    None
+                };
+                if stored.is_some() {
+                    heap.write_barrier(heap_idx, val);
+                    return Ok(());
+                }
+            }
+            Some(Target::Class(cls)) => {
+                let name = cls.static_fields.borrow().get(slot).cloned();
+                if let Some(name) = name {
+                    cls.statics.borrow_mut().insert(name, val);
+                    heap.write_barrier(heap_idx, val);
+                    return Ok(());
+                }
+            }
+            None => {}
+        }
+    }
+    Err(RuntimeError::new(
+        "OpSetFixedField: slot out of range or invalid target",
+    ))
+}

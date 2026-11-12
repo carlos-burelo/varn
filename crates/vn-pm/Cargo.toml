@@ -1,0 +1,21 @@
+[package]
+name = "vn-pm"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+vn-core    = { path = "../vn-core" }
+vn-modules = { path = "../vn-modules" }
+vn-project = { path = "../vn-project" }
+serde      = { workspace = true }
+serde_json = { workspace = true }
+semver     = { workspace = true }
+ureq = { version = "2", features = ["json"] }
+sha2 = { workspace = true }
+hex  = { workspace = true }
+tar = "0.4"
+flate2 = "1"
+rustc-hash = { workspace = true }
+
+[lints]
+workspace = true

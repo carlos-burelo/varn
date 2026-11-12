@@ -1,0 +1,455 @@
+mod alloc;
+mod buffers;
+mod isolate_spawn;
+pub(crate) mod isolates;
+mod metadata;
+mod objects;
+mod sendable;
+mod spawn;
+mod strings;
+mod tasks;
+
+use super::ctx::ExecCtx;
+use crate::heap::HeapObj;
+use crate::value::VmValue;
+use vn_types::{ClassObj, NativeCtx, NativeFn, ResourceStore};
+
+impl NativeCtx for ExecCtx {
+    fn alloc_str(&mut self, s: &str) -> VmValue {
+        self.heap.alloc_str_dynamic(s)
+    }
+
+    fn map_key(
+        &mut self,
+        v: VmValue,
+    ) -> Result<vn_types::value::MapKey, vn_types::NativeError> {
+        self.host_map_key(v)
+    }
+
+    fn str_map_key(&mut self, s: &str) -> vn_types::value::MapKey {
+        self.host_str_map_key(s)
+    }
+
+    fn collection_write_barrier(&mut self, parent: VmValue, child: VmValue) {
+        if parent.is_heap() {
+            self.heap.write_barrier(parent.as_heap(), child);
+        }
+    }
+
+    fn alloc_str_owned(&mut self, s: String) -> VmValue {
+        self.heap.alloc_str_dynamic(&s)
+    }
+
+    fn str_repr(&self, v: VmValue) -> String {
+        self.heap.str_repr(v)
+    }
+
+    fn str_repr_borrowed<'a>(&'a self, v: VmValue) -> std::borrow::Cow<'a, str> {
+        self.heap.str_repr_borrowed(v)
+    }
+
+    fn str_owned(&self, v: VmValue) -> Option<String> {
+        self.host_str_owned(v)
+    }
+
+    fn str_shared(&self, v: VmValue) -> Option<std::sync::Arc<str>> {
+        self.heap.str_shared(v)
+    }
+
+    fn str_sub(&mut self, base: &vn_types::marshal::VnStr, start: usize, len: usize) -> VmValue {
+        self.host_str_sub(base, start, len)
+    }
+
+    fn str_is_ascii(&self, v: VmValue) -> bool {
+        self.heap.str_is_ascii(v)
+    }
+
+    fn boundary(&self) -> Option<&dyn vn_types::Boundary> {
+        Some(self)
+    }
+
+    fn boundary_mut(&mut self) -> Option<&mut dyn vn_types::Boundary> {
+        Some(self)
+    }
+
+    fn char_at(&self, text: VmValue, index: i64) -> VmValue {
+        self.heap.char_at(text, index)
+    }
+
+    fn is_string(&self, v: VmValue) -> bool {
+        v.is_sso() || (v.is_heap() && matches!(self.heap.get(v.as_heap()), Some(HeapObj::Str(_))))
+    }
+
+    fn is_array(&self, v: VmValue) -> bool {
+        v.is_heap()
+            && matches!(
+                self.heap.get(v.as_heap()),
+                Some(HeapObj::Array(_) | HeapObj::Tuple(_))
+            )
+    }
+
+    fn is_tuple(&self, v: VmValue) -> bool {
+        v.is_heap() && matches!(self.heap.get(v.as_heap()), Some(HeapObj::Tuple(_)))
+    }
+
+    fn alloc_array(&mut self, items: Vec<VmValue>) -> VmValue {
+        self.heap.alloc_array_vm(items)
+    }
+
+    fn alloc_tuple(&mut self, items: Vec<VmValue>) -> VmValue {
+        self.heap.alloc_tuple_vm(items)
+    }
+
+    fn array_len(&self, arr: VmValue) -> usize {
+        crate::heap_array::array_len(&self.heap, arr)
+    }
+
+    fn array_get(&self, arr: VmValue, idx: usize) -> Option<VmValue> {
+        crate::heap_array::array_get(&self.heap, arr, idx)
+    }
+
+    fn array_set(&mut self, arr: VmValue, idx: usize, val: VmValue) {
+        crate::heap_array::array_set(&mut self.heap, arr, idx, val)
+    }
+
+    fn array_push(&mut self, arr: VmValue, val: VmValue) {
+        crate::heap_array::array_push(&mut self.heap, arr, val)
+    }
+
+    fn array_pop(&mut self, arr: VmValue) -> Option<VmValue> {
+        crate::heap_array::array_pop(&self.heap, arr)
+    }
+
+    fn entry_module(&self) -> Option<String> {
+        self.entry_module.clone()
+    }
+
+    fn values_equal(&self, a: VmValue, b: VmValue) -> bool {
+        crate::exec::compare::eq(a, b, &self.heap)
+    }
+
+    fn array_for_each(&self, arr: VmValue, f: &mut dyn FnMut(VmValue, usize)) {
+        crate::heap_array::array_for_each(&self.heap, arr, f)
+    }
+
+    fn is_object(&self, v: VmValue) -> bool {
+        self.host_is_object(v)
+    }
+
+    fn object_for_each(&self, obj: VmValue, f: &mut dyn FnMut(&str, VmValue)) {
+        self.host_object_for_each(obj, f)
+    }
+
+    fn map_for_each(&self, map: VmValue, f: &mut dyn FnMut(VmValue, VmValue)) {
+        self.host_map_for_each(map, f)
+    }
+
+    fn get_object_shape(&self, obj: VmValue) -> Option<std::rc::Rc<vn_types::Shape>> {
+        self.host_get_object_shape(obj)
+    }
+
+    fn alloc_object(&mut self) -> VmValue {
+        self.heap.alloc_object()
+    }
+
+    fn alloc_object_with_shape(
+        &mut self,
+        shape: &std::rc::Rc<vn_types::Shape>,
+        values: Vec<VmValue>,
+    ) -> VmValue {
+        self.host_alloc_object_with_shape(shape, values)
+    }
+
+    fn get_field(&self, obj: VmValue, key: &str) -> Option<VmValue> {
+        self.host_get_field(obj, key)
+    }
+
+    fn set_field(&mut self, obj: VmValue, key: &str, val: VmValue) {
+        self.host_set_field(obj, key, val)
+    }
+
+    fn alloc_fn(&mut self, f: NativeFn, name: &'static str) -> VmValue {
+        self.heap.alloc_native_fn(f, name)
+    }
+
+    fn alloc_class(&mut self, class: std::rc::Rc<ClassObj>) -> VmValue {
+        self.heap.alloc_class_vm(class)
+    }
+
+    fn enum_variant(
+        &mut self,
+        module: &'static str,
+        enum_name: &'static str,
+        variant: &'static str,
+        payload: &[VmValue],
+    ) -> Result<VmValue, String> {
+        ExecCtx::enum_variant(self, module, enum_name, variant, payload).map_err(|e| e.to_string())
+    }
+
+    fn enum_variant_name(&self, value: VmValue) -> Option<std::sync::Arc<str>> {
+        if !value.is_heap() {
+            return None;
+        }
+        if let Some(crate::heap::HeapObj::EnumVariant(ev)) = self.heap.get(value.as_heap()) {
+            Some(ev.def.variant_name.clone())
+        } else {
+            None
+        }
+    }
+
+    fn alloc_range(&mut self, start: i64, end: i64, inclusive: bool) -> VmValue {
+        self.heap.alloc_range(start, end, inclusive)
+    }
+
+    fn call_vm(
+        &mut self,
+        callee: VmValue,
+        args: &[VmValue],
+    ) -> Result<VmValue, vn_types::NativeError> {
+        self.host_call_vm(callee, args)
+    }
+
+    fn method(&mut self, recv: VmValue, name: &str) -> Option<VmValue> {
+        self.bound_method(recv, name)
+    }
+
+    fn spawn_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, String> {
+        self.spawn_internal(callee, args)
+    }
+
+    fn suspend_timer(&mut self, ms: u64) -> VmValue {
+        vn_builtins::modules::net::driver::driver();
+        let promise = vn_builtins::runtime::timer::sleep_task(ms);
+        self.task_from_host(promise, vn_types::HostOpen::Plain)
+    }
+
+    fn task_new(&mut self) -> VmValue {
+        crate::task::alloc_handle(&mut self.heap, crate::task::TaskCell::pending())
+    }
+
+    fn task_resolved(&mut self, value: VmValue) -> VmValue {
+        self.host_task_resolved(value)
+    }
+
+    fn task_rejected(&mut self, value: VmValue) -> VmValue {
+        self.host_task_rejected(value)
+    }
+
+    fn task_from_host(
+        &mut self,
+        promise: vn_types::HostPromise,
+        open: vn_types::HostOpen,
+    ) -> VmValue {
+        self.host_task_from_host(promise, open)
+    }
+
+    fn alloc_bigint(&mut self, value: num_bigint::BigInt) -> VmValue {
+        self.heap.alloc_bigint(value)
+    }
+
+    fn alloc_decimal(&mut self, value: bigdecimal::BigDecimal) -> VmValue {
+        self.heap.alloc_decimal(value)
+    }
+
+    fn alloc_char(&mut self, value: char) -> VmValue {
+        self.heap.alloc_char(value)
+    }
+
+    fn alloc_map(&mut self, entries: Vec<(VmValue, VmValue)>) -> VmValue {
+        self.host_alloc_map(entries)
+    }
+
+    fn alloc_set(&mut self, items: Vec<VmValue>) -> VmValue {
+        self.host_alloc_set(items)
+    }
+
+    fn alloc_enum_variant(&mut self, data: vn_types::value::EnumVariantData) -> VmValue {
+        self.heap.alloc_enum_variant_vm(data)
+    }
+
+    fn alloc_bound_native(
+        &mut self,
+        receiver: VmValue,
+        func: NativeFn,
+        name: &'static str,
+    ) -> VmValue {
+        self.host_alloc_bound_native(receiver, func, name)
+    }
+
+    fn task_gather(&mut self, tasks: VmValue) -> Result<VmValue, String> {
+        isolates::gather_tasks(self, tasks)
+    }
+
+    fn task_yield(&mut self) -> VmValue {
+        crate::task::alloc_handle(&mut self.heap, crate::task::TaskCell::yielded())
+    }
+
+    fn task_cancel(&mut self, task: VmValue) -> Result<(), String> {
+        self.host_task_cancel(task)
+    }
+
+    #[allow(clippy::mut_from_ref)]
+    fn resources(&mut self) -> &mut ResourceStore {
+        unsafe { &mut *self.resources.get() }
+    }
+
+    fn resume_generator(
+        &mut self,
+        generator: VmValue,
+        input: VmValue,
+    ) -> vn_types::NativeFnResult {
+        let state = self.heap.generator_of(generator).ok_or_else(|| {
+            vn_types::NativeError::type_error("generator.next: invalid receiver")
+        })?;
+        if state.is_async {
+            return Ok(self.step_generator_task(&state));
+        }
+        self.resume_generator(&state, input)
+            .map_err(vn_types::NativeError::from)
+    }
+
+    fn close_async_generator(&mut self, generator: VmValue) -> VmValue {
+        let Some(state) = self.heap.generator_of(generator) else {
+            return self.host_task_resolved(VmValue::null());
+        };
+        if !state.is_suspended() {
+            state.close();
+            return self.host_task_resolved(VmValue::null());
+        }
+        state.begin_close();
+        self.step_generator_task(&state)
+    }
+
+    fn close_generator(&mut self, generator: VmValue) -> Result<(), vn_types::NativeError> {
+        let Some(state) = self.heap.generator_of(generator) else {
+            return Ok(());
+        };
+        self.close_generator_state(&state)
+            .map_err(vn_types::NativeError::from)
+    }
+
+    fn as_char(&self, v: VmValue) -> Option<char> {
+        self.heap.char_of(v)
+    }
+
+    fn as_bigint(&self, v: VmValue) -> Option<num_bigint::BigInt> {
+        self.heap.bigint_of(v)
+    }
+
+    fn as_decimal(&self, v: VmValue) -> Option<bigdecimal::BigDecimal> {
+        self.heap.decimal_of(v)
+    }
+
+    fn as_range(&self, v: VmValue) -> Option<vn_types::value::RangeData> {
+        self.heap.range_of(v)
+    }
+
+    fn as_map(&self, v: VmValue) -> Option<vn_types::value::MapRef> {
+        self.heap.map_of(v)
+    }
+
+    fn as_set(&self, v: VmValue) -> Option<vn_types::value::SetRef> {
+        self.heap.set_of(v)
+    }
+
+    fn is_static_receiver(&self, v: VmValue) -> bool {
+        self.heap.is_static_receiver(v)
+    }
+
+    fn alloc_range_data(&mut self, range: vn_types::value::RangeData) -> VmValue {
+        self.heap.alloc_range_data(range)
+    }
+
+    fn call_static(&mut self, f: NativeFn) -> VmValue {
+        vn_types::call_static_with(f)
+    }
+
+    fn get_class(&self, name: &str) -> Option<std::rc::Rc<ClassObj>> {
+        self.heap.get_intrinsic_class(name)
+    }
+
+    fn register_class(&mut self, name: &str, cls: std::rc::Rc<ClassObj>) {
+        self.heap.set_intrinsic_class(name, cls);
+    }
+
+    fn class_from_value(&self, value: VmValue) -> Option<std::rc::Rc<ClassObj>> {
+        if !value.is_heap() {
+            return None;
+        }
+        match self.heap.get(value.as_heap()) {
+            Some(crate::heap::HeapObj::Class(cls)) => Some(cls.clone()),
+            Some(_) | None => None,
+        }
+    }
+
+    fn current_source_file(&self) -> Option<String> {
+        self.host_current_source_file()
+    }
+
+    fn spawn_isolate(
+        &mut self,
+        module_path: &str,
+        export_name: &str,
+        args: Vec<vn_types::value::SendValue>,
+    ) -> Result<vn_types::HostPromise, String> {
+        self.host_spawn_isolate(module_path, export_name, args)
+    }
+
+    fn alloc_instance(&mut self, class_name: &str) -> Option<VmValue> {
+        self.host_alloc_instance(class_name)
+    }
+
+    fn get_function_location(&self, func_val: VmValue) -> Option<(String, String)> {
+        self.host_get_function_location(func_val)
+    }
+
+    fn load_module(&mut self, specifier: &str) -> Result<VmValue, String> {
+        self.load_module(specifier).map_err(|e| format!("{:?}", e))
+    }
+
+    fn to_sendable(&self, val: VmValue) -> Result<vn_types::value::SendValue, String> {
+        sendable::to_sendable(self, val)
+    }
+
+    fn parse_json(&mut self, text: &str) -> Result<VmValue, String> {
+        self.json_parse(text)
+    }
+
+    fn stringify_json(&mut self, value: VmValue) -> Result<String, String> {
+        self.json_stringify(value)
+    }
+
+    fn parse_csv(
+        &mut self,
+        text: &str,
+        delimiter: u8,
+        has_header: bool,
+        trim: bool,
+    ) -> Result<VmValue, String> {
+        self.host_parse_csv(text, delimiter, has_header, trim)
+    }
+
+    fn stringify_csv(&mut self, value: VmValue, delimiter: u8) -> Result<String, String> {
+        crate::exec::ctx_csv::stringify_csv(self, value, delimiter)
+    }
+
+    fn capabilities(&self) -> &vn_types::capabilities::CapabilitySet {
+        &self.capabilities
+    }
+
+    fn print_silent(&self) -> bool {
+        self.print_silent
+    }
+
+    fn define_metadata(&mut self, target: VmValue, key: &str, value: VmValue) {
+        self.host_define_metadata(target, key, value)
+    }
+
+    fn get_metadata(&self, target: VmValue, key: &str) -> Option<VmValue> {
+        self.host_get_metadata(target, key)
+    }
+
+    fn has_metadata(&self, target: VmValue, key: &str) -> bool {
+        self.host_has_metadata(target, key)
+    }
+}

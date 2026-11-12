@@ -1,6 +1,6 @@
 # Instalación Varn
 
-Código manda. Fuentes: `Cargo.toml`, `rust-toolchain.toml`, `crates/varn-cli/src/cli.rs`, `.github/workflows/ci.yml`.
+Código manda. Fuentes: `Cargo.toml`, `rust-toolchain.toml`, `crates/vn-cli/src/cli.rs`, `.github/workflows/ci.yml`.
 
 ## Requisitos
 

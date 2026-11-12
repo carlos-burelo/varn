@@ -1,0 +1,189 @@
+use super::module_resolver::ModuleResolver;
+use std::path::Path;
+use std::sync::Arc;
+use vn_core::ModuleId;
+use vn_sem::bind::BindResult;
+use vn_sem::exports::ExportMap;
+use vn_sem::resolver::ImportResolver;
+
+impl ImportResolver for ModuleResolver {
+    fn evict_heavy(&self) -> (usize, usize, usize) {
+        self.graph.lock().evict_heavy()
+    }
+
+    fn graph_stats(&self) -> (usize, usize, usize, usize) {
+        self.graph.lock().heavy_stats()
+    }
+
+    fn module_syntax_failure(
+        &self,
+        abs_path: &str,
+    ) -> Option<Arc<vn_sem::resolver::SyntaxFailure>> {
+        let canonical = vn_modules::canonical_or_original(Path::new(abs_path));
+        let failures = self.syntax_failures.lock();
+        failures
+            .get(abs_path)
+            .or_else(|| failures.get(&canonical))
+            .cloned()
+    }
+
+    fn module_bind(&self, abs_path: &str) -> Option<Arc<BindResult>> {
+        let _binding = self.bind_guard();
+        if let Some(cached) = self.cached_bind(abs_path) {
+            return Some(cached);
+        }
+
+        let canonical = vn_modules::canonical_or_original(Path::new(abs_path));
+
+        if canonical != abs_path
+            && let Some(cached) = self.cached_bind(&canonical)
+        {
+            return Some(cached);
+        }
+
+        if self.is_binding(&canonical) {
+            return None;
+        }
+
+        let source = self.load_source(&ModuleId::local_str(&canonical))?;
+        let source = source.text;
+        let source = source.as_ref();
+
+        if let Some(cached) = super::cache::try_load_cache(self, &canonical, source) {
+            let bind_rc = Arc::new(cached.bind);
+            self.store_bind(canonical.clone(), Arc::clone(&bind_rc));
+            self.store_exports(canonical, Arc::new(cached.exports));
+            return Some(bind_rc);
+        }
+
+        let super::resolver_parse::ParsedModule {
+            program,
+            arena: ast_arena,
+            lex_errs,
+            interner,
+        } = self.parse_and_cache(source, &canonical)?;
+        let bind =
+            self.bind_and_cache(&program, ast_arena.as_ref(), interner, lex_errs, &canonical);
+
+        let base_dir = Path::new(&canonical).parent().unwrap_or(Path::new("."));
+        let exports = self.collect(
+            &program,
+            ast_arena.as_ref(),
+            bind.as_ref(),
+            &canonical,
+            base_dir,
+            &mut Vec::new(),
+        );
+        super::cache::save_to_cache(self, &canonical, source, &exports, bind.as_ref());
+
+        Some(bind)
+    }
+
+    fn module_exports(&self, abs_path: &str, visiting: &mut Vec<String>) -> Arc<ExportMap> {
+        let _binding = self.bind_guard();
+        if let Some(cached) = self.cached_exports(abs_path) {
+            return cached;
+        }
+
+        let canonical = vn_modules::canonical_or_original(Path::new(abs_path));
+        if canonical != abs_path
+            && let Some(cached) = self.cached_exports(&canonical)
+        {
+            return cached;
+        }
+
+        if visiting.iter().any(|v| v == &canonical) {
+            return Arc::new(ExportMap::default());
+        }
+
+        self.store_exports(canonical.clone(), Arc::new(ExportMap::default()));
+
+        visiting.push(canonical.clone());
+        let result = Arc::new(self.module_exports_uncached(&canonical, visiting));
+        visiting.pop();
+
+        self.store_exports(canonical, Arc::clone(&result));
+        result
+    }
+
+    fn stdlib_specs(&self) -> Vec<String> {
+        vn_modules::std_module_ids()
+            .into_iter()
+            .map(str::to_owned)
+            .collect()
+    }
+
+    fn stdlib_bind(&self, specifier: &str) -> Option<Arc<BindResult>> {
+        let _binding = self.bind_guard();
+        let key = ModuleId::stdlib(specifier).as_str();
+        if let Some(cached) = self.cached_bind(&key) {
+            return Some(cached);
+        }
+        if self.is_binding(&key) || self.is_binding(specifier) {
+            return None;
+        }
+
+        let source = self.load_source(&ModuleId::stdlib(specifier))?;
+        self.bind_from_embedded(specifier, &source)
+    }
+
+    fn stdlib_exports(&self, specifier: &str) -> Arc<ExportMap> {
+        let _binding = self.bind_guard();
+        let key = ModuleId::stdlib(specifier).as_str();
+        if let Some(cached) = self.cached_exports(&key) {
+            return cached;
+        }
+
+        let result = self
+            .load_source(&ModuleId::stdlib(specifier))
+            .map(|source| self.exports_from_embedded(specifier, &source, &mut Vec::new()));
+
+        match result {
+            Some(exports) => {
+                self.store_exports(key, Arc::clone(&exports));
+                exports
+            }
+            None => Arc::new(ExportMap::default()),
+        }
+    }
+
+    fn resolve_specifier(&self, base_dir: &Path, specifier: &str) -> Option<String> {
+        let base_str = base_dir.to_string_lossy().into_owned();
+        if let Some(hit) = self.cached_path(&base_str, specifier) {
+            return Some(hit);
+        }
+        let resolved = match vn_modules::resolver::resolve_in(specifier, base_dir).ok()? {
+            ModuleId::Local(p) if Path::new(p.as_ref()).exists() => p.to_string(),
+            ModuleId::Local(_)
+            | ModuleId::Core(_)
+            | ModuleId::Std(_)
+            | ModuleId::Runtime(_)
+            | ModuleId::Package { .. } => return None,
+        };
+        self.store_path(base_str, specifier.to_owned(), resolved.clone());
+        Some(resolved)
+    }
+
+    fn record_dep(&self, importer: &str, imported: &str) {
+        self.graph.lock().record_dep(importer, imported);
+    }
+
+    fn core_exports(&self) -> Arc<vn_sem::cores::CoreExports> {
+        if let Some(hit) = self.core_exports.lock().as_ref() {
+            return Arc::clone(hit);
+        }
+
+        let built = Arc::new(vn_binder::core::loader::build_core_exports(self));
+        *self.core_exports.lock() = Some(Arc::clone(&built));
+        built
+    }
+
+    fn core_members(&self) -> Arc<vn_sem::cores::CoreMembers> {
+        if let Some(hit) = self.core_members.lock().as_ref() {
+            return Arc::clone(hit);
+        }
+        let built = Arc::new(vn_binder::core::loader::build_core_members(self));
+        *self.core_members.lock() = Some(Arc::clone(&built));
+        built
+    }
+}

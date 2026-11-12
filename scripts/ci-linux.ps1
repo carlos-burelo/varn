@@ -6,7 +6,7 @@
     Con el mismo Rust que fija rust-toolchain.toml:
       1. cargo clippy --workspace --all-targets          (job "Code Quality & Linting")
       2. cargo build --profile quick --bin vn
-      3. cargo test --profile quick -p varn-cli --test error_corpus
+      3. cargo test --profile quick -p vn-cli --test error_corpus
       4. los 4 cuadrantes de tests/main.vn (dev-checkout/@embedded x JIT/No-JIT)
       5. el estres del GC con verificador de invariantes (VARN_GC_STRESS=256, VARN_GC_VERIFY=1)
     Lo que solo se rompe en Linux (cfg, rutas, FFI SysV, sockets, lints) no aparece en
@@ -32,7 +32,7 @@ set -e
 apt-get update -qq >/dev/null && apt-get install -y -qq fonts-dejavu-core fontconfig >/dev/null && fc-cache -f
 cargo clippy --workspace --all-targets
 cargo build --profile quick --bin vn
-cargo test --profile quick -p varn-cli --test error_corpus
+cargo test --profile quick -p vn-cli --test error_corpus
 BIN=/target/quick/vn
 $BIN std-bundle --std-dir std --out /tmp/std.vnb
 echo "== Quadrant 1 (dev-checkout + JIT)";    timeout 900 $BIN run ./tests/main.vn

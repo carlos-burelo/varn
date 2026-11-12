@@ -1,0 +1,260 @@
+use cranelift_codegen::ir::{types, InstBuilder, Value};
+use cranelift_frontend::FunctionBuilder;
+
+use super::super::super::emit::{box_bool, box_found_index, box_int};
+use super::super::{heap, Ctx};
+use super::invoke::boxed_window;
+
+pub(crate) fn emit_call_native_op(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    values: &[Option<Value>],
+    object: u32,
+    args: &[u32],
+    op_id: u64,
+) -> Result<Value, String> {
+    let frame = ctx
+        .frame
+        .as_ref()
+        .ok_or("from_ssa: native call without a frame")?;
+    if args.is_empty() && op_id == vn_core::op_id::KnownOp::IntToString.id() {
+        return heap::emit_unary_boxed(b, ctx, values, object, ctx.helpers.to_string);
+    }
+    let receiver = heap::boxed_value(b, ctx, values, object)?;
+    if args.len() <= 1 && op_id == vn_core::op_id::KnownOp::GeneratorNext.id() {
+        return emit_generator_next(b, ctx, values, receiver, args.first().copied());
+    }
+    if args.len() == 1
+        && (op_id == vn_core::op_id::KnownOp::StrCharCodeAt.id()
+            || op_id == vn_core::op_id::KnownOp::StrCodePointAt.id())
+    {
+        let (recv_tag, recv_payload) = b.ins().isplit(receiver);
+        let (pos_tag, pos_payload) = heap::boxed_parts(b, ctx, values, args[0])?;
+        let code = crate::clif::from_ssa::exceptions::call_checked_value(
+            b,
+            ctx,
+            ctx.helpers.str_char_code_at,
+            &[frame.exec_ctx, recv_tag, recv_payload, pos_tag, pos_payload],
+        )?;
+        return Ok(box_int(b, code));
+    }
+    if args.len() == 1 && op_id == vn_core::runtime_ops::op_id(vn_core::runtime_ops::STR_INDEX)
+    {
+        let (recv_tag, recv_payload) = b.ins().isplit(receiver);
+        let (pos_tag, pos_payload) = heap::boxed_parts(b, ctx, values, args[0])?;
+        crate::clif::from_ssa::exceptions::call_checked(
+            b,
+            ctx,
+            ctx.helpers.str_char_at,
+            &[frame.exec_ctx, recv_tag, recv_payload, pos_tag, pos_payload],
+        )?;
+        return Ok(b.ins().load(
+            types::I128,
+            cranelift_codegen::ir::MemFlagsData::trusted(),
+            frame.exec_ctx,
+            ctx.helpers.jit_native_result_offset as i32,
+        ));
+    }
+    if args.len() == 1 {
+        let (recv_tag, recv_payload) = b.ins().isplit(receiver);
+        let (arg_tag, arg_payload) = heap::boxed_parts(b, ctx, values, args[0])?;
+        if op_id == vn_core::op_id::KnownOp::StrStartsWith.id() {
+            let r = crate::clif::from_ssa::exceptions::call_checked_value(
+                b,
+                ctx,
+                ctx.helpers.str_starts_with,
+                &[frame.exec_ctx, recv_tag, recv_payload, arg_tag, arg_payload],
+            )?;
+            return Ok(box_bool(b, r));
+        }
+        if op_id == vn_core::op_id::KnownOp::StrEndsWith.id() {
+            let r = crate::clif::from_ssa::exceptions::call_checked_value(
+                b,
+                ctx,
+                ctx.helpers.str_ends_with,
+                &[frame.exec_ctx, recv_tag, recv_payload, arg_tag, arg_payload],
+            )?;
+            return Ok(box_bool(b, r));
+        }
+        if op_id == vn_core::op_id::KnownOp::StrIndexOf.id() {
+            let r = crate::clif::from_ssa::exceptions::call_checked_value(
+                b,
+                ctx,
+                ctx.helpers.str_index_of,
+                &[frame.exec_ctx, recv_tag, recv_payload, arg_tag, arg_payload],
+            )?;
+            return Ok(box_found_index(b, r));
+        }
+        if op_id == vn_core::op_id::KnownOp::StrIncludes.id() {
+            let r = crate::clif::from_ssa::exceptions::call_checked_value(
+                b,
+                ctx,
+                ctx.helpers.str_includes,
+                &[frame.exec_ctx, recv_tag, recv_payload, arg_tag, arg_payload],
+            )?;
+            return Ok(box_bool(b, r));
+        }
+    }
+    if op_id == vn_core::op_id::KnownOp::StrSplit.id() && args.len() <= 1 {
+        let (recv_tag, recv_payload) = b.ins().isplit(receiver);
+        let argc_v = b.ins().iconst(types::I64, args.len() as i64);
+        let (sep_tag, sep_payload) = if args.len() == 1 {
+            heap::boxed_parts(b, ctx, values, args[0])?
+        } else {
+            (b.ins().iconst(types::I64, 0), b.ins().iconst(types::I64, 0))
+        };
+        crate::clif::from_ssa::exceptions::call_checked(
+            b,
+            ctx,
+            ctx.helpers.str_split,
+            &[
+                frame.exec_ctx,
+                recv_tag,
+                recv_payload,
+                argc_v,
+                sep_tag,
+                sep_payload,
+            ],
+        )?;
+        return Ok(b.ins().load(
+            types::I128,
+            cranelift_codegen::ir::MemFlagsData::trusted(),
+            frame.exec_ctx,
+            ctx.helpers.jit_native_result_offset as i32,
+        ));
+    }
+    if op_id == vn_core::op_id::KnownOp::StrSubstring.id() && (args.len() == 1 || args.len() == 2)
+    {
+        let (recv_tag, recv_payload) = b.ins().isplit(receiver);
+        let (start_tag, start_payload) = heap::boxed_parts(b, ctx, values, args[0])?;
+        let has_end_v = b.ins().iconst(types::I64, (args.len() - 1) as i64);
+        let (end_tag, end_payload) = if args.len() == 2 {
+            heap::boxed_parts(b, ctx, values, args[1])?
+        } else {
+            (b.ins().iconst(types::I64, 0), b.ins().iconst(types::I64, 0))
+        };
+        crate::clif::from_ssa::exceptions::call_checked(
+            b,
+            ctx,
+            ctx.helpers.str_substring,
+            &[
+                frame.exec_ctx,
+                recv_tag,
+                recv_payload,
+                start_tag,
+                start_payload,
+                has_end_v,
+                end_tag,
+                end_payload,
+            ],
+        )?;
+        return Ok(b.ins().load(
+            types::I128,
+            cranelift_codegen::ir::MemFlagsData::trusted(),
+            frame.exec_ctx,
+            ctx.helpers.jit_native_result_offset as i32,
+        ));
+    }
+    if op_id == vn_core::op_id::KnownOp::StrSlice.id() && (args.len() == 1 || args.len() == 2) {
+        let (recv_tag, recv_payload) = b.ins().isplit(receiver);
+        let (start_tag, start_payload) = heap::boxed_parts(b, ctx, values, args[0])?;
+        let has_end_v = b.ins().iconst(types::I64, (args.len() - 1) as i64);
+        let (end_tag, end_payload) = if args.len() == 2 {
+            heap::boxed_parts(b, ctx, values, args[1])?
+        } else {
+            (b.ins().iconst(types::I64, 0), b.ins().iconst(types::I64, 0))
+        };
+        crate::clif::from_ssa::exceptions::call_checked(
+            b,
+            ctx,
+            ctx.helpers.str_slice_range,
+            &[
+                frame.exec_ctx,
+                recv_tag,
+                recv_payload,
+                start_tag,
+                start_payload,
+                has_end_v,
+                end_tag,
+                end_payload,
+            ],
+        )?;
+        return Ok(b.ins().load(
+            types::I128,
+            cranelift_codegen::ir::MemFlagsData::trusted(),
+            frame.exec_ctx,
+            ctx.helpers.jit_native_result_offset as i32,
+        ));
+    }
+    let window = boxed_window(b, ctx, values, receiver, args)?;
+    let slot = {
+        let mut natives = ctx.natives.borrow_mut();
+        natives.push(op_id);
+        natives.len() - 1
+    };
+    let fn_v = crate::clif::reloc::abs_value(b, crate::clif::reloc::AbsSym::Native(slot as u32));
+    let op_v = b.ins().iconst(types::I64, op_id as i64);
+    let total = b.ins().iconst(types::I64, (args.len() + 1) as i64);
+    crate::clif::from_ssa::exceptions::call_checked(
+        b,
+        ctx,
+        ctx.helpers.jit_call_native_window,
+        &[frame.exec_ctx, fn_v, op_v, window, total],
+    )?;
+    Ok(b.ins().load(
+        types::I128,
+        cranelift_codegen::ir::MemFlagsData::trusted(),
+        frame.exec_ctx,
+        ctx.helpers.jit_native_result_offset as i32,
+    ))
+}
+
+fn emit_generator_next(
+    b: &mut FunctionBuilder,
+    ctx: &Ctx<'_>,
+    values: &[Option<Value>],
+    receiver: Value,
+    input: Option<u32>,
+) -> Result<Value, String> {
+    let exec_ctx = ctx.exec_ctx;
+    let (gen_tag, gen_payload) = b.ins().isplit(receiver);
+    let (in_tag, in_payload) = match input {
+        Some(v) => heap::boxed_parts(b, ctx, values, v)?,
+        None => (
+            b.ins()
+                .iconst(types::I64, vn_types::vm_value::KIND_NULL as i64),
+            b.ins().iconst(types::I64, 0),
+        ),
+    };
+    let out = super::direct::entry_out_slot(b);
+    let entry = super::super::super::emit::call_helper(
+        b,
+        ctx.cc,
+        ctx.helpers.generator_enter,
+        &[exec_ctx, gen_tag, gen_payload, in_tag, in_payload, out],
+    );
+    let entered = b.create_block();
+    let merge = b.create_block();
+    let taken = b
+        .ins()
+        .icmp_imm_u(cranelift_codegen::ir::condcodes::IntCC::NotEqual, entry, 0);
+    b.ins().brif(taken, entered, &[], merge, &[]);
+    b.switch_to_block(entered);
+    super::direct::call_entry(b, ctx, entry, out)?;
+    super::super::super::emit::call_helper_void(
+        b,
+        ctx.cc,
+        ctx.helpers.generator_leave,
+        &[exec_ctx],
+    );
+    b.ins().jump(merge, &[]);
+    b.switch_to_block(merge);
+    super::super::store::drop_home_addrs(ctx);
+    crate::clif::from_ssa::exceptions::check_error_branch(b, ctx)?;
+    Ok(b.ins().load(
+        types::I128,
+        cranelift_codegen::ir::MemFlagsData::trusted(),
+        exec_ctx,
+        ctx.helpers.jit_native_result_offset as i32,
+    ))
+}

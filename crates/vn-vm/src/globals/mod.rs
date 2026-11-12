@@ -1,0 +1,137 @@
+use crate::heap::Heap;
+use crate::value::VmValue;
+use rustc_hash::FxHashMap;
+use std::sync::Arc;
+
+#[derive(Clone)]
+#[repr(C)]
+pub struct GlobalStore {
+    pub values: Vec<VmValue>,
+    names: FxHashMap<Arc<str>, usize>,
+    pub idx_to_name: Vec<Arc<str>>,
+}
+
+impl GlobalStore {
+    pub(crate) fn new() -> Self {
+        Self {
+            values: Vec::new(),
+            names: FxHashMap::default(),
+            idx_to_name: Vec::new(),
+        }
+    }
+
+    pub(crate) fn with_native_layout(heap: &mut Heap) -> Self {
+        let mut native_map = vn_builtins::register_globals_vm(heap);
+        let order = vn_core::abi::NATIVE_GLOBALS;
+
+        let mut values = Vec::with_capacity(order.len());
+        let mut names = FxHashMap::default();
+        let mut idx_to_name: Vec<Arc<str>> = Vec::with_capacity(order.len());
+
+        for global in order {
+            let name = global.name;
+            let rc_name: Arc<str> = Arc::from(name);
+            let Some(val) = native_map.remove(name) else {
+                panic!("native global '{name}' sin valor en builtins");
+            };
+            names.insert(rc_name.clone(), values.len());
+            idx_to_name.push(rc_name);
+            values.push(val);
+        }
+
+        let mut leftover: Vec<(Arc<str>, VmValue)> = native_map.into_iter().collect();
+        leftover.sort_by(|(a, _), (b, _)| a.as_ref().cmp(b.as_ref()));
+        for (name, val) in leftover {
+            names.insert(name.clone(), values.len());
+            idx_to_name.push(name);
+            values.push(val);
+        }
+
+        Self {
+            values,
+            names,
+            idx_to_name,
+        }
+    }
+
+    pub(crate) fn reserve_module_region(&mut self, count: u32, is_main: bool) -> u32 {
+        let base = self.values.len() as u32;
+        let empty: Arc<str> = Arc::from("");
+        for _ in 0..count {
+            self.values.push(VmValue::null());
+            self.idx_to_name.push(empty.clone());
+        }
+        let main_slot = vn_core::ast::MetaProperty::Main.slot();
+        if main_slot < count {
+            self.values[(base + main_slot) as usize] = VmValue::from_bool(is_main);
+        }
+        base
+    }
+
+    pub(crate) fn define(&mut self, name: &str, value: VmValue) -> usize {
+        if let Some(&idx) = self.names.get(name) {
+            self.values[idx] = value;
+            return idx;
+        }
+        let idx = self.values.len();
+        let rc_name: Arc<str> = Arc::from(name);
+        self.idx_to_name.push(rc_name.clone());
+        self.values.push(value);
+        self.names.insert(rc_name, idx);
+        idx
+    }
+
+    pub(crate) fn set_by_name(&mut self, name: &str, value: VmValue) -> bool {
+        if let Some(&idx) = self.names.get(name) {
+            self.values[idx] = value;
+            return true;
+        }
+        false
+    }
+
+    #[inline(always)]
+    pub(crate) fn set_by_index(&mut self, idx: usize, value: VmValue) {
+        assert!(
+            idx < self.values.len(),
+            "E_GLOBAL_OOB: set_by_index {idx} >= {}",
+            self.values.len()
+        );
+        self.values[idx] = value;
+    }
+
+    pub(crate) fn get_by_name(&self, name: &str) -> Option<VmValue> {
+        let idx = *self.names.get(name)?;
+        Some(self.values[idx])
+    }
+
+    #[inline(always)]
+    pub(crate) fn get_by_index(&self, idx: usize) -> Option<VmValue> {
+        self.values.get(idx).copied()
+    }
+
+    #[inline(always)]
+    pub(crate) fn get_by_index_unchecked(&self, idx: usize) -> VmValue {
+        assert!(
+            idx < self.values.len(),
+            "E_GLOBAL_OOB: get {idx} >= {}",
+            self.values.len()
+        );
+        self.values[idx]
+    }
+
+    #[inline(always)]
+    pub(crate) fn set_by_index_unchecked(&mut self, idx: usize, value: VmValue) {
+        assert!(
+            idx < self.values.len(),
+            "E_GLOBAL_OOB: set {idx} >= {}",
+            self.values.len()
+        );
+        self.values[idx] = value;
+    }
+}
+
+impl Default for GlobalStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}

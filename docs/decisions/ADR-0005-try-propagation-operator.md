@@ -1,4 +1,4 @@
-> Estado verificado 2026-10-13: VIGENTE — `ExprKind::Try` (`crates/varn-core/src/ast/expr.rs:155`), `infer_try`/`check_try` en checker, `tests/109-try-operator.vn`.
+> Estado verificado 2026-10-13: VIGENTE — `ExprKind::Try` (`crates/vn-core/src/ast/expr.rs:155`), `infer_try`/`check_try` en checker, `tests/109-try-operator.vn`.
 >
 > Histórico. No spec vigente. Código manda. Revalidar antes de usar.
 
@@ -38,9 +38,9 @@ El operador `try <expr>` soporta de forma canónica tres familias de tipos:
 - Para tipos anulables, se emite `TirUnOp::IsNull` con retorno anticipado de `null` y desempaquetado vía `TirExprKind::Cast`.
 
 ### 4. Corrección de Invariantes del JIT y Binder
-- Se corrigió `crates/varn-checker/src/binder/decl_values/declarations.rs` para registrar todas las variantes de enum en `sum_type_variants`.
-- Se corrigió `crates/varn-jit/src/clif/kinds.rs` para clasificar `OpCode::GetEnumTag` como `K::Int` (en lugar de `boxed`), garantizando que la comparación de tags en el backend JIT use instrucciones nativas directas (`icmp`).
-- Se corrigió `crates/varn-checker/src/checker_expressions/check/exhaustiveness.rs` para reconocer `MatchPattern::EnumVariant` en el análisis de exhaustividad.
+- Se corrigió `crates/vn-checker/src/binder/decl_values/declarations.rs` para registrar todas las variantes de enum en `sum_type_variants`.
+- Se corrigió `crates/vn-jit/src/clif/kinds.rs` para clasificar `OpCode::GetEnumTag` como `K::Int` (en lugar de `boxed`), garantizando que la comparación de tags en el backend JIT use instrucciones nativas directas (`icmp`).
+- Se corrigió `crates/vn-checker/src/checker_expressions/check/exhaustiveness.rs` para reconocer `MatchPattern::EnumVariant` en el análisis de exhaustividad.
 
 ## Consecuencias
 - **Cero Ambigüedad Sintáctica**: El operador ternario, encadenamiento opcional y null coalescing permanecen limpios y sin ambigüedades.

@@ -16,7 +16,7 @@ que seguir vivo y mantiene bloqueado su propio exe.
 
 ## 2. `vn-shadow`
 
-`crates/varn-shadow` es un lanzador sin dependencias. Su código no cambia, así
+`crates/vn-shadow` es un lanzador sin dependencias. Su código no cambia, así
 que cargo nunca tiene que volver a enlazarlo y su bloqueo no estorba.
 
 1. Resuelve el objetivo: `VARN_SHADOW_TARGET` o el `vn` del mismo directorio.
@@ -34,7 +34,7 @@ resuelven, y vigilan el `vn` original para reiniciar el servidor cuando cambia.
 Basta con compilarlo una vez:
 
 ```
-cargo build -p varn-shadow
+cargo build -p vn-shadow
 ```
 
 Instalación: `scripts/install.ps1 [-Dest …]` compila `vn` y `vn-shadow` en
@@ -49,16 +49,16 @@ decisión de empaquetado, no de arquitectura.
 ```
 varn-std-bundle  lib  build.rs que produce STDLIB_BYTES; lo embebe cualquier bin
 varn-ide         lib  documentos, workspace y consultas; sin tower-lsp ni MCP
-varn-lsp         lib  adaptador tower-lsp → varn-ide; `async fn serve(io)`, sin runtime propio
-varn-mcp         lib  adaptador MCP → varn-ide en proceso + run/build vía varn-pipeline
-vn               bin  varn-cli con features `lsp` y `mcp`
+vn-lsp         lib  adaptador tower-lsp → varn-ide; `async fn serve(io)`, sin runtime propio
+varn-mcp         lib  adaptador MCP → varn-ide en proceso + run/build vía vn-pipeline
+vn               bin  vn-cli con features `lsp` y `mcp`
 vn-shadow        bin  lanzador de desarrollo
 ```
 
 Pasos, un commit cada uno:
-1. Extraer `varn-std-bundle` desde `varn-cli/build.rs`.
-2. `varn-lsp` expone `serve(io)`; el runtime pasa a `commands/lsp.rs`.
-3. Extraer `varn-ide` desde `varn-lsp/{analysis,db,document,index,query,workspace}`.
+1. Extraer `varn-std-bundle` desde `vn-cli/build.rs`.
+2. `vn-lsp` expone `serve(io)`; el runtime pasa a `commands/lsp.rs`.
+3. Extraer `varn-ide` desde `vn-lsp/{analysis,db,document,index,query,workspace}`.
 4. `varn-mcp` en Rust sobre `varn-ide` (`vn mcp`); se borra el repo Node cuando
    cubra las mismas herramientas.
 

@@ -1,0 +1,236 @@
+use tower_lsp_f::lsp_types::{Contents, Hover, MarkupContent, MarkupKind};
+use vn_core::TokenKind;
+
+pub fn keyword_hover(kind: TokenKind) -> Option<Hover> {
+    match kind {
+        TokenKind::True => Some(make_doc_hover(
+            "true: bool",
+            "Literal booleano que representa el valor de verdad lógico.",
+        )),
+        TokenKind::False => Some(make_doc_hover(
+            "false: bool",
+            "Literal booleano que representa el valor de falsedad lógico.",
+        )),
+        TokenKind::Null => Some(make_doc_hover(
+            "null",
+            "Representa la ausencia intencional de cualquier valor u objeto.",
+        )),
+        TokenKind::Void => Some(make_doc_hover(
+            "type void",
+            "Indica la ausencia intencional de valor de retorno en una función o procedimiento.",
+        )),
+        TokenKind::Dynamic => Some(make_doc_hover(
+            "type dynamic",
+            "Desactiva la verificación estática de tipos para la expresión. Despachado en runtime mediante Inline Caches polimórficos.",
+        )),
+        TokenKind::Match => Some(make_doc_hover(
+            "match (subject) { ... }",
+            "Expresión condicional de coincidencia de patrones (pattern matching) exhaustiva evaluada en tiempo de ejecución.",
+        )),
+        TokenKind::Yield => Some(make_doc_hover(
+            "yield value",
+            "Suspende la ejecución del generador y emite el valor intermedio al iterador consumidor.",
+        )),
+        TokenKind::Await => Some(make_doc_hover(
+            "await task",
+            "Suspende asíncronamente la ejecución hasta que la `Task<T>` se resuelva, sin bloquear el hilo del scheduler.",
+        )),
+        TokenKind::Super => Some(make_doc_hover(
+            "super",
+            "Referencia a la clase base inmediata para invocar constructores o métodos heredados.",
+        )),
+        TokenKind::At => Some(make_doc_hover(
+            "@decorator",
+            "Prefijo de anotación de decorador para enriquecer clases, métodos y funciones con metadatos de compilación.",
+        )),
+        TokenKind::Identifier
+        | TokenKind::EOF
+        | TokenKind::IntegerLiteral
+        | TokenKind::FloatLiteral
+        | TokenKind::BinaryLiteral
+        | TokenKind::OctalLiteral
+        | TokenKind::HexLiteral
+        | TokenKind::BigIntLiteral
+        | TokenKind::Str
+        | TokenKind::Char
+        | TokenKind::Template
+        | TokenKind::TemplateHead
+        | TokenKind::TemplateMiddle
+        | TokenKind::TemplateTail
+        | TokenKind::RegularExpression
+        | TokenKind::LParen
+        | TokenKind::RParen
+        | TokenKind::LBrace
+        | TokenKind::RBrace
+        | TokenKind::LBracket
+        | TokenKind::RBracket
+        | TokenKind::LAngle
+        | TokenKind::RAngle
+        | TokenKind::Semicolon
+        | TokenKind::Comma
+        | TokenKind::Dot
+        | TokenKind::DotDot
+        | TokenKind::DotDotDot
+        | TokenKind::DotDotEq
+        | TokenKind::Colon
+        | TokenKind::ColonColon
+        | TokenKind::Question
+        | TokenKind::QuestionDot
+        | TokenKind::QuestionLBracket
+        | TokenKind::QuestionQuestion
+        | TokenKind::QuestionQuestionEq
+        | TokenKind::Plus
+        | TokenKind::PlusPlus
+        | TokenKind::PlusEq
+        | TokenKind::Minus
+        | TokenKind::MinusMinus
+        | TokenKind::MinusEq
+        | TokenKind::Star
+        | TokenKind::StarStar
+        | TokenKind::StarEq
+        | TokenKind::StarStarEq
+        | TokenKind::Slash
+        | TokenKind::SlashEq
+        | TokenKind::Percent
+        | TokenKind::PercentEq
+        | TokenKind::Amp
+        | TokenKind::AmpAmp
+        | TokenKind::AmpEq
+        | TokenKind::AmpAmpEq
+        | TokenKind::Pipe
+        | TokenKind::PipePipe
+        | TokenKind::PipeEq
+        | TokenKind::PipePipeEq
+        | TokenKind::PipeGt
+        | TokenKind::Caret
+        | TokenKind::CaretEq
+        | TokenKind::Tilde
+        | TokenKind::LtLt
+        | TokenKind::LtLtEq
+        | TokenKind::GtGt
+        | TokenKind::GtGtEq
+        | TokenKind::GtGtGt
+        | TokenKind::GtGtGtEq
+        | TokenKind::Eq
+        | TokenKind::EqEq
+        | TokenKind::EqEqEq
+        | TokenKind::Bang
+        | TokenKind::BangEq
+        | TokenKind::BangEqEq
+        | TokenKind::Lt
+        | TokenKind::LtEq
+        | TokenKind::Gt
+        | TokenKind::GtEq
+        | TokenKind::Arrow
+        | TokenKind::FatArrow
+        | TokenKind::Let
+        | TokenKind::Const
+        | TokenKind::Var
+        | TokenKind::Function
+        | TokenKind::Class
+        | TokenKind::Struct
+        | TokenKind::Interface
+        | TokenKind::Type
+        | TokenKind::Enum
+        | TokenKind::Namespace
+        | TokenKind::Module
+        | TokenKind::Extension
+        | TokenKind::On
+        | TokenKind::If
+        | TokenKind::Else
+        | TokenKind::Switch
+        | TokenKind::Case
+        | TokenKind::Default
+        | TokenKind::While
+        | TokenKind::For
+        | TokenKind::Do
+        | TokenKind::Break
+        | TokenKind::Continue
+        | TokenKind::Return
+        | TokenKind::Throw
+        | TokenKind::Try
+        | TokenKind::Catch
+        | TokenKind::Finally
+        | TokenKind::Using
+        | TokenKind::With
+        | TokenKind::Import
+        | TokenKind::Export
+        | TokenKind::From
+        | TokenKind::As
+        | TokenKind::Async
+        | TokenKind::New
+        | TokenKind::This
+        | TokenKind::Delete
+        | TokenKind::Typeof
+        | TokenKind::Instanceof
+        | TokenKind::In
+        | TokenKind::Of
+        | TokenKind::Is
+        | TokenKind::Public
+        | TokenKind::Private
+        | TokenKind::Protected
+        | TokenKind::Static
+        | TokenKind::Abstract
+        | TokenKind::Override
+        | TokenKind::Readonly
+        | TokenKind::Mut
+        | TokenKind::Out
+        | TokenKind::Declare
+        | TokenKind::Native
+        | TokenKind::Extends
+        | TokenKind::Implements
+        | TokenKind::Get
+        | TokenKind::Set
+        | TokenKind::Constructor
+        | TokenKind::Destructor
+        | TokenKind::Hash
+        | TokenKind::Backslash
+        | TokenKind::Dollar
+        | TokenKind::Backtick
+        | TokenKind::Newline
+        | TokenKind::Whitespace
+        | TokenKind::DocComment
+        | TokenKind::Placeholder
+        | TokenKind::DecimalLiteral
+        | TokenKind::Spawn
+        | TokenKind::Parallel
+        | TokenKind::Start
+        | TokenKind::RawStr => None,
+    }
+}
+
+pub fn decorator_hover(name: &str) -> Option<Hover> {
+    use vn_core::ast::decorator_kind::BuiltinDecoratorKind as K;
+    match K::of(name)? {
+        K::Inline => Some(make_doc_hover(
+            "@inline",
+            "Garantiza la expansión del cuerpo en el sitio de llamada o falla la compilación. Solo funciones libres con un único `return`; nada de async, generadores, rest ni recursión.",
+        )),
+        K::Deprecated => Some(make_doc_hover(
+            "@deprecated(reason?: str)",
+            "Marca el símbolo como obsoleto. El compilador emite advertencia `deprecated-use` en cada uso.",
+        )),
+        K::Test => Some(make_doc_hover(
+            "@test",
+            "Registra la función sin parámetros como caso de prueba: `vn test` la ejecuta aislada con estado de módulo fresco.",
+        )),
+        K::Pure => Some(make_doc_hover(
+            "@pure",
+            "Declara la función pura. El compilador rechaza throw, await/spawn/yield, `new`, mutación no local y llamadas a funciones no marcadas `@pure`.",
+        )),
+        K::Capability => Some(make_doc_hover(
+            "@capability(domain: str, ...)",
+            "Declara la capacidad de host que la función requiere. Quien la llame debe declararla también para propagar; el toplevel tiene autoridad ambiental.",
+        )),
+    }
+}
+
+fn make_doc_hover(sig: &str, doc: &str) -> Hover {
+    Hover {
+        contents: Contents::MarkupContent(MarkupContent {
+            kind: MarkupKind::Markdown,
+            value: format!("```vn\n{}\n```\n***\n{}", sig, doc),
+        }),
+        range: None,
+    }
+}

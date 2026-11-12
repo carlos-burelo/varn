@@ -1,0 +1,14 @@
+[package]
+name = "vn-sem"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+vn-core   = { path = "../vn-core" }
+serde       = { workspace = true }
+postcard    = { workspace = true }
+rustc-hash  = { workspace = true }
+xxhash-rust = { workspace = true }
+
+[lints]
+workspace = true

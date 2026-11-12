@@ -1,0 +1,165 @@
+use super::construct::jit_propagate_error;
+use crate::exec::ctx::ExecCtx;
+use crate::value::VmValue;
+
+#[repr(C)]
+pub struct JitClassMemberArgs {
+    pub class_val: VmValue,
+    pub fn_val: VmValue,
+    pub name_idx: usize,
+    pub kind: u8,
+}
+
+#[vn_macros::jit_slow(field = "get_super")]
+pub(crate) extern "C" fn jit_get_super(ctx: *mut ExecCtx, name_idx: usize) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let frame_idx = ctx_ref.frames.len() - 1;
+        let closure_ref = ctx_ref.frames[frame_idx].closure();
+        let base = ctx_ref.frames[frame_idx].base;
+        let this_val = ctx_ref.stack.box_reg(base, 0);
+        let name_nv = closure_ref.constants[name_idx];
+        let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
+
+        let receiver = crate::exec::props::get_class(this_val, &ctx_ref.heap);
+        let cls = crate::exec::class::home_class(receiver.clone(), closure_ref, &ctx_ref.heap)
+            .or_else(|| ctx_ref.frames[frame_idx].current_class.clone())
+            .or(receiver)
+            .expect("GetSuper: 'this' has no class");
+        match crate::exec::class::op_get_super(cls, &name, this_val, &mut ctx_ref.heap) {
+            Ok(v) => ctx_ref.jit_native_result = v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
+    }
+}
+
+#[vn_macros::jit_slow(field = "alloc_instance")]
+pub(crate) extern "C" fn jit_alloc_instance(ctx: *mut ExecCtx, class_tag: u64, class_payload: u64) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let class_val = VmValue::from_raw_parts(class_tag, class_payload);
+        match crate::exec::class::op_alloc_instance(class_val, &mut ctx_ref.heap) {
+            Ok(v) => ctx_ref.jit_native_result = v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
+    }
+}
+
+#[vn_macros::jit_slow(field = "declare_layout")]
+pub(crate) extern "C" fn jit_declare_layout(
+    ctx: *mut ExecCtx,
+    closure: *const crate::closure::VmClosure,
+    class_tag: u64,
+    class_payload: u64,
+    layout_idx: usize,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let closure_ref = &*closure;
+        let class_val = VmValue::from_raw_parts(class_tag, class_payload);
+        let declared =
+            crate::exec::class::pool_layout(&closure_ref.proto, layout_idx).and_then(|layout| {
+                crate::exec::class::op_declare_layout(class_val, layout, &mut ctx_ref.heap)
+            });
+        if let Err(e) = declared {
+            jit_propagate_error(ctx_ref, e);
+        }
+    }
+}
+
+#[vn_macros::jit_slow(field = "make_class")]
+pub(crate) extern "C" fn jit_make_class(
+    ctx: *mut ExecCtx,
+    closure: *const crate::closure::VmClosure,
+    super_tag: u64,
+    super_payload: u64,
+    name_idx: usize,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let closure_ref = &*closure;
+        let name_nv = closure_ref.constants[name_idx];
+        let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
+        let cls = crate::exec::class::op_class(&name, &mut ctx_ref.heap);
+        let super_val = VmValue::from_raw_parts(super_tag, super_payload);
+        if !super_val.is_null()
+            && let Err(e) = crate::exec::class::op_inherit(cls, super_val, &mut ctx_ref.heap)
+        {
+            jit_propagate_error(ctx_ref, e);
+        }
+        ctx_ref.jit_native_result = cls;
+    }
+}
+
+#[vn_macros::jit_slow(field = "inherit")]
+pub(crate) extern "C" fn jit_inherit(
+    ctx: *mut ExecCtx,
+    class_tag: u64,
+    class_payload: u64,
+    super_tag: u64,
+    super_payload: u64,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let class_val = VmValue::from_raw_parts(class_tag, class_payload);
+        let super_val = VmValue::from_raw_parts(super_tag, super_payload);
+        if let Err(e) = crate::exec::class::op_inherit(class_val, super_val, &mut ctx_ref.heap) {
+            jit_propagate_error(ctx_ref, e);
+        }
+    }
+}
+
+#[vn_macros::jit_slow(field = "class_member_op")]
+pub(crate) extern "C" fn jit_class_member_op(
+    ctx: *mut ExecCtx,
+    closure: *const crate::closure::VmClosure,
+    args: *const std::ffi::c_void,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let args = &*(args as *const JitClassMemberArgs);
+        let closure_ref = &*closure;
+        let key_nv = closure_ref.constants[args.name_idx];
+        let key = ctx_ref.heap.str_val(key_nv).expect("non-string const");
+
+        let res = match args.kind {
+            0 => {
+                crate::exec::class::op_method(args.class_val, &key, args.fn_val, &mut ctx_ref.heap)
+            }
+            1 => crate::exec::class::op_define_static(
+                args.class_val,
+                &key,
+                args.fn_val,
+                &mut ctx_ref.heap,
+            ),
+            2 => crate::exec::class::op_define_getter(
+                args.class_val,
+                &key,
+                args.fn_val,
+                &mut ctx_ref.heap,
+            ),
+            3 => crate::exec::class::op_define_setter(
+                args.class_val,
+                &key,
+                args.fn_val,
+                &mut ctx_ref.heap,
+            ),
+            4 => crate::exec::class::op_define_static_getter(
+                args.class_val,
+                &key,
+                args.fn_val,
+                &mut ctx_ref.heap,
+            ),
+            5 => crate::exec::class::op_define_static_setter(
+                args.class_val,
+                &key,
+                args.fn_val,
+                &mut ctx_ref.heap,
+            ),
+            _ => panic!("Unknown class member op kind: {}", args.kind),
+        };
+        if let Err(e) = res {
+            jit_propagate_error(ctx_ref, e);
+        }
+    }
+}

@@ -8,7 +8,7 @@ Base de la auditoría: commit `7dc95881`, binario `target\release\vn.exe` compil
 
 Por la Ley 12, ninguna afirmación de este documento se apoya en otro `.md`. Cada hallazgo cita el código que se leyó (`archivo:línea`) y la medición que se ejecutó. Lo que no se pudo comprobar está marcado como tal.
 
-Se leyó el GC completo: `heap/{gc,minor,major,young,children,structs,core,jit,strings,intern,obj}.rs`, `heap/cells/{mod,blocks,typed,native}.rs`, `varn-types/src/cell.rs`, `vm_value/{array,vm_array,vm_array_access}.rs`, `exec/ctx_gc.rs`, `closure.rs`, `dispatch/modules.rs`, el contrato con el JIT (`varn-jit/src/clif/alloc/safepoints.rs`, `from_ssa/alloc_instance.rs`) y `scripts/verify.ps1`.
+Se leyó el GC completo: `heap/{gc,minor,major,young,children,structs,core,jit,strings,intern,obj}.rs`, `heap/cells/{mod,blocks,typed,native}.rs`, `vn-types/src/cell.rs`, `vm_value/{array,vm_array,vm_array_access}.rs`, `exec/ctx_gc.rs`, `closure.rs`, `dispatch/modules.rs`, el contrato con el JIT (`vn-jit/src/clif/alloc/safepoints.rs`, `from_ssa/alloc_instance.rs`) y `scripts/verify.ps1`.
 
 Se midió con programas deterministas (apéndice A), con los contadores de `vn bench -v` y con `VARN_GC_TRACE`. Las pausas por fase del GC mayor se midieron con instrumentación temporal que no se commiteó.
 
@@ -218,7 +218,7 @@ No se añade superficie al lenguaje (Leyes 17 y 20): todo es interno al runtime.
 - El mayor se dispara cuando los bytes del heap viejo superan `max(piso_en_bytes, bytes_vivos_tras_el_último_mayor × 2)`. El piso en bytes es al menos dos nurseries, para que una construcción con supervivencia del 100 % no dispare un mayor inútil (H6).
 - **El JIT lee un límite variable** en lugar de un inmediato. Cuando el ledger rebasa el presupuesto, `request_gc()` baja el límite a 0 y el siguiente sondeo cae al camino lento. Coste: una carga adicional por sondeo.
 
-No se mide la memoria en el asignador global: `mimalloc` está instalado solo en el binario `varn-cli` (`main.rs:2-3`), no en la biblioteca.
+No se mide la memoria en el asignador global: `mimalloc` está instalado solo en el binario `vn-cli` (`main.rs:2-3`), no en la biblioteca.
 
 ### 6.2 Envejecimiento
 

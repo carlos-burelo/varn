@@ -25,9 +25,9 @@ Cada tipo de valor existe en tres o cuatro formas y se traduce con
 `intern`/`extract` (`heap/intern.rs`, `heap/access.rs`, `object.rs`,
 `sendable.rs`, `marshal.rs`, `host_values.rs`: ~1700 líneas entre los seis,
 incluido `ObjData`).
-Puntos de llamada: 79 `extract` en `varn-vm` y 16 en `varn-builtins`; 77 y 37
-`intern`; 331, 229 y 110 referencias a `Value::` en `varn-vm`, `varn-types` y
-`varn-builtins`.
+Puntos de llamada: 79 `extract` en `vn-vm` y 16 en `vn-builtins`; 77 y 37
+`intern`; 331, 229 y 110 referencias a `Value::` en `vn-vm`, `vn-types` y
+`vn-builtins`.
 
 ## Por qué `Value` no es portable
 Tres caminos meten handles del heap dentro de un `Value`:

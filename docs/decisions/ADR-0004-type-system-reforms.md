@@ -1,4 +1,4 @@
-> Estado verificado 2026-10-13: PARCIAL — nominalidad vigente (`crates/varn-checker/src/checker_expressions/class_hierarchy.rs:5` `is_subclass_or_same`); §2 narrowing reemplazada por ADR-0015 (el propio ADR lo declara).
+> Estado verificado 2026-10-13: PARCIAL — nominalidad vigente (`crates/vn-checker/src/checker_expressions/class_hierarchy.rs:5` `is_subclass_or_same`); §2 narrowing reemplazada por ADR-0015 (el propio ADR lo declara).
 >
 > Histórico. No spec vigente. Código manda. Revalidar antes de usar.
 

@@ -1,4 +1,4 @@
-> Estado verificado 2026-10-13: VIGENTE — `NumConv` en `crates/varn-core/src/numeric_conv.rs:5`, `numeric_big.rs`, `literal_fits_type`; `tests/119,120,121,122,123-*.vn`.
+> Estado verificado 2026-10-13: VIGENTE — `NumConv` en `crates/vn-core/src/numeric_conv.rs:5`, `numeric_big.rs`, `literal_fits_type`; `tests/119,120,121,122,123-*.vn`.
 >
 > Histórico. No spec vigente. Código manda. Revalidar antes de usar.
 

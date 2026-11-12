@@ -1,0 +1,283 @@
+use super::cells::SlotState;
+use super::obj::HeapObj;
+use super::str::{HeapStr, INLINE_STR_CAP};
+use super::structs::HeapInner;
+use crate::value::VmValue;
+use std::sync::Arc;
+use vn_types::RuntimeString;
+
+enum StrPart {
+    Value(VmValue),
+    Owned(HeapStr),
+}
+
+fn part_of(whole: &str, byte_start: usize, byte_len: usize) -> StrPart {
+    let start = byte_start.min(whole.len());
+    let len = byte_len.min(whole.len() - start);
+    let part = &whole[start..start + len];
+    if let Some(sso) = VmValue::try_from_sso(part) {
+        return StrPart::Value(sso);
+    }
+    StrPart::Owned(if part.len() <= INLINE_STR_CAP {
+        HeapStr::inline(part)
+    } else {
+        HeapStr::shared(Arc::from(part))
+    })
+}
+
+enum StrSource {
+    Base(Arc<str>, usize, bool),
+    Parts(Vec<StrPart>),
+}
+
+impl HeapInner {
+    pub(crate) fn alloc_str(&mut self, s: impl AsRef<str>) -> VmValue {
+        let s_ref = s.as_ref();
+        if let Some(sso) = VmValue::try_from_sso(s_ref) {
+            return sso;
+        }
+        if let Some(&idx) = self.string_interner.get(s_ref) {
+            return VmValue::from_heap(idx);
+        }
+        self.alloc_str_view(HeapStr::shared(Arc::from(s_ref)))
+    }
+
+    pub(crate) fn alloc_str_interned(&mut self, s: impl AsRef<str>) -> VmValue {
+        let s_ref = s.as_ref();
+        if let Some(sso) = VmValue::try_from_sso(s_ref) {
+            return sso;
+        }
+        if let Some(&idx) = self.string_interner.get(s_ref) {
+            return VmValue::from_heap(idx);
+        }
+        let rs: RuntimeString = Arc::from(s_ref);
+        let idx = self
+            .cells
+            .alloc(HeapObj::Str(HeapStr::shared(rs.clone())), SlotState::Old);
+        self.note_old(idx);
+        if let HeapObj::Str(hs) = self.cells.get(idx) {
+            hs.mark_interned();
+        }
+        self.string_interner.insert(rs, idx);
+        VmValue::from_heap(idx)
+    }
+
+    pub(crate) fn alloc_str_dynamic(&mut self, s: impl AsRef<str>) -> VmValue {
+        let s_ref = s.as_ref();
+        if let Some(sso) = VmValue::try_from_sso(s_ref) {
+            return sso;
+        }
+        if s_ref.len() <= INLINE_STR_CAP {
+            return self.alloc_str_view(HeapStr::inline(s_ref));
+        }
+        self.alloc_str_view(HeapStr::shared(Arc::from(s_ref)))
+    }
+
+    pub(crate) fn alloc_str_view(&mut self, hs: HeapStr) -> VmValue {
+        VmValue::from_heap(self.alloc(HeapObj::Str(hs)))
+    }
+
+    pub(crate) fn alloc_str_view_of(
+        &mut self,
+        v: VmValue,
+        byte_start: usize,
+        byte_len: usize,
+    ) -> VmValue {
+        let mut view = VmValue::null();
+        self.str_views_of(v, &[(byte_start, byte_len)], |part| view = part);
+        view
+    }
+
+    pub(crate) fn str_views_of(
+        &mut self,
+        v: VmValue,
+        ranges: &[(usize, usize)],
+        mut sink: impl FnMut(VmValue),
+    ) {
+        let empty = || VmValue::try_from_sso("").unwrap_or_else(VmValue::null);
+        if v.is_sso() {
+            let mut buf = [0u8; vn_types::vm_value::SSO_MAX_LEN];
+            let whole = v.sso_as_str(&mut buf);
+            for &(byte_start, byte_len) in ranges {
+                let start = byte_start.min(whole.len());
+                let len = byte_len.min(whole.len() - start);
+                sink(self.alloc_str_dynamic(&whole[start..start + len]));
+            }
+            return;
+        }
+        let source = match v.is_heap().then(|| self.get(v.as_heap())).flatten() {
+            Some(HeapObj::Str(HeapStr::Shared(base, ascii))) => StrSource::Base(
+                Arc::clone(base),
+                0usize,
+                ascii.get() & !super::str::ascii_flag::INTERNED_BIT == super::str::ascii_flag::YES,
+            ),
+            Some(HeapObj::Str(HeapStr::View {
+                base, start, ascii, ..
+            })) => StrSource::Base(
+                Arc::clone(base),
+                *start,
+                ascii.get() & !super::str::ascii_flag::INTERNED_BIT == super::str::ascii_flag::YES,
+            ),
+            Some(HeapObj::Str(HeapStr::Ext { buf, len, .. })) => {
+                let whole = unsafe { &(&*buf.get())[..*len] };
+                StrSource::Parts(
+                    ranges
+                        .iter()
+                        .map(|&(start, len)| part_of(whole, start, len))
+                        .collect(),
+                )
+            }
+            Some(HeapObj::Str(HeapStr::Inline { len, bytes, .. })) => {
+                let whole = unsafe { std::str::from_utf8_unchecked(&bytes[..*len as usize]) };
+                StrSource::Parts(
+                    ranges
+                        .iter()
+                        .map(|&(start, len)| part_of(whole, start, len))
+                        .collect(),
+                )
+            }
+            _ => {
+                for _ in ranges {
+                    sink(empty());
+                }
+                return;
+            }
+        };
+        match source {
+            StrSource::Base(base, base_start, ascii_yes) => {
+                for &(byte_start, byte_len) in ranges {
+                    let start = base_start + byte_start.min(base.len().saturating_sub(base_start));
+                    let len = byte_len.min(base.len() - start);
+                    if len == 0 {
+                        sink(empty());
+                    } else if let Some(sso) = VmValue::try_from_sso(&base[start..start + len]) {
+                        sink(sso);
+                    } else {
+                        sink(self.alloc_str_view(HeapStr::view(
+                            Arc::clone(&base),
+                            start,
+                            len,
+                            ascii_yes,
+                        )));
+                    }
+                }
+            }
+            StrSource::Parts(parts) => {
+                for part in parts {
+                    sink(match part {
+                        StrPart::Value(value) => value,
+                        StrPart::Owned(owned) => self.alloc_str_view(owned),
+                    });
+                }
+            }
+        }
+    }
+
+    pub(crate) fn str_val(&self, nv: VmValue) -> Option<RuntimeString> {
+        if nv.is_sso() {
+            let mut buf = [0u8; vn_types::vm_value::SSO_MAX_LEN];
+            let s = nv.sso_as_str(&mut buf);
+            return Some(Arc::from(s));
+        }
+        if !nv.is_heap() {
+            return None;
+        }
+        if let Some(HeapObj::Str(s)) = self.get(nv.as_heap()) {
+            return Some(s.to_shared());
+        }
+        None
+    }
+
+    pub(crate) fn is_string(&self, nv: VmValue) -> bool {
+        if nv.is_sso() {
+            return true;
+        }
+        if nv.is_heap() {
+            return matches!(self.get(nv.as_heap()), Some(HeapObj::Str(_)));
+        }
+        false
+    }
+
+    pub(crate) fn str_owned(&self, nv: VmValue) -> Option<String> {
+        if nv.is_sso() {
+            let mut buf = [0u8; vn_types::vm_value::SSO_MAX_LEN];
+            let s = nv.sso_as_str(&mut buf);
+            return Some(s.to_owned());
+        }
+        if nv.is_heap()
+            && let Some(HeapObj::Str(s)) = self.get(nv.as_heap())
+        {
+            return Some(s.to_string());
+        }
+        None
+    }
+
+    pub(crate) fn str_repr_borrowed<'a>(&'a self, nv: VmValue) -> std::borrow::Cow<'a, str> {
+        if nv.is_heap()
+            && let Some(HeapObj::Str(s)) = self.get(nv.as_heap())
+        {
+            return std::borrow::Cow::Borrowed(s.as_ref());
+        }
+        std::borrow::Cow::Owned(self.str_repr(nv))
+    }
+
+    pub(crate) fn str_repr_into<W: std::fmt::Write>(&self, nv: VmValue, out: &mut W) {
+        use crate::strbuf::{itoa, INT_MAX_DIGITS};
+        if nv.is_null() {
+            let _ = out.write_str("null");
+        } else if nv.is_bool() {
+            let _ = out.write_str(if nv.as_bool() { "true" } else { "false" });
+        } else if nv.is_int() {
+            let mut buf = [0u8; INT_MAX_DIGITS];
+            let _ = out.write_str(itoa(nv.as_int(), &mut buf));
+        } else if nv.is_f64() {
+            let _ = out.write_str(&vn_core::float_to_string(nv.as_f64()));
+        } else if nv.is_sso() {
+            let mut buf = [0u8; vn_types::vm_value::SSO_MAX_LEN];
+            let _ = out.write_str(nv.sso_as_str(&mut buf));
+        } else if nv.is_heap() {
+            if let Some(HeapObj::Str(s)) = self.get(nv.as_heap()) {
+                let _ = out.write_str(s.as_ref());
+                return;
+            }
+            let _ = out.write_str(&self.str_repr(nv));
+        } else {
+            let _ = out.write_str(&self.str_repr(nv));
+        }
+    }
+}
+
+fn one_char(c: char) -> VmValue {
+    let mut buf = [0u8; 4];
+    VmValue::try_from_sso(c.encode_utf8(&mut buf)).unwrap_or_else(VmValue::null)
+}
+
+impl HeapInner {
+    pub(crate) fn char_at(&self, text: VmValue, index: i64) -> VmValue {
+        let Ok(at) = usize::try_from(index) else {
+            return VmValue::null();
+        };
+        if text.is_sso() {
+            let mut buf = [0u8; vn_types::vm_value::SSO_MAX_LEN];
+            let short = text.sso_as_str(&mut buf);
+            let found = if short.is_ascii() {
+                short.as_bytes().get(at).map(|byte| *byte as char)
+            } else {
+                short.chars().nth(at)
+            };
+            return found.map_or_else(VmValue::null, one_char);
+        }
+        if !text.is_heap() {
+            return VmValue::null();
+        }
+        let Some(HeapObj::Str(long)) = self.get(text.as_heap()) else {
+            return VmValue::null();
+        };
+        let found = if long.is_ascii() {
+            long.as_str().as_bytes().get(at).map(|byte| *byte as char)
+        } else {
+            long.as_str().chars().nth(at)
+        };
+        found.map_or_else(VmValue::null, one_char)
+    }
+}

@@ -1,6 +1,6 @@
 # Gramática de Varn
 
-Gramática sintáctica del lenguaje en EBNF, derivada de `varn-lexer` y `varn-parser`.
+Gramática sintáctica del lenguaje en EBNF, derivada de `vn-lexer` y `vn-parser`.
 Describe lo que el parser **acepta**. Los errores semánticos (tipos, nombres, modificadores
 inválidos para un contexto) los reporta el checker, no el parser.
 

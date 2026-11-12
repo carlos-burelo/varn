@@ -7,7 +7,7 @@ coverage/
 *.gcda
 *.gcno
 
-# std bundle: lo produce crates/varn-cli/build.rs dentro de OUT_DIR y se
+# std bundle: lo produce crates/vn-cli/build.rs dentro de OUT_DIR y se
 # embebe en `vn`. Esta entrada evita commitear copias sueltas.
 std.vnb
 
@@ -19,7 +19,7 @@ warp.lock
 # Scratch de testing (los sources reales de builtins llamados test_*.vn se conservan)
 test_*.vn
 tmp*.vn
-!crates/varn-builtins/src/modules/**/test_*.vn
+!crates/vn-builtins/src/modules/**/test_*.vn
 # artefactos de la suite de tests (escriben en CWD)
 temp_*.txt
 

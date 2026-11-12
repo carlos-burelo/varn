@@ -1,34 +1,34 @@
 file,line,source
-crates/varn-builtins/src/modules/core/globals/globals.vn,2,export declare function print(...args: dynamic[]): void;
-crates/varn-builtins/src/modules/core/globals/globals.vn,3,export declare function debug(...args: dynamic[]): void;
-crates/varn-builtins/src/modules/core/globals/globals.vn,11,    declare function log(...args: dynamic[]): void
-crates/varn-builtins/src/modules/core/globals/globals.vn,12,    declare function error(...args: dynamic[]): void
-crates/varn-builtins/src/modules/core/globals/globals.vn,13,    declare function warn(...args: dynamic[]): void
-crates/varn-builtins/src/modules/core/globals/globals.vn,14,    declare function info(...args: dynamic[]): void
-crates/varn-builtins/src/modules/core/globals/globals.vn,15,    declare function debug(...args: dynamic[]): void
-crates/varn-builtins/src/modules/core/types/aliases/aliases.vn,45,export type ReturnType<T> = T extends (...args: dynamic[]) => infer R ? R : never
-crates/varn-builtins/src/modules/core/types/array/array.vn,18,    flat(depth?: int): dynamic[];
-crates/varn-builtins/src/modules/core/types/iteration/iteration.vn,47,export interface TaskHandle<T = dynamic> {
-crates/varn-builtins/src/modules/runtime/csv/csv_runtime.vn,3,"export declare function parse$(text: str, delimiter: str, hasHeader: bool, trim: bool): dynamic;"
-crates/varn-builtins/src/modules/runtime/csv/csv_runtime.vn,4,"export declare function stringify$(data: dynamic, delimiter: str): str;"
-crates/varn-builtins/src/modules/runtime/io/io_runtime.vn,3,export declare function write$(...args: dynamic[]): void;
-crates/varn-builtins/src/modules/runtime/io/io_runtime.vn,4,export declare function writeln$(...args: dynamic[]): void;
-crates/varn-builtins/src/modules/runtime/json/json_runtime.vn,3,export declare function parse$(text: str): dynamic;
-crates/varn-builtins/src/modules/runtime/json/json_runtime.vn,4,export declare function stringify$(value: dynamic): str;
-crates/varn-builtins/src/modules/runtime/reflect/reflect_runtime.vn,3,"export declare function defineMetadata$(metadataKey: dynamic, metadataValue: dynamic, target: dynamic): void;"
-crates/varn-builtins/src/modules/runtime/reflect/reflect_runtime.vn,4,"export declare function getMetadata$(metadataKey: dynamic, target: dynamic): dynamic;"
-crates/varn-builtins/src/modules/runtime/reflect/reflect_runtime.vn,5,"export declare function hasMetadata$(metadataKey: dynamic, target: dynamic): bool;"
-crates/varn-builtins/src/modules/runtime/reflect/reflect_runtime.vn,8,"export declare function setMetaKey$(metaId: str, target: dynamic, value: dynamic): void;"
-crates/varn-builtins/src/modules/runtime/reflect/reflect_runtime.vn,9,"export declare function getMetaKey$(metaId: str, target: dynamic): dynamic;"
-crates/varn-builtins/src/modules/runtime/reflect/reflect_runtime.vn,10,"export declare function hasMetaKey$(metaId: str, target: dynamic): bool;"
-crates/varn-builtins/src/modules/runtime/sqlite/sqlite_runtime.vn,6,"export declare function queryAll$(dbId: int, sql: str, params: dynamic[]): dynamic[];"
-crates/varn-builtins/src/modules/runtime/sqlite/sqlite_runtime.vn,7,"export declare function queryOne$(dbId: int, sql: str, params: dynamic[]): dynamic;"
-crates/varn-builtins/src/modules/runtime/task/task_runtime.vn,3,"export declare function spawn$<T>(target: Task<T> | ((...args: dynamic[]) => T), ...args: dynamic[]): TaskHandle<T>;"
-crates/varn-builtins/src/modules/runtime/task/task_runtime.vn,14,"export declare function spawnIsolate$(fn: dynamic, args: Array<dynamic>): TaskHandle<IsolateHandle>;"
-crates/varn-builtins/src/modules/runtime/task/task_runtime.vn,18,export declare class Sender<T = dynamic> {
-crates/varn-builtins/src/modules/runtime/task/task_runtime.vn,24,export declare class Receiver<T = dynamic> {
-crates/varn-builtins/src/modules/runtime/task/task_runtime.vn,30,export declare class Channel<T = dynamic> {
-crates/varn-builtins/src/modules/runtime/task/task_runtime.vn,35,export declare function channel$<T = dynamic>(capacity: int): Channel<T>;
+crates/vn-builtins/src/modules/core/globals/globals.vn,2,export declare function print(...args: dynamic[]): void;
+crates/vn-builtins/src/modules/core/globals/globals.vn,3,export declare function debug(...args: dynamic[]): void;
+crates/vn-builtins/src/modules/core/globals/globals.vn,11,    declare function log(...args: dynamic[]): void
+crates/vn-builtins/src/modules/core/globals/globals.vn,12,    declare function error(...args: dynamic[]): void
+crates/vn-builtins/src/modules/core/globals/globals.vn,13,    declare function warn(...args: dynamic[]): void
+crates/vn-builtins/src/modules/core/globals/globals.vn,14,    declare function info(...args: dynamic[]): void
+crates/vn-builtins/src/modules/core/globals/globals.vn,15,    declare function debug(...args: dynamic[]): void
+crates/vn-builtins/src/modules/core/types/aliases/aliases.vn,45,export type ReturnType<T> = T extends (...args: dynamic[]) => infer R ? R : never
+crates/vn-builtins/src/modules/core/types/array/array.vn,18,    flat(depth?: int): dynamic[];
+crates/vn-builtins/src/modules/core/types/iteration/iteration.vn,47,export interface TaskHandle<T = dynamic> {
+crates/vn-builtins/src/modules/runtime/csv/csv_runtime.vn,3,"export declare function parse$(text: str, delimiter: str, hasHeader: bool, trim: bool): dynamic;"
+crates/vn-builtins/src/modules/runtime/csv/csv_runtime.vn,4,"export declare function stringify$(data: dynamic, delimiter: str): str;"
+crates/vn-builtins/src/modules/runtime/io/io_runtime.vn,3,export declare function write$(...args: dynamic[]): void;
+crates/vn-builtins/src/modules/runtime/io/io_runtime.vn,4,export declare function writeln$(...args: dynamic[]): void;
+crates/vn-builtins/src/modules/runtime/json/json_runtime.vn,3,export declare function parse$(text: str): dynamic;
+crates/vn-builtins/src/modules/runtime/json/json_runtime.vn,4,export declare function stringify$(value: dynamic): str;
+crates/vn-builtins/src/modules/runtime/reflect/reflect_runtime.vn,3,"export declare function defineMetadata$(metadataKey: dynamic, metadataValue: dynamic, target: dynamic): void;"
+crates/vn-builtins/src/modules/runtime/reflect/reflect_runtime.vn,4,"export declare function getMetadata$(metadataKey: dynamic, target: dynamic): dynamic;"
+crates/vn-builtins/src/modules/runtime/reflect/reflect_runtime.vn,5,"export declare function hasMetadata$(metadataKey: dynamic, target: dynamic): bool;"
+crates/vn-builtins/src/modules/runtime/reflect/reflect_runtime.vn,8,"export declare function setMetaKey$(metaId: str, target: dynamic, value: dynamic): void;"
+crates/vn-builtins/src/modules/runtime/reflect/reflect_runtime.vn,9,"export declare function getMetaKey$(metaId: str, target: dynamic): dynamic;"
+crates/vn-builtins/src/modules/runtime/reflect/reflect_runtime.vn,10,"export declare function hasMetaKey$(metaId: str, target: dynamic): bool;"
+crates/vn-builtins/src/modules/runtime/sqlite/sqlite_runtime.vn,6,"export declare function queryAll$(dbId: int, sql: str, params: dynamic[]): dynamic[];"
+crates/vn-builtins/src/modules/runtime/sqlite/sqlite_runtime.vn,7,"export declare function queryOne$(dbId: int, sql: str, params: dynamic[]): dynamic;"
+crates/vn-builtins/src/modules/runtime/task/task_runtime.vn,3,"export declare function spawn$<T>(target: Task<T> | ((...args: dynamic[]) => T), ...args: dynamic[]): TaskHandle<T>;"
+crates/vn-builtins/src/modules/runtime/task/task_runtime.vn,14,"export declare function spawnIsolate$(fn: dynamic, args: Array<dynamic>): TaskHandle<IsolateHandle>;"
+crates/vn-builtins/src/modules/runtime/task/task_runtime.vn,18,export declare class Sender<T = dynamic> {
+crates/vn-builtins/src/modules/runtime/task/task_runtime.vn,24,export declare class Receiver<T = dynamic> {
+crates/vn-builtins/src/modules/runtime/task/task_runtime.vn,30,export declare class Channel<T = dynamic> {
+crates/vn-builtins/src/modules/runtime/task/task_runtime.vn,35,export declare function channel$<T = dynamic>(capacity: int): Channel<T>;
 std/encoding/csv.vn,10,"    export function parse<T = dynamic>(text: str, options?: CsvOptions): T[] {"
 std/encoding/toml.vn,52,function parseTomlValue(valueText: str): dynamic {
 std/encoding/toml.vn,68,        let items: dynamic[] = [];

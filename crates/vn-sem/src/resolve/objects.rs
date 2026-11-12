@@ -1,0 +1,121 @@
+use crate::types::{CheckerTyTable, ObjectTypeMember, Type, TypeContext};
+use std::sync::Arc;
+use vn_core::ast::InterfaceMember;
+
+use super::names::resolve_atom_name;
+use super::resolve_type_node;
+
+pub(super) fn resolve_object_members(
+    members: &[InterfaceMember],
+    ctx: Option<&dyn TypeContext>,
+    interner: &vn_core::AtomInterner,
+    table: &mut CheckerTyTable,
+) -> Vec<ObjectTypeMember> {
+    let resolved_members: Vec<ObjectTypeMember> = members
+        .iter()
+        .map(|m| match m {
+            InterfaceMember::Property {
+                key,
+                type_ann,
+                optional,
+                readonly,
+                ..
+            } => {
+                let declared = resolve_type_node(type_ann, ctx, table);
+                let ty = if *optional {
+                    Type::make_nullable(declared, table)
+                } else {
+                    declared
+                };
+                ObjectTypeMember::Property {
+                    name: resolve_atom_name(*key, ctx, interner),
+                    ty: ty.0,
+                    optional: *optional,
+                    readonly: *readonly,
+                }
+            }
+            InterfaceMember::Method {
+                key,
+                type_params,
+                params,
+                return_type,
+                optional,
+                is_async,
+                ..
+            } => {
+                let resolved_params = params
+                    .iter()
+                    .map(|p| {
+                        let mut ty = p
+                            .type_ann
+                            .as_ref()
+                            .map(|ann| resolve_type_node(ann, ctx, table))
+                            .unwrap_or(Type::Dynamic);
+                        if p.is_rest && !matches!(table.get(ty.0), vn_core::TypeKind::Array(_)) {
+                            ty = Type::array(ty, table);
+                        }
+                        crate::types::FunctionParam {
+                            name: Some(Arc::from(crate::infer::pattern_lead_name(
+                                &p.pattern, interner,
+                            ))),
+                            ty: ty.0,
+                            optional: p.is_optional || p.default.is_some(),
+                            is_rest: p.is_rest,
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                let ret_resolved = return_type
+                    .as_ref()
+                    .map(|m| resolve_type_node(m, ctx, table))
+                    .unwrap_or(Type::Dynamic);
+                let ret = crate::types::async_fn_return(ret_resolved, *is_async, table);
+                ObjectTypeMember::Method {
+                    name: resolve_atom_name(*key, ctx, interner),
+                    params: resolved_params,
+                    return_type: ret.0,
+                    optional: *optional,
+                    is_arrow: false,
+                    type_params: type_params
+                        .iter()
+                        .map(|tp| Arc::from(interner.resolve(tp.name)))
+                        .collect(),
+                }
+            }
+            InterfaceMember::Callable {
+                params,
+                return_type,
+                ..
+            } => {
+                let resolved_params = params
+                    .iter()
+                    .map(|p| {
+                        let mut ty = p
+                            .type_ann
+                            .as_ref()
+                            .map(|ann| resolve_type_node(ann, ctx, table))
+                            .unwrap_or(Type::Dynamic);
+                        if p.is_rest && !matches!(table.get(ty.0), vn_core::TypeKind::Array(_)) {
+                            ty = Type::array(ty, table);
+                        }
+                        crate::types::FunctionParam {
+                            name: Some(Arc::from(crate::infer::pattern_lead_name(
+                                &p.pattern, interner,
+                            ))),
+                            ty: ty.0,
+                            optional: p.is_optional || p.default.is_some(),
+                            is_rest: p.is_rest,
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let ret_ty = resolve_type_node(return_type, ctx, table);
+                ObjectTypeMember::Callable {
+                    params: resolved_params,
+                    return_type: ret_ty.0,
+                    is_arrow: false,
+                }
+            }
+        })
+        .collect();
+    resolved_members
+}

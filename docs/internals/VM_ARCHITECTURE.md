@@ -1,4 +1,4 @@
-# Arquitectura VM (`crates/varn-vm`)
+# Arquitectura VM (`crates/vn-vm`)
 
 Intérprete de registros, frames, GC, excepciones y frontera con el JIT. Tareas,
 scheduler e isolates: [`RUNTIME_ARCHITECTURE.md`](RUNTIME_ARCHITECTURE.md).
@@ -73,8 +73,8 @@ nacen viejos (`HeapInner::born_old`).
 si `jit_error_flag != 0` lo limpia, toma el error de `jit_panic_exception_error`
 o `jit_native_result` (`exec/ctx.rs`) y lo redirige al handler o lo devuelve
 como `Failed`. Código longjmp 2 = suspend (retoma en `jit_panic_suspend_resume_ip`);
-otro código = `panic`. El `setjmp`/`longjmp` vive en `varn-vm/src/arch/`
-(`vm_setjmp`/`vm_longjmp`); `varn-jit` no contiene `longjmp` ni `personality`.
+otro código = `panic`. El `setjmp`/`longjmp` vive en `vn-vm/src/arch/`
+(`vm_setjmp`/`vm_longjmp`); `vn-jit` no contiene `longjmp` ni `personality`.
 
 ## 6. Async, generadores, isolates
 
@@ -98,4 +98,4 @@ otro código = `panic`. El `setjmp`/`longjmp` vive en `varn-vm/src/arch/`
   `thread::Builder` con `VM_STACK_BYTES`, `Vm` nuevo; el módulo que carga tiene
   `import.meta.main = false`).
   `TaskGroup` vive en la std (`std/task/group.vn`), no en Rust. No existe crate `varn-runtime`
-  (el runtime auxiliar es `varn-rt`).
+  (el runtime auxiliar es `vn-rt`).

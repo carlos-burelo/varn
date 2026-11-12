@@ -1,0 +1,20 @@
+use rustc_hash::FxHashMap as HashMap;
+use vn_core::OpCode;
+use vn_types::bytecode::{decode, remap_registers};
+use vn_types::chunk::PoolEntry;
+
+pub(crate) fn remap_bytecode(code: &mut [u16], constants: &[PoolEntry], mapping: &HashMap<u8, u8>) {
+    remap_registers(code, constants, |r| mapping.get(&r).copied().unwrap_or(r));
+
+    let mut offset = 0;
+    while let Some(info) = decode(code, offset, constants) {
+        if OpCode::from_u16(code[offset]) == Some(OpCode::Move)
+            && info.def.is_some()
+            && info.def == info.uses.first().copied()
+        {
+            code[offset] = OpCode::Nop as u16;
+            code[offset + 1] = OpCode::Nop as u16;
+        }
+        offset += info.len;
+    }
+}

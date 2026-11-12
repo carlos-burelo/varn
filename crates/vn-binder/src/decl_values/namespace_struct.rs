@@ -1,0 +1,341 @@
+use std::sync::Arc;
+use vn_core::ast::NamespaceDecl;
+
+use vn_sem::infer::pattern_lead_name;
+use vn_sem::scope::ScopeKind;
+use vn_sem::symbol::{Symbol, SymbolKind};
+use vn_sem::types::Type;
+use vn_sem::types::{ClassMemberInfo, ClassMemberKind};
+
+impl<'r> super::super::Binder<'r> {
+    pub(crate) fn bind_namespace(&mut self, n: &NamespaceDecl) {
+        let id_rc: Arc<str> = self.declared_type_name(n.id, n.ast_id);
+        let namespace_ty = Type::named_with_origin(
+            id_rc.clone(),
+            Some(Arc::from(self.source_file.as_ref())),
+            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+        );
+        let mut sym =
+            Symbol::new(SymbolKind::Namespace, n.id, n.range.start.line).with_type(namespace_ty);
+        sym.doc = n.doc.as_ref().map(|s| self.intern_local(s.as_str()));
+        self.define(n.id, sym);
+
+        let child = self.scopes.child(ScopeKind::Namespace, self.current);
+        let saved = self.current;
+        self.current = child;
+
+        self.namespace_path.push(id_rc.clone());
+        for d in &n.body {
+            self.bind_decl(d);
+        }
+        self.namespace_path.pop();
+
+        self.declare_kind(id_rc.clone(), vn_sem::bind::DeclKind::Namespace);
+        let members = self.collect_namespace_members(&exported_decls(&n.body));
+        if !members.is_empty() {
+            self.type_members.namespaces.insert(id_rc, members);
+        }
+
+        self.current = saved;
+    }
+
+    fn collect_namespace_members(&mut self, body: &[vn_core::ast::Decl]) -> Vec<ClassMemberInfo> {
+        use vn_core::ast::Decl;
+        let mut members = Vec::new();
+        for decl in body {
+            match decl {
+                Decl::Function(f) => {
+                    let declared = f
+                        .return_type
+                        .as_ref()
+                        .map(|m| self.resolve_type(m))
+                        .unwrap_or(Type::Void);
+                    let ret = vn_sem::types::async_fn_return(
+                        declared,
+                        f.modifiers.is_async,
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    );
+                    let params_list = f
+                        .params
+                        .iter()
+                        .map(|p| self.function_param(p, crate::ParamSite::Declared))
+                        .collect::<Vec<_>>();
+                    let fn_type = Type::fn_(
+                        vn_sem::types::FunctionType {
+                            params: params_list,
+                            return_type: ret.0,
+                            is_arrow: false,
+                            type_params: f
+                                .type_params
+                                .iter()
+                                .map(|t| Arc::from(self.interner.resolve(t.name)))
+                                .collect(),
+                            type_param_defaults: f
+                                .type_params
+                                .iter()
+                                .map(|t| t.default.as_ref().map(|d| self.resolve_type(d).0))
+                                .collect(),
+                        },
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    );
+                    let scope = self.scopes.get(self.current);
+                    let symbol_id = scope.resolve(f.id, &self.scopes);
+                    members.push(ClassMemberInfo {
+                        name: Arc::from(self.interner.resolve(f.id)),
+                        kind: ClassMemberKind::Function,
+                        is_async: f.modifiers.is_async,
+                        is_generator: f.modifiers.is_generator,
+                        is_static: false,
+                        is_optional: false,
+                        line: f.range.start.line.saturating_sub(1),
+                        col: f.range.start.column,
+                        offset: f.range.start.offset,
+                        ty: fn_type,
+                        members: Vec::new(),
+                        visibility: None,
+                        is_abstract: false,
+                        is_readonly: false,
+                        is_override: false,
+                        symbol_id,
+                        ..Default::default()
+                    });
+                }
+                Decl::Class(c) => {
+                    let name: Arc<str> =
+                        c.id.map(|a| Arc::from(self.interner.resolve(a)))
+                            .unwrap_or_else(|| Arc::from(""));
+                    let declared =
+                        c.id.map(|a| self.type_name_of(a, c.ast_id))
+                            .unwrap_or_default();
+                    let class_members = self
+                        .type_members
+                        .classes
+                        .get(&declared)
+                        .map(|e| e.members.clone())
+                        .unwrap_or_default();
+                    let scope = self.scopes.get(self.current);
+                    let symbol_id = c.id.and_then(|a| scope.resolve(a, &self.scopes));
+                    let class_ty = Type::named_with_origin(
+                        declared,
+                        Some(Arc::from(self.source_file.as_ref())),
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    );
+                    members.push(ClassMemberInfo {
+                        name,
+                        kind: ClassMemberKind::Class,
+                        is_async: false,
+                        is_generator: false,
+                        is_static: false,
+                        is_optional: false,
+                        line: c.range.start.line.saturating_sub(1),
+                        col: c.range.start.column,
+                        offset: c.range.start.offset,
+                        ty: class_ty,
+                        members: class_members,
+                        visibility: None,
+                        is_abstract: false,
+                        is_readonly: false,
+                        is_override: false,
+                        symbol_id,
+                        ..Default::default()
+                    });
+                }
+                Decl::Variable(v) => {
+                    for d in &v.declarators {
+                        let name: Arc<str> = Arc::from(pattern_lead_name(&d.id, &self.interner));
+                        let ty = match (&d.type_ann, d.init) {
+                            (Some(ann), _) => self.resolve_type(ann),
+                            (None, Some(init)) => self.infer_expr_type_self(init),
+                            (None, None) => Type::Error,
+                        };
+                        let scope = self.scopes.get(self.current);
+                        let symbol_id = self
+                            .interner
+                            .get(&name)
+                            .and_then(|a| scope.resolve(a, &self.scopes));
+                        members.push(ClassMemberInfo {
+                            name,
+                            kind: ClassMemberKind::Variable,
+                            is_async: false,
+                            is_generator: false,
+                            is_static: false,
+                            is_optional: false,
+                            line: d.range.start.line.saturating_sub(1),
+                            col: d.range.start.column,
+                            offset: d.range.start.offset,
+                            ty,
+                            members: Vec::new(),
+                            visibility: None,
+                            is_abstract: false,
+                            is_readonly: false,
+                            is_override: false,
+                            symbol_id,
+                            ..Default::default()
+                        });
+                    }
+                }
+                Decl::Namespace(n) => {
+                    let inner_members = self.collect_namespace_members(&exported_decls(&n.body));
+                    let scope = self.scopes.get(self.current);
+                    let symbol_id = scope.resolve(n.id, &self.scopes);
+                    let n_id_rc: Arc<str> = Arc::from(self.interner.resolve(n.id));
+                    let ns_ty = Type::named_with_origin(
+                        self.type_name_of(n.id, n.ast_id),
+                        Some(Arc::from(self.source_file.as_ref())),
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    );
+                    members.push(ClassMemberInfo {
+                        name: n_id_rc,
+                        kind: ClassMemberKind::Namespace,
+                        is_async: false,
+                        is_generator: false,
+                        is_static: false,
+                        is_optional: false,
+                        line: n.range.start.line.saturating_sub(1),
+                        col: n.range.start.column,
+                        offset: n.range.start.offset,
+                        ty: ns_ty,
+                        members: inner_members,
+                        visibility: None,
+                        is_abstract: false,
+                        is_readonly: false,
+                        is_override: false,
+                        symbol_id,
+                        ..Default::default()
+                    });
+                }
+                Decl::TypeAlias(t) => {
+                    let scope = self.scopes.get(self.current);
+                    let symbol_id = scope.resolve(t.id, &self.scopes);
+                    let t_id_rc: Arc<str> = Arc::from(self.interner.resolve(t.id));
+                    let alias_ty = if t.type_params.is_empty() {
+                        self.resolve_type(&t.alias)
+                    } else {
+                        Type::named_with_origin(
+                            t_id_rc.clone(),
+                            Some(Arc::from(self.source_file.as_ref())),
+                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                        )
+                    };
+                    members.push(ClassMemberInfo {
+                        name: t_id_rc,
+                        kind: ClassMemberKind::Property,
+                        is_async: false,
+                        is_generator: false,
+                        is_static: false,
+                        is_optional: false,
+                        line: t.range.start.line.saturating_sub(1),
+                        col: t.range.start.column,
+                        offset: t.range.start.offset,
+                        ty: alias_ty,
+                        members: Vec::new(),
+                        visibility: None,
+                        is_abstract: false,
+                        is_readonly: false,
+                        is_override: false,
+                        symbol_id,
+                        ..Default::default()
+                    });
+                }
+                Decl::Enum(e) => {
+                    let e_id_rc: Arc<str> = Arc::from(self.interner.resolve(e.id));
+                    let declared = self.type_name_of(e.id, e.ast_id);
+                    let variants = self
+                        .type_members
+                        .enums
+                        .get(&declared)
+                        .cloned()
+                        .unwrap_or_default();
+                    let scope = self.scopes.get(self.current);
+                    let symbol_id = scope.resolve(e.id, &self.scopes);
+                    let enum_ty = Type::named_with_origin(
+                        declared,
+                        Some(Arc::from(self.source_file.as_ref())),
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    );
+                    members.push(ClassMemberInfo {
+                        name: e_id_rc,
+                        kind: ClassMemberKind::Enum,
+                        is_async: false,
+                        is_generator: false,
+                        is_static: false,
+                        is_optional: false,
+                        line: e.range.start.line.saturating_sub(1),
+                        col: e.range.start.column,
+                        offset: e.range.start.offset,
+                        ty: enum_ty,
+                        members: variants,
+                        visibility: None,
+                        is_abstract: false,
+                        is_readonly: false,
+                        is_override: false,
+                        symbol_id,
+                        ..Default::default()
+                    });
+                }
+                Decl::Interface(i) => {
+                    let i_id_rc: Arc<str> = Arc::from(self.interner.resolve(i.id));
+                    let declared = self.type_name_of(i.id, i.ast_id);
+                    let interface_members = self
+                        .type_members
+                        .interfaces
+                        .get(&declared)
+                        .cloned()
+                        .unwrap_or_default();
+                    let scope = self.scopes.get(self.current);
+                    let symbol_id = scope.resolve(i.id, &self.scopes);
+                    let iface_ty = Type::named_with_origin(
+                        declared,
+                        Some(Arc::from(self.source_file.as_ref())),
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    );
+                    members.push(ClassMemberInfo {
+                        name: i_id_rc,
+                        kind: ClassMemberKind::Interface,
+                        is_async: false,
+                        is_generator: false,
+                        is_static: false,
+                        is_optional: false,
+                        line: i.range.start.line.saturating_sub(1),
+                        col: i.range.start.column,
+                        offset: i.range.start.offset,
+                        ty: iface_ty,
+                        members: interface_members,
+                        visibility: None,
+                        is_abstract: false,
+                        is_readonly: false,
+                        is_override: false,
+                        symbol_id,
+                        ..Default::default()
+                    });
+                }
+                Decl::Export(e) => {
+                    use vn_core::ast::ExportDecl;
+                    if let ExportDecl::Decl { declaration, .. } = e {
+                        let inner =
+                            self.collect_namespace_members(std::slice::from_ref(declaration));
+                        members.extend(inner);
+                    }
+                }
+                Decl::Import(_) | Decl::Extension(_) | Decl::SumType(_) => {}
+            }
+        }
+        members
+    }
+}
+
+fn exported_decls(body: &[vn_core::ast::Decl]) -> Vec<vn_core::ast::Decl> {
+    body.iter()
+        .filter_map(|d| {
+            if let vn_core::ast::Decl::Export(vn_core::ast::ExportDecl::Decl {
+                declaration,
+                ..
+            }) = d
+            {
+                Some(declaration.as_ref().clone())
+            } else {
+                None
+            }
+        })
+        .collect()
+}

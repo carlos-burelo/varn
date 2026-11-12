@@ -19,7 +19,7 @@ await describe("53 int overflow", async () => {
         //
         // It does not wrap, does not saturate and does not promote to float. The range
         // is `[-2^63, 2^63-1]`; leaving it raises `integer overflow` naming both
-        // operands. The rules live in one place, `varn-core/src/numeric.rs`, and are
+        // operands. The rules live in one place, `vn-core/src/numeric.rs`, and are
         // tier-identical by contract — every assertion here must hold under
         // `VARN_NO_JIT=1`, and the constant folder must agree with both.
         //

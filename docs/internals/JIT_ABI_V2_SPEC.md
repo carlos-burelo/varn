@@ -1,11 +1,11 @@
 # JIT ABI v2 — spec vigente
 
-Contrato entre `varn-jit` (Cranelift) y `varn-vm`. Código manda; rutas abajo
+Contrato entre `vn-jit` (Cranelift) y `vn-vm`. Código manda; rutas abajo
 verificadas contra fuentes.
 
 ## 1. Versión y helpers
 
-- `JIT_HELPERS_VERSION: u32 = 9` (`crates/varn-jit-abi/src/lib.rs`).
+- `JIT_HELPERS_VERSION: u32 = 9` (`crates/vn-jit-abi/src/lib.rs`).
 - `JitHelpers` (`lib.rs`) es tabla de direcciones de helpers + layouts +
   offsets al `ExecCtx`: `jit_native_result_offset`, `jit_error_flag_offset`,
   `jit_exit_offset`, `globals_offset`, `globals_store_offset`,
@@ -16,7 +16,7 @@ verificadas contra fuentes.
 
 ## 2. Activaciones: Native vs Framed
 
-`Activation { Native, Framed }` (`varn-jit/src/clif/abi.rs`).
+`Activation { Native, Framed }` (`vn-jit/src/clif/abi.rs`).
 
 - `Native`: firma por `NativeShape::signature()` con `CALL_CONV = CallConv::Tail`
   (`clif/native_abi.rs`); args/valores nativos por clase
@@ -37,7 +37,7 @@ Orden de intento (`clif/lower.rs`): primero `try_lower(Native)`; si falla
 con `NEEDS_ACTIVATION` (`from_ssa/context.rs`: entrada OSR, o un op que necesita
 homes —vivos de `try`, `await`, `yield`, upvalues—), reintenta con `Framed`. Cualquier otro error es bail.
 
-Entrada directa JIT→JIT (`varn-vm/src/exec/jit_helpers/`): tras empujar el frame
+Entrada directa JIT→JIT (`vn-vm/src/exec/jit_helpers/`): tras empujar el frame
 del callee, `calls_static.rs::direct_entry` devuelve su código compilado salvo que
 sea `is_async || is_generator` (la llamada solo crea la tarea/generador); `try`
 ya no veta. `await f(x)` fusionado (`suspend.rs::mounted_entry`) entra directo a
@@ -47,16 +47,16 @@ en homes), así que el `longjmp` deja `frames` coherente.
 
 ## 3. Gates y tiering
 
-- `SIZE_GATE_WORDS: usize = 8192` (`varn-jit/src/lib.rs`). `gate_reason`
+- `SIZE_GATE_WORDS: usize = 8192` (`vn-jit/src/lib.rs`). `gate_reason`
   rechaza protos de más de 8192 words salvo leaf-safe (sin alloc, sync, no
   generador) (`clif/lower.rs`).
-- Umbrales (`varn-vm/src/jit/tiering.rs`): `JIT_TIER_THRESHOLD = 1` (con
+- Umbrales (`vn-vm/src/jit/tiering.rs`): `JIT_TIER_THRESHOLD = 1` (con
   backedge usa `VARN_JIT_TIER`), `JIT_TIER_THRESHOLD_STRAIGHT = 128` (sin
   backedge), `JIT_OSR_BACKEDGES = 1000` (`VARN_JIT_OSR`).
 
-## 4. Try nativo (sin longjmp/personality en varn-jit)
+## 4. Try nativo (sin longjmp/personality en vn-jit)
 
-`grep longjmp|personality crates/varn-jit` vacío; `riscv` ausente (solo host
+`grep longjmp|personality crates/vn-jit` vacío; `riscv` ausente (solo host
 vía `cranelift_native`: `x86_64`/`aarch64` en `mem/buffer.rs`, `clif/mod.rs`).
 
 - `emit_try` (`from_ssa/exceptions.rs`): vuelca vivos a homes (por eso un
@@ -74,7 +74,7 @@ Bails reales de try en `setup.rs`: handler compartido por dos valores
 (`landing_maps`, también `exceptions.rs`), catch block con params
 (`create_blocks`), try-stacks inconsistentes (`reachability`).
 
-## 5. AOT stub (`varn-jit/src/aot/mod.rs`)
+## 5. AOT stub (`vn-jit/src/aot/mod.rs`)
 
 Solo prototipado, no backend general. Emite: `LoadInt`/`Zero`/`One`,
 `LoadConst` (str/int/bool), `LoadTrue/False/Null`, `Move`, `Add/Sub/Mul/Mod`
@@ -85,8 +85,8 @@ Solo prototipado, no backend general. Emite: `LoadInt`/`Zero`/`One`,
 
 ## 6. Archivos que mandan
 
-`crates/varn-jit-abi/src/lib.rs` (versión + `JitHelpers` + layouts),
-`varn-jit/src/clif/abi.rs`, `clif/native_abi.rs`, `clif/from_ssa/drive.rs`,
+`crates/vn-jit-abi/src/lib.rs` (versión + `JitHelpers` + layouts),
+`vn-jit/src/clif/abi.rs`, `clif/native_abi.rs`, `clif/from_ssa/drive.rs`,
 `clif/from_ssa/context.rs`, `clif/from_ssa/exceptions.rs`, `clif/lower.rs`,
-`varn-jit/src/lib.rs`, `varn-vm/src/jit/tiering.rs`,
-`varn-vm/src/exec/dispatch/jit_frame.rs`.
+`vn-jit/src/lib.rs`, `vn-vm/src/jit/tiering.rs`,
+`vn-vm/src/exec/dispatch/jit_frame.rs`.

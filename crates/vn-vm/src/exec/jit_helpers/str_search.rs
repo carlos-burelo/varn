@@ -1,0 +1,363 @@
+use super::construct::jit_propagate_error;
+use super::intrinsics::borrow_str_fast;
+use crate::exec::ctx::ExecCtx;
+use crate::heap::HeapObj;
+use crate::value::VmValue;
+
+#[vn_macros::jit_slow(field = "str_starts_with")]
+pub(crate) extern "C" fn jit_str_starts_with(
+    ctx: *mut ExecCtx,
+    recv_tag: u64,
+    recv_payload: u64,
+    search_tag: u64,
+    search_payload: u64,
+) -> u64 {
+    unsafe {
+        let heap = &(*ctx).heap;
+        let receiver = VmValue::from_raw_parts(recv_tag, recv_payload);
+        let search = VmValue::from_raw_parts(search_tag, search_payload);
+        if receiver.is_sso() && search.is_sso() {
+            let r_len = receiver.sso_len();
+            let s_len = search.sso_len();
+            if s_len == 0 {
+                return 1;
+            }
+            if r_len < s_len {
+                return 0;
+            }
+            let shift = (s_len * 8) as u32;
+            let mask = if shift >= 64 {
+                u64::MAX
+            } else {
+                (1u64 << shift) - 1
+            };
+            return if (receiver.raw_payload() & mask) == (search.raw_payload() & mask) {
+                1
+            } else {
+                0
+            };
+        }
+        if receiver.is_heap()
+            && search.is_sso()
+            && let Some(HeapObj::Str(h)) = heap.get(receiver.as_heap())
+        {
+            let n_len = search.sso_len();
+            let s_bytes = h.as_str().as_bytes();
+            if s_bytes.len() >= n_len {
+                let mut b2 = [0u8; vn_types::vm_value::SSO_MAX_LEN];
+                search.sso_copy_bytes(&mut b2);
+                return if s_bytes[..n_len] == b2[..n_len] {
+                    1
+                } else {
+                    0
+                };
+            }
+            return 0;
+        }
+        if receiver.is_heap()
+            && search.is_heap()
+            && let (Some(HeapObj::Str(h1)), Some(HeapObj::Str(h2))) =
+                (heap.get(receiver.as_heap()), heap.get(search.as_heap()))
+        {
+            return if h1.as_str().as_bytes().starts_with(h2.as_str().as_bytes()) {
+                1
+            } else {
+                0
+            };
+        }
+        let mut b1 = [0u8; vn_types::vm_value::SSO_MAX_LEN];
+        let mut b2 = [0u8; vn_types::vm_value::SSO_MAX_LEN];
+        if let (Some(s), Some(n)) = (
+            borrow_str_fast(receiver, heap, &mut b1),
+            borrow_str_fast(search, heap, &mut b2),
+        ) {
+            return if s.as_bytes().starts_with(n.as_bytes()) {
+                1
+            } else {
+                0
+            };
+        }
+        jit_propagate_error(
+            &mut *ctx,
+            crate::error::RuntimeError::new("startsWith: receiver and argument must be strings"),
+        );
+        0
+    }
+}
+
+#[vn_macros::jit_slow(field = "str_ends_with")]
+pub(crate) extern "C" fn jit_str_ends_with(
+    ctx: *mut ExecCtx,
+    recv_tag: u64,
+    recv_payload: u64,
+    search_tag: u64,
+    search_payload: u64,
+) -> u64 {
+    unsafe {
+        let heap = &(*ctx).heap;
+        let receiver = VmValue::from_raw_parts(recv_tag, recv_payload);
+        let search = VmValue::from_raw_parts(search_tag, search_payload);
+        if receiver.is_sso() && search.is_sso() {
+            let r_len = receiver.sso_len();
+            let s_len = search.sso_len();
+            if s_len == 0 {
+                return 1;
+            }
+            if r_len < s_len {
+                return 0;
+            }
+            let r_offset = (r_len - s_len) * 8;
+            let r_shifted = receiver.raw_payload() >> r_offset;
+            let shift = (s_len * 8) as u32;
+            let mask = if shift >= 64 {
+                u64::MAX
+            } else {
+                (1u64 << shift) - 1
+            };
+            return if (r_shifted & mask) == (search.raw_payload() & mask) {
+                1
+            } else {
+                0
+            };
+        }
+        if receiver.is_heap()
+            && search.is_sso()
+            && let Some(HeapObj::Str(h)) = heap.get(receiver.as_heap())
+        {
+            let n_len = search.sso_len();
+            let s_bytes = h.as_str().as_bytes();
+            if s_bytes.len() >= n_len {
+                let mut b2 = [0u8; vn_types::vm_value::SSO_MAX_LEN];
+                search.sso_copy_bytes(&mut b2);
+                return if s_bytes[s_bytes.len() - n_len..] == b2[..n_len] {
+                    1
+                } else {
+                    0
+                };
+            }
+            return 0;
+        }
+        if receiver.is_heap()
+            && search.is_heap()
+            && let (Some(HeapObj::Str(h1)), Some(HeapObj::Str(h2))) =
+                (heap.get(receiver.as_heap()), heap.get(search.as_heap()))
+        {
+            return if h1.as_str().as_bytes().ends_with(h2.as_str().as_bytes()) {
+                1
+            } else {
+                0
+            };
+        }
+        let mut b1 = [0u8; vn_types::vm_value::SSO_MAX_LEN];
+        let mut b2 = [0u8; vn_types::vm_value::SSO_MAX_LEN];
+        if let (Some(s), Some(n)) = (
+            borrow_str_fast(receiver, heap, &mut b1),
+            borrow_str_fast(search, heap, &mut b2),
+        ) {
+            return if s.as_bytes().ends_with(n.as_bytes()) {
+                1
+            } else {
+                0
+            };
+        }
+        jit_propagate_error(
+            &mut *ctx,
+            crate::error::RuntimeError::new("endsWith: receiver and argument must be strings"),
+        );
+        0
+    }
+}
+
+pub(crate) const NOT_FOUND: i64 = -1;
+
+#[vn_macros::jit_slow(field = "str_index_of")]
+pub(crate) extern "C" fn jit_str_index_of(
+    ctx: *mut ExecCtx,
+    recv_tag: u64,
+    recv_payload: u64,
+    search_tag: u64,
+    search_payload: u64,
+) -> i64 {
+    unsafe {
+        let heap = &(*ctx).heap;
+        let receiver = VmValue::from_raw_parts(recv_tag, recv_payload);
+        let search = VmValue::from_raw_parts(search_tag, search_payload);
+        let mut b1 = [0u8; vn_types::vm_value::SSO_MAX_LEN];
+        let mut b2 = [0u8; vn_types::vm_value::SSO_MAX_LEN];
+        if let (Some(s), Some(n)) = (
+            borrow_str_fast(receiver, heap, &mut b1),
+            borrow_str_fast(search, heap, &mut b2),
+        ) {
+            return vn_types::str_util::char_index_of(s, n).map_or(NOT_FOUND, |at| at as i64);
+        }
+        jit_propagate_error(
+            &mut *ctx,
+            crate::error::RuntimeError::new("indexOf: receiver and argument must be strings"),
+        );
+        NOT_FOUND
+    }
+}
+
+#[vn_macros::jit_slow(field = "str_includes")]
+pub(crate) extern "C" fn jit_str_includes(
+    ctx: *mut ExecCtx,
+    recv_tag: u64,
+    recv_payload: u64,
+    search_tag: u64,
+    search_payload: u64,
+) -> u64 {
+    unsafe {
+        let heap = &(*ctx).heap;
+        let receiver = VmValue::from_raw_parts(recv_tag, recv_payload);
+        let search = VmValue::from_raw_parts(search_tag, search_payload);
+        let mut b1 = [0u8; vn_types::vm_value::SSO_MAX_LEN];
+        let mut b2 = [0u8; vn_types::vm_value::SSO_MAX_LEN];
+        if let (Some(s), Some(n)) = (
+            borrow_str_fast(receiver, heap, &mut b1),
+            borrow_str_fast(search, heap, &mut b2),
+        ) {
+            use vn_types::str_util::find_bytes;
+            return if find_bytes(s, n).is_some() { 1 } else { 0 };
+        }
+        jit_propagate_error(
+            &mut *ctx,
+            crate::error::RuntimeError::new("includes: receiver and argument must be strings"),
+        );
+        0
+    }
+}
+
+#[vn_macros::jit_slow(field = "str_split")]
+pub(crate) extern "C" fn jit_str_split(
+    ctx: *mut ExecCtx,
+    s_tag: u64,
+    s_payload: u64,
+    argc: u64,
+    sep_tag: u64,
+    sep_payload: u64,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let mut buf = [0u8; vn_types::vm_value::SSO_MAX_LEN];
+        let s_val = VmValue::from_raw_parts(s_tag, s_payload);
+        let Some(text) = borrow_str_fast(s_val, &ctx_ref.heap, &mut buf) else {
+            jit_propagate_error(
+                ctx_ref,
+                crate::error::RuntimeError::new("split: receiver must be a string"),
+            );
+            return;
+        };
+
+        let mut sbuf = [0u8; vn_types::vm_value::SSO_MAX_LEN];
+        let sep: Option<&str> = if argc == 0 {
+            None
+        } else {
+            let sep_val = VmValue::from_raw_parts(sep_tag, sep_payload);
+            match borrow_str_fast(sep_val, &ctx_ref.heap, &mut sbuf) {
+                Some(sep) => Some(sep),
+                None => {
+                    jit_propagate_error(
+                        ctx_ref,
+                        crate::error::RuntimeError::new("split: separator must be a string"),
+                    );
+                    return;
+                }
+            }
+        };
+        let ranges = &mut ctx_ref.str_ranges;
+        ranges.clear();
+        vn_types::str_util::split_ranges(text, sep, ranges);
+        let mut vals = Vec::with_capacity(ranges.len());
+        ctx_ref
+            .heap
+            .str_views_of(s_val, &ctx_ref.str_ranges, |part| vals.push(part));
+        ctx_ref.jit_native_result = ctx_ref
+            .heap
+            .alloc_array_repr(false, vn_types::vm_value::ArrayRepr::boxed(vals));
+    }
+}
+
+#[vn_macros::jit_slow(field = "str_slice_range")]
+pub(crate) extern "C" fn jit_str_slice_range(
+    ctx: *mut ExecCtx,
+    s_tag: u64,
+    s_payload: u64,
+    start_tag: u64,
+    start_payload: u64,
+    has_end: u64,
+    end_tag: u64,
+    end_payload: u64,
+) {
+    use vn_types::str_util::{char_len, char_range_to_bytes};
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let mut buf = [0u8; vn_types::vm_value::SSO_MAX_LEN];
+        let s_val = VmValue::from_raw_parts(s_tag, s_payload);
+        let start_val = VmValue::from_raw_parts(start_tag, start_payload);
+        let end_val = VmValue::from_raw_parts(end_tag, end_payload);
+        let (text, ascii): (&str, bool) = if s_val.is_sso() {
+            let s = s_val.sso_as_str(&mut buf);
+            (s, s.is_ascii())
+        } else if s_val.is_heap() {
+            match ctx_ref.heap.get(s_val.as_heap()) {
+                Some(crate::heap::HeapObj::Str(h)) => (h.as_str(), h.is_ascii()),
+                _ => {
+                    jit_propagate_error(
+                        ctx_ref,
+                        crate::error::RuntimeError::new("slice: receiver must be a string"),
+                    );
+                    return;
+                }
+            }
+        } else {
+            jit_propagate_error(
+                ctx_ref,
+                crate::error::RuntimeError::new("slice: receiver must be a string"),
+            );
+            return;
+        };
+        let Some(start) = start_val.is_int().then(|| start_val.as_int()) else {
+            jit_propagate_error(
+                ctx_ref,
+                crate::error::RuntimeError::new("slice: bounds must be ints"),
+            );
+            return;
+        };
+        let end: Option<i64> = if has_end == 0 {
+            None
+        } else if end_val.is_int() {
+            Some(end_val.as_int())
+        } else {
+            jit_propagate_error(
+                ctx_ref,
+                crate::error::RuntimeError::new("slice: bounds must be ints"),
+            );
+            return;
+        };
+        let (bs, be) = if ascii {
+            let len = text.len() as i64;
+            let si = normalize_idx(start, len).min(text.len());
+            let ei = normalize_idx(end.unwrap_or(len), len)
+                .min(text.len())
+                .max(si);
+            (si, ei)
+        } else {
+            let len = char_len(&text, false);
+            let si = normalize_idx(start, len as i64).min(len);
+            let ei = normalize_idx(end.unwrap_or(len as i64), len as i64)
+                .min(len)
+                .max(si);
+            char_range_to_bytes(&text, false, si, ei)
+        };
+        ctx_ref.jit_native_result = ctx_ref.heap.alloc_str_view_of(s_val, bs, be - bs);
+    }
+}
+
+#[inline]
+pub(super) fn normalize_idx(idx: i64, len: i64) -> usize {
+    if idx < 0 {
+        (len + idx).max(0) as usize
+    } else {
+        idx as usize
+    }
+}

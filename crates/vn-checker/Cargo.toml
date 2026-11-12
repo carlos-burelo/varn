@@ -1,0 +1,17 @@
+[package]
+name = "vn-checker"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+vn-core     = { path = "../vn-core" }
+rustc-hash    = { workspace = true }
+
+vn-sem      = { path = "../vn-sem" }
+vn-binder   = { path = "../vn-binder" }
+
+[dev-dependencies]
+vn-sem = { path = "../vn-sem" }
+
+[lints]
+workspace = true

@@ -1,4 +1,4 @@
-> Estado verificado 2026-10-13: VIGENTE — `CORE_PREFIX` (`crates/varn-modules/src/spec.rs:1`), `Layer`+`check_import` (`layer.rs:62-66`), `RUNTIME_NET/CRYPTO` (`ids.rs:30-32`), `core:types/*` (`lang_type.rs:56-62`).
+> Estado verificado 2026-10-13: VIGENTE — `CORE_PREFIX` (`crates/vn-modules/src/spec.rs:1`), `Layer`+`check_import` (`layer.rs:62-66`), `RUNTIME_NET/CRYPTO` (`ids.rs:30-32`), `core:types/*` (`lang_type.rs:56-62`).
 >
 > Histórico. No spec vigente. Código manda. Revalidar antes de usar.
 
@@ -39,7 +39,7 @@ Módulos de `core:*`:
   `AsyncDisposable`.
 
 El id de un módulo builtin es su lugar en el árbol:
-`crates/varn-builtins/src/modules/<capa>/<ruta>/` con un único contrato `.vn`
+`crates/vn-builtins/src/modules/<capa>/<ruta>/` con un único contrato `.vn`
 es `<capa>:<ruta>`. No hay manifiesto (`module.json`) que lo repita. Todo
 `core:*` está en scope; que `core:types` agrupe varios módulos es
 organización, no una fachada que reexporta.
@@ -60,13 +60,13 @@ texto: un `Result` declarado por el usuario no es el del núcleo.
 
 ## Migración (cada paso, un commit verde)
 1. Una sola regla de capas para binder, loader y bundle
-   (`varn_modules::layer::check_import`).
+   (`vn_modules::layer::check_import`).
 2. Borrar `Symbol`.
 3. Reorganizar `core:*` y `runtime:*` por ruta; sin `module.json`.
 4. `core:*` con código Varn compilado; `Option`/`Result` a
    `core:types/{option,result}` con métodos (`isSome`, `unwrap`, …,
    `Result.catching`); `std:result` desaparece; `try` reconoce el
-   `Option`/`Result` del núcleo por origen (`varn_core::CoreSum`), nunca por
+   `Option`/`Result` del núcleo por origen (`vn_core::CoreSum`), nunca por
    texto.
 
 Los cuatro pasos están hechos.

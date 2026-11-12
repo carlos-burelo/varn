@@ -14,7 +14,7 @@ error.
 ## Decisiones
 
 ### Una sola definición por hecho
-- `varn_core::pow_int`, `pow_decimal`, `fmax`, `fmin`, `fsign`, `float_to_fixed`,
+- `vn_core::pow_int`, `pow_decimal`, `fmax`, `fmin`, `fsign`, `float_to_fixed`,
   `slice_bounds`, `clamp_index` son la única fuente. El intrínseco de la VM, los
   nativos y las funciones de Varn llaman a la misma.
 - `RangeData` cuenta en `i128`; `len()` es `None` cuando no cabe en `int`.

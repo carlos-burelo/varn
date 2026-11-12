@@ -1,0 +1,146 @@
+use crate::checker::recorder::Recorder;
+use crate::checker::Checker;
+use vn_core::ast::operators::UnaryOp;
+use vn_core::ast::{ExprId, ExprKind};
+use vn_sem::bind::BindResult;
+use vn_sem::types::Type;
+
+impl<'r> Checker<'r> {
+    pub(crate) fn extract_narrowings(
+        &mut self,
+        rec: &mut Recorder,
+        expr: ExprId,
+        bind: &BindResult,
+        is_true_branch: bool,
+    ) -> Vec<(vn_sem::symbol::SymbolId, Type)> {
+        let arena = self.ast_arena;
+        let cache_key = (expr.index(), is_true_branch, self.current_scope);
+        if let Some(cached) = self.narrowings_cache.get(&cache_key) {
+            return cached.clone();
+        }
+
+        let mut narrowings = Vec::new();
+
+        match &arena.expr(expr).kind {
+            ExprKind::Unary {
+                op: UnaryOp::Not,
+                operand,
+                ..
+            } => {
+                let operand = *operand;
+                narrowings.extend(self.extract_narrowings(rec, operand, bind, !is_true_branch));
+            }
+
+            ExprKind::Paren { expression } => {
+                let inner = *expression;
+                narrowings.extend(self.extract_narrowings(rec, inner, bind, is_true_branch));
+            }
+
+            ExprKind::Identifier { name } => {
+                self.narrow_identifier(rec, *name, bind, is_true_branch, &mut narrowings);
+            }
+
+            ExprKind::Binary { left, right, op } => {
+                let (left, right, op) = (*left, *right, *op);
+                self.narrow_null_comparison(
+                    rec,
+                    left,
+                    right,
+                    op,
+                    bind,
+                    is_true_branch,
+                    &mut narrowings,
+                );
+                self.narrow_discriminant(
+                    rec,
+                    left,
+                    right,
+                    op,
+                    bind,
+                    is_true_branch,
+                    &mut narrowings,
+                );
+            }
+
+            ExprKind::Logical {
+                left,
+                right,
+                op: vn_core::ast::operators::LogicalOp::And,
+            } => {
+                self.narrow_logical_and(rec, *left, *right, bind, is_true_branch, &mut narrowings);
+            }
+
+            ExprKind::Logical {
+                left,
+                right,
+                op: vn_core::ast::operators::LogicalOp::Or,
+            } => {
+                self.narrow_logical_or(rec, *left, *right, bind, is_true_branch, &mut narrowings);
+            }
+
+            ExprKind::Is {
+                expression,
+                type_ann,
+            } => {
+                let (expression, type_ann) = (*expression, type_ann.clone());
+                self.narrow_is(
+                    rec,
+                    expression,
+                    type_ann,
+                    bind,
+                    is_true_branch,
+                    &mut narrowings,
+                );
+            }
+
+            ExprKind::Call { callee, args, .. } => {
+                let (callee, args) = (*callee, args.clone());
+                self.narrow_type_guard(rec, callee, &args, bind, is_true_branch, &mut narrowings);
+            }
+
+            ExprKind::IntLiteral { .. }
+            | ExprKind::FloatLiteral { .. }
+            | ExprKind::BigIntLiteral { .. }
+            | ExprKind::DecimalLiteral { .. }
+            | ExprKind::StrLiteral { .. }
+            | ExprKind::CharLiteral { .. }
+            | ExprKind::BoolLiteral { .. }
+            | ExprKind::NullLiteral
+            | ExprKind::Template { .. }
+            | ExprKind::TaggedTemplate { .. }
+            | ExprKind::Missing
+            | ExprKind::This
+            | ExprKind::ImportMeta(_)
+            | ExprKind::Super
+            | ExprKind::Array { .. }
+            | ExprKind::Object { .. }
+            | ExprKind::Tuple { .. }
+            | ExprKind::Unary { .. }
+            | ExprKind::Update { .. }
+            | ExprKind::Logical { .. }
+            | ExprKind::Assign { .. }
+            | ExprKind::Conditional { .. }
+            | ExprKind::Member { .. }
+            | ExprKind::New { .. }
+            | ExprKind::Function { .. }
+            | ExprKind::Arrow { .. }
+            | ExprKind::Sequence { .. }
+            | ExprKind::Await { .. }
+            | ExprKind::Spawn { .. }
+            | ExprKind::Yield { .. }
+            | ExprKind::Spread { .. }
+            | ExprKind::Pipeline { .. }
+            | ExprKind::Range { .. }
+            | ExprKind::NonNull { .. }
+            | ExprKind::Try { .. }
+            | ExprKind::As { .. }
+            | ExprKind::Satisfies { .. }
+            | ExprKind::ClassExpr { .. }
+            | ExprKind::Match { .. }
+            | ExprKind::With { .. }
+            | ExprKind::MetaAccess { .. } => {}
+        }
+        self.narrowings_cache.insert(cache_key, narrowings.clone());
+        narrowings
+    }
+}

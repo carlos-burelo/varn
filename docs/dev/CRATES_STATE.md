@@ -1,6 +1,6 @@
 # Estado e Inventario de Crates del Workspace
 
-Matriz de estado y jerarquía de dependencias de los **31 members** declarados en `Cargo.toml` (raíz, `members`): `varn-core`, `varn-lexer`, `varn-parser`, `varn-checker`, `varn-emit`, `varn-types`, `varn-tir`, `varn-sem`, `varn-binder`, `varn-resolver`, `varn-macros`, `varn-modules`, `varn-builtins`, `varn-cli`, `varn-lsp`, `varn-vm`, `varn-debug`, `varn-pm`, `varn-jit`, `varn-jit-abi`, `varn-pipeline`, `varn-compiler`, `varn-gpu`, `varn-ui`, `varn-text`, `varn-rt`, `varn-shadow`, `varn-dap`, `varn-project`, `varn-inspect` y `xtask`. `default-members` excluye `varn-rt`, `varn-shadow` y `xtask`.
+Matriz de estado y jerarquía de dependencias de los **31 members** declarados en `Cargo.toml` (raíz, `members`): `vn-core`, `vn-lexer`, `vn-parser`, `vn-checker`, `vn-emit`, `vn-types`, `vn-tir`, `vn-sem`, `vn-binder`, `vn-resolver`, `vn-macros`, `vn-modules`, `vn-builtins`, `vn-cli`, `vn-lsp`, `vn-vm`, `vn-debug`, `vn-pm`, `vn-jit`, `vn-jit-abi`, `vn-pipeline`, `vn-compiler`, `vn-gpu`, `vn-ui`, `vn-text`, `vn-rt`, `vn-shadow`, `vn-dap`, `vn-project`, `vn-inspect` y `xtask`. `default-members` excluye `vn-rt`, `vn-shadow` y `xtask`.
 
 Los conteos (líneas, tests, asserts) viven en el código y no se copian aquí: se desincronizan. La prueba canónica de integridad es `tests/main.vn` (200+ imports) bajo las cuatro combinaciones de procedencia de std y JIT (más el cuadrante 5 de caché JIT en `verify.ps1`) descritas en [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
@@ -21,126 +21,126 @@ Aristas reales declaradas en los manifiestos (no el flujo de datos del pipeline)
 
 ```mermaid
 graph TD
-    varn_binder["varn-binder"] --> varn_core["varn-core"]
-    varn_binder["varn-binder"] --> varn_modules["varn-modules"]
-    varn_binder["varn-binder"] --> varn_sem["varn-sem"]
-    varn_builtins["varn-builtins"] --> varn_core["varn-core"]
-    varn_builtins["varn-builtins"] --> varn_gpu["varn-gpu"]
-    varn_builtins["varn-builtins"] --> varn_macros["varn-macros"]
-    varn_builtins["varn-builtins"] --> varn_modules["varn-modules"]
-    varn_builtins["varn-builtins"] --> varn_text["varn-text"]
-    varn_builtins["varn-builtins"] --> varn_types["varn-types"]
-    varn_builtins["varn-builtins"] --> varn_ui["varn-ui"]
-    varn_checker["varn-checker"] --> varn_binder["varn-binder"]
-    varn_checker["varn-checker"] --> varn_core["varn-core"]
-    varn_checker["varn-checker"] --> varn_sem["varn-sem"]
-    varn_cli["varn-cli"] --> varn_builtins["varn-builtins"]
-    varn_cli["varn-cli"] --> varn_checker["varn-checker"]
-    varn_cli["varn-cli"] --> varn_compiler["varn-compiler"]
-    varn_cli["varn-cli"] --> varn_core["varn-core"]
-    varn_cli["varn-cli"] --> varn_dap["varn-dap"]
-    varn_cli["varn-cli"] --> varn_debug["varn-debug"]
-    varn_cli["varn-cli"] --> varn_jit["varn-jit"]
-    varn_cli["varn-cli"] --> varn_lexer["varn-lexer"]
-    varn_cli["varn-cli"] --> varn_lsp["varn-lsp"]
-    varn_cli["varn-cli"] --> varn_modules["varn-modules"]
-    varn_cli["varn-cli"] --> varn_parser["varn-parser"]
-    varn_cli["varn-cli"] --> varn_pipeline["varn-pipeline"]
-    varn_cli["varn-cli"] --> varn_pm["varn-pm"]
-    varn_cli["varn-cli"] --> varn_resolver["varn-resolver"]
-    varn_cli["varn-cli"] --> varn_sem["varn-sem"]
-    varn_cli["varn-cli"] --> varn_types["varn-types"]
-    varn_cli["varn-cli"] --> varn_vm["varn-vm"]
-    varn_compiler["varn-compiler"] --> varn_core["varn-core"]
-    varn_compiler["varn-compiler"] --> varn_tir["varn-tir"]
-    varn_compiler["varn-compiler"] --> varn_types["varn-types"]
-    varn_core["varn-core"]
-    varn_dap["varn-dap"] --> varn_core["varn-core"]
-    varn_dap["varn-dap"] --> varn_pipeline["varn-pipeline"]
-    varn_dap["varn-dap"] --> varn_types["varn-types"]
-    varn_dap["varn-dap"] --> varn_vm["varn-vm"]
-    varn_debug["varn-debug"] --> varn_compiler["varn-compiler"]
-    varn_debug["varn-debug"] --> varn_core["varn-core"]
-    varn_debug["varn-debug"] --> varn_emit["varn-emit"]
-    varn_debug["varn-debug"] --> varn_jit["varn-jit"]
-    varn_debug["varn-debug"] --> varn_sem["varn-sem"]
-    varn_debug["varn-debug"] --> varn_tir["varn-tir"]
-    varn_debug["varn-debug"] --> varn_types["varn-types"]
-    varn_emit["varn-emit"] --> varn_core["varn-core"]
-    varn_emit["varn-emit"] --> varn_modules["varn-modules"]
-    varn_emit["varn-emit"] --> varn_sem["varn-sem"]
-    varn_emit["varn-emit"] --> varn_tir["varn-tir"]
-    varn_gpu["varn-gpu"]
-    varn_jit_abi["varn-jit-abi"] --> varn_types["varn-types"]
-    varn_jit["varn-jit"] --> varn_core["varn-core"]
-    varn_jit["varn-jit"] --> varn_jit_abi["varn-jit-abi"]
-    varn_jit["varn-jit"] --> varn_types["varn-types"]
-    varn_lexer["varn-lexer"] --> varn_core["varn-core"]
-    varn_lsp["varn-lsp"] --> varn_builtins["varn-builtins"]
-    varn_lsp["varn-lsp"] --> varn_checker["varn-checker"]
-    varn_lsp["varn-lsp"] --> varn_compiler["varn-compiler"]
-    varn_lsp["varn-lsp"] --> varn_core["varn-core"]
-    varn_lsp["varn-lsp"] --> varn_emit["varn-emit"]
-    varn_lsp["varn-lsp"] --> varn_lexer["varn-lexer"]
-    varn_lsp["varn-lsp"] --> varn_modules["varn-modules"]
-    varn_lsp["varn-lsp"] --> varn_parser["varn-parser"]
-    varn_lsp["varn-lsp"] --> varn_resolver["varn-resolver"]
-    varn_lsp["varn-lsp"] --> varn_sem["varn-sem"]
-    varn_lsp["varn-lsp"] --> varn_tir["varn-tir"]
-    varn_lsp["varn-lsp"] --> varn_types["varn-types"]
-    varn_macros["varn-macros"] --> varn_core["varn-core"]
-    varn_macros["varn-macros"] --> varn_lexer["varn-lexer"]
-    varn_macros["varn-macros"] --> varn_parser["varn-parser"]
-    varn_modules["varn-modules"] --> varn_core["varn-core"]
-    varn_parser["varn-parser"] --> varn_core["varn-core"]
-    varn_pipeline["varn-pipeline"] --> varn_checker["varn-checker"]
-    varn_pipeline["varn-pipeline"] --> varn_compiler["varn-compiler"]
-    varn_pipeline["varn-pipeline"] --> varn_core["varn-core"]
-    varn_pipeline["varn-pipeline"] --> varn_emit["varn-emit"]
-    varn_pipeline["varn-pipeline"] --> varn_lexer["varn-lexer"]
-    varn_pipeline["varn-pipeline"] --> varn_modules["varn-modules"]
-    varn_pipeline["varn-pipeline"] --> varn_parser["varn-parser"]
-    varn_pipeline["varn-pipeline"] --> varn_resolver["varn-resolver"]
-    varn_pipeline["varn-pipeline"] --> varn_sem["varn-sem"]
-    varn_pipeline["varn-pipeline"] --> varn_tir["varn-tir"]
-    varn_pipeline["varn-pipeline"] --> varn_types["varn-types"]
-    varn_pipeline["varn-pipeline"] --> varn_vm["varn-vm"]
-    varn_pm["varn-pm"] --> varn_core["varn-core"]
-    varn_pm["varn-pm"] --> varn_modules["varn-modules"]
-    varn_resolver["varn-resolver"] --> varn_binder["varn-binder"]
-    varn_resolver["varn-resolver"] --> varn_core["varn-core"]
-    varn_resolver["varn-resolver"] --> varn_lexer["varn-lexer"]
-    varn_resolver["varn-resolver"] --> varn_modules["varn-modules"]
-    varn_resolver["varn-resolver"] --> varn_parser["varn-parser"]
-    varn_resolver["varn-resolver"] --> varn_sem["varn-sem"]
-    varn_rt["varn-rt"]
-    varn_sem["varn-sem"] --> varn_core["varn-core"]
-    varn_shadow["varn-shadow"]
-    varn_text["varn-text"]
-    varn_tir["varn-tir"] --> varn_core["varn-core"]
-    varn_types["varn-types"] --> varn_core["varn-core"]
-    varn_ui["varn-ui"]
-    varn_vm["varn-vm"] --> varn_builtins["varn-builtins"]
-    varn_vm["varn-vm"] --> varn_core["varn-core"]
-    varn_vm["varn-vm"] --> varn_jit["varn-jit"]
-    varn_vm["varn-vm"] --> varn_macros["varn-macros"]
-    varn_vm["varn-vm"] --> varn_modules["varn-modules"]
-    varn_vm["varn-vm"] --> varn_types["varn-types"]
-    varn_project["varn-project"]
-    varn_modules["varn-modules"] --> varn_project["varn-project"]
-    varn_pm["varn-pm"] --> varn_project["varn-project"]
-    varn_pipeline["varn-pipeline"] --> varn_project["varn-project"]
-    varn_cli["varn-cli"] --> varn_project["varn-project"]
-    varn_cli["varn-cli"] --> varn_inspect["varn-inspect"]
-    varn_inspect["varn-inspect"] --> varn_lsp["varn-lsp"]
-    varn_inspect["varn-inspect"] --> varn_debug["varn-debug"]
-    varn_lsp["varn-lsp"] --> varn_pipeline["varn-pipeline"]
+    vn_binder["vn-binder"] --> vn_core["vn-core"]
+    vn_binder["vn-binder"] --> vn_modules["vn-modules"]
+    vn_binder["vn-binder"] --> vn_sem["vn-sem"]
+    vn_builtins["vn-builtins"] --> vn_core["vn-core"]
+    vn_builtins["vn-builtins"] --> vn_gpu["vn-gpu"]
+    vn_builtins["vn-builtins"] --> vn_macros["vn-macros"]
+    vn_builtins["vn-builtins"] --> vn_modules["vn-modules"]
+    vn_builtins["vn-builtins"] --> vn_text["vn-text"]
+    vn_builtins["vn-builtins"] --> vn_types["vn-types"]
+    vn_builtins["vn-builtins"] --> vn_ui["vn-ui"]
+    vn_checker["vn-checker"] --> vn_binder["vn-binder"]
+    vn_checker["vn-checker"] --> vn_core["vn-core"]
+    vn_checker["vn-checker"] --> vn_sem["vn-sem"]
+    vn_cli["vn-cli"] --> vn_builtins["vn-builtins"]
+    vn_cli["vn-cli"] --> vn_checker["vn-checker"]
+    vn_cli["vn-cli"] --> vn_compiler["vn-compiler"]
+    vn_cli["vn-cli"] --> vn_core["vn-core"]
+    vn_cli["vn-cli"] --> vn_dap["vn-dap"]
+    vn_cli["vn-cli"] --> vn_debug["vn-debug"]
+    vn_cli["vn-cli"] --> vn_jit["vn-jit"]
+    vn_cli["vn-cli"] --> vn_lexer["vn-lexer"]
+    vn_cli["vn-cli"] --> vn_lsp["vn-lsp"]
+    vn_cli["vn-cli"] --> vn_modules["vn-modules"]
+    vn_cli["vn-cli"] --> vn_parser["vn-parser"]
+    vn_cli["vn-cli"] --> vn_pipeline["vn-pipeline"]
+    vn_cli["vn-cli"] --> vn_pm["vn-pm"]
+    vn_cli["vn-cli"] --> vn_resolver["vn-resolver"]
+    vn_cli["vn-cli"] --> vn_sem["vn-sem"]
+    vn_cli["vn-cli"] --> vn_types["vn-types"]
+    vn_cli["vn-cli"] --> vn_vm["vn-vm"]
+    vn_compiler["vn-compiler"] --> vn_core["vn-core"]
+    vn_compiler["vn-compiler"] --> vn_tir["vn-tir"]
+    vn_compiler["vn-compiler"] --> vn_types["vn-types"]
+    vn_core["vn-core"]
+    vn_dap["vn-dap"] --> vn_core["vn-core"]
+    vn_dap["vn-dap"] --> vn_pipeline["vn-pipeline"]
+    vn_dap["vn-dap"] --> vn_types["vn-types"]
+    vn_dap["vn-dap"] --> vn_vm["vn-vm"]
+    vn_debug["vn-debug"] --> vn_compiler["vn-compiler"]
+    vn_debug["vn-debug"] --> vn_core["vn-core"]
+    vn_debug["vn-debug"] --> vn_emit["vn-emit"]
+    vn_debug["vn-debug"] --> vn_jit["vn-jit"]
+    vn_debug["vn-debug"] --> vn_sem["vn-sem"]
+    vn_debug["vn-debug"] --> vn_tir["vn-tir"]
+    vn_debug["vn-debug"] --> vn_types["vn-types"]
+    vn_emit["vn-emit"] --> vn_core["vn-core"]
+    vn_emit["vn-emit"] --> vn_modules["vn-modules"]
+    vn_emit["vn-emit"] --> vn_sem["vn-sem"]
+    vn_emit["vn-emit"] --> vn_tir["vn-tir"]
+    vn_gpu["vn-gpu"]
+    vn_jit_abi["vn-jit-abi"] --> vn_types["vn-types"]
+    vn_jit["vn-jit"] --> vn_core["vn-core"]
+    vn_jit["vn-jit"] --> vn_jit_abi["vn-jit-abi"]
+    vn_jit["vn-jit"] --> vn_types["vn-types"]
+    vn_lexer["vn-lexer"] --> vn_core["vn-core"]
+    vn_lsp["vn-lsp"] --> vn_builtins["vn-builtins"]
+    vn_lsp["vn-lsp"] --> vn_checker["vn-checker"]
+    vn_lsp["vn-lsp"] --> vn_compiler["vn-compiler"]
+    vn_lsp["vn-lsp"] --> vn_core["vn-core"]
+    vn_lsp["vn-lsp"] --> vn_emit["vn-emit"]
+    vn_lsp["vn-lsp"] --> vn_lexer["vn-lexer"]
+    vn_lsp["vn-lsp"] --> vn_modules["vn-modules"]
+    vn_lsp["vn-lsp"] --> vn_parser["vn-parser"]
+    vn_lsp["vn-lsp"] --> vn_resolver["vn-resolver"]
+    vn_lsp["vn-lsp"] --> vn_sem["vn-sem"]
+    vn_lsp["vn-lsp"] --> vn_tir["vn-tir"]
+    vn_lsp["vn-lsp"] --> vn_types["vn-types"]
+    vn_macros["vn-macros"] --> vn_core["vn-core"]
+    vn_macros["vn-macros"] --> vn_lexer["vn-lexer"]
+    vn_macros["vn-macros"] --> vn_parser["vn-parser"]
+    vn_modules["vn-modules"] --> vn_core["vn-core"]
+    vn_parser["vn-parser"] --> vn_core["vn-core"]
+    vn_pipeline["vn-pipeline"] --> vn_checker["vn-checker"]
+    vn_pipeline["vn-pipeline"] --> vn_compiler["vn-compiler"]
+    vn_pipeline["vn-pipeline"] --> vn_core["vn-core"]
+    vn_pipeline["vn-pipeline"] --> vn_emit["vn-emit"]
+    vn_pipeline["vn-pipeline"] --> vn_lexer["vn-lexer"]
+    vn_pipeline["vn-pipeline"] --> vn_modules["vn-modules"]
+    vn_pipeline["vn-pipeline"] --> vn_parser["vn-parser"]
+    vn_pipeline["vn-pipeline"] --> vn_resolver["vn-resolver"]
+    vn_pipeline["vn-pipeline"] --> vn_sem["vn-sem"]
+    vn_pipeline["vn-pipeline"] --> vn_tir["vn-tir"]
+    vn_pipeline["vn-pipeline"] --> vn_types["vn-types"]
+    vn_pipeline["vn-pipeline"] --> vn_vm["vn-vm"]
+    vn_pm["vn-pm"] --> vn_core["vn-core"]
+    vn_pm["vn-pm"] --> vn_modules["vn-modules"]
+    vn_resolver["vn-resolver"] --> vn_binder["vn-binder"]
+    vn_resolver["vn-resolver"] --> vn_core["vn-core"]
+    vn_resolver["vn-resolver"] --> vn_lexer["vn-lexer"]
+    vn_resolver["vn-resolver"] --> vn_modules["vn-modules"]
+    vn_resolver["vn-resolver"] --> vn_parser["vn-parser"]
+    vn_resolver["vn-resolver"] --> vn_sem["vn-sem"]
+    vn_rt["vn-rt"]
+    vn_sem["vn-sem"] --> vn_core["vn-core"]
+    vn_shadow["vn-shadow"]
+    vn_text["vn-text"]
+    vn_tir["vn-tir"] --> vn_core["vn-core"]
+    vn_types["vn-types"] --> vn_core["vn-core"]
+    vn_ui["vn-ui"]
+    vn_vm["vn-vm"] --> vn_builtins["vn-builtins"]
+    vn_vm["vn-vm"] --> vn_core["vn-core"]
+    vn_vm["vn-vm"] --> vn_jit["vn-jit"]
+    vn_vm["vn-vm"] --> vn_macros["vn-macros"]
+    vn_vm["vn-vm"] --> vn_modules["vn-modules"]
+    vn_vm["vn-vm"] --> vn_types["vn-types"]
+    vn_project["vn-project"]
+    vn_modules["vn-modules"] --> vn_project["vn-project"]
+    vn_pm["vn-pm"] --> vn_project["vn-project"]
+    vn_pipeline["vn-pipeline"] --> vn_project["vn-project"]
+    vn_cli["vn-cli"] --> vn_project["vn-project"]
+    vn_cli["vn-cli"] --> vn_inspect["vn-inspect"]
+    vn_inspect["vn-inspect"] --> vn_lsp["vn-lsp"]
+    vn_inspect["vn-inspect"] --> vn_debug["vn-debug"]
+    vn_lsp["vn-lsp"] --> vn_pipeline["vn-pipeline"]
     xtask["xtask"]
 ```
 
-Solo `[dependencies]` (sin dev/build). `varn-macros` parsea los contratos `.vn` en tiempo de expansión, por eso depende de `varn-lexer`/`varn-parser`; `varn-builtins` usa los mismos dos solo como build-dependencies (su `build.rs` genera `MODULE_REGISTRY`). La ejecución alcanza el frontend por `varn-vm → varn-macros` y `varn-vm → varn-builtins → varn-macros`.
+Solo `[dependencies]` (sin dev/build). `vn-macros` parsea los contratos `.vn` en tiempo de expansión, por eso depende de `vn-lexer`/`vn-parser`; `vn-builtins` usa los mismos dos solo como build-dependencies (su `build.rs` genera `MODULE_REGISTRY`). La ejecución alcanza el frontend por `vn-vm → vn-macros` y `vn-vm → vn-builtins → vn-macros`.
 
-Las vistas de inspección que necesitan el análisis del LSP (`-p types`, `-p lsp`) viven en el crate `varn-inspect` (depende de `varn-lsp` y `varn-debug`), no en el pipeline: solo requieren ruta y fuente, así que no justifican que el orquestador dependa del servidor de editor.
+Las vistas de inspección que necesitan el análisis del LSP (`-p types`, `-p lsp`) viven en el crate `vn-inspect` (depende de `vn-lsp` y `vn-debug`), no en el pipeline: solo requieren ruta y fuente, así que no justifican que el orquestador dependa del servidor de editor.
 
 ---
 
@@ -150,51 +150,51 @@ Sin conteos de líneas: viven en el código (`find crates -name "*.rs" | xargs w
 
 | Crate | Dominio |
 |---|---|
-| `varn-core` | AST, opcodes, tokens, diagnósticos, ids de módulo y de op, huellas, `RuntimeKind` |
-| `varn-lexer` | Frontend: tokenización |
-| `varn-parser` | Frontend: parser |
-| `varn-checker` | Frontend: chequeo (sobre `varn-sem` + `varn-binder`) |
-| `varn-emit` | Emisión (sobre `varn-sem` + `varn-tir`) |
-| `varn-sem` | Representación semántica |
-| `varn-binder` | Nombres y alcances |
-| `varn-resolver` | Resolución de módulos e imports |
-| `varn-tir` | Representación intermedia tipada canónica |
-| `varn-types` | Modelo de datos de runtime y bytecode |
-| `varn-macros` | Proc-macros: `varn_contract!`, `#[jit_slow]`, `jit_helper_table!` |
-| `varn-compiler` | Compilador (TIR→SSA→bytecode + `regalloc` interno) |
-| `varn-jit` | JIT (Cranelift, sobre `varn-jit-abi`) |
-| `varn-jit-abi` | ABI del JIT |
-| `varn-vm` | Ejecución |
-| `varn-builtins` | Stdlib nativa |
-| `varn-modules` | Resolución de módulos y bundle |
-| `varn-pipeline` | Orquestación de fases y caché |
-| `varn-cli` | CLI (`vn`) |
-| `varn-lsp` | Servidor LSP |
-| `varn-dap` | Adaptador DAP |
-| `varn-debug` | Inspección de fases |
-| `varn-pm` | Gestor de paquetes |
-| `varn-gpu` | Cómputo GPU (host) |
-| `varn-ui` | UI nativa (host) |
-| `varn-text` | Shaping de texto (host) |
-| `varn-rt` | Runtime estático para binarios AOT |
-| `varn-shadow` | Binario `vn-shadow` |
+| `vn-core` | AST, opcodes, tokens, diagnósticos, ids de módulo y de op, huellas, `RuntimeKind` |
+| `vn-lexer` | Frontend: tokenización |
+| `vn-parser` | Frontend: parser |
+| `vn-checker` | Frontend: chequeo (sobre `vn-sem` + `vn-binder`) |
+| `vn-emit` | Emisión (sobre `vn-sem` + `vn-tir`) |
+| `vn-sem` | Representación semántica |
+| `vn-binder` | Nombres y alcances |
+| `vn-resolver` | Resolución de módulos e imports |
+| `vn-tir` | Representación intermedia tipada canónica |
+| `vn-types` | Modelo de datos de runtime y bytecode |
+| `vn-macros` | Proc-macros: `varn_contract!`, `#[jit_slow]`, `jit_helper_table!` |
+| `vn-compiler` | Compilador (TIR→SSA→bytecode + `regalloc` interno) |
+| `vn-jit` | JIT (Cranelift, sobre `vn-jit-abi`) |
+| `vn-jit-abi` | ABI del JIT |
+| `vn-vm` | Ejecución |
+| `vn-builtins` | Stdlib nativa |
+| `vn-modules` | Resolución de módulos y bundle |
+| `vn-pipeline` | Orquestación de fases y caché |
+| `vn-cli` | CLI (`vn`) |
+| `vn-lsp` | Servidor LSP |
+| `vn-dap` | Adaptador DAP |
+| `vn-debug` | Inspección de fases |
+| `vn-pm` | Gestor de paquetes |
+| `vn-gpu` | Cómputo GPU (host) |
+| `vn-ui` | UI nativa (host) |
+| `vn-text` | Shaping de texto (host) |
+| `vn-rt` | Runtime estático para binarios AOT |
+| `vn-shadow` | Binario `vn-shadow` |
 | `xtask` | Herramientas (`cargo xtask`) |
 
 ---
 
 ## 3. Descripción por Dominio Funcional
 
-### Frontend e IR Intermedio (`varn-lexer`, `varn-parser`, `varn-checker`, `varn-tir`)
-Tokenización (punto y coma opcional), parser descendente con precedencia por niveles, y type-checker que produce un `CheckResult`; `varn-emit` lo baja a un `TirModule` (`varn-tir`) con tipos y resoluciones canónicas en cada nodo.
+### Frontend e IR Intermedio (`vn-lexer`, `vn-parser`, `vn-checker`, `vn-tir`)
+Tokenización (punto y coma opcional), parser descendente con precedencia por niveles, y type-checker que produce un `CheckResult`; `vn-emit` lo baja a un `TirModule` (`vn-tir`) con tipos y resoluciones canónicas en cada nodo.
 
-### Compilador (`varn-compiler`)
+### Compilador (`vn-compiler`)
 Baja `TirModule` vía `from_tir` → SSA → bytecode, con pases a punto fijo (const-fold, guardas redundantes, monomorfización, álgebra, CSE, campos fijos, escape, LICM, DCE, simplificación de CFG), transformación a máquina de estados para async/generadores y regalloc. Ver `COMPILER_ARCHITECTURE.md`.
 
-### Ejecución (`varn-vm`, `varn-jit`)
+### Ejecución (`vn-vm`, `vn-jit`)
 VM de registros de 128 bits (`VmValue` con tag + payload de 64 bits, nativo `i64`/`f64` y SSO hasta 8 bytes), GC generacional no copiante (generación joven `born` + marcas pegajosas en old-gen) e inline caches. El JIT (Cranelift, x86-64 y ARM64) entra por tiering: umbral 1 llamada si la función tiene bucle, 128 si no, y OSR a los 1000 back-edges; comparte la tabla de helpers con `vn debug -p clif`.
 
-### Runtime (`varn-rt`)
-`varn-rt` proporciona el runtime nativo mínimo para compilación AOT estática. No existe `varn-runtime` como crate.
+### Runtime (`vn-rt`)
+`vn-rt` proporciona el runtime nativo mínimo para compilación AOT estática. No existe `varn-runtime` como crate.
 
 ---
 

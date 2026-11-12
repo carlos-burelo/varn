@@ -1,0 +1,16 @@
+[package]
+name = "vn-dap"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+vn-core = { path = "../vn-core" }
+vn-pipeline = { path = "../vn-pipeline" }
+vn-types = { path = "../vn-types" }
+vn-vm = { path = "../vn-vm" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rustc-hash = { workspace = true }
+
+[lints]
+workspace = true

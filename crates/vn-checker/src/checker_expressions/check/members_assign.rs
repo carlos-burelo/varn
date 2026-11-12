@@ -1,0 +1,169 @@
+use super::members::extension_type_name;
+use crate::checker::recorder::Recorder;
+use crate::checker::Checker;
+use vn_core::ast::operators::Visibility;
+use vn_core::ast::{ExprId, ExprKind};
+use vn_core::source::SourceRange;
+use vn_core::{Diagnostic, ErrorCode, TypeKind};
+use vn_sem::bind::BindResult;
+use vn_sem::types::ObjectTypeMember;
+
+impl<'r> Checker<'r> {
+    pub(super) fn check_extension_assignment(
+        &mut self,
+        rec: &mut Recorder,
+        target: ExprId,
+        bind: &BindResult,
+    ) {
+        let arena = self.ast_arena;
+        let target_range = arena.expr(target).range;
+        if let ExprKind::Member {
+            object,
+            computed: true,
+            ..
+        } = &arena.expr(target).kind
+        {
+            let obj_ty = self.infer_type(rec, *object, bind);
+            let immutable = match self.ty_table.get(obj_ty.0) {
+                TypeKind::Tuple(_) => {
+                    Some("cannot assign to a tuple element: tuples are immutable")
+                }
+                TypeKind::Record(_) => {
+                    Some("cannot assign to a field of a record: records are immutable, use `with`")
+                }
+                TypeKind::Primitive(vn_core::LangPrimitive::Str) | TypeKind::Literal(_) => {
+                    Some("cannot assign to a character of a string: strings are immutable")
+                }
+                TypeKind::Primitive(_)
+                | TypeKind::This
+                | TypeKind::Array(_)
+                | TypeKind::Union(_)
+                | TypeKind::Intersection(_)
+                | TypeKind::Named(..)
+                | TypeKind::Generic(..)
+                | TypeKind::TemplateLiteral(_)
+                | TypeKind::Fn(_)
+                | TypeKind::Interface(_)
+                | TypeKind::Typeof(_)
+                | TypeKind::KeyOf(_)
+                | TypeKind::IndexedAccess { .. }
+                | TypeKind::Mapped { .. }
+                | TypeKind::Conditional { .. }
+                | TypeKind::Infer(_)
+                | TypeKind::EnumVariant { .. }
+                | TypeKind::TypePredicate { .. } => None,
+            };
+            let immutable = immutable.or_else(|| {
+                obj_ty
+                    .is_readonly_view(&self.ty_table)
+                    .then_some("cannot assign through a read-only view: it only reads")
+            });
+            if let Some(message) = immutable {
+                self.emit(
+                    Diagnostic::error(ErrorCode::NotAssignable, message).with_range(target_range),
+                );
+            }
+            return;
+        }
+        let ExprKind::Member {
+            object,
+            property,
+            computed: false,
+            ..
+        } = &arena.expr(target).kind
+        else {
+            return;
+        };
+        let (object, property) = (*object, *property);
+        let ExprKind::Identifier { name: prop_name } = &arena.expr(property).kind else {
+            return;
+        };
+        let prop_name = bind.interner.resolve(*prop_name);
+
+        let obj_ty = self.infer_type(rec, object, bind);
+        let non_null = obj_ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+        if let Some(tn) = extension_type_name(self, &non_null, &self.ty_table, bind)
+            && let Some(setter_map) = bind.extensions.setters.get(tn.as_ref())
+            && let Some(mangled) = setter_map.get(prop_name)
+        {
+            rec.desugar
+                .extension_set_members
+                .insert(target_range.start.offset, mangled.clone());
+        }
+        self.check_accessor_side(&obj_ty, prop_name, true, &target_range, bind);
+        if self.plan_value_update(rec, target, bind) {
+            return;
+        }
+        let record_field = matches!(self.ty_table.get(non_null.0), TypeKind::Record(_));
+        if record_field {
+            self.emit(
+                Diagnostic::error(
+                    ErrorCode::NotAssignable,
+                    format!("cannot assign to field '{prop_name}' of a record through an optional chain: use `with`"),
+                )
+                .with_range(target_range),
+            );
+            return;
+        }
+        let frozen = matches!(
+            self.find_member(&obj_ty, prop_name, bind),
+            Some(ObjectTypeMember::Property { readonly: true, .. })
+        ) || self.declared_readonly(&obj_ty, prop_name, bind);
+        if frozen {
+            self.emit(
+                Diagnostic::error(
+                    ErrorCode::NotAssignable,
+                    format!("cannot assign to readonly property '{prop_name}'"),
+                )
+                .with_range(target_range),
+            );
+        }
+    }
+
+    pub(super) fn check_member_visibility(
+        &mut self,
+        class_name: &str,
+        prop_name: &str,
+        range: &SourceRange,
+        bind: &BindResult,
+    ) {
+        let Some(members) = bind.get_class_entry(class_name) else {
+            return;
+        };
+        let Some(m) = members
+            .members
+            .iter()
+            .find(|m| m.name.as_ref() == prop_name)
+        else {
+            return;
+        };
+
+        match m.visibility {
+            Some(Visibility::Private) => {
+                if self.current_class.as_deref() != Some(class_name) {
+                    self.emit(
+                        Diagnostic::error(ErrorCode::PrivateMemberAccess, format!(
+                            "property '{prop_name}' is private and only accessible within class '{class_name}'"
+                        ))
+                        .with_range(*range),
+                    );
+                }
+            }
+            Some(Visibility::Protected) => {
+                let current_class = self.current_class.as_deref();
+                let is_authorized = current_class.is_some_and(|c| {
+                    c == class_name || self.is_subclass_or_same(c, class_name, bind)
+                });
+                if !is_authorized {
+                    self.emit(
+                        Diagnostic::error(ErrorCode::ProtectedMemberAccess, format!(
+                            "property '{prop_name}' is protected and only accessible within class '{class_name}' and its subclasses"
+                        ))
+                        .with_range(*range),
+                    );
+                }
+            }
+            None | Some(Visibility::Public) => {}
+        }
+    }
+}

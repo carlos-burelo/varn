@@ -8,7 +8,7 @@ Orden: capa más baja primero (Ley 14). Validación por item:
 ## Fase A — cimientos del compilador
 
 ### A1. Borrar `HirType`; SSA consume `BackendTy`
-- Hallazgo: `varn-compiler/src/hir` define un segundo sistema de tipos
+- Hallazgo: `vn-compiler/src/hir` define un segundo sistema de tipos
   (`HirType`, `TyId`, `ClassId`, `TyTable`) y `from_tir/ty.rs` lo degrada:
   `Decimal/BigInt/Void/Never/Dynamic → Dynamic`, `Char/Bytes/Enum/Fn → Ref`.
   `class_id` deduplica por nombre sin origen (Ley 16).
@@ -20,7 +20,7 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   conversiones `lower::*` que dependan de `HirType`.
 
 ### A2. Vaciar `DynReason::NotYetSupported`
-- Hallazgo: 79 sitios (casi todos en `varn-emit`) degradan un tipo conocido.
+- Hallazgo: 79 sitios (casi todos en `vn-emit`) degradan un tipo conocido.
 - Ganancia: menos `Dynamic`, menos guards `verify_at_runtime`, menos rutas por
   nombre en VM/JIT.
 - Verificación: `Coverage::of` sobre `tests/` y `std/` antes/después; la cuenta
@@ -75,7 +75,7 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   `Enum` 234, `Dynamic(Declared)` 118.
 - HECHO (accesores): `ClassObj` tenía tres tripletas paralelas (método/getter/setter x
   mapa/vtable/dueños); ahora hay una sola tabla de miembros con clave canónica
-  `AccessorKind::key` (varn-core). Las lecturas y escrituras de accesores de una clase
+  `AccessorKind::key` (vn-core). Las lecturas y escrituras de accesores de una clase
   conocida se resuelven estáticamente como llamadas al accesor. Los accesores salían con
   `fresh_sig` (firma toda NYS, retorno boxed): ahora usan la firma construida desde el
   tipo de la propiedad. Medido (quick, JIT, 20M iteraciones): lectura de getter
@@ -133,7 +133,7 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   evolutivos y namespaces. No es solo duplicación: el checker además reutiliza
   `numeric_operand`, `adopt_literal_operands`, `widen_literal` del binder.
 - Paso seguro, a hacer primero: mover esos helpers puros de álgebra de tipos a
-  `varn-sem` (capa de tipos), de modo que el checker deje de depender del binder
+  `vn-sem` (capa de tipos), de modo que el checker deje de depender del binder
   para ellos. Segundo: cortar la inferencia del binder a lo que es resolución de
   nombres (identificador/miembro para herencia) y que el checker infiera el resto.
 - CORRECCIÓN (2026-10-23): la evolución de arrays que el "Experimento 2" creía perdida
@@ -161,8 +161,8 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   binder cambia 10 de 249 tests en `check:types`, y la causa dominante no es el checker sino
   la frontera de módulo: `ModuleResolver::module_bind`/`stdlib_bind` solo parsean y bindean
   las dependencias, nunca las tipan, así que un import (`Path.join`, `None`, miembros de
-  namespace) lee el tipo provisional del binder de la dependencia. `varn-resolver` no depende
-  de `varn-checker` (el checker está arriba). Cortar de verdad exige: (1) un trait
+  namespace) lee el tipo provisional del binder de la dependencia. `vn-resolver` no depende
+  de `vn-checker` (el checker está arriba). Cortar de verdad exige: (1) un trait
   `ModuleChecker` inyectado en el resolver (Ley 1) que tipe cada dependencia una vez, en
   orden topológico, con ciclos de import resueltos explícitamente; (2) cachear el bind ya
   tipado (`try_load_cache`/`save_to_cache`) para que el costo sea una vez por módulo;
@@ -181,7 +181,7 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   `f("s")` entre módulos porque la firma de una función exportada se arma en el binder y
   `finalize` no la reconstruye con los parámetros que tipó el checker: pendiente.
 - HECHO (paso a, 7abf324d): resolución de tipos e inferencia de expresiones viven en
-  `varn-sem` (`resolve/`, `infer/`); binder y checker los importan de la capa baja. Matriz
+  `vn-sem` (`resolve/`, `infer/`); binder y checker los importan de la capa baja. Matriz
   quick 3798/0. Falta (b) y (c).
 - Hallazgo: binder (`type_infer_*`) y checker (`infer_*`) infieren expresiones.
 - Ganancia: un motor; el binder deja de conocer tipos semánticos (AGENTS §3).
@@ -192,7 +192,7 @@ Orden: capa más baja primero (Ley 14). Validación por item:
 ## Fase B — módulos
 
 ### B1. Un solo cargador de módulos
-- Hallazgo: `varn-resolver` + `varn-modules` + `varn-pipeline/resolver.rs`
+- Hallazgo: `vn-resolver` + `vn-modules` + `vn-pipeline/resolver.rs`
   (`Session`) + `stdlib_loader/layer_link/portable`.
 - Ganancia: una identidad, una resolución, una carga, una caché (Ley 8).
 - Verificación: 4 cuadrantes con `VARN_CACHE_DIR` limpio.
@@ -233,7 +233,7 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   interfaz sale como `GetProperty` por nombre; el intérprete ya tiene un IC polimórfico de 8
   entradas con `INSTANCE_FIELD` (`id` = class_id, `slot` = índice de campo,
   `reg_ops/get_property.rs`), pero `emit_get_property` del JIT
-  (`varn-jit/src/clif/from_ssa/props/get.rs`) solo inlinea el caso `SHAPE_PROP` (objetos con
+  (`vn-jit/src/clif/from_ssa/props/get.rs`) solo inlinea el caso `SHAPE_PROP` (objetos con
   shape) y para instancias de clase cae siempre a la ayuda `get_property_flat` (lookup por
   nombre completo). Por eso `p.x` por clase vale 1 ns (`GetFixedField` con offset fijo) y por
   interfaz 33 ns.
@@ -252,7 +252,7 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   compara con la esperada por el tipo estático del miembro de interfaz y, si difiere, va al
   camino lento (un campo `int?` de una clase frente a `int` de la interfaz no comparte
   representación). (4) `SetProperty` por interfaz queda para después con el mismo patrón.
-- Alcance: `varn-types` (`CacheEntry`), `varn-vm` (llenado del IC), `varn-jit` (rama de
+- Alcance: `vn-types` (`CacheEntry`), `vn-vm` (llenado del IC), `vn-jit` (rama de
   instancia). Sin cambios en checker, TIR, SSA ni bytecode. También cubre los accesos
   `Declared`/`Unrecorded` sobre instancias de clase, no solo interfaces.
 - Verificación: microbenchmark de lectura por interfaz (200M: hoy 6.6 s; objetivo cercano a
@@ -359,7 +359,7 @@ Orden: capa más baja primero (Ley 14). Validación por item:
 
 ## Estado
 - [x] D1  - [x] A1  - [x] A2 (corpus en 0 `Unrecorded`; cola: extensiones, interfaces, `CoreMember`)
-- [~] A3 (helpers movidos a varn-sem, widen_literal borrado; falta cortar la inferencia
+- [~] A3 (helpers movidos a vn-sem, widen_literal borrado; falta cortar la inferencia
   del binder a resolución de nombres)
 - [x] B1 (Session borrado, DiskResolver -> ModuleResolver; los tres caminos de
   parse/bind/collect comparten parse_and_cache/bind_and_cache/collect, no se funden más:
@@ -410,16 +410,16 @@ Los miembros de enum van tras `;` en la lista de variantes (`Red, Green; get cod
 
 ### Causa (verificada con trazas, no supuesta)
 1. **La caché inline del intérprete acierta.** Una traza temporal en `call_method`
-   (`crates/varn-vm/src/exec/dispatch/reg_ops/method_calls/mod.rs`) mostró, para
+   (`crates/vn-vm/src/exec/dispatch/reg_ops/method_calls/mod.rs`) mostró, para
    receptores enum: clase resuelta (`get_class` usa `EnumVariantData.enum_class_id`), IC
    usable y `probe` con acierto en 4 999 999 de 5 000 000 llamadas.
 2. **El JIT nunca llega a esa caché.** El guard inline que genera
-   `crates/varn-jit/src/clif/from_ssa/call/method.rs` comprueba que la celda del receptor
+   `crates/vn-jit/src/clif/from_ssa/call/method.rs` comprueba que la celda del receptor
    sea `CELL_KIND_INSTANCE` y lee el id de clase en
    `INST_CELL_DATA_OFF + INST_CLASS_ID_OFF`. Cualquier otro tipo de celda salta
    directamente al bloque `slow`.
 3. **Una variante de enum no es una celda plana.** Es `HeapObj::EnumVariant(EnumVariantData)`
-   (`crates/varn-types/src/value/mod.rs`) con `enum_class_id: Option<u32>`,
+   (`crates/vn-types/src/value/mod.rs`) con `enum_class_id: Option<u32>`,
    `def: Arc<VariantDef>` y `slots: Vec<VmValue>`: indirecciones y un `Vec`, sin id de
    clase en una posición fija de la celda.
 4. **Resultado.** Cada llamada pasa por `jit_call_method_window` y de ahí por
@@ -429,7 +429,7 @@ Los miembros de enum van tras `;` en la lista de variantes (`Red, Green; get cod
 
 ### Intento descartado
 Se amplió `jit_call_method_cached_window`
-(`crates/varn-vm/src/exec/jit_helpers/calls.rs`) para aceptar `EnumVariant` además de
+(`crates/vn-vm/src/exec/jit_helpers/calls.rs`) para aceptar `EnumVariant` además de
 `instance`. No cambió nada (259/253 ms) y se revirtió: ese helper solo se alcanza después
 del guard inline, que ya había rechazado la celda. Un helper intermedio en el bloque
 `slow` recortaría una parte de los 43 ns pero no llegaría al nivel de una clase, y añadiría
@@ -460,15 +460,15 @@ variantes y obliga a revisar la comparación estructural.
   `tests/189-enum-variant-slots.vn` sin cambios; matriz completa de 4 cuadrantes más
   `VARN_JIT_CACHE=verify`; comparación de tiers (`vn run --compare-tiers`).
 - **Se borraría (previsiblemente):** la rama de enum en `get_class`
-  (`crates/varn-vm/src/exec/props/intrinsic.rs`) que resuelve la clase por
+  (`crates/vn-vm/src/exec/props/intrinsic.rs`) que resuelve la clase por
   `enum_class_id`, y el pre-chequeo `enum_variant_template` de `call_method` para nombres
   que no son constructores de variante.
 
 ### Superficie afectada (a revisar si se retoma)
 - Recorrido del GC y `for_each_value_mut` sobre los slots de variante.
-- Envío entre isolates: `crates/varn-types/src/value/sendable.rs` copia `enum_class_id`.
+- Envío entre isolates: `crates/vn-types/src/value/sendable.rs` copia `enum_class_id`.
 - Congelado/descongelado de módulos (`module_freeze.rs`) y clases con identidad única.
-- Igualdad y comparación de variantes (`crates/varn-vm/src/exec/compare.rs`,
+- Igualdad y comparación de variantes (`crates/vn-vm/src/exec/compare.rs`,
   `same_enum`) y `instanceof` sobre enums (`exec/advanced.rs`).
 - Operaciones de payload y tag (`exec/dispatch/reg_ops/enum_ops.rs`, `GetEnumTag`,
   `VariantPayload`) y su lowering en el JIT.

@@ -1,0 +1,10 @@
+[package]
+name = "vn-jit-abi"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+vn-types = { path = "../vn-types" }
+
+[lints]
+workspace = true

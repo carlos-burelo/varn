@@ -1,0 +1,15 @@
+use crate::types::TypeContext;
+use std::sync::Arc;
+
+pub(super) fn resolve_atom_name(
+    atom: vn_core::Atom,
+    ctx: Option<&dyn TypeContext>,
+    interner: &vn_core::AtomInterner,
+) -> Arc<str> {
+    if let Some(s) = interner.try_resolve(atom) {
+        return Arc::from(s);
+    }
+    ctx.and_then(|c| c.atom_text(atom))
+        .map(Arc::from)
+        .unwrap_or_default()
+}

@@ -1,0 +1,308 @@
+use super::cells::SlotState;
+use super::obj::HeapObj;
+use super::structs::HeapInner;
+use crate::value::VmValue;
+use std::rc::Rc;
+use vn_types::HeapRef;
+
+impl HeapInner {
+    #[inline(always)]
+    pub(crate) fn get(&self, r: HeapRef) -> Option<&HeapObj> {
+        if self.cells.state(r) == SlotState::Free
+            || self.cells.header_kind(r) == vn_types::cell::CELL_KIND_INSTANCE
+        {
+            return None;
+        }
+        Some(self.cells.get(r))
+    }
+
+    #[inline(always)]
+    pub(crate) fn get_mut(&mut self, r: HeapRef) -> Option<&mut HeapObj> {
+        if self.cells.state(r) == SlotState::Free
+            || self.cells.header_kind(r) == vn_types::cell::CELL_KIND_INSTANCE
+        {
+            return None;
+        }
+        Some(self.cells.get_mut(r))
+    }
+
+    pub(crate) fn closure_of(&self, v: VmValue) -> Option<&Rc<crate::closure::VmClosure>> {
+        match self.get(self.heap_ref(v)?)? {
+            HeapObj::VmClosure(c) => Some(c),
+            HeapObj::Str(_)
+            | HeapObj::Array(_)
+            | HeapObj::Tuple(_)
+            | HeapObj::Object(_)
+            | HeapObj::Buffer(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::Class(_)
+            | HeapObj::NativeFn(..)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::Map(_)
+            | HeapObj::Set(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::Range(_)
+            | HeapObj::EnumVariant(_)
+            | HeapObj::BigInt(_)
+            | HeapObj::Decimal(_)
+            | HeapObj::Char(_)
+            | HeapObj::Generator(_)
+            | HeapObj::Spread(_) => None,
+        }
+    }
+
+    pub(crate) fn instance(&self, r: HeapRef) -> Option<vn_types::value::InstanceRef> {
+        if self.cells.state(r) == SlotState::Free {
+            return None;
+        }
+        if self.cells.header_kind(r) != vn_types::cell::CELL_KIND_INSTANCE {
+            return None;
+        }
+        Some(unsafe {
+            vn_types::value::InstanceRef::from_data_ptr(
+                (r.addr() as usize + vn_types::cell::INST_CELL_DATA_OFF) as *mut u8,
+            )
+        })
+    }
+
+    pub(crate) fn instance_of(&self, v: VmValue) -> Option<vn_types::value::InstanceRef> {
+        self.instance(self.heap_ref(v)?)
+    }
+
+    pub(crate) fn native_of(&self, v: VmValue) -> Option<(vn_types::NativeFn, &'static str)> {
+        match self.get(self.heap_ref(v)?)? {
+            HeapObj::NativeFn(f, name) => Some((*f, *name)),
+            HeapObj::Str(_)
+            | HeapObj::Array(_)
+            | HeapObj::Tuple(_)
+            | HeapObj::Object(_)
+            | HeapObj::Buffer(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::VmClosure(_)
+            | HeapObj::Class(_)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::Map(_)
+            | HeapObj::Set(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::Range(_)
+            | HeapObj::EnumVariant(_)
+            | HeapObj::BigInt(_)
+            | HeapObj::Decimal(_)
+            | HeapObj::Char(_)
+            | HeapObj::Generator(_)
+            | HeapObj::Spread(_) => None,
+        }
+    }
+
+    pub(crate) fn generator_of(
+        &self,
+        v: VmValue,
+    ) -> Option<std::rc::Rc<crate::generator::GenState>> {
+        match self.get(self.heap_ref(v)?)? {
+            HeapObj::Generator(g) => Some(g.clone()),
+            HeapObj::Str(_)
+            | HeapObj::Array(_)
+            | HeapObj::Tuple(_)
+            | HeapObj::Object(_)
+            | HeapObj::Buffer(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::VmClosure(_)
+            | HeapObj::Class(_)
+            | HeapObj::NativeFn(..)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::Map(_)
+            | HeapObj::Set(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::Range(_)
+            | HeapObj::EnumVariant(_)
+            | HeapObj::BigInt(_)
+            | HeapObj::Decimal(_)
+            | HeapObj::Char(_)
+            | HeapObj::Spread(_) => None,
+        }
+    }
+
+    pub(crate) fn char_of(&self, v: VmValue) -> Option<char> {
+        match self.get(self.heap_ref(v)?)? {
+            HeapObj::Char(c) => Some(*c),
+            HeapObj::Str(_)
+            | HeapObj::Array(_)
+            | HeapObj::Tuple(_)
+            | HeapObj::Object(_)
+            | HeapObj::Buffer(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::VmClosure(_)
+            | HeapObj::Class(_)
+            | HeapObj::NativeFn(..)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::Map(_)
+            | HeapObj::Set(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::Range(_)
+            | HeapObj::EnumVariant(_)
+            | HeapObj::BigInt(_)
+            | HeapObj::Decimal(_)
+            | HeapObj::Generator(_)
+            | HeapObj::Spread(_) => None,
+        }
+    }
+
+    pub(crate) fn bigint_of(&self, v: VmValue) -> Option<num_bigint::BigInt> {
+        match self.get(self.heap_ref(v)?)? {
+            HeapObj::BigInt(b) => Some((**b).clone()),
+            HeapObj::Str(_)
+            | HeapObj::Array(_)
+            | HeapObj::Tuple(_)
+            | HeapObj::Object(_)
+            | HeapObj::Buffer(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::VmClosure(_)
+            | HeapObj::Class(_)
+            | HeapObj::NativeFn(..)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::Map(_)
+            | HeapObj::Set(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::Range(_)
+            | HeapObj::EnumVariant(_)
+            | HeapObj::Decimal(_)
+            | HeapObj::Char(_)
+            | HeapObj::Generator(_)
+            | HeapObj::Spread(_) => None,
+        }
+    }
+
+    pub(crate) fn decimal_of(&self, v: VmValue) -> Option<bigdecimal::BigDecimal> {
+        match self.get(self.heap_ref(v)?)? {
+            HeapObj::Decimal(d) => Some((**d).clone()),
+            HeapObj::Str(_)
+            | HeapObj::Array(_)
+            | HeapObj::Tuple(_)
+            | HeapObj::Object(_)
+            | HeapObj::Buffer(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::VmClosure(_)
+            | HeapObj::Class(_)
+            | HeapObj::NativeFn(..)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::Map(_)
+            | HeapObj::Set(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::Range(_)
+            | HeapObj::EnumVariant(_)
+            | HeapObj::BigInt(_)
+            | HeapObj::Char(_)
+            | HeapObj::Generator(_)
+            | HeapObj::Spread(_) => None,
+        }
+    }
+
+    pub(crate) fn range_of(&self, v: VmValue) -> Option<vn_types::value::RangeData> {
+        match self.get(self.heap_ref(v)?)? {
+            HeapObj::Range(r) => Some(r.clone()),
+            HeapObj::Str(_)
+            | HeapObj::Array(_)
+            | HeapObj::Tuple(_)
+            | HeapObj::Object(_)
+            | HeapObj::Buffer(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::VmClosure(_)
+            | HeapObj::Class(_)
+            | HeapObj::NativeFn(..)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::Map(_)
+            | HeapObj::Set(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::EnumVariant(_)
+            | HeapObj::BigInt(_)
+            | HeapObj::Decimal(_)
+            | HeapObj::Char(_)
+            | HeapObj::Generator(_)
+            | HeapObj::Spread(_) => None,
+        }
+    }
+
+    pub(crate) fn map_of(&self, v: VmValue) -> Option<vn_types::value::MapRef> {
+        match self.get(self.heap_ref(v)?)? {
+            HeapObj::Map(m) => Some(*m),
+            HeapObj::Str(_)
+            | HeapObj::Array(_)
+            | HeapObj::Tuple(_)
+            | HeapObj::Object(_)
+            | HeapObj::Buffer(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::VmClosure(_)
+            | HeapObj::Class(_)
+            | HeapObj::NativeFn(..)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::Set(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::Range(_)
+            | HeapObj::EnumVariant(_)
+            | HeapObj::BigInt(_)
+            | HeapObj::Decimal(_)
+            | HeapObj::Char(_)
+            | HeapObj::Generator(_)
+            | HeapObj::Spread(_) => None,
+        }
+    }
+
+    pub(crate) fn set_of(&self, v: VmValue) -> Option<vn_types::value::SetRef> {
+        match self.get(self.heap_ref(v)?)? {
+            HeapObj::Set(s) => Some(*s),
+            HeapObj::Str(_)
+            | HeapObj::Array(_)
+            | HeapObj::Tuple(_)
+            | HeapObj::Object(_)
+            | HeapObj::Buffer(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::VmClosure(_)
+            | HeapObj::Class(_)
+            | HeapObj::NativeFn(..)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::Map(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::Range(_)
+            | HeapObj::EnumVariant(_)
+            | HeapObj::BigInt(_)
+            | HeapObj::Decimal(_)
+            | HeapObj::Char(_)
+            | HeapObj::Generator(_)
+            | HeapObj::Spread(_) => None,
+        }
+    }
+
+    pub(crate) fn is_static_receiver(&self, v: VmValue) -> bool {
+        v.is_null()
+            || self
+                .heap_ref(v)
+                .and_then(|idx| self.get(idx))
+                .is_some_and(|o| matches!(o, HeapObj::Class(_) | HeapObj::Module(_)))
+    }
+
+    pub(crate) fn heap_ref(&self, val: VmValue) -> Option<HeapRef> {
+        if val.is_heap() {
+            Some(val.as_heap())
+        } else {
+            None
+        }
+    }
+}

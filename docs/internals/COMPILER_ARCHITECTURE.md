@@ -2,13 +2,13 @@
 
 Entrada: `TirModule` (contrato en [`TIR_CONTRATO_TIPADO.md`](TIR_CONTRATO_TIPADO.md)).
 Salida: `FunctionProto` con bytecode de registros, metadatos de registros y SSA
-portable para el JIT. Todo vive en `crates/varn-compiler/src/`.
+portable para el JIT. Todo vive en `crates/vn-compiler/src/`.
 
 ## Flujo (`from_tir/compile.rs`)
 
 `compile_module(tir, export_names, source, measure)`:
 
-1. `varn_tir::verify_module` — rechaza TIR inválido (`OptError::InvalidTir`) antes de bajar nada.
+1. `vn_tir::verify_module` — rechaza TIR inválido (`OptError::InvalidTir`) antes de bajar nada.
 2. Por función (`compile_one`, top-level y cada closure vía `compile_closure`):
    1. `build_top_level` / `build_function` (`from_tir/build/`) — TIR → SSA interno.
    2. `passes::optimize` — pases a punto fijo.
@@ -42,7 +42,7 @@ Hasta punto fijo (máx. 100 iteraciones), en este orden: `const_fold`,
 mismo bloque, en orden, sin lecturas previas, y el objeto no escapa, reescribe los
 `GetFixedField` por los valores guardados y borra la asignación.
 
-## SSA portable (`varn-types/src/ssa/`)
+## SSA portable (`vn-types/src/ssa/`)
 
 Lo que el JIT consume. `SsaProto`: `name`, `nparams`, `entry`, `blocks`, `values`,
 `regs`, `register_count`, `has_this`, `captured`, `secondary_entries`.
@@ -54,4 +54,4 @@ Lo que el JIT consume. `SsaProto`: `name`, `nparams`, `entry`, `blocks`, `values
   buscan por `ip` (OSR en bucles, reanudación tras `await`/`yield`, landing de catch).
 
 En el bytecode, `ExceptionRange { try_start_ip, try_end_ip, catch_ip, err_reg }`
-(`varn-types/src/chunk/proto/records.rs`) describe cada `try` para la VM.
+(`vn-types/src/chunk/proto/records.rs`) describe cada `try` para la VM.

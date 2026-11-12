@@ -10,7 +10,7 @@ Verificado (contrato real, detalle en `types.md` / `specification.md`):
 
 - 4 tipos numéricos, sin anchos físicos públicos: `int, float, bigint, decimal`.
 - `int` = entero 64 bits con signo; `+ - * / % **` lanzan `IntegerOverflow`
-  fuera de rango (`tests/120-int-division.vn`, `crates/varn-core/src/numeric_conv.rs`).
+  fuera de rango (`tests/120-int-division.vn`, `crates/vn-core/src/numeric_conv.rs`).
 - `int / int` = `int` truncado hacia cero; `x / 0` lanza `DivisionByZero`
   (`tests/120-int-division.vn`).
 - Conversiones explícitas con `as` (`tests/122-numeric-conversions.vn`).

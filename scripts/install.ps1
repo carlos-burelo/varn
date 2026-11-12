@@ -13,7 +13,7 @@ New-Item -ItemType Directory -Force $Dest | Out-Null
 
 Push-Location $repoRoot
 try {
-    & cargo build --release -p varn-cli -p varn-shadow
+    & cargo build --release -p vn-cli -p vn-shadow
     if ($LASTEXITCODE -ne 0) { throw "cargo build falló (exit $LASTEXITCODE)" }
 } finally {
     Pop-Location

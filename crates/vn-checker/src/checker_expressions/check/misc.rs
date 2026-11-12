@@ -1,0 +1,229 @@
+use super::const_int::closest_name;
+use super::Checker;
+use crate::checker::recorder::Recorder;
+use vn_core::ast::ExprId;
+use vn_core::{Diagnostic, ErrorCode, Suggestion};
+use vn_sem::bind::BindResult;
+use vn_sem::types::Type;
+
+impl<'r> Checker<'r> {
+    pub(super) fn check_pipeline(
+        &mut self,
+        rec: &mut Recorder,
+        left: ExprId,
+        right: ExprId,
+        bind: &BindResult,
+    ) {
+        self.check_expr(rec, left, bind);
+        let lhs_ty = self.infer_type(rec, left, bind);
+        let saved_pipeline = self.in_pipeline_rhs;
+        let saved_pipe_ty = self.pipeline_value_type.replace(lhs_ty);
+        self.in_pipeline_rhs = true;
+        self.check_expr(rec, right, bind);
+        self.in_pipeline_rhs = saved_pipeline;
+        self.pipeline_value_type = saved_pipe_ty;
+    }
+
+    pub(super) fn check_range(
+        &mut self,
+        rec: &mut Recorder,
+        start: ExprId,
+        end: ExprId,
+        range: vn_core::SourceRange,
+        bind: &BindResult,
+    ) {
+        self.check_expr(rec, start, bind);
+        self.check_expr(rec, end, bind);
+        let lo = self.infer_type(rec, start, bind).apparent(&self.ty_table);
+        let hi = self.infer_type(rec, end, bind).apparent(&self.ty_table);
+        let domain_ok = |t: &Type| t.is_unresolved() || *t == Type::Int || *t == Type::Char;
+        let same = lo.is_unresolved() || hi.is_unresolved() || lo == hi;
+        if !(domain_ok(&lo) && domain_ok(&hi) && same) {
+            let lo_s = lo.display(&self.ty_table, &bind.interner);
+            let hi_s = hi.display(&self.ty_table, &bind.interner);
+            self.emit(
+                Diagnostic::error(
+                    ErrorCode::TypeMismatch,
+                    format!(
+                        "range bounds must be both `int` or both `char`, found '{lo_s}' and '{hi_s}'"
+                    ),
+                )
+                .with_range(range),
+            );
+        }
+    }
+
+    pub(super) fn check_tagged_template(
+        &mut self,
+        rec: &mut Recorder,
+        tag: ExprId,
+        template: ExprId,
+        range: vn_core::SourceRange,
+        bind: &BindResult,
+    ) {
+        self.check_expr(rec, tag, bind);
+        self.check_expr(rec, template, bind);
+        let tag_ty_raw = self.infer_type(rec, tag, bind);
+        let tag_ty = tag_ty_raw.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+        if let vn_core::TypeKind::Fn(fid) = self.ty_table.get(tag_ty.0) {
+            let ret = self.ty_table.get_function(fid).return_type;
+            self.record_type(rec, range.start.offset, Type::resolved(ret));
+        }
+    }
+
+    pub(super) fn check_with_object(
+        &mut self,
+        rec: &mut Recorder,
+        object: ExprId,
+        properties: &[vn_core::ast::ObjectProp],
+        range: vn_core::SourceRange,
+        bind: &BindResult,
+    ) {
+        self.check_expr(rec, object, bind);
+        let obj_ty = self.infer_type(rec, object, bind);
+        for prop in properties {
+            match prop {
+                vn_core::ast::ObjectProp::Property {
+                    key,
+                    value,
+                    range: prop_range,
+                    ..
+                } => {
+                    let member = match key {
+                        vn_core::ast::PropKey::Identifier(name)
+                        | vn_core::ast::PropKey::Str(name) => Some(name.clone()),
+                        vn_core::ast::PropKey::Int(_) | vn_core::ast::PropKey::Computed(_) => {
+                            self.emit(
+                                Diagnostic::error(
+                                    ErrorCode::InvalidWithEntry,
+                                    "`with` replaces fields by name: a computed or numeric key is not statically known",
+                                )
+                                .with_range(*prop_range),
+                            );
+                            None
+                        }
+                    };
+                    let expected = match (&member, obj_ty.is_unresolved()) {
+                        (Some(name), false) => {
+                            let found = self.find_member_info(&obj_ty, name, bind);
+                            if found.is_none() {
+                                self.emit(
+                                    Diagnostic::error(
+                                        ErrorCode::MissingProperty,
+                                        format!(
+                                            "property '{name}' does not exist on type '{}'",
+                                            obj_ty.display(&self.ty_table, &bind.interner)
+                                        ),
+                                    )
+                                    .with_range(*prop_range),
+                                );
+                            }
+                            found.map(|(ty, _)| ty)
+                        }
+                        (Some(_), true) | (None, _) => None,
+                    };
+                    self.with_expected(expected, |c| c.check_expr(rec, *value, bind));
+                    if let Some(expected) = expected {
+                        let actual = self.infer_type(rec, *value, bind);
+                        if !actual.is_unresolved()
+                            && !self.value_fits(rec, &expected, &actual, Some(*value), Some(bind))
+                        {
+                            self.emit(
+                                Diagnostic::error(
+                                    ErrorCode::TypeMismatch,
+                                    format!(
+                                        "type mismatch: '{}' expects '{}' but got '{}'",
+                                        member.as_deref().unwrap_or("?"),
+                                        expected.display(&self.ty_table, &bind.interner),
+                                        actual.display(&self.ty_table, &bind.interner)
+                                    ),
+                                )
+                                .with_range(*prop_range),
+                            );
+                        }
+                    }
+                }
+                vn_core::ast::ObjectProp::Spread {
+                    argument,
+                    range: entry_range,
+                } => {
+                    self.check_expr(rec, *argument, bind);
+                    self.emit(
+                        Diagnostic::error(
+                            ErrorCode::InvalidWithEntry,
+                            "`with` replaces named fields only: a spread entry has no statically known fields",
+                        )
+                        .with_range(*entry_range),
+                    );
+                }
+                vn_core::ast::ObjectProp::Method {
+                    range: entry_range, ..
+                } => {
+                    self.emit(
+                        Diagnostic::error(
+                            ErrorCode::InvalidWithEntry,
+                            "`with` replaces fields: a method entry cannot be a replacement",
+                        )
+                        .with_range(*entry_range),
+                    );
+                }
+            }
+        }
+        self.record_type(rec, range.start.offset, obj_ty);
+    }
+
+    pub(super) fn check_meta_access(
+        &mut self,
+        rec: &mut Recorder,
+        target: ExprId,
+        expr: ExprId,
+        range: vn_core::SourceRange,
+        bind: &BindResult,
+    ) {
+        self.check_expr(rec, target, bind);
+        let ty = self.infer_type(rec, expr, bind);
+        self.record_type(rec, range.start.offset, ty);
+    }
+
+    pub(super) fn check_identifier(
+        &mut self,
+        rec: &mut Recorder,
+        name: vn_core::Atom,
+        range: vn_core::SourceRange,
+        bind: &BindResult,
+    ) {
+        let name_str = bind.interner.resolve(name);
+        if name_str == vn_core::TokenKind::Placeholder.as_str() {
+            if !self.is_assignment_target && !self.in_pipeline_rhs {
+                self.emit(
+                    Diagnostic::error(
+                        ErrorCode::UnknownSymbol,
+                        "cannot use '_' as a value; '_' is the discard placeholder",
+                    )
+                    .with_range(range),
+                );
+            } else if self.in_pipeline_rhs
+                && let Some(ty) = self.pipeline_value_type
+            {
+                self.record_type(rec, range.start.offset, ty);
+            }
+            return;
+        }
+
+        let scope = bind.scopes.get(self.current_scope);
+        if let Some(sid) = scope.resolve(name, &bind.scopes) {
+            self.warn_if_deprecated(sid, name_str, range, bind);
+        }
+        if scope.resolve(name, &bind.scopes).is_none() {
+            let mut diag = Diagnostic::error(
+                ErrorCode::UnknownSymbol,
+                format!("undefined variable: {name_str}"),
+            )
+            .with_range(range);
+            if let Some(candidate) = closest_name(name_str, scope, &bind.scopes, &bind.interner) {
+                diag = diag.with_suggestion(Suggestion::did_you_mean(&candidate, range));
+            }
+            self.emit(diag);
+        }
+    }
+}

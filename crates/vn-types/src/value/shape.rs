@@ -1,0 +1,115 @@
+use super::RuntimeString;
+use rustc_hash::FxHashMap as HashMap;
+use std::cell::{OnceCell, RefCell};
+use std::rc::Rc;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
+
+static NEXT_SHAPE_ID: AtomicU32 = AtomicU32::new(1);
+
+pub struct Shape {
+    pub id: u32,
+    pub class: Option<Rc<crate::value::ClassObj>>,
+    pub property_names: HashMap<RuntimeString, usize>,
+
+    ordered: Vec<RuntimeString>,
+
+    json_prefixes: OnceCell<Vec<String>>,
+    transitions: RefCell<HashMap<RuntimeString, Rc<Shape>>>,
+}
+
+pub const SHAPE_ID_OFF: usize = std::mem::offset_of!(Shape, id);
+
+impl std::fmt::Debug for Shape {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Shape")
+            .field("id", &self.id)
+            .field("class", &self.class.as_ref().map(|c| &c.name))
+            .field("property_names", &self.property_names)
+            .finish()
+    }
+}
+
+impl Shape {
+    pub fn create(
+        class: Option<Rc<crate::value::ClassObj>>,
+        property_names: HashMap<RuntimeString, usize>,
+    ) -> Rc<Self> {
+        let mut by_slot: Vec<(usize, RuntimeString)> = property_names
+            .iter()
+            .map(|(k, &slot)| (slot, Arc::clone(k)))
+            .collect();
+        by_slot.sort_unstable_by_key(|(slot, _)| *slot);
+        let ordered: Vec<RuntimeString> = by_slot.into_iter().map(|(_, k)| k).collect();
+        Rc::new(Shape {
+            id: NEXT_SHAPE_ID.fetch_add(1, Ordering::Relaxed),
+            class,
+            property_names,
+            ordered,
+            json_prefixes: OnceCell::new(),
+            transitions: RefCell::new(HashMap::default()),
+        })
+    }
+
+    #[inline]
+    pub fn ordered_names(&self) -> &[RuntimeString] {
+        &self.ordered
+    }
+
+    pub fn json_prefixes(&self) -> &[String] {
+        self.json_prefixes.get_or_init(|| {
+            let ordered = &self.ordered;
+            let mut json_prefixes = Vec::with_capacity(ordered.len());
+            for (i, name) in ordered.iter().enumerate() {
+                let mut p = String::new();
+                if i > 0 {
+                    p.push(',');
+                }
+                vn_core::text_repr::write_quoted_str(name, &mut p);
+                p.push(':');
+                json_prefixes.push(p);
+            }
+            json_prefixes
+        })
+    }
+
+    pub fn create_root() -> Rc<Self> {
+        Shape::create(None, HashMap::default())
+    }
+
+    pub fn transition(&self, key: RuntimeString) -> Rc<Shape> {
+        let mut trans = self.transitions.borrow_mut();
+        if let Some(child) = trans.get(&key) {
+            return Rc::clone(child);
+        }
+        let mut new_props = self.property_names.clone();
+        let slot = new_props.len();
+        new_props.insert(Arc::clone(&key), slot);
+        let child = Shape::create(self.class.clone(), new_props);
+        trans.insert(key, Rc::clone(&child));
+        child
+    }
+
+    #[inline]
+    pub fn transition_str(&self, key: &str) -> Rc<Shape> {
+        let mut trans = self.transitions.borrow_mut();
+        if let Some(child) = trans.get(key) {
+            return Rc::clone(child);
+        }
+        let rc_key: RuntimeString = Arc::from(key);
+        let mut new_props = self.property_names.clone();
+        let slot = new_props.len();
+        new_props.insert(Arc::clone(&rc_key), slot);
+        let child = Shape::create(self.class.clone(), new_props);
+        trans.insert(rc_key, Rc::clone(&child));
+        child
+    }
+}
+
+thread_local! {
+    static ROOT_SHAPE: Rc<Shape> = Shape::create_root();
+}
+
+pub fn root_shape() -> Rc<Shape> {
+    ROOT_SHAPE.with(Rc::clone)
+}

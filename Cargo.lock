@@ -3668,417 +3668,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "varn-binder"
-version = "0.1.0"
-dependencies = [
- "rustc-hash 1.1.0",
- "varn-core",
- "varn-modules",
- "varn-sem",
-]
-
-[[package]]
-name = "varn-builtins"
-version = "0.1.0"
-dependencies = [
- "base64 0.21.7",
- "bigdecimal",
- "chrono",
- "flate2",
- "hex",
- "hmac",
- "httparse",
- "libloading",
- "mio",
- "num-bigint",
- "num-traits",
- "parking_lot",
- "rand",
- "regex",
- "rusqlite",
- "rustc-hash 1.1.0",
- "rustls",
- "sha1",
- "sha2",
- "socket2",
- "tar",
- "urlencoding",
- "uuid",
- "varn-core",
- "varn-gpu",
- "varn-lexer",
- "varn-macros",
- "varn-modules",
- "varn-parser",
- "varn-text",
- "varn-types",
- "varn-ui",
- "webpki-roots 1.0.6",
- "zip",
-]
-
-[[package]]
-name = "varn-checker"
-version = "0.1.0"
-dependencies = [
- "rustc-hash 1.1.0",
- "varn-binder",
- "varn-core",
- "varn-sem",
-]
-
-[[package]]
-name = "varn-cli"
-version = "0.1.0"
-dependencies = [
- "clap",
- "clap_complete",
- "dhat",
- "mimalloc",
- "postcard",
- "rustc-hash 1.1.0",
- "serde",
- "serde_json",
- "shlex",
- "varn-builtins",
- "varn-compiler",
- "varn-core",
- "varn-dap",
- "varn-debug",
- "varn-inspect",
- "varn-jit",
- "varn-lexer",
- "varn-lsp",
- "varn-modules",
- "varn-parser",
- "varn-pipeline",
- "varn-pm",
- "varn-project",
- "varn-sem",
- "varn-types",
- "varn-vm",
-]
-
-[[package]]
-name = "varn-compiler"
-version = "0.1.0"
-dependencies = [
- "bigdecimal",
- "num-bigint",
- "rustc-hash 1.1.0",
- "varn-core",
- "varn-tir",
- "varn-types",
-]
-
-[[package]]
-name = "varn-core"
-version = "0.1.0"
-dependencies = [
- "bigdecimal",
- "console",
- "num-bigint",
- "num-traits",
- "regex",
- "rustc-hash 1.1.0",
- "serde",
- "xxhash-rust",
-]
-
-[[package]]
-name = "varn-dap"
-version = "0.1.0"
-dependencies = [
- "rustc-hash 1.1.0",
- "serde",
- "serde_json",
- "varn-core",
- "varn-pipeline",
- "varn-types",
- "varn-vm",
-]
-
-[[package]]
-name = "varn-debug"
-version = "0.1.0"
-dependencies = [
- "console",
- "iced-x86",
- "rustc-hash 1.1.0",
- "varn-compiler",
- "varn-core",
- "varn-emit",
- "varn-jit",
- "varn-sem",
- "varn-tir",
- "varn-types",
-]
-
-[[package]]
-name = "varn-emit"
-version = "0.1.0"
-dependencies = [
- "rustc-hash 1.1.0",
- "varn-core",
- "varn-modules",
- "varn-sem",
- "varn-tir",
-]
-
-[[package]]
-name = "varn-gpu"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "parking_lot",
- "pollster",
- "rustc-hash 1.1.0",
- "wgpu",
-]
-
-[[package]]
-name = "varn-inspect"
-version = "0.1.0"
-dependencies = [
- "rustc-hash 1.1.0",
- "tower-lsp-f",
- "varn-core",
- "varn-debug",
- "varn-lsp",
- "varn-modules",
- "varn-pipeline",
- "varn-sem",
-]
-
-[[package]]
-name = "varn-jit"
-version = "0.1.0"
-dependencies = [
- "cranelift-codegen",
- "cranelift-frontend",
- "cranelift-module",
- "cranelift-native",
- "cranelift-object",
- "rustc-hash 1.1.0",
- "serde",
- "varn-core",
- "varn-jit-abi",
- "varn-types",
-]
-
-[[package]]
-name = "varn-jit-abi"
-version = "0.1.0"
-dependencies = [
- "varn-types",
-]
-
-[[package]]
-name = "varn-lexer"
-version = "0.1.0"
-dependencies = [
- "varn-core",
-]
-
-[[package]]
-name = "varn-lsp"
-version = "0.1.0"
-dependencies = [
- "dashmap 5.5.3",
- "once_cell",
- "rustc-hash 1.1.0",
- "serde_json",
- "tokio",
- "tower-lsp-f",
- "varn-builtins",
- "varn-checker",
- "varn-compiler",
- "varn-core",
- "varn-emit",
- "varn-modules",
- "varn-pipeline",
- "varn-resolver",
- "varn-sem",
- "varn-tir",
- "varn-types",
-]
-
-[[package]]
-name = "varn-macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
- "varn-core",
- "varn-lexer",
- "varn-parser",
-]
-
-[[package]]
-name = "varn-modules"
-version = "0.1.0"
-dependencies = [
- "rustc-hash 1.1.0",
- "semver",
- "varn-core",
- "varn-project",
-]
-
-[[package]]
-name = "varn-parser"
-version = "0.1.0"
-dependencies = [
- "varn-core",
- "varn-lexer",
-]
-
-[[package]]
-name = "varn-pipeline"
-version = "0.1.0"
-dependencies = [
- "postcard",
- "rustc-hash 1.1.0",
- "varn-checker",
- "varn-compiler",
- "varn-core",
- "varn-emit",
- "varn-lexer",
- "varn-modules",
- "varn-parser",
- "varn-project",
- "varn-resolver",
- "varn-sem",
- "varn-tir",
- "varn-types",
- "varn-vm",
-]
-
-[[package]]
-name = "varn-pm"
-version = "0.1.0"
-dependencies = [
- "flate2",
- "hex",
- "rustc-hash 1.1.0",
- "semver",
- "serde",
- "serde_json",
- "sha2",
- "tar",
- "ureq",
- "varn-core",
- "varn-modules",
- "varn-project",
-]
-
-[[package]]
-name = "varn-project"
-version = "0.1.0"
-dependencies = [
- "serde",
- "toml",
-]
-
-[[package]]
-name = "varn-resolver"
-version = "0.1.0"
-dependencies = [
- "parking_lot",
- "postcard",
- "rustc-hash 1.1.0",
- "varn-binder",
- "varn-checker",
- "varn-core",
- "varn-lexer",
- "varn-modules",
- "varn-parser",
- "varn-sem",
-]
-
-[[package]]
-name = "varn-rt"
-version = "0.1.0"
-
-[[package]]
-name = "varn-sem"
-version = "0.1.0"
-dependencies = [
- "postcard",
- "rustc-hash 1.1.0",
- "serde",
- "varn-core",
- "xxhash-rust",
-]
-
-[[package]]
-name = "varn-shadow"
-version = "0.1.0"
-
-[[package]]
-name = "varn-text"
-version = "0.1.0"
-dependencies = [
- "egui",
-]
-
-[[package]]
-name = "varn-tir"
-version = "0.1.0"
-dependencies = [
- "rustc-hash 1.1.0",
- "varn-core",
-]
-
-[[package]]
-name = "varn-types"
-version = "0.1.0"
-dependencies = [
- "bigdecimal",
- "memchr",
- "num-bigint",
- "rustc-hash 1.1.0",
- "serde",
- "varn-core",
-]
-
-[[package]]
-name = "varn-ui"
-version = "0.1.0"
-dependencies = [
- "egui",
- "egui-wgpu",
- "parking_lot",
- "pollster",
- "rustc-hash 1.1.0",
- "varn-text",
- "wgpu",
- "winit",
-]
-
-[[package]]
-name = "varn-vm"
-version = "0.1.0"
-dependencies = [
- "bigdecimal",
- "libc",
- "memchr",
- "num-bigint",
- "num-traits",
- "postcard",
- "rustc-hash 1.1.0",
- "ryu",
- "serde",
- "serde_json",
- "varn-builtins",
- "varn-core",
- "varn-jit",
- "varn-macros",
- "varn-modules",
- "varn-types",
-]
-
-[[package]]
 name = "vcpkg"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4116,6 +3705,417 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "vn-binder"
+version = "0.1.0"
+dependencies = [
+ "rustc-hash 1.1.0",
+ "vn-core",
+ "vn-modules",
+ "vn-sem",
+]
+
+[[package]]
+name = "vn-builtins"
+version = "0.1.0"
+dependencies = [
+ "base64 0.21.7",
+ "bigdecimal",
+ "chrono",
+ "flate2",
+ "hex",
+ "hmac",
+ "httparse",
+ "libloading",
+ "mio",
+ "num-bigint",
+ "num-traits",
+ "parking_lot",
+ "rand",
+ "regex",
+ "rusqlite",
+ "rustc-hash 1.1.0",
+ "rustls",
+ "sha1",
+ "sha2",
+ "socket2",
+ "tar",
+ "urlencoding",
+ "uuid",
+ "vn-core",
+ "vn-gpu",
+ "vn-lexer",
+ "vn-macros",
+ "vn-modules",
+ "vn-parser",
+ "vn-text",
+ "vn-types",
+ "vn-ui",
+ "webpki-roots 1.0.6",
+ "zip",
+]
+
+[[package]]
+name = "vn-checker"
+version = "0.1.0"
+dependencies = [
+ "rustc-hash 1.1.0",
+ "vn-binder",
+ "vn-core",
+ "vn-sem",
+]
+
+[[package]]
+name = "vn-cli"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "clap_complete",
+ "dhat",
+ "mimalloc",
+ "postcard",
+ "rustc-hash 1.1.0",
+ "serde",
+ "serde_json",
+ "shlex",
+ "vn-builtins",
+ "vn-compiler",
+ "vn-core",
+ "vn-dap",
+ "vn-debug",
+ "vn-inspect",
+ "vn-jit",
+ "vn-lexer",
+ "vn-lsp",
+ "vn-modules",
+ "vn-parser",
+ "vn-pipeline",
+ "vn-pm",
+ "vn-project",
+ "vn-sem",
+ "vn-types",
+ "vn-vm",
+]
+
+[[package]]
+name = "vn-compiler"
+version = "0.1.0"
+dependencies = [
+ "bigdecimal",
+ "num-bigint",
+ "rustc-hash 1.1.0",
+ "vn-core",
+ "vn-tir",
+ "vn-types",
+]
+
+[[package]]
+name = "vn-core"
+version = "0.1.0"
+dependencies = [
+ "bigdecimal",
+ "console",
+ "num-bigint",
+ "num-traits",
+ "regex",
+ "rustc-hash 1.1.0",
+ "serde",
+ "xxhash-rust",
+]
+
+[[package]]
+name = "vn-dap"
+version = "0.1.0"
+dependencies = [
+ "rustc-hash 1.1.0",
+ "serde",
+ "serde_json",
+ "vn-core",
+ "vn-pipeline",
+ "vn-types",
+ "vn-vm",
+]
+
+[[package]]
+name = "vn-debug"
+version = "0.1.0"
+dependencies = [
+ "console",
+ "iced-x86",
+ "rustc-hash 1.1.0",
+ "vn-compiler",
+ "vn-core",
+ "vn-emit",
+ "vn-jit",
+ "vn-sem",
+ "vn-tir",
+ "vn-types",
+]
+
+[[package]]
+name = "vn-emit"
+version = "0.1.0"
+dependencies = [
+ "rustc-hash 1.1.0",
+ "vn-core",
+ "vn-modules",
+ "vn-sem",
+ "vn-tir",
+]
+
+[[package]]
+name = "vn-gpu"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "parking_lot",
+ "pollster",
+ "rustc-hash 1.1.0",
+ "wgpu",
+]
+
+[[package]]
+name = "vn-inspect"
+version = "0.1.0"
+dependencies = [
+ "rustc-hash 1.1.0",
+ "tower-lsp-f",
+ "vn-core",
+ "vn-debug",
+ "vn-lsp",
+ "vn-modules",
+ "vn-pipeline",
+ "vn-sem",
+]
+
+[[package]]
+name = "vn-jit"
+version = "0.1.0"
+dependencies = [
+ "cranelift-codegen",
+ "cranelift-frontend",
+ "cranelift-module",
+ "cranelift-native",
+ "cranelift-object",
+ "rustc-hash 1.1.0",
+ "serde",
+ "vn-core",
+ "vn-jit-abi",
+ "vn-types",
+]
+
+[[package]]
+name = "vn-jit-abi"
+version = "0.1.0"
+dependencies = [
+ "vn-types",
+]
+
+[[package]]
+name = "vn-lexer"
+version = "0.1.0"
+dependencies = [
+ "vn-core",
+]
+
+[[package]]
+name = "vn-lsp"
+version = "0.1.0"
+dependencies = [
+ "dashmap 5.5.3",
+ "once_cell",
+ "rustc-hash 1.1.0",
+ "serde_json",
+ "tokio",
+ "tower-lsp-f",
+ "vn-builtins",
+ "vn-checker",
+ "vn-compiler",
+ "vn-core",
+ "vn-emit",
+ "vn-modules",
+ "vn-pipeline",
+ "vn-resolver",
+ "vn-sem",
+ "vn-tir",
+ "vn-types",
+]
+
+[[package]]
+name = "vn-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+ "vn-core",
+ "vn-lexer",
+ "vn-parser",
+]
+
+[[package]]
+name = "vn-modules"
+version = "0.1.0"
+dependencies = [
+ "rustc-hash 1.1.0",
+ "semver",
+ "vn-core",
+ "vn-project",
+]
+
+[[package]]
+name = "vn-parser"
+version = "0.1.0"
+dependencies = [
+ "vn-core",
+ "vn-lexer",
+]
+
+[[package]]
+name = "vn-pipeline"
+version = "0.1.0"
+dependencies = [
+ "postcard",
+ "rustc-hash 1.1.0",
+ "vn-checker",
+ "vn-compiler",
+ "vn-core",
+ "vn-emit",
+ "vn-lexer",
+ "vn-modules",
+ "vn-parser",
+ "vn-project",
+ "vn-resolver",
+ "vn-sem",
+ "vn-tir",
+ "vn-types",
+ "vn-vm",
+]
+
+[[package]]
+name = "vn-pm"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "hex",
+ "rustc-hash 1.1.0",
+ "semver",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tar",
+ "ureq",
+ "vn-core",
+ "vn-modules",
+ "vn-project",
+]
+
+[[package]]
+name = "vn-project"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "toml",
+]
+
+[[package]]
+name = "vn-resolver"
+version = "0.1.0"
+dependencies = [
+ "parking_lot",
+ "postcard",
+ "rustc-hash 1.1.0",
+ "vn-binder",
+ "vn-checker",
+ "vn-core",
+ "vn-lexer",
+ "vn-modules",
+ "vn-parser",
+ "vn-sem",
+]
+
+[[package]]
+name = "vn-rt"
+version = "0.1.0"
+
+[[package]]
+name = "vn-sem"
+version = "0.1.0"
+dependencies = [
+ "postcard",
+ "rustc-hash 1.1.0",
+ "serde",
+ "vn-core",
+ "xxhash-rust",
+]
+
+[[package]]
+name = "vn-shadow"
+version = "0.1.0"
+
+[[package]]
+name = "vn-text"
+version = "0.1.0"
+dependencies = [
+ "egui",
+]
+
+[[package]]
+name = "vn-tir"
+version = "0.1.0"
+dependencies = [
+ "rustc-hash 1.1.0",
+ "vn-core",
+]
+
+[[package]]
+name = "vn-types"
+version = "0.1.0"
+dependencies = [
+ "bigdecimal",
+ "memchr",
+ "num-bigint",
+ "rustc-hash 1.1.0",
+ "serde",
+ "vn-core",
+]
+
+[[package]]
+name = "vn-ui"
+version = "0.1.0"
+dependencies = [
+ "egui",
+ "egui-wgpu",
+ "parking_lot",
+ "pollster",
+ "rustc-hash 1.1.0",
+ "vn-text",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
+name = "vn-vm"
+version = "0.1.0"
+dependencies = [
+ "bigdecimal",
+ "libc",
+ "memchr",
+ "num-bigint",
+ "num-traits",
+ "postcard",
+ "rustc-hash 1.1.0",
+ "ryu",
+ "serde",
+ "serde_json",
+ "vn-builtins",
+ "vn-core",
+ "vn-jit",
+ "vn-macros",
+ "vn-modules",
+ "vn-types",
+]
 
 [[package]]
 name = "walkdir"
@@ -5100,7 +5100,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "varn-core",
+ "vn-core",
 ]
 
 [[package]]

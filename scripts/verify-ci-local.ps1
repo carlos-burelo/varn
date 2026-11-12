@@ -37,17 +37,17 @@ function Step($name, [scriptblock]$body) {
 
 if (-not $SkipCross) {
     Step "cross-check linux-gnu (cfg unix)" {
-        cargo check -p varn-jit --target x86_64-unknown-linux-gnu > $null 2> $null
+        cargo check -p vn-jit --target x86_64-unknown-linux-gnu > $null 2> $null
         if ($LASTEXITCODE -ne 0) { throw "cargo check linux-gnu exit=$LASTEXITCODE" }
     }
     Step "cross-check macOS ARM (cfg macos)" {
-        cargo check -p varn-jit --target aarch64-apple-darwin > $null 2> $null
+        cargo check -p vn-jit --target aarch64-apple-darwin > $null 2> $null
         if ($LASTEXITCODE -ne 0) { throw "cargo check macos exit=$LASTEXITCODE" }
     }
     Step "fallback.rs aislado para linux-gnu (sin dependencias C)" {
         $tmp = Join-Path $env:TEMP "vn-fbcheck"
         New-Item -ItemType Directory -Force -Path $tmp | Out-Null
-        Copy-Item "crates/varn-vm/src/arch/fallback.rs" (Join-Path $tmp "fallback.rs") -Force
+        Copy-Item "crates/vn-vm/src/arch/fallback.rs" (Join-Path $tmp "fallback.rs") -Force
         $out = Join-Path $tmp "out"
         New-Item -ItemType Directory -Force -Path $out | Out-Null
         rustc --edition 2021 --crate-type lib --target x86_64-unknown-linux-gnu (Join-Path $tmp "fallback.rs") --out-dir $out > $null 2> $null

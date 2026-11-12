@@ -1,0 +1,13 @@
+[package]
+name = "vn-modules"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+vn-core  = { path = "../vn-core" }
+vn-project = { path = "../vn-project" }
+semver     = { workspace = true }
+rustc-hash = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,28 @@
+[package]
+name = "vn-lsp"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+vn-core    = { path = "../vn-core" }
+vn-checker = { path = "../vn-checker" }
+vn-emit    = { path = "../vn-emit" }
+vn-modules  = { path = "../vn-modules" }
+vn-builtins = { path = "../vn-builtins", features = ["runtime"] }
+vn-types    = { path = "../vn-types" }
+vn-compiler = { path = "../vn-compiler" }
+vn-tir      = { path = "../vn-tir" }
+vn-sem      = { path = "../vn-sem" }
+vn-resolver = { path = "../vn-resolver" }
+vn-pipeline = { path = "../vn-pipeline" }
+
+tower-lsp-f  = { workspace = true }
+tokio      = { workspace = true }
+serde_json = { workspace = true }
+dashmap    = "5"
+once_cell  = "1"
+rustc-hash = { workspace = true }
+
+
+[lints]
+workspace = true

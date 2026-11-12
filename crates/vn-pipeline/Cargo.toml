@@ -1,0 +1,24 @@
+[package]
+name = "vn-pipeline"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+vn-core        = { path = "../vn-core" }
+vn-lexer       = { path = "../vn-lexer" }
+vn-parser      = { path = "../vn-parser", features = ["profiling"] }
+vn-checker     = { path = "../vn-checker" }
+vn-emit        = { path = "../vn-emit" }
+vn-tir         = { path = "../vn-tir" }
+vn-compiler    = { path = "../vn-compiler" }
+vn-vm          = { path = "../vn-vm" }
+vn-project     = { path = "../vn-project" }
+vn-modules     = { path = "../vn-modules" }
+vn-types       = { path = "../vn-types" }
+vn-sem         = { path = "../vn-sem" }
+vn-resolver    = { path = "../vn-resolver" }
+rustc-hash       = { workspace = true }
+postcard     = { workspace = true }
+
+[lints]
+workspace = true

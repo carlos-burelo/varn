@@ -1,0 +1,414 @@
+use parking_lot::Mutex;
+use std::collections::VecDeque;
+use std::sync::OnceLock;
+use vn_core::StdErrorClass;
+use vn_macros::varn_contract;
+use vn_types::NativeError;
+use vn_types::{NativeCtx, VmValue};
+
+#[path = "draw.rs"]
+mod ui_draw;
+use ui_draw::DrawCmd;
+
+pub struct UiRuntime;
+
+vn_macros::varn_enum! {
+    module: MODULE_ID,
+    contract: "src/modules/runtime/ui/ui_runtime.vn",
+    pub enum UiEventKind;
+}
+
+vn_macros::varn_enum! {
+    module: MODULE_ID,
+    contract: "src/modules/runtime/ui/ui_runtime.vn",
+    pub enum UiInjectKind;
+}
+
+vn_macros::varn_enum! {
+    module: MODULE_ID,
+    contract: "src/modules/runtime/ui/ui_runtime.vn",
+    pub enum UiControlKind;
+}
+
+struct Window {
+    alive: bool,
+    closed: bool,
+    w: i64,
+    h: i64,
+    events: VecDeque<vn_ui::RealEvent>,
+    commands: Vec<DrawCmd>,
+    real: Option<u64>,
+    canvas: vn_ui::Canvas,
+    dark: bool,
+    activated: Vec<vn_ui::Activation>,
+    typed: Vec<vn_ui::TextChange>,
+}
+
+static WINDOWS: OnceLock<Mutex<Vec<Option<Window>>>> = OnceLock::new();
+
+fn windows() -> &'static Mutex<Vec<Option<Window>>> {
+    WINDOWS.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+fn with_win<T>(id: i64, f: impl FnOnce(&mut Window) -> Result<T, String>) -> Result<T, String> {
+    if id < 0 {
+        return Err("ui: bad window handle".to_string());
+    }
+    let mut all = windows().lock();
+    let w = all
+        .get_mut(id as usize)
+        .and_then(|s| s.as_mut())
+        .filter(|w| w.alive)
+        .ok_or_else(|| "ui: destroyed window".to_string())?;
+    f(w)
+}
+
+fn real_poll(id: u64) -> Result<Vec<vn_ui::RealEvent>, String> {
+    vn_ui::take_events(id)
+}
+
+fn ui_event(ctx: &mut dyn NativeCtx, e: &vn_ui::RealEvent) -> Result<VmValue, String> {
+    let (kind, key, pressed, x, y, button, w, h) = match *e {
+        vn_ui::RealEvent::Key { key, pressed } => (UiEventKind::Key, key, pressed, 0, 0, 0, 0, 0),
+        vn_ui::RealEvent::Mouse { x, y, button, pressed } => (UiEventKind::Mouse, 0, pressed, x, y, button, 0, 0),
+        vn_ui::RealEvent::Resize { w, h } => (UiEventKind::Resize, 0, false, 0, 0, 0, w, h),
+        vn_ui::RealEvent::Wheel { dy } => (UiEventKind::Wheel, 0, false, 0, dy, 0, 0, 0),
+        vn_ui::RealEvent::Close => (UiEventKind::Close, 0, false, 0, 0, 0, 0, 0),
+    };
+    let kind = kind.to_value(ctx)?;
+    Ok(UiEvent { kind, key, pressed, x, y, button, w, h }.alloc(ctx))
+}
+
+vn_macros::varn_record! {
+    contract: "src/modules/runtime/ui/ui_runtime.vn",
+    interface: "TypedText",
+    struct TypedText;
+}
+
+vn_macros::varn_record! {
+    contract: "src/modules/runtime/ui/ui_runtime.vn",
+    interface: "DrawnItem",
+    struct DrawnItem;
+}
+
+vn_macros::varn_record! {
+    contract: "src/modules/runtime/ui/ui_runtime.vn",
+    interface: "UiEvent",
+    struct UiEvent;
+}
+
+
+varn_contract! {
+    module: "runtime:ui",
+    contract: "src/modules/runtime/ui/ui_runtime.vn",
+    impl UiRuntime {
+        fn open(_ctx: &mut dyn NativeCtx, title: &str, w: i64, h: i64, headless: bool) -> Result<i64, NativeError> {
+            if w <= 0 || h <= 0 {
+                return Err(NativeError::range_error(format!("ui.open: bad size ({w}x{h})")));
+            }
+            let mut all = windows().lock();
+            let real = if !headless && w <= u32::MAX as i64 && h <= u32::MAX as i64 {
+                drop(all);
+                let r = vn_ui::try_open(title, w as u32, h as u32);
+                all = windows().lock();
+                r
+            } else {
+                None
+            };
+            let id = all.len() as i64;
+            all.push(Some(Window {
+                alive: true,
+                closed: false,
+                w,
+                h,
+                events: VecDeque::new(),
+                commands: Vec::new(),
+                real,
+                canvas: vn_ui::Canvas::new(),
+                dark: true,
+                activated: Vec::new(),
+                typed: Vec::new(),
+            }));
+            Ok(id)
+        }
+        fn close(_ctx: &mut dyn NativeCtx, id: i64) -> Result<(), NativeError> {
+            let real = with_win(id, |w| {
+                w.alive = false;
+                Ok(w.real)
+            }).map_err(|e| NativeError::std(StdErrorClass::Std, e))?;
+            if let Some(h) = real {
+                let _ = vn_ui::close(h);
+            }
+            Ok(())
+        }
+        fn shouldClose(_ctx: &mut dyn NativeCtx, id: i64) -> Result<bool, NativeError> {
+            (with_win(id, |w| Ok(w.closed))).map_err(|e| NativeError::std(StdErrorClass::Std, e))
+        }
+        fn size(_ctx: &mut dyn NativeCtx, id: i64) -> Result<Vec<VmValue>, NativeError> {
+            (with_win(id, |w| {
+                if let Some(h) = w.real
+                    && let Ok((rw, rh)) = vn_ui::size(h)
+                {
+                    w.w = rw as i64;
+                    w.h = rh as i64;
+                }
+                Ok(vec![VmValue::from_int(w.w), VmValue::from_int(w.h)])
+            })).map_err(|e| NativeError::std(StdErrorClass::Std, e))
+        }
+        fn inject(ctx: &mut dyn NativeCtx, id: i64, kind: VmValue, a: i64, b: i64, c: i64) -> Result<(), NativeError> {
+            let inject = UiInjectKind::from_value(ctx, kind)
+                .ok_or_else(|| "ui.inject: kind is not a UiInjectKind".to_string()).map_err(|e| NativeError::std(StdErrorClass::Std, e))?;
+            (with_win(id, |w| {
+                let e = match inject {
+                    UiInjectKind::Key => vn_ui::RealEvent::Key { key: a, pressed: b != 0 },
+                    UiInjectKind::Mouse => vn_ui::RealEvent::Mouse { x: a, y: b, button: c, pressed: false },
+                    UiInjectKind::MouseDown => vn_ui::RealEvent::Mouse { x: a, y: b, button: c, pressed: true },
+                    UiInjectKind::MouseUp => vn_ui::RealEvent::Mouse { x: a, y: b, button: c, pressed: false },
+                    UiInjectKind::Resize => {
+                        w.w = a;
+                        w.h = b;
+                        vn_ui::RealEvent::Resize { w: a, h: b }
+                    }
+                    UiInjectKind::Wheel => vn_ui::RealEvent::Wheel { dy: a },
+                    UiInjectKind::Close => {
+                        w.closed = true;
+                        vn_ui::RealEvent::Close
+                    }
+                };
+                w.events.push_back(e);
+                Ok(())
+            })).map_err(|e| NativeError::std(StdErrorClass::Std, e))
+        }
+        fn poll(ctx: &mut dyn NativeCtx, id: i64) -> Result<Vec<VmValue>, NativeError> {
+            let real = with_win(id, |w| Ok(w.real)).map_err(|e| NativeError::std(StdErrorClass::Std, e))?;
+            if let Some(h) = real {
+                let _ = vn_ui::pump(h);
+                for e in real_poll(h).map_err(|e| NativeError::std(StdErrorClass::Std, e))? {
+                    with_win(id, |w| {
+                        match e {
+                            vn_ui::RealEvent::Close => w.closed = true,
+                            vn_ui::RealEvent::Resize { w: rw, h: rh } => {
+                                w.w = rw;
+                                w.h = rh;
+                            }
+                            vn_ui::RealEvent::Key { .. }
+                            | vn_ui::RealEvent::Mouse { .. }
+                            | vn_ui::RealEvent::Wheel { .. } => {}
+                        }
+                        w.events.push_back(e);
+                        Ok(())
+                    }).map_err(|e| NativeError::std(StdErrorClass::Std, e))?;
+                }
+            }
+            let drained = with_win(id, |w| {
+                let drained = std::mem::take(&mut w.events);
+                for e in &drained {
+                    w.canvas.feed(e);
+                }
+                Ok(drained)
+            }).map_err(|e| NativeError::std(StdErrorClass::Std, e))?;
+            let mut out = Vec::with_capacity(drained.len());
+            for e in &drained {
+                out.push(ui_event(ctx, e).map_err(|e| NativeError::std(StdErrorClass::Std, e))?);
+            }
+            Ok(out)
+        }
+        fn rect(_ctx: &mut dyn NativeCtx, id: i64, x: f64, y: f64, w: f64, h: f64, color: i64, radius: f64) -> Result<(), NativeError> {
+            (with_win(id, |win| {
+                win.commands.push(DrawCmd::Rect { x, y, w, h, color, radius });
+                Ok(())
+            })).map_err(|e| NativeError::std(StdErrorClass::Std, e))
+        }
+        fn text(_ctx: &mut dyn NativeCtx, id: i64, x: f64, y: f64, s: &str, size: f64, color: i64) -> Result<(), NativeError> {
+            (with_win(id, |win| {
+                win.commands.push(DrawCmd::Text { x, y, s: s.to_string(), size, color });
+                Ok(())
+            })).map_err(|e| NativeError::std(StdErrorClass::Std, e))
+        }
+        fn clip(_ctx: &mut dyn NativeCtx, id: i64, x: f64, y: f64, w: f64, h: f64) -> Result<(), NativeError> {
+            (with_win(id, |win| {
+                win.commands.push(DrawCmd::Clip { x, y, w, h });
+                Ok(())
+            })).map_err(|e| NativeError::std(StdErrorClass::Std, e))
+        }
+        fn unclip(_ctx: &mut dyn NativeCtx, id: i64) -> Result<(), NativeError> {
+            (with_win(id, |win| {
+                win.commands.push(DrawCmd::Unclip);
+                Ok(())
+            })).map_err(|e| NativeError::std(StdErrorClass::Std, e))
+        }
+        fn clear(_ctx: &mut dyn NativeCtx, id: i64, color: i64) -> Result<(), NativeError> {
+            (with_win(id, |win| {
+                win.commands.push(DrawCmd::Clear(color));
+                Ok(())
+            })).map_err(|e| NativeError::std(StdErrorClass::Std, e))
+        }
+        fn setDark(_ctx: &mut dyn NativeCtx, id: i64, dark: bool) -> Result<(), NativeError> {
+            (with_win(id, |win| {
+                win.dark = dark;
+                Ok(())
+            })).map_err(|e| NativeError::std(StdErrorClass::Std, e))
+        }
+        fn present(_ctx: &mut dyn NativeCtx, id: i64) -> Result<i64, NativeError> {
+            (with_win(id, |win| {
+                let n = win.commands.len() as i64;
+                let cmds = std::mem::take(&mut win.commands);
+                let scene = ui_draw::assemble(&cmds)?;
+                win.canvas.set_dark(win.dark);
+                let hits = match win.real {
+                    Some(h) => vn_ui::draw_now(h, &mut win.canvas, scene.clear, &scene.runs)
+                        .map_err(|e| format!("ui.draw: {e}"))?,
+                    None => win.canvas.interact(win.w as u32, win.h as u32, &scene.runs),
+                };
+                win.activated.extend(hits.activations);
+                win.typed.extend(hits.texts);
+                Ok(n)
+            })).map_err(|e| NativeError::std(StdErrorClass::Std, e))
+        }
+        fn control(
+            ctx: &mut dyn NativeCtx,
+            window: i64,
+            cid: i64,
+            kind: VmValue,
+            x: f64,
+            y: f64,
+            w: f64,
+            h: f64,
+            color: i64,
+            flag: bool,
+            value: f64,
+            low: f64,
+            high: f64,
+        ) -> Result<(), NativeError> {
+            let kind = match UiControlKind::from_value(ctx, kind)
+                .ok_or_else(|| "ui.control: kind is not a UiControlKind".to_string()).map_err(|e| NativeError::std(StdErrorClass::Std, e))?
+            {
+                UiControlKind::Button => vn_ui::ControlKind::Button,
+                UiControlKind::Switch => vn_ui::ControlKind::Switch,
+                UiControlKind::Slider => vn_ui::ControlKind::Slider,
+                UiControlKind::Scroll => vn_ui::ControlKind::Scroll,
+                UiControlKind::Surface => vn_ui::ControlKind::Surface,
+                UiControlKind::Field | UiControlKind::Area => {
+                    return Err(NativeError::type_error("ui.control: use ui.field for text controls".to_string()))
+                }
+            };
+            let id = u32::try_from(cid).map_err(|_| "ui.control: bad control id".to_string()).map_err(|e| NativeError::std(StdErrorClass::Std, e))?;
+            (with_win(window, |win| {
+                win.commands.push(DrawCmd::Control {
+                    id,
+                    kind,
+                    x,
+                    y,
+                    w,
+                    h,
+                    color,
+                    flag,
+                    value,
+                    low,
+                    high,
+                    text: String::new(),
+                    hint: String::new(),
+                    size: 0.0,
+                });
+                Ok(())
+            })).map_err(|e| NativeError::std(StdErrorClass::Std, e))
+        }
+        fn field(
+            ctx: &mut dyn NativeCtx,
+            window: i64,
+            cid: i64,
+            kind: VmValue,
+            x: f64,
+            y: f64,
+            w: f64,
+            h: f64,
+            color: i64,
+            focused: bool,
+            text: &str,
+            hint: &str,
+            size: f64,
+        ) -> Result<(), NativeError> {
+            let kind = match UiControlKind::from_value(ctx, kind)
+                .ok_or_else(|| "ui.field: kind is not a UiControlKind".to_string()).map_err(|e| NativeError::std(StdErrorClass::Std, e))?
+            {
+                UiControlKind::Field => vn_ui::ControlKind::Field,
+                UiControlKind::Area => vn_ui::ControlKind::Area,
+                UiControlKind::Button | UiControlKind::Switch | UiControlKind::Slider | UiControlKind::Scroll | UiControlKind::Surface => {
+                    return Err(NativeError::type_error("ui.field: kind is not a text control".to_string()))
+                }
+            };
+            let id = u32::try_from(cid).map_err(|_| "ui.field: bad control id".to_string()).map_err(|e| NativeError::std(StdErrorClass::Std, e))?;
+            (with_win(window, |win| {
+                win.commands.push(DrawCmd::Control {
+                    id,
+                    kind,
+                    x,
+                    y,
+                    w,
+                    h,
+                    color,
+                    flag: focused,
+                    value: 0.0,
+                    low: 0.0,
+                    high: 0.0,
+                    text: text.to_string(),
+                    hint: hint.to_string(),
+                    size,
+                });
+                Ok(())
+            })).map_err(|e| NativeError::std(StdErrorClass::Std, e))
+        }
+        fn typed(ctx: &mut dyn NativeCtx, id: i64) -> Result<Vec<VmValue>, NativeError> {
+            let changes = with_win(id, |win| Ok(std::mem::take(&mut win.typed))).map_err(|e| NativeError::std(StdErrorClass::Std, e))?;
+            Ok(changes
+                .into_iter()
+                .map(|c| {
+                    let text = ctx.alloc_str_owned(c.text);
+                    TypedText {
+                        id: i64::from(c.id),
+                        text,
+                    }
+                    .alloc(ctx)
+                })
+                .collect())
+        }
+        fn activated(_ctx: &mut dyn NativeCtx, id: i64) -> Result<Vec<VmValue>, NativeError> {
+            let hits = with_win(id, |win| Ok(std::mem::take(&mut win.activated))).map_err(|e| NativeError::std(StdErrorClass::Std, e))?;
+            Ok(hits
+                .into_iter()
+                .flat_map(|a| [VmValue::from_f64(f64::from(a.id)), VmValue::from_f64(f64::from(a.value))])
+                .collect())
+        }
+        fn real(_ctx: &mut dyn NativeCtx, id: i64) -> Result<bool, NativeError> {
+            (with_win(id, |w| Ok(w.real.is_some()))).map_err(|e| NativeError::std(StdErrorClass::Std, e))
+        }
+        fn keyCode(_ctx: &mut dyn NativeCtx, name: &str) -> Result<i64, NativeError> {
+            (vn_ui::named_key_code(name)
+                .ok_or_else(|| format!("ui.keyCode: unknown key '{name}'"))).map_err(|e| NativeError::std(StdErrorClass::Std, e))
+        }
+        fn textWidth(_ctx: &mut dyn NativeCtx, id: i64, text: &str, size: f64) -> Result<f64, NativeError> {
+            (with_win(id, |win| Ok(f64::from(win.canvas.text_width(text, size as f32))))).map_err(|e| NativeError::std(StdErrorClass::Std, e))
+        }
+        fn drawn(ctx: &mut dyn NativeCtx, id: i64) -> Result<Vec<VmValue>, NativeError> {
+            let cmds = with_win(id, |win| Ok(win.commands.clone())).map_err(|e| NativeError::std(StdErrorClass::Std, e))?;
+            Ok(cmds
+                .iter()
+                .map(|c| {
+                    let d = ui_draw::describe(c);
+                    let kind = ctx.alloc_str(d.kind);
+                    let text = ctx.alloc_str_owned(d.text);
+                    DrawnItem {
+                        kind,
+                        x: d.x,
+                        y: d.y,
+                        w: d.w,
+                        h: d.h,
+                        color: d.color,
+                        text,
+                    }
+                    .alloc(ctx)
+                })
+                .collect())
+        }
+    }
+}

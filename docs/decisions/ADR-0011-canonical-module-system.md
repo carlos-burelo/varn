@@ -1,4 +1,4 @@
-> Estado verificado 2026-10-13: PARCIAL — loader único con `Provenance` (`crates/varn-modules/src/loader.rs:9`) + `Layer` (`layer.rs`) vigentes; persisten rutas por crate (`varn-resolver/src/graph.rs`, `varn-pipeline/src/stdlib_loader.rs:135`, `ImportResolver` en checker).
+> Estado verificado 2026-10-13: PARCIAL — loader único con `Provenance` (`crates/vn-modules/src/loader.rs:9`) + `Layer` (`layer.rs`) vigentes; persisten rutas por crate (`vn-resolver/src/graph.rs`, `vn-pipeline/src/stdlib_loader.rs:135`, `ImportResolver` en checker).
 >
 > Histórico. No spec vigente. Código manda. Revalidar antes de usar.
 
@@ -13,15 +13,15 @@ Accepted. Supersedes the parallel per-crate loading paths it removes.
 different types, different resolution rules, and different representation choices:
 
 1. **VM**: `trait ModuleLoader { resolve, load -> FunctionProto, native }` plus
-   `CompositeLoader` (`crates/varn-vm/src/loader.rs`), with `FileLoader` and
-   `StdlibLoader` in `crates/varn-pipeline/src/stdlib_loader.rs`.
+   `CompositeLoader` (`crates/vn-vm/src/loader.rs`), with `FileLoader` and
+   `StdlibLoader` in `crates/vn-pipeline/src/stdlib_loader.rs`.
 2. **Checker**: `trait ImportResolver { module_bind, stdlib_bind, module_exports,
-   resolve_specifier }` (`crates/varn-checker/src/module_resolver/resolver.rs`), with
+   resolve_specifier }` (`crates/vn-checker/src/module_resolver/resolver.rs`), with
    `Carrier::{Blob, Embedded, File}` (`.../module_resolver/stdlib.rs`).
-3. **Assets/provider**: `varn_modules::provider` (`interface_blob`, `embedded_source`,
+3. **Assets/provider**: `vn_modules::provider` (`interface_blob`, `embedded_source`,
    `source_path`, `bundled_source`) plus `std_root`.
 4. **CLI/LSP/build**: `read_source_file`, `ImportSpecifier::parse`,
-   `varn_modules::resolver::ModuleResolver`, `register_provider`.
+   `vn_modules::resolver::ModuleResolver`, `register_provider`.
 
 Every one of them can pick a different representation for the *same* `ModuleId`. That
 is not theoretical: the checker once served `std:` modules from a precompiled **blob**
@@ -37,19 +37,19 @@ The cost is structural:
 
 ## Decision
 
-**`varn-modules` is the module system.** It already depends only on `varn-core`, and
-`varn-checker`, `varn-vm`, `varn-pipeline`, `varn-cli`, and `varn-lsp` all already
+**`vn-modules` is the module system.** It already depends only on `vn-core`, and
+`vn-checker`, `vn-vm`, `vn-pipeline`, `vn-cli`, and `vn-lsp` all already
 depend on it, so the contract lives there with no cycles.
 
 ### 1. One identity
-`varn_core::ModuleId` is the only module identity. There is no second key (path,
+`vn_core::ModuleId` is the only module identity. There is no second key (path,
 `virtual_id`, specifier string, blob index). Resolution returns a `ModuleId`;
 every cache, every artifact, every request is keyed by `ModuleId` (+ source
 fingerprint when the file may change).
 
 ### 2. One resolution
 `resolve(specifier: &str, from: &ModuleId) -> Result<ModuleId, LoadError>` is owned by
-`varn-modules::resolver`. Relative paths, packages, `std:`/`core:`/`runtime:`, and
+`vn-modules::resolver`. Relative paths, packages, `std:`/`core:`/`runtime:`, and
 native ids all go through the same function. No phase computes paths on its own.
 
 ### 3. One load
@@ -93,26 +93,26 @@ branching key.
 ## Consequences
 
 ### Deleted (the whole point)
-- `varn-checker::module_resolver::Carrier` and `stdlib_carrier`.
-- Direct `varn_modules::provider::{interface_blob, embedded_source, bundled_source,
-  source_path}` calls outside `varn-modules` backends.
-- `varn-vm::loader::trait ModuleLoader` and `CompositeLoader`; the VM takes the
+- `vn-checker::module_resolver::Carrier` and `stdlib_carrier`.
+- Direct `vn_modules::provider::{interface_blob, embedded_source, bundled_source,
+  source_path}` calls outside `vn-modules` backends.
+- `vn-vm::loader::trait ModuleLoader` and `CompositeLoader`; the VM takes the
   registry plus a compile callback.
-- `varn-pipeline::stdlib_loader::{FileLoader, StdlibLoader}` as independent resolvers;
+- `vn-pipeline::stdlib_loader::{FileLoader, StdlibLoader}` as independent resolvers;
   they become thin adapters (or disappear into the registry).
-- `varn-lsp`/`varn-cli` resolution helpers that duplicate `varn_modules::resolver`.
+- `vn-lsp`/`vn-cli` resolution helpers that duplicate `vn_modules::resolver`.
 - Per-phase source caches; one cache per `(ModuleId, fingerprint)`.
 
 ### Kept / strengthened
-- `ModuleId` in `varn-core` (unchanged).
-- The `ImportSpecifier` parser and `ModuleResolver` in `varn-modules` (become the only
+- `ModuleId` in `vn-core` (unchanged).
+- The `ImportSpecifier` parser and `ModuleResolver` in `vn-modules` (become the only
   resolution path).
 - Precompiled interfaces/bytecode as **optional fields of `ModuleSource`**, so a bundle
   can still skip parsing and compiling — but through the same door as source.
 
 ## Migration steps (each one part of the final design, none discarded)
 
-1. **Contract + backends** in `varn-modules`: `LoadError`, `ModuleSource`,
+1. **Contract + backends** in `vn-modules`: `LoadError`, `ModuleSource`,
    `ModuleLoader`, `ModuleRegistry`, `FilesystemLoader`, `MemoryLoader`, unit-tested.
    (Touches no consumer; pure addition of the single door.)
 2. **Checker adopts the registry**: `ImportResolver` is implemented by an adapter over
@@ -126,8 +126,8 @@ branching key.
 ## Alternatives rejected
 - **Keep the four paths, add adapters between them**: explicitly forbidden by `AGENTS.md`
   Ley 8. An adapter that lets the old design survive is the bug.
-- **Move the contract to `varn-core`**: works, but `varn-core` is the AST/span leaf;
-  `varn-modules` already owns ids/providers/artifacts and everyone depends on it.
+- **Move the contract to `vn-core`**: works, but `vn-core` is the AST/span leaf;
+  `vn-modules` already owns ids/providers/artifacts and everyone depends on it.
 - **Have the VM keep returning compiled protos from `load`**: couples loading to
   compiling and forces a second loader for the checker. Separation is the point.
 

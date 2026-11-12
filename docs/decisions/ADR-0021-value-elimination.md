@@ -1,4 +1,4 @@
-> Estado verificado 2026-10-13: VIGENTE — `crates/varn-vm/src/value.rs:1` re-exporta solo `VmValue`; `SendValue` en `varn-types`; `tests/157-task-value-handles.vn` regresión verde.
+> Estado verificado 2026-10-13: VIGENTE — `crates/vn-vm/src/value.rs:1` re-exporta solo `VmValue`; `SendValue` en `vn-types`; `tests/157-task-value-handles.vn` regresión verde.
 >
 > Histórico. No spec vigente. Código manda. Revalidar antes de usar.
 

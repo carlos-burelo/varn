@@ -1,0 +1,239 @@
+use super::context::{Builder, Result};
+use crate::ssa::ir::{InstKind, SsaFunc, Terminator, VarId};
+use std::sync::Arc;
+use vn_tir::DynReason;
+use vn_tir::{
+    BackendTy, Resolution, TirExpr, TirExprKind, TirFunction, TirModule, TirStmt, TirUnOp,
+};
+
+pub(super) fn absent_param(cond: &TirExpr) -> Option<u32> {
+    let TirExprKind::Unary {
+        op: TirUnOp::IsNull,
+        operand,
+    } = &cond.kind
+    else {
+        return None;
+    };
+    if let TirExpr {
+        kind: TirExprKind::Var,
+        res: Resolution::Param(i),
+        ..
+    } = operand.as_ref()
+    {
+        return Some(*i);
+    }
+    None
+}
+
+pub(crate) fn defaulted_param_mask(body: &[TirStmt], nparams: usize) -> Vec<bool> {
+    let mut mask = vec![false; nparams];
+    for stmt in body {
+        if let TirStmt::If { cond, .. } = stmt
+            && let Some(i) = absent_param(cond).filter(|i| (*i as usize) < nparams)
+        {
+            mask[i as usize] = true;
+        }
+    }
+    mask
+}
+
+pub fn build_function(
+    tir: &TirModule,
+    func: &TirFunction,
+    self_fn: Option<vn_tir::FnId>,
+    lines: &[u32],
+) -> Result<SsaFunc> {
+    build_inner(tir, func, false, &[], self_fn, lines)
+}
+
+pub fn build_top_level(
+    tir: &TirModule,
+    export_slots: &[Arc<str>],
+    lines: &[u32],
+) -> Result<SsaFunc> {
+    build_inner(tir, &tir.top_level, true, export_slots, None, lines)
+}
+
+fn build_inner(
+    tir: &TirModule,
+    func: &TirFunction,
+    register_module_fns: bool,
+    export_slots: &[Arc<str>],
+    self_fn: Option<vn_tir::FnId>,
+    lines: &[u32],
+) -> Result<SsaFunc> {
+    let mut pinned = super::super::pinning::captured_vars(func);
+    pinned.extend(super::super::pinning::try_pinned_vars(func));
+    let mut b = Builder::with_pinned(tir, pinned.clone(), lines);
+    b.self_fn = self_fn;
+    b.locals_bt = func.locals.clone();
+    b.return_bt = Some(func.return_ty);
+    b.next_synthetic = func.locals.len() as u32;
+    let entry = b.current;
+
+    let defaulted = defaulted_param_mask(&func.body, func.params.len());
+    b.defaulted = func
+        .params
+        .iter()
+        .zip(&defaulted)
+        .map(|(pty, defaulted)| defaulted.then_some(*pty))
+        .collect();
+    for (i, pty) in func.params.iter().enumerate() {
+        let t = if defaulted[i] {
+            BackendTy::Dynamic(DynReason::Boxed)
+        } else {
+            *pty
+        };
+        let v = b.new_value(t);
+        b.block_mut(entry).params.push(v);
+        let v = match *pty {
+            BackendTy::BigInt | BackendTy::Decimal if !defaulted[i] => {
+                b.widen_exact(v, BackendTy::Int, *pty)
+            }
+            BackendTy::Literal(_)
+            | BackendTy::Int
+            | BackendTy::Float
+            | BackendTy::Bool
+            | BackendTy::Char
+            | BackendTy::Str
+            | BackendTy::Bytes
+            | BackendTy::BigInt
+            | BackendTy::Decimal
+            | BackendTy::Array(_)
+            | BackendTy::Map(..)
+            | BackendTy::Set(_)
+            | BackendTy::Tuple(_)
+            | BackendTy::Class(_)
+            | BackendTy::Enum(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Nullable(_)
+            | BackendTy::Void
+            | BackendTy::Never
+            | BackendTy::Dynamic(_) => v,
+        };
+        b.write_var(VarId::Param(i as u32), entry, v);
+    }
+
+    if register_module_fns {
+        b.build_imports();
+        for (i, f) in tir.functions.iter().enumerate() {
+            if !super::ops::is_free_fn_name(&f.name) {
+                continue;
+            }
+            let fv = b.emit(
+                InstKind::MakeClosure {
+                    func: i as u32,
+                    upvalues_src: vec![],
+                },
+                BackendTy::Dynamic(DynReason::Runtime),
+            );
+            let store = b.global_store(&f.name, fv);
+            b.emit_effect(store);
+        }
+        b.build_exports(export_slots);
+    }
+
+    b.lower_block(&func.body)?;
+    if register_module_fns && b.is_open() {
+        b.build_exports(export_slots);
+    }
+    if b.is_open() {
+        b.set_term(Terminator::Return(None));
+    }
+
+    Ok(SsaFunc {
+        name: func.name.clone(),
+        entry,
+        blocks: b.blocks,
+        values: b.values,
+        is_async: func.is_async,
+        is_generator: func.is_generator,
+        inline_scopes: b.inline_scopes,
+    })
+}
+
+pub fn build_module(tir: &TirModule, lines: &[u32]) -> Result<Vec<SsaFunc>> {
+    let mut out = Vec::with_capacity(tir.functions.len() + 1);
+    out.push(build_function(tir, &tir.top_level, None, lines)?);
+    for (i, f) in tir.functions.iter().enumerate() {
+        out.push(build_function(
+            tir,
+            f,
+            Some(vn_tir::FnId(i as u32)),
+            lines,
+        )?);
+    }
+    Ok(out)
+}
+
+impl<'m> Builder<'m> {
+    pub(super) fn filled_param_ty(&mut self, cond: &TirExpr) -> Result<Option<BackendTy>> {
+        let Some(i) = absent_param(cond) else {
+            return Ok(None);
+        };
+        if !self.is_open() || !matches!(self.defaulted.get(i as usize), Some(Some(_))) {
+            return Ok(None);
+        }
+        let filled = self.read_var(VarId::Param(i), self.current)?;
+        Ok(Some(self.value_ty(filled)))
+    }
+
+    pub(super) fn restore_supplied_param(
+        &mut self,
+        cond: &TirExpr,
+        filled: Option<BackendTy>,
+    ) -> Result<()> {
+        let Some(i) = absent_param(cond) else {
+            return Ok(());
+        };
+        let Some(declared) = self.defaulted.get_mut(i as usize).and_then(Option::take) else {
+            return Ok(());
+        };
+        let ty = declared.non_nullable(&self.tir.types).representation();
+        if filled != Some(ty) {
+            return Ok(());
+        }
+        let var = VarId::Param(i);
+        let supplied = self.read_var(var, self.current)?;
+        let conv = match ty {
+            BackendTy::Int => Some(vn_core::ValueConv::ExpectInt),
+            BackendTy::Float => Some(vn_core::ValueConv::ExpectFloat),
+            BackendTy::Bool => Some(vn_core::ValueConv::ExpectBool),
+            BackendTy::Str => Some(vn_core::ValueConv::ExpectStr),
+            BackendTy::Literal(_)
+            | BackendTy::Dynamic(_)
+            | BackendTy::Nullable(_)
+            | BackendTy::Decimal
+            | BackendTy::BigInt
+            | BackendTy::Void
+            | BackendTy::Never => return Ok(()),
+            BackendTy::Char
+            | BackendTy::Bytes
+            | BackendTy::Enum(_)
+            | BackendTy::Fn(_)
+            | BackendTy::Array(_)
+            | BackendTy::Map(..)
+            | BackendTy::Set(_)
+            | BackendTy::Tuple(_)
+            | BackendTy::Class(_) => None,
+        };
+        let typed = match conv {
+            Some(conv) => self.emit(
+                InstKind::Convert {
+                    operand: supplied,
+                    conv,
+                },
+                crate::ssa::verify::convert_result_ty(conv),
+            ),
+            None => self.emit(
+                InstKind::Cast {
+                    operand: supplied,
+                    ty,
+                },
+                ty,
+            ),
+        };
+        self.write_var(var, self.current, typed);
+        Ok(())
+    }
+}

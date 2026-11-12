@@ -1,0 +1,13 @@
+[package]
+name = "vn-binder"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+vn-sem     = { path = "../vn-sem" }
+vn-core    = { path = "../vn-core" }
+vn-modules = { path = "../vn-modules" }
+rustc-hash   = { workspace = true }
+
+[lints]
+workspace = true

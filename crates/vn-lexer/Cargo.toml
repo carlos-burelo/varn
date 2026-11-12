@@ -1,0 +1,10 @@
+[package]
+name = "vn-lexer"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+vn-core = { path = "../vn-core" }
+
+[lints]
+workspace = true

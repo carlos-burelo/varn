@@ -1,12 +1,12 @@
 # Sistema de módulos
 
-Fuentes: `crates/varn-modules/src/`, `crates/varn-cli/src/std_source.rs`,
-`crates/varn-builtins/src/provider_impl.rs`, `crates/varn-resolver/src/graph.rs`,
-`crates/varn-sem/src/resolver.rs`. Código manda.
+Fuentes: `crates/vn-modules/src/`, `crates/vn-cli/src/std_source.rs`,
+`crates/vn-builtins/src/provider_impl.rs`, `crates/vn-resolver/src/graph.rs`,
+`crates/vn-sem/src/resolver.rs`. Código manda.
 
 ## Identidades
 
-`ModuleId` (`varn-core/src/module_id.rs`): `Local(path)`, `Package { .. }`, `Std(spec)`, `Core(spec)`,
+`ModuleId` (`vn-core/src/module_id.rs`): `Local(path)`, `Package { .. }`, `Std(spec)`, `Core(spec)`,
 `Runtime(spec)`. Los especificadores `std:x`, `core:x` y `runtime:x` nunca tocan el
 disco del usuario: los sirve el proveedor de la std. Un solo resolvedor de
 especificadores (`resolver.rs`) normaliza rutas relativas y esquemas.
@@ -41,7 +41,7 @@ Resolución de la raíz (`std_root.rs::resolve`, una vez por proceso):
 3. un `std/` en un ancestro del ejecutable (`DevCheckout`);
 4. imagen embebida (`Embedded`).
 
-Qué imagen se usa (`varn-cli/src/std_source.rs::select`):
+Qué imagen se usa (`vn-cli/src/std_source.rs::select`):
 
 - **Árbol fuente** (override, `VARN_STD=<ruta>` o dev-checkout): `vn` construye la imagen en `<cache>/std/std.<huella>.vnb` lanzando `vn std-bundle` como proceso hijo. La huella cubre el binario y ruta/tamaño/mtime de cada módulo, así que cambiar `std/` o recompilar `vn` la regenera. Un error de tipos en `std/` aparece en la primera corrida, no en `cargo check`.
 - **Embebida**: con la feature `embed-std`, `dist/std.vnb` va dentro del binario; si no, se lee de `VARN_STD_BUNDLE`.
@@ -50,11 +50,11 @@ El checker lee las interfaces de std/core directamente de la imagen; no recompil
 
 ## Grafo y caché de interfaces
 
-`ModuleGraph` (`varn-resolver/src/graph.rs`): caché en memoria por ruta de
+`ModuleGraph` (`vn-resolver/src/graph.rs`): caché en memoria por ruta de
 `BindResult`, `ExportMap`, `Program`, `AstArena`, rutas resueltas y dependencias
 inversas (`invalidate` por `reverse_deps`, `evict_heavy`, `clear`).
 
-`ImportResolver` (`varn-sem/src/resolver.rs`) es lo que ve el checker:
+`ImportResolver` (`vn-sem/src/resolver.rs`) es lo que ve el checker:
 `module_bind`, `module_exports`, `stdlib_bind`, `stdlib_exports`,
 `resolve_specifier`, `record_dep`, `core_exports`, `core_members`, `evict_heavy`,
 `graph_stats`, `find_bind_for_type`, `stdlib_specs`, `find_stdlib_bind`.
@@ -66,4 +66,4 @@ Los artefactos en disco (grafo compilado, interfaces) usan el sobre de
 ## Módulos nativos
 
 `runtime:*` y la parte nativa de `core:*` tienen un contrato `.vn` y una
-implementación Rust en `varn-builtins`. Ver [`LBI_ARCHITECTURE.md`](LBI_ARCHITECTURE.md).
+implementación Rust en `vn-builtins`. Ver [`LBI_ARCHITECTURE.md`](LBI_ARCHITECTURE.md).

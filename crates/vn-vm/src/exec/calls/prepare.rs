@@ -1,0 +1,272 @@
+use super::*;
+
+#[inline(always)]
+pub(crate) fn try_prepare_call_fast(
+    callee_nv: VmValue,
+    arg_count: usize,
+    staging: &[VmValue],
+    heap: &Heap,
+    store: &mut FrameStore,
+) -> Option<(PreparedCall, bool)> {
+    if !callee_nv.is_heap() {
+        return None;
+    }
+
+    match heap.get(callee_nv.as_heap())? {
+        HeapObj::VmClosure(nc) => {
+            if !nc.proto.is_generator && !nc.proto.is_async && !nc.proto.has_rest {
+                let frame = materialize_frame(store, nc, stage_window(staging, arg_count)).ok()?;
+                return Some((PreparedCall::Frame(frame), false));
+            }
+            None
+        }
+
+        HeapObj::BoundMethod(bm) => match &bm.target {
+            BoundMethodTarget::Native { func, .. } => {
+                Some((PreparedCall::NativeImmediate(*func, arg_count), true))
+            }
+            BoundMethodTarget::Vm { .. } => None,
+        },
+        HeapObj::NativeFn(f, _name) => {
+            Some((PreparedCall::RawNativeImmediate(*f, arg_count), false))
+        }
+        HeapObj::Str(_)
+        | HeapObj::Array(_)
+        | HeapObj::Tuple(_)
+        | HeapObj::Object(_)
+        | HeapObj::Buffer(_)
+        | HeapObj::Module(_)
+        | HeapObj::FrozenModule(_)
+        | HeapObj::Class(_)
+        | HeapObj::Map(_)
+        | HeapObj::Set(_)
+        | HeapObj::Task(_)
+        | HeapObj::TaskHandle(_)
+        | HeapObj::Range(_)
+        | HeapObj::EnumVariant(_)
+        | HeapObj::BigInt(_)
+        | HeapObj::Decimal(_)
+        | HeapObj::Char(_)
+        | HeapObj::Generator(_)
+        | HeapObj::Spread(_) => None,
+    }
+}
+
+fn describe_generator(
+    nc: &Rc<VmClosure>,
+    arg_count: usize,
+    current_class: Option<Rc<vn_types::ClassObj>>,
+    staging: &mut Vec<VmValue>,
+    heap: &mut Heap,
+    settings: crate::settings::ExecSettings,
+    store: &FrameStore,
+) -> PreparedCall {
+    let args_start = staging.len() - arg_count;
+    let args: Vec<VmValue> = staging.drain(args_start..).collect();
+    let constants = resolve_constants(&nc.proto, heap);
+
+    let upvalues = nc
+        .upvalues
+        .iter()
+        .map(|uv| VmUpvalue::closed(uv.read(store)))
+        .collect();
+    let mut gen_closure =
+        VmClosure::with_upvalues(nc.proto.clone(), upvalues, Rc::new(constants), settings);
+    gen_closure.module_base = nc.module_base;
+    PreparedCall::Generator {
+        closure: Rc::new(gen_closure),
+        args,
+        current_class,
+    }
+}
+
+pub(crate) fn prepare_call(
+    callee_nv: VmValue,
+    arg_count: usize,
+    staging: &mut Vec<VmValue>,
+    heap: &mut Heap,
+    settings: crate::settings::ExecSettings,
+    store: &mut FrameStore,
+) -> VmResult<PreparedCall> {
+    let mut arg_count = arg_count;
+
+    if callee_nv.is_heap() {
+        match heap.get(callee_nv.as_heap()).expect("invalid heap index") {
+            HeapObj::VmClosure(nc) => {
+                let nc = nc.clone();
+                bundle_rest_args(&nc.proto, &mut arg_count, staging, heap);
+                if nc.proto.is_generator {
+                    return Ok(describe_generator(
+                        &nc, arg_count, None, staging, heap, settings, store,
+                    ));
+                }
+                if nc.proto.is_async {
+                    let args_start = staging.len().saturating_sub(arg_count);
+                    return Ok(PreparedCall::Async(super::LazyParts {
+                        proto: nc.proto.clone(),
+                        upvalues: nc.upvalues.iter().map(|uv| uv.read(store)).collect(),
+                        module_base: nc.module_base,
+                        args: staging.drain(args_start..).collect(),
+                        current_class: None,
+                    }));
+                }
+                let window: Vec<VmValue> = stage_window(staging, arg_count).to_vec();
+                let _ = arg_count;
+                return Ok(PreparedCall::Frame(materialize_frame(store, &nc, &window)?));
+            }
+            HeapObj::NativeFn(f, _name) => {
+                let func = *f;
+                return Ok(PreparedCall::RawNativeImmediate(func, arg_count));
+            }
+            HeapObj::BoundMethod(bm) => {
+                let bm = bm.clone();
+                match bm.target {
+                    BoundMethodTarget::Native { func, .. } => {
+                        let recv_nv = bm.receiver;
+                        let mut final_count = arg_count;
+
+                        if staging.is_empty() {
+                            staging.push(recv_nv);
+                            final_count = 1;
+                        } else {
+                            let start = staging.len().saturating_sub(arg_count);
+                            staging[start] = recv_nv;
+                        }
+                        return Ok(PreparedCall::NativeImmediate(func, final_count));
+                    }
+                    BoundMethodTarget::Vm {
+                        closure,
+                        owner_class,
+                    } => {
+                        let recv_nv = bm.receiver;
+                        let nc = if let Some(rc) = heap.closure_of(closure) {
+                            rc.clone()
+                        } else {
+                            return Err(RuntimeError::new(
+                                "BoundMethod(Vm): invalid closure payload",
+                            ));
+                        };
+
+                        let mut full_arg_count = arg_count;
+                        if staging.is_empty() {
+                            staging.push(recv_nv);
+                            full_arg_count = 1;
+                        } else {
+                            let start = staging.len().saturating_sub(full_arg_count);
+                            staging[start] = recv_nv;
+                        }
+                        bundle_rest_args(&nc.proto, &mut full_arg_count, staging, heap);
+                        if nc.proto.is_generator {
+                            return Ok(describe_generator(
+                                &nc,
+                                full_arg_count,
+                                owner_class,
+                                staging,
+                                heap,
+                                settings,
+                                store,
+                            ));
+                        }
+                        if nc.proto.is_async {
+                            let args_start = staging.len().saturating_sub(full_arg_count);
+                            return Ok(PreparedCall::Async(super::LazyParts {
+                                proto: nc.proto.clone(),
+                                upvalues: nc.upvalues.iter().map(|uv| uv.read(store)).collect(),
+                                module_base: nc.module_base,
+                                args: staging.drain(args_start..).collect(),
+                                current_class: owner_class,
+                            }));
+                        }
+                        if !nc.proto.is_generator && !nc.proto.is_async {
+                            let window: Vec<VmValue> =
+                                stage_window(staging, full_arg_count).to_vec();
+                            let _ = full_arg_count;
+                            let mut frame = materialize_frame(store, &nc, &window)?;
+                            frame.current_class = owner_class;
+                            if nc.proto.name.as_deref()
+                                == Some(vn_core::TokenKind::Constructor.as_str())
+                            {
+                                return Ok(PreparedCall::Constructor(frame, recv_nv));
+                            }
+                            return Ok(PreparedCall::Frame(frame));
+                        }
+                        return Err(RuntimeError::new("BoundMethod(Vm): invalid VmClosure"));
+                    }
+                }
+            }
+            HeapObj::Class(cls) => {
+                let cls = cls.clone();
+                let instance_nv = VmValue::from_heap(heap.alloc_instance(&cls).0);
+                if let Some(ctor) = cls.constructor() {
+                    let mut full_arg_count = arg_count;
+                    if staging.is_empty() {
+                        staging.push(instance_nv);
+                        full_arg_count = 1;
+                    } else {
+                        let start = staging.len().saturating_sub(full_arg_count);
+                        staging[start] = instance_nv;
+                    }
+                    if let Some(nc) = heap.closure_of(ctor).cloned() {
+                        bundle_rest_args(&nc.proto, &mut full_arg_count, staging, heap);
+                        let window: Vec<VmValue> = stage_window(staging, full_arg_count).to_vec();
+                        let mut frame = materialize_frame(store, &nc, &window)?;
+                        frame.current_class = Some(cls.clone());
+                        return Ok(PreparedCall::Constructor(frame, instance_nv));
+                    }
+                    if let Some((f, _)) = heap.native_of(ctor) {
+                        let take = staging.len().saturating_sub(full_arg_count);
+                        let vm_args: Vec<VmValue> = staging.drain(take..).collect();
+                        return Ok(PreparedCall::NativeConstructor(f, vm_args, instance_nv));
+                    }
+                }
+                staging.clear();
+                return Ok(PreparedCall::PushValue(instance_nv));
+            }
+            HeapObj::EnumVariant(data) => {
+                let data = data.clone();
+                let mut args: Vec<VmValue> = std::mem::take(staging);
+
+                if !args.is_empty() {
+                    args.remove(0);
+                }
+
+                if data.def.fields.is_empty() && args.is_empty() {
+                    return Ok(PreparedCall::PushValue(callee_nv));
+                }
+                let instance = data.instantiate(&args);
+                return Ok(PreparedCall::PushValue(VmValue::from_heap(
+                    heap.alloc(HeapObj::EnumVariant(Box::new(instance))),
+                )));
+            }
+            HeapObj::Str(_)
+            | HeapObj::Array(_)
+            | HeapObj::Tuple(_)
+            | HeapObj::Object(_)
+            | HeapObj::Buffer(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_)
+            | HeapObj::Map(_)
+            | HeapObj::Set(_)
+            | HeapObj::Task(_)
+            | HeapObj::TaskHandle(_)
+            | HeapObj::Range(_)
+            | HeapObj::BigInt(_)
+            | HeapObj::Decimal(_)
+            | HeapObj::Char(_)
+            | HeapObj::Generator(_)
+            | HeapObj::Spread(_) => {}
+        }
+    }
+
+    let callee_repr = heap.str_repr(callee_nv);
+    let type_name = crate::exec::props::meta::type_name(callee_nv, heap);
+    if callee_nv.is_null() {
+        Err(RuntimeError::new(
+            "Cannot invoke function because the value is null. Check if the function or host entry exists and is exported.",
+        ))
+    } else {
+        Err(RuntimeError::new(format!(
+            "value is not callable: {callee_repr} (type: {type_name})",
+        )))
+    }
+}

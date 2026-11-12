@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-varn-core = { path = "../varn-core" }
+vn-core = { path = "../vn-core" }
 regex.workspace = true
 serde.workspace = true
 serde_json.workspace = true

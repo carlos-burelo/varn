@@ -1,0 +1,157 @@
+use super::recorder::Recorder;
+use super::Checker;
+use std::sync::Arc;
+use vn_core::TypeKind;
+use vn_sem::bind::BindResult;
+use vn_sem::types::Type;
+
+impl<'r> Checker<'r> {
+    pub(super) fn check_extension(
+        &mut self,
+        rec: &mut Recorder,
+        ext: &vn_core::ast::ExtensionDecl,
+        bind: &BindResult,
+    ) {
+        let outer_scope = self.current_scope;
+        if let Some(type_scope) = self.next_child_scope(bind) {
+            self.current_scope = type_scope;
+        }
+        let mut injected: Vec<Arc<str>> = Vec::new();
+        for tp in &ext.type_params {
+            let name: Arc<str> = Arc::from(bind.interner.resolve(tp.name));
+            if self.active_type_params.insert(name.clone()) {
+                injected.push(name);
+            }
+        }
+        let ext_self_ty = self.resolve_type_node_cached(&ext.target, bind);
+        let ext_class_name = match self.ty_table.get(ext_self_ty.0) {
+            TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => {
+                Some(Arc::from(bind.interner.resolve(n)))
+            }
+
+            TypeKind::Primitive(p)
+                if !matches!(
+                    p,
+                    vn_core::LangPrimitive::Dynamic | vn_core::LangPrimitive::Error
+                ) =>
+            {
+                Some(p.name().into())
+            }
+            TypeKind::Primitive(_)
+            | TypeKind::Literal(_)
+            | TypeKind::This
+            | TypeKind::Array(_)
+            | TypeKind::Union(_)
+            | TypeKind::Intersection(_)
+            | TypeKind::Tuple(_)
+            | TypeKind::TemplateLiteral(_)
+            | TypeKind::Fn(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
+            | TypeKind::Typeof(_)
+            | TypeKind::KeyOf(_)
+            | TypeKind::IndexedAccess { .. }
+            | TypeKind::Mapped { .. }
+            | TypeKind::Conditional { .. }
+            | TypeKind::Infer(_)
+            | TypeKind::EnumVariant { .. }
+            | TypeKind::TypePredicate { .. } => None,
+        };
+        let saved_class = self.current_class.replace(
+            ext_class_name.unwrap_or_else(|| Arc::from(vn_core::TokenKind::Placeholder.as_str())),
+        );
+        let saved_self = self.extension_self.replace(ext_self_ty);
+
+        for member in &ext.members {
+            let saved_expected = self.expected_return_type.take();
+            match member {
+                vn_core::ast::ExtensionMember::Method(method) => {
+                    for tp in &method.type_params {
+                        let name: Arc<str> = Arc::from(bind.interner.resolve(tp.name));
+                        if self.active_type_params.insert(name.clone()) {
+                            injected.push(name);
+                        }
+                    }
+                    self.expected_return_type = method.return_type.as_ref().map(|rt| {
+                        let ty = self.resolve_type_node_cached(rt, bind);
+                        if method.modifiers.is_async {
+                            vn_sem::types::awaited(&ty, &self.ty_table)
+                        } else {
+                            ty
+                        }
+                    });
+                    let saved_scope = self.current_scope;
+                    if let Some(m_scope) = self.next_child_scope(bind) {
+                        self.current_scope = m_scope;
+                        self.record_scope(rec, self.ast_arena.stmt(method.body).range.start.offset);
+                    }
+                    self.check_param_defaults(rec, &method.params, bind);
+                    self.in_function_body(method.modifiers.is_async, |c| {
+                        c.check_stmt(rec, method.body, bind)
+                    });
+                    self.current_scope = saved_scope;
+                }
+                vn_core::ast::ExtensionMember::Getter {
+                    return_type, body, ..
+                } => {
+                    let body = *body;
+                    self.expected_return_type = return_type
+                        .as_ref()
+                        .map(|rt| self.resolve_type_node_cached(rt, bind));
+                    let saved_scope = self.current_scope;
+                    if let Some(m_scope) = self.next_child_scope(bind) {
+                        self.current_scope = m_scope;
+                        self.record_scope(rec, self.ast_arena.stmt(body).range.start.offset);
+                    }
+                    self.in_function_body(false, |c| c.check_stmt(rec, body, bind));
+                    self.current_scope = saved_scope;
+                }
+                vn_core::ast::ExtensionMember::Setter { body, .. } => {
+                    let body = *body;
+                    self.expected_return_type = Some(Type::Void);
+                    let saved_scope = self.current_scope;
+                    if let Some(m_scope) = self.next_child_scope(bind) {
+                        self.current_scope = m_scope;
+                        self.record_scope(rec, self.ast_arena.stmt(body).range.start.offset);
+                    }
+                    self.in_function_body(false, |c| c.check_stmt(rec, body, bind));
+                    self.current_scope = saved_scope;
+                }
+            }
+            self.expected_return_type = saved_expected;
+        }
+
+        for name in injected {
+            self.active_type_params.remove(name.as_ref());
+        }
+        self.current_scope = outer_scope;
+        self.current_class = saved_class;
+        self.extension_self = saved_self;
+    }
+
+    pub(super) fn check_export(
+        &mut self,
+        rec: &mut Recorder,
+        e: &vn_core::ast::ExportDecl,
+        bind: &BindResult,
+    ) {
+        self.reject_mutable_export(e, bind);
+        match e {
+            vn_core::ast::ExportDecl::Decl { declaration, .. } => {
+                self.check_decl(rec, declaration, bind);
+            }
+            vn_core::ast::ExportDecl::Default { declaration, .. } => match declaration.as_ref() {
+                vn_core::ast::ExportDefaultDecl::Function(f) => {
+                    self.check_decl(rec, &vn_core::ast::Decl::Function(f.clone()), bind);
+                }
+                vn_core::ast::ExportDefaultDecl::Class(c) => {
+                    self.check_decl(rec, &vn_core::ast::Decl::Class(c.clone()), bind);
+                }
+                vn_core::ast::ExportDefaultDecl::Expr(expr) => {
+                    self.check_expr(rec, *expr, bind);
+                }
+            },
+            vn_core::ast::ExportDecl::Named { .. } | vn_core::ast::ExportDecl::All { .. } => {}
+        }
+    }
+}

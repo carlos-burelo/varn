@@ -1,0 +1,216 @@
+use super::arrays::array_arms;
+use super::generics::generic_arms;
+use super::hashable::constraint_shortcut;
+use super::nominal::{class_value_arm, nominal_arms};
+use super::objects::{object_arm, record_arm};
+use super::scalar::{is_simple_type, simple_types_compatible, t};
+use super::unions::union_arms;
+use crate::bind::{BindResult, BindView};
+use crate::types::{CheckerTyTable, Type};
+use rustc_hash::{FxHashMap, FxHashSet};
+use vn_core::TypeKind;
+
+pub fn types_compatible(
+    declared: &Type,
+    inferred: &Type,
+    bind: Option<&BindView>,
+    table: &CheckerTyTable,
+) -> bool {
+    if declared.0 == inferred.0 {
+        return true;
+    }
+    let mut cache = FxHashMap::default();
+    types_compatible_with_cache(declared, inferred, bind, &mut cache, table)
+}
+
+pub(super) fn unknown_shortcut(declared: &Type, inferred: &Type) -> Option<bool> {
+    if declared.is_error() || inferred.is_error() || declared.is_dynamic() {
+        Some(true)
+    } else if inferred.is_dynamic() {
+        Some(false)
+    } else {
+        None
+    }
+}
+
+pub fn types_compatible_with_cache(
+    declared: &Type,
+    inferred: &Type,
+    bind: Option<&BindView>,
+    cache: &mut FxHashMap<(Type, Type, usize), bool>,
+    table: &CheckerTyTable,
+) -> bool {
+    if declared.0 == inferred.0 {
+        return true;
+    }
+    if let Some(fits) = unknown_shortcut(declared, inferred) {
+        return fits;
+    }
+    if let Some(fits) = constraint_shortcut(declared, inferred, bind, table) {
+        return fits;
+    }
+    if declared == inferred {
+        return true;
+    }
+    if matches!(table.get(declared.0), TypeKind::Conditional { .. })
+        || matches!(table.get(inferred.0), TypeKind::Conditional { .. })
+    {
+        return true;
+    }
+    if is_simple_type(declared, table) && is_simple_type(inferred, table) {
+        return simple_types_compatible(declared, inferred, table);
+    }
+    let mut in_progress = FxHashSet::default();
+    types_compatible_impl(declared, inferred, bind, cache, &mut in_progress, table)
+}
+
+pub(super) fn types_compatible_impl(
+    declared: &Type,
+    inferred: &Type,
+    bind: Option<&BindView>,
+    cache: &mut FxHashMap<(Type, Type, usize), bool>,
+    in_progress: &mut FxHashSet<(Type, Type, usize)>,
+    table: &CheckerTyTable,
+) -> bool {
+    if declared.0 == inferred.0 {
+        return true;
+    }
+    if let Some(fits) = unknown_shortcut(declared, inferred) {
+        return fits;
+    }
+    if let Some(fits) = constraint_shortcut(declared, inferred, bind, table) {
+        return fits;
+    }
+    if declared == inferred {
+        return true;
+    }
+    if matches!(table.get(declared.0), TypeKind::Conditional { .. })
+        || matches!(table.get(inferred.0), TypeKind::Conditional { .. })
+    {
+        return true;
+    }
+    if is_simple_type(declared, table) && is_simple_type(inferred, table) {
+        return simple_types_compatible(declared, inferred, table);
+    }
+    let key = (
+        *declared,
+        *inferred,
+        bind.map_or(0usize, |b| b.bind as *const BindResult as usize),
+    );
+    if let Some(cached) = cache.get(&key) {
+        return *cached;
+    }
+    if !in_progress.insert(key) {
+        return true;
+    }
+
+    let d = table.get(declared.0);
+    let i = table.get(inferred.0);
+    let given_alias = match d {
+        TypeKind::Union(_) => super::nominal::expanded_alias(inferred, bind, table),
+        TypeKind::Primitive(_)
+        | TypeKind::Literal(_)
+        | TypeKind::This
+        | TypeKind::Array(_)
+        | TypeKind::Intersection(_)
+        | TypeKind::Tuple(_)
+        | TypeKind::Named(..)
+        | TypeKind::Generic(..)
+        | TypeKind::TemplateLiteral(_)
+        | TypeKind::Fn(_)
+        | TypeKind::Record(_)
+        | TypeKind::Interface(_)
+        | TypeKind::Typeof(_)
+        | TypeKind::KeyOf(_)
+        | TypeKind::IndexedAccess { .. }
+        | TypeKind::Mapped { .. }
+        | TypeKind::Conditional { .. }
+        | TypeKind::Infer(_)
+        | TypeKind::EnumVariant { .. }
+        | TypeKind::TypePredicate { .. } => None,
+    };
+    if let Some(expanded) = given_alias {
+        let result = types_compatible_impl(declared, &expanded, bind, cache, in_progress, table);
+        in_progress.remove(&key);
+        cache.insert(key, result);
+        return result;
+    }
+    let result = match (d, i) {
+        (TypeKind::Primitive(vn_core::LangPrimitive::Error), _)
+        | (_, TypeKind::Primitive(vn_core::LangPrimitive::Error))
+        | (TypeKind::Primitive(vn_core::LangPrimitive::Dynamic), _) => true,
+
+        (_, TypeKind::Primitive(vn_core::LangPrimitive::Dynamic)) => false,
+
+        (_, TypeKind::Primitive(vn_core::LangPrimitive::Never)) => true,
+
+        (a, b) if a == b => true,
+
+        (TypeKind::Primitive(_), TypeKind::Primitive(_)) => {
+            simple_types_compatible(declared, inferred, table)
+        }
+        (TypeKind::Primitive(p), TypeKind::Literal(l)) => {
+            use vn_core::LangPrimitive as P;
+            let base = l.base();
+            p == base || (matches!(p, P::Decimal | P::BigInt) && base == P::Int)
+        }
+        (TypeKind::Primitive(vn_core::LangPrimitive::Str), TypeKind::TemplateLiteral(_)) => true,
+        (TypeKind::TemplateLiteral(a), TypeKind::TemplateLiteral(b)) => a == b,
+
+        (TypeKind::Tuple(decl_elems), TypeKind::Tuple(inf_elems)) => {
+            let decl_ids = table.get_list(decl_elems).to_vec();
+            let inf_ids = table.get_list(inf_elems).to_vec();
+            decl_ids.len() == inf_ids.len()
+                && decl_ids.iter().zip(inf_ids.iter()).all(|(dd, ii)| {
+                    types_compatible_impl(&t(*dd), &t(*ii), bind, cache, in_progress, table)
+                })
+        }
+
+        (TypeKind::Intersection(decl_members), _) => table
+            .get_list(decl_members)
+            .to_vec()
+            .iter()
+            .all(|m| types_compatible_impl(&t(*m), inferred, bind, cache, in_progress, table)),
+
+        (_, TypeKind::Intersection(inf_members)) => table
+            .get_list(inf_members)
+            .to_vec()
+            .iter()
+            .any(|m| types_compatible_impl(declared, &t(*m), bind, cache, in_progress, table)),
+
+        _ => {
+            if let Some(r) = class_value_arm(declared, inferred, d, bind, cache, in_progress, table)
+            {
+                r
+            } else if let Some(r) = array_arms(d, i, bind, cache, in_progress, table) {
+                r
+            } else if let Some(r) = generic_arms(d, i, bind, cache, in_progress, table) {
+                r
+            } else if let Some(r) =
+                union_arms(declared, inferred, d, i, bind, cache, in_progress, table)
+            {
+                r
+            } else if let Some(r) =
+                nominal_arms(declared, inferred, d, i, bind, cache, in_progress, table)
+            {
+                r
+            } else if let (TypeKind::Record(decl_fields), TypeKind::Record(inf_fields)) = (d, i) {
+                record_arm(decl_fields, inf_fields, bind, cache, in_progress, table)
+            } else if let (
+                TypeKind::Interface(decl_fields),
+                TypeKind::Record(inf_fields) | TypeKind::Interface(inf_fields),
+            ) = (d, i)
+            {
+                object_arm(decl_fields, inf_fields, bind, cache, in_progress, table)
+            } else if let (TypeKind::Record(_), TypeKind::Interface(_)) = (d, i) {
+                false
+            } else {
+                false
+            }
+        }
+    };
+
+    in_progress.remove(&key);
+    cache.insert(key, result);
+    result
+}

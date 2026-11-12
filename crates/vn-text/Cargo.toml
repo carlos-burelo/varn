@@ -1,0 +1,10 @@
+[package]
+name = "vn-text"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+egui = { version = "0.37", features = ["default_fonts"] }
+
+[lints]
+workspace = true

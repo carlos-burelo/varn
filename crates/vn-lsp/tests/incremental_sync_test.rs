@@ -1,0 +1,48 @@
+#![allow(unused_crate_dependencies)]
+
+use tower_lsp_f::lsp_types::{
+    Position, Range, TextDocumentContentChangeEvent, TextDocumentContentChangePartial,
+};
+use vn_lsp::backend::sync::edits::apply_change;
+use vn_lsp::document::position::byte_offset;
+
+#[test]
+fn test_incremental_edit_application() {
+    let mut doc = "function hello() {\n    return 42;\n}\n".to_string();
+
+    let change = TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+        TextDocumentContentChangePartial {
+            range: Range {
+                start: Position {
+                    line: 1,
+                    character: 11,
+                },
+                end: Position {
+                    line: 1,
+                    character: 13,
+                },
+            },
+            #[allow(deprecated)]
+            range_length: None,
+            text: "100".to_string(),
+        },
+    );
+
+    apply_change(&mut doc, change);
+    assert_eq!(doc, "function hello() {\n    return 100;\n}\n");
+}
+
+#[test]
+fn test_position_with_utf16_astral_characters() {
+    let source = "const emoji = \"😀\";\nconst next = 1;\n";
+
+    let offset_line1 = byte_offset(
+        source,
+        Position {
+            line: 1,
+            character: 0,
+        },
+    );
+    let expected = "const emoji = \"😀\";\n".len();
+    assert_eq!(offset_line1, expected);
+}

@@ -8,7 +8,7 @@ El sistema de tipos conflate naturalezas distintas bajo un mismo símbolo, y cad
 
 - `TypeKind::Object` significa a la vez el tipo anotado `{x:int}`, el tipo inferido de un literal y una interfaz genérica ya expandida. Aceptar clase → interfaz pero no clase → `{x:int}` es imposible de expresar.
 - El record es una bolsa mutable con identidad; la tupla y el struct son valores inmutables. Tres productos con tres semánticas.
-- `Map<float,V>`, `Map<{x:int},V>` y `Map<Clase,V>` compilan sin restricción de clave; la VM decide en runtime cómo hashear (`varn-vm/src/exec/hashable_keys.rs`): una decisión dinámica sobre un hecho estático (Leyes 6 y 17).
+- `Map<float,V>`, `Map<{x:int},V>` y `Map<Clase,V>` compilan sin restricción de clave; la VM decide en runtime cómo hashear (`vn-vm/src/exec/hashable_keys.rs`): una decisión dinámica sobre un hecho estático (Leyes 6 y 17).
 - Los accesos a miembros de records e interfaces van por nombre (`Resolution::ByName`, `DynReason::{Shape, Interface}`). Medido el 2026-11-09 (§12): con la caché en línea, una lectura de record cuesta lo mismo que la de un campo de clase o struct, y la de interfaz solo es más lenta en el intérprete.
 - La invariancia se decide en ocho sitios con `arrays::same_element` en lugar de usar una única relación de equivalencia (§4).
 - Hay dos o tres formas de decir lo mismo: `==` y `===`, `switch` y `match`, `instanceof` e `is`, `{[k:str]:V}` y `Map<str,V>`, spread con sobrescritura y `with`.

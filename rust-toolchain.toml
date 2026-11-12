@@ -1,7 +1,7 @@
 [toolchain]
 # Pinned so CI and this checkout compile with the same compiler. Without a pin,
 # a rustc regression arrives disguised as a bug in this repo — and the JIT and
-# the layout probes in `varn-vm` are exactly the code where "the compiler
+# the layout probes in `vn-vm` are exactly the code where "the compiler
 # changed" is a plausible explanation for a failure.
 #
 # Raise it deliberately: bump, run the four-way matrix from CONTRIBUTING, and

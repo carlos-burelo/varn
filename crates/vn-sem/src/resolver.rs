@@ -1,0 +1,82 @@
+use crate::bind::BindResult;
+use crate::exports::ExportMap;
+use std::path::Path;
+use std::sync::Arc;
+
+pub struct SyntaxFailure {
+    pub source: Arc<str>,
+    pub diagnostics: Vec<vn_core::Diagnostic>,
+}
+
+impl SyntaxFailure {
+    pub fn first_detail(&self) -> String {
+        self.diagnostics.first().map_or_else(String::new, |first| {
+            format!(
+                "{} ({}:{}:{})",
+                first.message,
+                vn_core::diagnostics::display_path(&first.file),
+                first.range.start.line,
+                first.range.start.column
+            )
+        })
+    }
+}
+
+pub trait ImportResolver {
+    fn module_bind(&self, abs_path: &str) -> Option<Arc<BindResult>>;
+
+    fn module_syntax_failure(&self, abs_path: &str) -> Option<Arc<SyntaxFailure>>;
+
+    fn module_exports(&self, abs_path: &str, visiting: &mut Vec<String>) -> Arc<ExportMap>;
+
+    fn stdlib_bind(&self, specifier: &str) -> Option<Arc<BindResult>>;
+
+    fn stdlib_exports(&self, specifier: &str) -> Arc<ExportMap>;
+
+    fn resolve_specifier(&self, base_dir: &Path, specifier: &str) -> Option<String>;
+
+    fn record_dep(&self, importer: &str, imported: &str);
+
+    fn core_exports(&self) -> Arc<crate::cores::CoreExports>;
+
+    fn evict_heavy(&self) -> (usize, usize, usize);
+
+    fn graph_stats(&self) -> (usize, usize, usize, usize);
+
+    fn core_members(&self) -> Arc<crate::cores::CoreMembers>;
+
+    fn find_bind_for_type(
+        &self,
+        type_name: &str,
+        origin_modules: &[String],
+    ) -> Option<Arc<BindResult>> {
+        for path in origin_modules {
+            let Some(bind) = self.module_bind(path).or_else(|| self.stdlib_bind(path)) else {
+                continue;
+            };
+            if bind.get_class_entry(type_name).is_some()
+                || bind.get_namespace_members_local(type_name).is_some()
+                || bind.get_interface_members_local(type_name).is_some()
+            {
+                return Some(bind);
+            }
+        }
+        None
+    }
+
+    fn stdlib_specs(&self) -> Vec<String>;
+
+    fn find_stdlib_bind(
+        &self,
+        check: &mut dyn FnMut(&BindResult) -> bool,
+    ) -> Option<Arc<BindResult>> {
+        for spec in self.stdlib_specs() {
+            if let Some(bind) = self.stdlib_bind(&spec)
+                && check(&bind)
+            {
+                return Some(bind);
+            }
+        }
+        None
+    }
+}

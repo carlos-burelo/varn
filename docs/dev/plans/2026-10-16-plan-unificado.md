@@ -128,7 +128,7 @@ cuadrante 5 de `verify.ps1` (`5489ec54`). http_routing 262→227 ms
 (bun 219).
 Globales top-level a registros del módulo (regresión de la migración
 HIR→TIR): walker TIR exhaustivo (`7a11028a`) y pase de promoción en
-varn-emit (`5e652ef0`); class_fields 6.4→3.6 ms.
+vn-emit (`5e652ef0`); class_fields 6.4→3.6 ms.
 Módulos/LBI/ABI (2026-10-16): el macro parsea el contrato (`78a47de6`,
 borra contracts.json y gen-contract-tables); build.rs con el parser real
 (`9f23745a`, AST de namespace guarda `declare` `f9af54e6`); registro
@@ -173,14 +173,14 @@ un nombre no declarado no daba error y llegaba al verificador TIR como
 `InvalidTir` (`1f274bea`); las sentencias inalcanzables solo avisaban y no se
 chequeaban, pero se emitían (`94f63b09`). Corpus `tests/errors` 206/0.
 Toolchain (2026-10-24, diseño y plan en `2026-10-24-toolchain-pipeline*.md`):
-`Failure` tipado y exit codes en el borde (`df849f7a`); `varn-project` con un
+`Failure` tipado y exit codes en el borde (`df849f7a`); `vn-project` con un
 solo `varn.toml` y una sola búsqueda de raíz (`bb302345`); `Session` dueña del
 `Project` y del resolver (`ad2234b7`); `Source` (`283499b7`); `lower_module`
 único (`682ce5ea`); `Session::compile` con `Compilation` por etapas, sin
 `DebugSink` ni `RunOpts` (`767f7430`); `Policy` y `PermissionArgs`
 (`52b456c0`); `main` delgado, features `lsp`/`dap`/`pm` fuera, `Target` y
-linker en `varn-jit` (`d7510dd7`, `cdd5a247`); `--target exe` (`7aeff0c1`);
-`vn task` (`0e338714`); bench sobre `Compilation` (`8426ff49`); `varn-inspect`
+linker en `vn-jit` (`d7510dd7`, `cdd5a247`); `--target exe` (`7aeff0c1`);
+`vn task` (`0e338714`); bench sobre `Compilation` (`8426ff49`); `vn-inspect`
 (`a795e15c`); LSP sobre `Session` en modo `Tooling` (`0b68dc9b`). Hallados y
 corregidos en el camino: `implements` de clase genérica sin verificar
 (`3ac6f3b1`), pánico del hover con miembros de clase foránea (`003aa267`),
@@ -277,7 +277,7 @@ Freeze/thaw (B2, otra sesión); tabla nueva cae en
 
 **Evidencia (código, 2026-10-17).**
 - Cada `next()` asigna un objeto: `make_iter_result`
-  (`varn-vm/src/generator.rs`) → `alloc_object_with_shape_slice` con
+  (`vn-vm/src/generator.rs`) → `alloc_object_with_shape_slice` con
   `iter_result_shape()` (TLS + clon de `Rc<Shape>`). Igual en
   `Generator.return` (`iteration.rs`), `task.rs::next_result` y
   `host_tasks.rs::iter_result`.

@@ -1,0 +1,17 @@
+[package]
+name = "vn-inspect"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+vn-core     = { path = "../vn-core" }
+vn-debug    = { path = "../vn-debug" }
+vn-lsp      = { path = "../vn-lsp" }
+vn-modules  = { path = "../vn-modules" }
+vn-pipeline = { path = "../vn-pipeline" }
+vn-sem      = { path = "../vn-sem" }
+rustc-hash    = { workspace = true }
+tower-lsp-f   = { workspace = true }
+
+[lints]
+workspace = true

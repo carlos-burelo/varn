@@ -1,0 +1,344 @@
+use crate::error::{PResult, ParseError};
+mod class;
+mod class_key;
+mod class_member;
+mod class_mods;
+mod enum_decl;
+mod export;
+mod extension;
+mod import;
+pub mod type_decls;
+
+mod struct_decl;
+pub use class::parse_class_decl;
+pub(super) use enum_decl::parse_enum_decl;
+pub(super) use export::parse_export_decl;
+pub(super) use extension::parse_extension_decl;
+pub(super) use import::parse_import_decl;
+pub(super) use struct_decl::parse_struct_decl;
+pub(super) use type_decls::{parse_interface_decl, parse_namespace_decl, parse_type_alias_decl};
+
+use crate::expressions::parse_expr;
+use crate::stream::TokenStream;
+use crate::types::{parse_type, parse_type_params};
+use vn_core::ast::operators::{Modifiers, VarKind};
+use vn_core::ast::{Decorator, FunctionDecl, Pattern, VarDeclarator, VariableDecl};
+use vn_core::TokenKind;
+
+pub(super) fn parse_var_decl_with_declare(
+    s: &mut TokenStream,
+    is_declare: bool,
+) -> PResult<VariableDecl> {
+    let range = s.range();
+    let kind = match s.kind() {
+        TokenKind::Let => {
+            s.advance();
+            VarKind::Let
+        }
+        TokenKind::Const => {
+            s.advance();
+            VarKind::Const
+        }
+        TokenKind::Var => {
+            let err_range = s.range();
+            s.push_error(
+                "`var` is not supported; use `let` or `const`".to_owned(),
+                err_range,
+            );
+            s.advance();
+            VarKind::Let
+        }
+        TokenKind::EOF
+        | TokenKind::Dynamic
+        | TokenKind::Identifier
+        | TokenKind::IntegerLiteral
+        | TokenKind::FloatLiteral
+        | TokenKind::BinaryLiteral
+        | TokenKind::OctalLiteral
+        | TokenKind::HexLiteral
+        | TokenKind::BigIntLiteral
+        | TokenKind::Str
+        | TokenKind::Char
+        | TokenKind::Template
+        | TokenKind::TemplateHead
+        | TokenKind::TemplateMiddle
+        | TokenKind::TemplateTail
+        | TokenKind::RegularExpression
+        | TokenKind::LParen
+        | TokenKind::RParen
+        | TokenKind::LBrace
+        | TokenKind::RBrace
+        | TokenKind::LBracket
+        | TokenKind::RBracket
+        | TokenKind::LAngle
+        | TokenKind::RAngle
+        | TokenKind::Semicolon
+        | TokenKind::Comma
+        | TokenKind::Dot
+        | TokenKind::DotDot
+        | TokenKind::DotDotDot
+        | TokenKind::DotDotEq
+        | TokenKind::Colon
+        | TokenKind::ColonColon
+        | TokenKind::Question
+        | TokenKind::QuestionDot
+        | TokenKind::QuestionLBracket
+        | TokenKind::QuestionQuestion
+        | TokenKind::QuestionQuestionEq
+        | TokenKind::Plus
+        | TokenKind::PlusPlus
+        | TokenKind::PlusEq
+        | TokenKind::Minus
+        | TokenKind::MinusMinus
+        | TokenKind::MinusEq
+        | TokenKind::Star
+        | TokenKind::StarStar
+        | TokenKind::StarEq
+        | TokenKind::StarStarEq
+        | TokenKind::Slash
+        | TokenKind::SlashEq
+        | TokenKind::Percent
+        | TokenKind::PercentEq
+        | TokenKind::Amp
+        | TokenKind::AmpAmp
+        | TokenKind::AmpEq
+        | TokenKind::AmpAmpEq
+        | TokenKind::Pipe
+        | TokenKind::PipePipe
+        | TokenKind::PipeEq
+        | TokenKind::PipePipeEq
+        | TokenKind::PipeGt
+        | TokenKind::Caret
+        | TokenKind::CaretEq
+        | TokenKind::Tilde
+        | TokenKind::LtLt
+        | TokenKind::LtLtEq
+        | TokenKind::GtGt
+        | TokenKind::GtGtEq
+        | TokenKind::GtGtGt
+        | TokenKind::GtGtGtEq
+        | TokenKind::Eq
+        | TokenKind::EqEq
+        | TokenKind::EqEqEq
+        | TokenKind::Bang
+        | TokenKind::BangEq
+        | TokenKind::BangEqEq
+        | TokenKind::Lt
+        | TokenKind::LtEq
+        | TokenKind::Gt
+        | TokenKind::GtEq
+        | TokenKind::Arrow
+        | TokenKind::FatArrow
+        | TokenKind::Function
+        | TokenKind::Class
+        | TokenKind::Struct
+        | TokenKind::Interface
+        | TokenKind::Type
+        | TokenKind::Enum
+        | TokenKind::Namespace
+        | TokenKind::Module
+        | TokenKind::Extension
+        | TokenKind::On
+        | TokenKind::If
+        | TokenKind::Else
+        | TokenKind::Switch
+        | TokenKind::Case
+        | TokenKind::Default
+        | TokenKind::While
+        | TokenKind::For
+        | TokenKind::Do
+        | TokenKind::Break
+        | TokenKind::Continue
+        | TokenKind::Return
+        | TokenKind::Throw
+        | TokenKind::Try
+        | TokenKind::Catch
+        | TokenKind::Finally
+        | TokenKind::Using
+        | TokenKind::With
+        | TokenKind::Import
+        | TokenKind::Export
+        | TokenKind::From
+        | TokenKind::As
+        | TokenKind::Async
+        | TokenKind::Await
+        | TokenKind::Yield
+        | TokenKind::New
+        | TokenKind::This
+        | TokenKind::Super
+        | TokenKind::Delete
+        | TokenKind::Typeof
+        | TokenKind::Instanceof
+        | TokenKind::In
+        | TokenKind::Of
+        | TokenKind::Void
+        | TokenKind::Is
+        | TokenKind::True
+        | TokenKind::False
+        | TokenKind::Null
+        | TokenKind::Public
+        | TokenKind::Private
+        | TokenKind::Protected
+        | TokenKind::Static
+        | TokenKind::Abstract
+        | TokenKind::Override
+        | TokenKind::Readonly
+        | TokenKind::Mut
+        | TokenKind::Out
+        | TokenKind::Declare
+        | TokenKind::Native
+        | TokenKind::Extends
+        | TokenKind::Implements
+        | TokenKind::Get
+        | TokenKind::Set
+        | TokenKind::Constructor
+        | TokenKind::Destructor
+        | TokenKind::Match
+        | TokenKind::At
+        | TokenKind::Hash
+        | TokenKind::Backslash
+        | TokenKind::Dollar
+        | TokenKind::Backtick
+        | TokenKind::Newline
+        | TokenKind::Whitespace
+        | TokenKind::DocComment
+        | TokenKind::Placeholder
+        | TokenKind::DecimalLiteral
+        | TokenKind::Spawn
+        | TokenKind::Parallel
+        | TokenKind::Start
+        | TokenKind::RawStr => {
+            return Err(ParseError::invalid("Expected `let` or `const`".to_owned()))
+        }
+    };
+
+    let dec_range = s.range();
+    let id = super::patterns::parse_pattern(s)?;
+    parse_var_decl_after_head(s, range, kind, dec_range, id, is_declare)
+}
+
+pub(super) fn parse_var_decl_after_head(
+    s: &mut TokenStream,
+    range: vn_core::SourceRange,
+    kind: VarKind,
+    first_range: vn_core::SourceRange,
+    first_id: Pattern,
+    is_declare: bool,
+) -> PResult<VariableDecl> {
+    let mut declarators = vec![parse_var_declarator_suffix(
+        s,
+        first_range,
+        first_id,
+        is_declare,
+    )?];
+
+    while s.eat(TokenKind::Comma) {
+        let dec_range = s.range();
+        let id = super::patterns::parse_pattern(s)?;
+        declarators.push(parse_var_declarator_suffix(s, dec_range, id, is_declare)?);
+    }
+
+    let full_range = s.span_from(range);
+    Ok(VariableDecl {
+        kind,
+        ast_id: s.next_ast_id(),
+        declarators,
+        is_declare,
+        doc: None,
+        range: full_range,
+    })
+}
+
+fn parse_var_declarator_suffix(
+    s: &mut TokenStream,
+    range: vn_core::SourceRange,
+    id: Pattern,
+    is_declare: bool,
+) -> PResult<VarDeclarator> {
+    let type_ann = if s.eat(TokenKind::Colon) {
+        Some(parse_type(s)?)
+    } else {
+        None
+    };
+    let init = if s.eat(TokenKind::Eq) {
+        if is_declare {
+            return Err(ParseError::invalid(
+                "declare variables cannot have initializers".to_owned(),
+            ));
+        }
+        Some(parse_expr(s)?)
+    } else {
+        None
+    };
+    if let (Pattern::Identifier { name, .. }, None, Some(init)) = (&id, &type_ann, init)
+        && let vn_core::ast::ExprKind::ClassExpr { declaration } =
+            &mut s.arena.expr_mut(init).kind
+        && declaration.id.is_none()
+    {
+        declaration.id = Some(*name);
+    }
+
+    let full_range = s.span_from(range);
+    Ok(VarDeclarator {
+        id,
+        type_ann,
+        init,
+        range: full_range,
+    })
+}
+
+pub(super) fn parse_function_decl(
+    s: &mut TokenStream,
+    decorators: Vec<Decorator>,
+    is_async_pre: bool,
+    is_declare: bool,
+) -> PResult<FunctionDecl> {
+    let range = s.range();
+    s.expect(TokenKind::Function)?;
+    let is_generator = s.eat(TokenKind::Star);
+
+    let id_offset = s.range().start.offset;
+    let id = s.expect_id()?;
+    let type_params = if s.check(TokenKind::LAngle) {
+        parse_type_params(s)?
+    } else {
+        vec![]
+    };
+    let params = super::params::parse_params(s)?;
+    let return_type = if s.eat(TokenKind::Colon) {
+        Some(parse_type(s)?)
+    } else {
+        None
+    };
+    let body = if is_declare {
+        if s.check(TokenKind::LBrace) {
+            return Err(ParseError::invalid(
+                "declare function cannot have a body".to_owned(),
+            ));
+        }
+        s.eat_semicolon();
+        s.stmt(s.range(), vn_core::ast::StmtKind::Empty)
+    } else {
+        s.in_function_body(is_async_pre, super::stmts::parse_block)?
+    };
+
+    let full_range = s.span_from(range);
+    Ok(FunctionDecl {
+        id,
+        ast_id: s.next_ast_id(),
+        id_offset,
+        type_params,
+        params,
+        return_type,
+        body,
+        modifiers: Modifiers {
+            is_async: is_async_pre,
+            is_generator,
+            is_declare,
+            ..Default::default()
+        },
+        decorators,
+        doc: None,
+        range: full_range,
+    })
+}

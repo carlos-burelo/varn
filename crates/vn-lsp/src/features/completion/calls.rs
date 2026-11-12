@@ -1,0 +1,152 @@
+use crate::document::DocumentState;
+use rustc_hash::FxHashSet;
+use tower_lsp_f::lsp_types::{CompletionItem, CompletionItemKind, InsertTextFormat};
+use vn_core::{TokenKind, TypeKind};
+
+pub fn build_call_argument_completions(
+    state: &DocumentState,
+    line: u32,
+    col: u32,
+) -> Option<Vec<CompletionItem>> {
+    let mut current_idx = state
+        .tokens
+        .iter()
+        .position(|t| t.line > line || (t.line == line && t.col >= col))
+        .unwrap_or(state.tokens.len());
+
+    current_idx = current_idx.saturating_sub(1);
+
+    let mut balance = 0_i32;
+    let mut lparen_idx = None;
+
+    for i in (0..=current_idx).rev() {
+        let t = &state.tokens[i];
+        if t.kind == TokenKind::RParen {
+            balance += 1;
+        } else if t.kind == TokenKind::LParen {
+            if balance == 0 {
+                lparen_idx = Some(i);
+                break;
+            } else {
+                balance -= 1;
+            }
+        } else if (t.kind == TokenKind::LBrace
+            || t.kind == TokenKind::RBrace
+            || t.kind == TokenKind::Semicolon)
+            && balance == 0
+        {
+            return None;
+        }
+    }
+
+    let lparen_idx = lparen_idx?;
+    if lparen_idx == 0 {
+        return None;
+    }
+
+    let mut callee_idx = lparen_idx - 1;
+    if state.tokens[callee_idx].kind == TokenKind::LAngle {
+        let mut angle_balance = 1;
+        for i in (0..callee_idx).rev() {
+            if state.tokens[i].kind == TokenKind::RAngle {
+                angle_balance += 1;
+            } else if state.tokens[i].kind == TokenKind::LAngle {
+                angle_balance -= 1;
+                if angle_balance == 0 && i > 0 {
+                    callee_idx = i - 1;
+                    break;
+                }
+            }
+        }
+    }
+
+    let callee_tok = &state.tokens[callee_idx];
+
+    let mut fn_params = Vec::new();
+
+    if let Some(info) = state.db.expr_types.get(&callee_tok.offset) {
+        if let Some(f) = state.db.callable_shape(&info.ty) {
+            fn_params.extend(
+                f.params
+                    .iter()
+                    .filter_map(|p| p.name.as_deref().map(str::to_owned)),
+            );
+        } else if let TypeKind::Named(name, _) = state.db.ty_kind(&info.ty) {
+            push_constructor_params(state, state.name(name), &mut fn_params);
+        }
+    } else if (callee_tok.kind == TokenKind::Identifier || callee_tok.kind.can_be_identifier())
+        && let Some((sid, _)) = state
+            .db
+            .resolve_at(state.lexeme(callee_tok), callee_tok.offset)
+    {
+        if sid >= state.db.bind.arena.len() {
+            return None;
+        }
+        let sym = state.symbol(sid);
+        if let Some(f) = state.db.fn_shape(sym.ty()) {
+            fn_params.extend(
+                f.params
+                    .iter()
+                    .filter_map(|p| p.name.as_deref().map(str::to_owned)),
+            );
+        } else if matches!(sym.kind(), vn_sem::symbol::SymbolKind::Class) {
+            push_constructor_params(state, state.lexeme(callee_tok), &mut fn_params);
+        }
+    }
+
+    if fn_params.is_empty() {
+        return None;
+    }
+
+    let mut provided_named_args = FxHashSet::default();
+    for i in (lparen_idx + 1)..=current_idx {
+        let t = &state.tokens[i];
+        if (t.kind == TokenKind::Identifier || t.kind.can_be_identifier())
+            && i + 1 < state.tokens.len()
+            && state.tokens[i + 1].kind == TokenKind::Colon
+        {
+            provided_named_args.insert(state.lexeme(t).to_owned());
+        }
+    }
+
+    let mut items = Vec::new();
+    for (idx, param) in fn_params.iter().enumerate() {
+        if !provided_named_args.contains(param) {
+            items.push(CompletionItem {
+                label: format!("{}:", param),
+                kind: Some(CompletionItemKind::Field),
+                insert_text: Some(format!("{}: $1", param)),
+                insert_text_format: Some(InsertTextFormat::Snippet),
+                detail: Some("named argument".to_string()),
+                sort_text: Some(format!("0_{idx:02}")),
+                ..Default::default()
+            });
+        }
+    }
+
+    if items.is_empty() {
+        None
+    } else {
+        Some(items)
+    }
+}
+
+fn push_constructor_params(state: &DocumentState, class_name: &str, out: &mut Vec<String>) {
+    let Some(entry) = state.db.bind.get_class_entry(class_name) else {
+        return;
+    };
+    let Some(ctor) = entry
+        .members
+        .iter()
+        .find(|m| m.kind == vn_sem::types::ClassMemberKind::Constructor)
+    else {
+        return;
+    };
+    if let Some(f) = state.db.fn_shape(&ctor.ty) {
+        out.extend(
+            f.params
+                .iter()
+                .filter_map(|p| p.name.as_deref().map(str::to_owned)),
+        );
+    }
+}

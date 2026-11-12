@@ -19,7 +19,7 @@ Gracias por tu interés en contribuir al desarrollo del lenguaje de programació
 
 1. **Simplicidad sobre Complejidad**: Preferir soluciones pequeñas, locales y cohesionadas. Aplicar DRY y KISS.
 2. **Sin Deuda Técnica Ni Compatibilidad Legada Innecesaria**: Si un subsistema tiene defectos fundamentales, no extenderlo; reemplazarlo.
-3. **Frontend / Backend Boundary**: Mantener límites estrictos entre frontend (`varn-lexer`, `varn-parser`, `varn-checker`), compilador (`varn-compiler`), backend (`varn-compiler::regalloc`), VM (`varn-vm`) y runtime nativo (`varn-builtins`, `varn-rt` para AOT).
+3. **Frontend / Backend Boundary**: Mantener límites estrictos entre frontend (`vn-lexer`, `vn-parser`, `vn-checker`), compilador (`vn-compiler`), backend (`vn-compiler::regalloc`), VM (`vn-vm`) y runtime nativo (`vn-builtins`, `vn-rt` para AOT).
 
 ---
 
@@ -101,7 +101,7 @@ Para simplificar la validación y asegurar cero roturas antes de hacer commit/pu
 > [!NOTE]
 > Los flags son distintos por shell: `verify.ps1` usa mayúscula inicial (`-Fast`, `-Quick`, `-SkipLint`, `-CleanCache`); `verify.sh` usa minúsculas (`--fast`, `--skip-lint`, `--clean-cache`) y no tiene equivalente de `-Quick`.
 
-`verify.ps1` ejecuta también el corpus de errores (`cargo test -p varn-cli --test error_corpus`), igual que el CI.
+`verify.ps1` ejecuta también el corpus de errores (`cargo test -p vn-cli --test error_corpus`), igual que el CI.
 
 - **Linux limpio desde Windows (Docker)**:
   ```powershell

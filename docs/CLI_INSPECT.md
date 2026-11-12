@@ -1,6 +1,6 @@
 # Inspección fases (`vn debug`)
 
-Código manda. Fuentes: `crates/varn-cli/src/cli.rs`, `crates/varn-cli/src/commands/debug.rs`, `crates/varn-debug/src/registry.rs`, `crates/varn-debug/src/flags/phases.rs`, `crates/varn-core/src/debug_flags/state.rs`, `crates/varn-cli/src/debug_sink.rs`, `crates/varn-debug/src/clif.rs`.
+Código manda. Fuentes: `crates/vn-cli/src/cli.rs`, `crates/vn-cli/src/commands/debug.rs`, `crates/vn-debug/src/registry.rs`, `crates/vn-debug/src/flags/phases.rs`, `crates/vn-core/src/debug_flags/state.rs`, `crates/vn-cli/src/debug_sink.rs`, `crates/vn-debug/src/clif.rs`.
 
 ## CLI (`cli.rs`)
 
@@ -79,11 +79,11 @@ Variable `VARN_GC_TRACE=1`: una línea por colección menor en cualquier comando
 vn debug -p clif --fn NAME file.vn
 ```
 
-`debug_clif` (`clif.rs`): ISA host vía `shared_isa()`, recorre proto + funciones anidadas, filtra por `--fn` (substring sobre nombre, `clif.rs`), inspecciona con `varn_jit::clif::debug::inspect` (lowering puro, sin enlazar). Flags `DebugFlags` (`state.rs`): `clif`, `clif_route`, `clif_kinds`, `clif_ir`, `clif_asm`, `clif_check`.
+`debug_clif` (`clif.rs`): ISA host vía `shared_isa()`, recorre proto + funciones anidadas, filtra por `--fn` (substring sobre nombre, `clif.rs`), inspecciona con `vn_jit::clif::debug::inspect` (lowering puro, sin enlazar). Flags `DebugFlags` (`state.rs`): `clif`, `clif_route`, `clif_kinds`, `clif_ir`, `clif_asm`, `clif_check`.
 
 ## Flags resto (`state.rs`)
 
-`tokens ast bytecode symbols symbols_all binds modules types types_all types_range expr expr_range check_types errors trace calls consts scope graph cap_trace info lsp* tir tir_check tiers bails summary typeloss gc fn_filter`. Parseo en `varn-debug/src/flags/spec.rs`; rangos `types:N`, `expr:N` (`flags/phases.rs`).
+`tokens ast bytecode symbols symbols_all binds modules types types_all types_range expr expr_range check_types errors trace calls consts scope graph cap_trace info lsp* tir tir_check tiers bails summary typeloss gc fn_filter`. Parseo en `vn-debug/src/flags/spec.rs`; rangos `types:N`, `expr:N` (`flags/phases.rs`).
 
 ## Ejemplos
 

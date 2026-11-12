@@ -1,0 +1,135 @@
+use vn_sem::symbol::SymbolKind;
+use vn_sem::types::Type;
+
+use super::SemanticDB;
+
+#[derive(Clone, Copy)]
+pub struct SymbolView<'a> {
+    pub id: vn_sem::symbol::SymbolId,
+    pub sym: &'a vn_sem::symbol::Symbol,
+    pub(super) ty: &'a Type,
+
+    pub(super) db: &'a SemanticDB,
+}
+
+pub(super) static DYNAMIC_TY: Type = Type::Dynamic;
+
+impl std::fmt::Debug for SymbolView<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SymbolView")
+            .field("name", &self.name())
+            .field("kind", &self.kind())
+            .finish()
+    }
+}
+
+impl<'a> SymbolView<'a> {
+    fn text(&self, atom: vn_core::Atom) -> &'a str {
+        self.db.bind.interner.resolve(atom)
+    }
+    pub fn name(&self) -> &'a str {
+        self.text(self.sym.name)
+    }
+    pub fn kind(&self) -> SymbolKind {
+        self.sym.kind
+    }
+    pub fn ty(&self) -> &'a Type {
+        self.ty
+    }
+
+    pub fn ty_text(&self) -> String {
+        self.db.ty_text(self.ty)
+    }
+
+    pub fn line(&self) -> u32 {
+        self.sym.line.saturating_sub(1)
+    }
+    pub fn col(&self) -> u32 {
+        self.sym.col
+    }
+    pub fn end_line(&self) -> u32 {
+        if self.sym.full_range.end.line > 0 {
+            self.sym.full_range.end.line.saturating_sub(1)
+        } else {
+            self.line()
+        }
+    }
+    pub fn end_col(&self) -> u32 {
+        if self.sym.full_range.end.line > 0 {
+            self.sym.full_range.end.column
+        } else {
+            self.sym.col + self.name().chars().count() as u32
+        }
+    }
+    pub fn full_range(&self) -> vn_core::SourceRange {
+        self.sym.full_range
+    }
+    pub fn doc(&self) -> Option<&'a str> {
+        self.sym.doc.map(|a| self.text(a))
+    }
+    pub fn origin(&self) -> Option<&'a str> {
+        self.sym.origin_module.map(|a| self.text(a))
+    }
+    pub fn throws(&self) -> &'a [String] {
+        &self.sym.throws
+    }
+    pub fn is_async(&self) -> bool {
+        self.sym.is_async
+    }
+    pub fn is_generator(&self) -> bool {
+        self.sym.is_generator
+    }
+    pub fn is_test(&self) -> bool {
+        self.sym.is_test
+    }
+    pub fn has_explicit_type(&self) -> bool {
+        self.sym.has_explicit_type
+    }
+    pub fn type_params(&self) -> Vec<String> {
+        self.sym
+            .type_params
+            .iter()
+            .map(|a| self.text(*a).to_owned())
+            .collect()
+    }
+
+    fn fn_shape(&self) -> Option<vn_sem::types::FunctionType> {
+        self.db.fn_shape(self.ty)
+    }
+    pub fn is_arrow(&self) -> bool {
+        self.fn_shape().is_some_and(|f| f.is_arrow)
+    }
+    pub fn is_from_stdlib(&self) -> bool {
+        self.origin()
+            .is_some_and(|m| vn_core::ModuleKind::of(m).is_some())
+    }
+
+    pub fn type_str(&self) -> String {
+        match (self.fn_shape(), self.kind()) {
+            (Some(ft), SymbolKind::Function | SymbolKind::Method) => {
+                self.db.ty_text(&Type::resolved(ft.return_type))
+            }
+            _ => self.db.ty_text(self.ty),
+        }
+    }
+    pub fn params_str(&self) -> String {
+        match self.fn_shape() {
+            Some(ft) => ft
+                .params
+                .iter()
+                .map(|p| {
+                    format!(
+                        "{}: {}{}",
+                        p.name
+                            .as_deref()
+                            .unwrap_or(vn_core::TokenKind::Placeholder.as_str()),
+                        self.db.ty_text(&Type::resolved(p.ty)),
+                        if p.optional { "?" } else { "" }
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", "),
+            None => String::new(),
+        }
+    }
+}

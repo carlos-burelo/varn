@@ -1,0 +1,49 @@
+#![allow(unused_crate_dependencies)]
+
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+fn repo_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .expect("repo root")
+}
+
+#[test]
+fn osr_entries_resume_from_ssa() {
+    let root = repo_root();
+    let cache = tempfile_dir();
+    let out = Command::new(env!("CARGO_BIN_EXE_vn"))
+        .arg("run")
+        .arg(root.join("tests/151-jit-osr.vn"))
+        .env(vn_core::env::EnvVar::CacheDir.name(), &cache)
+        .env("NO_COLOR", "1")
+        .env(vn_core::env::EnvVar::JitTier.name(), "100000000")
+        .env(vn_core::env::EnvVar::JitTierStraight.name(), "100000000")
+        .env(vn_core::env::EnvVar::JitOsr.name(), "50")
+        .env(vn_core::env::EnvVar::ClifTrace.name(), "1")
+        .output()
+        .expect("spawn vn");
+    let _ = std::fs::remove_dir_all(&cache);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        out.status.success() && stdout.contains("=== Suite: 151 jit osr ==="),
+        "OSR run failed:\n{stdout}\n{stderr}"
+    );
+    for name in ["osSingle", "osNested", "osTriple", "osDown"] {
+        assert!(
+            stderr
+                .lines()
+                .any(|l| l.contains(&format!("from_ssa {name} osr@"))),
+            "{name} did not resume through an SSA OSR entry:\n{stderr}"
+        );
+    }
+}
+
+fn tempfile_dir() -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("varn-osr-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("cache dir");
+    dir
+}

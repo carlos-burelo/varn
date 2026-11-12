@@ -1,0 +1,371 @@
+use tower_lsp_f::lsp_types::{
+    ActiveParameter, ParameterInformation, ParameterInformationLabel, SignatureHelp,
+    SignatureInformation,
+};
+use vn_core::TokenKind;
+
+use crate::document::DocumentState;
+
+pub fn build_signature_help(state: &DocumentState, line: u32, col: u32) -> Option<SignatureHelp> {
+    let before: Vec<_> = state
+        .tokens
+        .iter()
+        .filter(|t| t.line < line || (t.line == line && t.col < col))
+        .collect();
+
+    let mut depth: i32 = 0;
+    let mut active_param: u32 = 0;
+    let mut call_paren_idx: Option<usize> = None;
+
+    for (idx, tok) in before.iter().enumerate().rev() {
+        match tok.kind {
+            TokenKind::RParen | TokenKind::RBracket => depth += 1,
+
+            TokenKind::LBracket => {
+                if depth > 0 {
+                    depth -= 1;
+                }
+            }
+
+            TokenKind::LParen => {
+                if depth > 0 {
+                    depth -= 1;
+                } else {
+                    call_paren_idx = Some(idx);
+                    break;
+                }
+            }
+
+            TokenKind::Comma if depth == 0 => active_param += 1,
+            TokenKind::Semicolon if depth == 0 => break,
+
+            TokenKind::EOF
+            | TokenKind::Dynamic
+            | TokenKind::Identifier
+            | TokenKind::IntegerLiteral
+            | TokenKind::FloatLiteral
+            | TokenKind::BinaryLiteral
+            | TokenKind::OctalLiteral
+            | TokenKind::HexLiteral
+            | TokenKind::BigIntLiteral
+            | TokenKind::Str
+            | TokenKind::Char
+            | TokenKind::Template
+            | TokenKind::TemplateHead
+            | TokenKind::TemplateMiddle
+            | TokenKind::TemplateTail
+            | TokenKind::RegularExpression
+            | TokenKind::LBrace
+            | TokenKind::RBrace
+            | TokenKind::LAngle
+            | TokenKind::RAngle
+            | TokenKind::Semicolon
+            | TokenKind::Comma
+            | TokenKind::Dot
+            | TokenKind::DotDot
+            | TokenKind::DotDotDot
+            | TokenKind::DotDotEq
+            | TokenKind::Colon
+            | TokenKind::ColonColon
+            | TokenKind::Question
+            | TokenKind::QuestionDot
+            | TokenKind::QuestionLBracket
+            | TokenKind::QuestionQuestion
+            | TokenKind::QuestionQuestionEq
+            | TokenKind::Plus
+            | TokenKind::PlusPlus
+            | TokenKind::PlusEq
+            | TokenKind::Minus
+            | TokenKind::MinusMinus
+            | TokenKind::MinusEq
+            | TokenKind::Star
+            | TokenKind::StarStar
+            | TokenKind::StarEq
+            | TokenKind::StarStarEq
+            | TokenKind::Slash
+            | TokenKind::SlashEq
+            | TokenKind::Percent
+            | TokenKind::PercentEq
+            | TokenKind::Amp
+            | TokenKind::AmpAmp
+            | TokenKind::AmpEq
+            | TokenKind::AmpAmpEq
+            | TokenKind::Pipe
+            | TokenKind::PipePipe
+            | TokenKind::PipeEq
+            | TokenKind::PipePipeEq
+            | TokenKind::PipeGt
+            | TokenKind::Caret
+            | TokenKind::CaretEq
+            | TokenKind::Tilde
+            | TokenKind::LtLt
+            | TokenKind::LtLtEq
+            | TokenKind::GtGt
+            | TokenKind::GtGtEq
+            | TokenKind::GtGtGt
+            | TokenKind::GtGtGtEq
+            | TokenKind::Eq
+            | TokenKind::EqEq
+            | TokenKind::EqEqEq
+            | TokenKind::Bang
+            | TokenKind::BangEq
+            | TokenKind::BangEqEq
+            | TokenKind::Lt
+            | TokenKind::LtEq
+            | TokenKind::Gt
+            | TokenKind::GtEq
+            | TokenKind::Arrow
+            | TokenKind::FatArrow
+            | TokenKind::Let
+            | TokenKind::Const
+            | TokenKind::Var
+            | TokenKind::Function
+            | TokenKind::Class
+            | TokenKind::Struct
+            | TokenKind::Interface
+            | TokenKind::Type
+            | TokenKind::Enum
+            | TokenKind::Namespace
+            | TokenKind::Module
+            | TokenKind::Extension
+            | TokenKind::On
+            | TokenKind::If
+            | TokenKind::Else
+            | TokenKind::Switch
+            | TokenKind::Case
+            | TokenKind::Default
+            | TokenKind::While
+            | TokenKind::For
+            | TokenKind::Do
+            | TokenKind::Break
+            | TokenKind::Continue
+            | TokenKind::Return
+            | TokenKind::Throw
+            | TokenKind::Try
+            | TokenKind::Catch
+            | TokenKind::Finally
+            | TokenKind::Using
+            | TokenKind::With
+            | TokenKind::Import
+            | TokenKind::Export
+            | TokenKind::From
+            | TokenKind::As
+            | TokenKind::Async
+            | TokenKind::Await
+            | TokenKind::Yield
+            | TokenKind::New
+            | TokenKind::This
+            | TokenKind::Super
+            | TokenKind::Delete
+            | TokenKind::Typeof
+            | TokenKind::Instanceof
+            | TokenKind::In
+            | TokenKind::Of
+            | TokenKind::Void
+            | TokenKind::Is
+            | TokenKind::True
+            | TokenKind::False
+            | TokenKind::Null
+            | TokenKind::Public
+            | TokenKind::Private
+            | TokenKind::Protected
+            | TokenKind::Static
+            | TokenKind::Abstract
+            | TokenKind::Override
+            | TokenKind::Readonly
+            | TokenKind::Mut
+            | TokenKind::Out
+            | TokenKind::Declare
+            | TokenKind::Native
+            | TokenKind::Extends
+            | TokenKind::Implements
+            | TokenKind::Get
+            | TokenKind::Set
+            | TokenKind::Constructor
+            | TokenKind::Destructor
+            | TokenKind::Match
+            | TokenKind::At
+            | TokenKind::Hash
+            | TokenKind::Backslash
+            | TokenKind::Dollar
+            | TokenKind::Backtick
+            | TokenKind::Newline
+            | TokenKind::Whitespace
+            | TokenKind::DocComment
+            | TokenKind::Placeholder
+            | TokenKind::DecimalLiteral
+            | TokenKind::Spawn
+            | TokenKind::Parallel
+            | TokenKind::Start
+            | TokenKind::RawStr => {}
+        }
+    }
+
+    let call_idx = call_paren_idx?;
+    let fn_tok = call_idx.checked_sub(1).and_then(|i| before.get(i))?;
+
+    if let Some(resolved) = resolve_callee_signature(
+        state,
+        fn_tok.line,
+        fn_tok.col,
+        state.lexeme(fn_tok),
+        active_param,
+    ) {
+        return Some(resolved);
+    }
+
+    if let Some(chain) = state.resolve_chain_at(fn_tok.line, fn_tok.col) {
+        use crate::document::ChainResult;
+        let (params_str, ret_str) = match chain {
+            ChainResult::Symbol(sym) => match state.db.fn_shape(sym.ty()) {
+                Some(ft) => (format_params(state, &ft), state.db.id_text(ft.return_type)),
+                None => (sym.params_str(), sym.type_str()),
+            },
+
+            ChainResult::Member { member, .. } => match state.db.fn_shape(&member.ty) {
+                Some(ft) => (format_params(state, &ft), state.db.id_text(ft.return_type)),
+                None => (String::new(), state.ty_text(&member.ty)),
+            },
+        };
+        return build_signature_response(state.lexeme(fn_tok), &params_str, &ret_str, active_param);
+    }
+
+    None
+}
+
+fn resolve_callee_signature(
+    state: &DocumentState,
+    line: u32,
+    col: u32,
+    name: &str,
+    active_param: u32,
+) -> Option<SignatureHelp> {
+    let tok = state
+        .tokens
+        .iter()
+        .find(|t| t.line == line && t.col <= col && col < t.col + t.length)?;
+
+    if let Some(call_res) = state.db.call_resolutions.get(&tok.offset) {
+        let params_str = call_res
+            .params
+            .iter()
+            .map(|p| {
+                let n = p.name.as_deref().unwrap_or("arg");
+                let opt = if p.optional { "?" } else { "" };
+                format!("{}{}: {}", n, opt, state.ty_text(&p.ty))
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let ret_str = state.ty_text(&call_res.return_ty);
+        let name_str = call_res.callee_name.as_deref().unwrap_or(name);
+        return build_signature_response(name_str, &params_str, &ret_str, active_param);
+    }
+
+    if let Some(mem_res) = state.db.member_resolutions.get(&tok.offset)
+        && let Some(ft) = state.db.fn_shape(&mem_res.member_ty)
+    {
+        let params_str = format_params(state, &ft);
+        let ret_str = state.db.id_text(ft.return_type);
+        return build_signature_response(&mem_res.member_name, &params_str, &ret_str, active_param);
+    }
+
+    if let Some(info) = state.db.expr_types.get(&tok.offset)
+        && let Some(ft) = state.db.callable_shape(&info.ty)
+    {
+        let params_str = format_params(state, &ft);
+        let ret_str = state.db.id_text(ft.return_type);
+        return build_signature_response(name, &params_str, &ret_str, active_param);
+    }
+
+    if let Some((_, ty)) = state.db.resolve_at(name, tok.offset)
+        && let Some(ft) = state.db.fn_shape(&ty)
+    {
+        let params_str = format_params(state, &ft);
+        let ret_str = state.db.id_text(ft.return_type);
+        return build_signature_response(name, &params_str, &ret_str, active_param);
+    }
+
+    None
+}
+
+fn format_params(state: &DocumentState, ft: &vn_sem::types::FunctionType) -> String {
+    ft.params
+        .iter()
+        .map(|p| {
+            let n = p.name.as_deref().unwrap_or("arg");
+            let opt = if p.optional { "?" } else { "" };
+            format!("{}{}: {}", n, opt, state.db.id_text(p.ty))
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn build_signature_response(
+    fn_name: &str,
+    params_str: &str,
+    ret_str: &str,
+    active_param: u32,
+) -> Option<SignatureHelp> {
+    let param_strs = split_params(params_str);
+    let label = format!("{}({}): {}", fn_name, param_strs.join(", "), ret_str);
+
+    let parameters: Vec<ParameterInformation> = param_strs
+        .iter()
+        .map(|p| ParameterInformation {
+            label: ParameterInformationLabel::String(p.clone()),
+            documentation: None,
+        })
+        .collect();
+
+    let active = if active_param < parameters.len() as u32 {
+        Some(ActiveParameter::from(active_param))
+    } else {
+        None
+    };
+
+    Some(SignatureHelp {
+        signatures: vec![SignatureInformation {
+            label,
+            documentation: None,
+            parameters: Some(parameters),
+            active_parameter: active,
+        }],
+        active_signature: Some(0),
+        active_parameter: active,
+    })
+}
+
+fn split_params(params_str: &str) -> Vec<String> {
+    if params_str.trim().is_empty() {
+        return Vec::new();
+    }
+    let mut parts = Vec::new();
+    let mut depth = 0i32;
+    let mut current = String::new();
+
+    for ch in params_str.chars() {
+        match ch {
+            '<' | '(' | '[' | '{' => {
+                depth += 1;
+                current.push(ch);
+            }
+            '>' | ')' | ']' | '}' => {
+                depth -= 1;
+                current.push(ch);
+            }
+            ',' if depth == 0 => {
+                let trimmed = current.trim().to_string();
+                if !trimmed.is_empty() {
+                    parts.push(trimmed);
+                }
+                current.clear();
+            }
+            _ => current.push(ch),
+        }
+    }
+    let trimmed = current.trim().to_string();
+    if !trimmed.is_empty() {
+        parts.push(trimmed);
+    }
+    parts
+}

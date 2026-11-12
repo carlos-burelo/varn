@@ -1,0 +1,361 @@
+use crate::error::VmResult;
+use crate::exec::ctx::ExecCtx;
+use crate::value::VmValue;
+
+impl ExecCtx {
+    pub(crate) fn exec_call_reg(
+        &mut self,
+        callee: VmValue,
+        base: usize,
+        arg_start: usize,
+        arg_count: usize,
+        dest: usize,
+        frame_idx: usize,
+    ) -> VmResult<bool> {
+        let mut pending_receiver: Option<VmValue> = None;
+        if callee.is_heap() {
+            let heap_idx = callee.as_heap();
+            if let Some(crate::heap::HeapObj::VmClosure(nc)) = self.heap.get(heap_idx)
+                && !nc.proto.is_generator
+                && !nc.proto.is_async
+            {
+                let arity = nc.proto.arity;
+                if !nc.proto.has_rest && arg_count <= arity {
+                    let nc = nc.clone();
+                    if self.hotspot_counters.is_some() {
+                        let fn_name = nc.proto.name.as_deref().unwrap_or("<anon>");
+                        let is_jit = nc.jit_fn().is_some();
+                        self.record_hotspot_fn(fn_name, is_jit);
+                    }
+                    if self.call_depth() >= crate::frame::MAX_CALL_DEPTH {
+                        return Err(crate::frame::call_depth_exceeded());
+                    }
+
+                    let alloc = self.push_call_frame(&nc.proto, base, arg_start, arg_count)?;
+                    let mut frame = crate::frame::CallFrame::new_owned(nc, alloc);
+                    frame.return_reg = dest as u16;
+                    self.record_call_vm_fast();
+                    self.frames.push(frame);
+                    return Ok(true);
+                }
+            }
+
+            let mut bound_method = None;
+            if let Some(crate::heap::HeapObj::BoundMethod(bm)) = self.heap.get(heap_idx) {
+                bound_method = Some((**bm).clone());
+            }
+
+            if let Some(bm) = bound_method {
+                let receiver = bm.receiver;
+                match &bm.target {
+                    vn_types::value::BoundMethodTarget::Native { func, name, .. } => {
+                        let f = *func;
+                        self.record_call_native(f, Some(name));
+                        let args = self.stack.box_range(base, arg_start, arg_count);
+                        let mut args = args;
+                        if !args.is_empty() {
+                            args[0] = receiver;
+                        } else {
+                            args.push(receiver);
+                        }
+                        let result = self
+                            .invoke_native(f, &args)
+                            .map_err(crate::error::RuntimeError::from)?;
+                        self.store_call_result(frame_idx, dest, result)?;
+                        return Ok(false);
+                    }
+                    vn_types::value::BoundMethodTarget::Vm {
+                        closure: method_closure,
+                        owner_class,
+                    } => {
+                        if let Some(nc) = self.heap.closure_of(*method_closure).cloned() {
+                            let nc = &nc;
+                            let arity = nc.proto.arity;
+                            if !nc.proto.is_generator
+                                && !nc.proto.is_async
+                                && (arg_count == arity || arg_count == arity - 1)
+                            {
+                                let nc = nc.clone();
+                                let owner = owner_class.clone();
+                                if self.call_depth() >= crate::frame::MAX_CALL_DEPTH {
+                                    return Err(crate::frame::call_depth_exceeded());
+                                }
+
+                                let first_arg = if arg_count == arity { 1 } else { 0 };
+                                let alloc = self.push_call_frame_with_this(
+                                    &nc.proto,
+                                    receiver,
+                                    crate::exec::method_args::MethodArgs::Regs {
+                                        base,
+                                        start: arg_start + first_arg,
+                                        count: arg_count - first_arg,
+                                    },
+                                )?;
+                                let mut frame = crate::frame::CallFrame::new_owned(nc, alloc);
+                                frame.return_reg = dest as u16;
+                                frame.current_class = owner;
+                                self.record_call_vm_fast();
+                                self.frames.push(frame);
+                                return Ok(true);
+                            }
+                        }
+                    }
+                }
+
+                pending_receiver = Some(receiver);
+            } else {
+                match self.heap.get(callee.as_heap()) {
+                    Some(crate::heap::HeapObj::NativeFn(f, name)) => {
+                        let f = *f;
+                        let name_str = *name;
+                        self.record_call_native(f, Some(name_str));
+                        let args = self.stack.box_range(base, arg_start, arg_count);
+                        let slice = if args.len() > 1 { &args[1..] } else { &[] };
+                        let result = self
+                            .invoke_native(f, slice)
+                            .map_err(crate::error::RuntimeError::from)?;
+                        self.store_call_result(frame_idx, dest, result)?;
+                        return Ok(false);
+                    }
+                    Some(crate::heap::HeapObj::VmClosure(nc))
+                        if !nc.proto.is_generator && !nc.proto.is_async =>
+                    {
+                        let arity = nc.proto.arity;
+
+                        if !nc.proto.has_rest && arg_count <= arity {
+                            let nc = nc.clone();
+                            if self.hotspot_counters.is_some() {
+                                let fn_name = nc.proto.name.as_deref().unwrap_or("<anon>");
+                                let is_jit = nc.jit_fn().is_some();
+                                self.record_hotspot_fn(fn_name, is_jit);
+                            }
+                            if self.call_depth() >= crate::frame::MAX_CALL_DEPTH {
+                                return Err(crate::frame::call_depth_exceeded());
+                            }
+                            let alloc =
+                                self.push_call_frame(&nc.proto, base, arg_start, arg_count)?;
+                            let mut frame = crate::frame::CallFrame::new_owned(nc, alloc);
+                            frame.return_reg = dest as u16;
+                            self.record_call_vm_fast();
+                            self.frames.push(frame);
+                            return Ok(true);
+                        } else if nc.proto.has_rest && arg_count <= arity {
+                            let nc = nc.clone();
+                            let fn_name2 = nc.proto.name.as_deref().unwrap_or("<anon>").to_owned();
+                            let is_jit2 = nc.jit_fn().is_some();
+                            self.record_hotspot_fn(&fn_name2, is_jit2);
+                            if self.call_depth() >= crate::frame::MAX_CALL_DEPTH {
+                                return Err(crate::frame::call_depth_exceeded());
+                            }
+                            let alloc = self.stack.push_frame(&nc.proto);
+                            let rest_idx = arity.saturating_sub(1);
+                            let regular_count = arg_count.min(rest_idx);
+                            let mut failed: Option<crate::error::RuntimeError> = None;
+                            for i in 0..regular_count {
+                                if let Err(e) = self.stack.mov_cross(alloc, i, base, arg_start + i)
+                                {
+                                    failed = Some(e);
+                                    break;
+                                }
+                            }
+                            if failed.is_none() {
+                                for i in regular_count..rest_idx {
+                                    if let Err(e) =
+                                        self.stack.unbox_into_reg(alloc, i, VmValue::null())
+                                    {
+                                        failed = Some(e);
+                                        break;
+                                    }
+                                }
+                            }
+                            if failed.is_none() {
+                                let rest_items: Vec<VmValue> = if arg_count > rest_idx {
+                                    (rest_idx..arg_count)
+                                        .map(|i| self.stack.box_reg(base, arg_start + i))
+                                        .collect()
+                                } else {
+                                    vec![]
+                                };
+                                let rest_nv = self.heap.alloc_array_repr(
+                                    false,
+                                    vn_types::vm_value::ArrayRepr::boxed(rest_items),
+                                );
+                                if let Err(e) = self.stack.unbox_into_reg(alloc, rest_idx, rest_nv)
+                                {
+                                    failed = Some(e);
+                                }
+                            }
+                            if let Some(e) = failed {
+                                self.stack.pop_frame();
+                                return Err(e);
+                            }
+                            let mut frame = crate::frame::CallFrame::new_owned(nc, alloc);
+                            frame.return_reg = dest as u16;
+                            self.record_call_vm_fast();
+                            self.frames.push(frame);
+                            return Ok(true);
+                        }
+                    }
+                    Some(
+                        crate::heap::HeapObj::Str(_)
+                        | crate::heap::HeapObj::Array(_)
+                        | crate::heap::HeapObj::Tuple(_)
+                        | crate::heap::HeapObj::Object(_)
+                        | crate::heap::HeapObj::Buffer(_)
+                        | crate::heap::HeapObj::Module(_)
+                        | crate::heap::HeapObj::FrozenModule(_)
+                        | crate::heap::HeapObj::VmClosure(_)
+                        | crate::heap::HeapObj::Class(_)
+                        | crate::heap::HeapObj::BoundMethod(_)
+                        | crate::heap::HeapObj::Map(_)
+                        | crate::heap::HeapObj::Set(_)
+                        | crate::heap::HeapObj::Task(_)
+                        | crate::heap::HeapObj::TaskHandle(_)
+                        | crate::heap::HeapObj::Range(_)
+                        | crate::heap::HeapObj::EnumVariant(_)
+                        | crate::heap::HeapObj::BigInt(_)
+                        | crate::heap::HeapObj::Decimal(_)
+                        | crate::heap::HeapObj::Char(_)
+                        | crate::heap::HeapObj::Generator(_)
+                        | crate::heap::HeapObj::Spread(_),
+                    )
+                    | None => {}
+                }
+            }
+        }
+
+        self.stage.clear();
+        for i in 0..arg_count {
+            self.stage.push(self.stack.box_reg(base, arg_start + i));
+        }
+        if let Some(recv) = pending_receiver {
+            if self.stage.is_empty() {
+                self.stage.push(recv);
+            } else {
+                self.stage[0] = recv;
+            }
+        }
+
+        let prepared = self.prepare_call(callee, arg_count)?;
+        self.dispatch_prepared_call(prepared)?;
+
+        if self.frames.len() > frame_idx + 1 {
+            self.frames.last_mut().unwrap().return_reg = dest as u16;
+            return Ok(true);
+        }
+
+        let result = self.stage_pop();
+        self.store_call_result(frame_idx, dest, result)?;
+        Ok(false)
+    }
+
+    pub(crate) fn exec_call_self(
+        &mut self,
+        base: usize,
+        arg_start: usize,
+        arg_count: usize,
+        dest: usize,
+        frame_idx: usize,
+    ) -> VmResult<bool> {
+        let parent_frame = &self.frames[frame_idx];
+        let closure_ptr = parent_frame.closure_ptr;
+        let closure_ref = unsafe { &*closure_ptr };
+
+        let callee = match &parent_frame._owned_closure {
+            Some(rc) => self.heap.alloc_vm_closure(rc.clone()),
+            None => VmValue::null(),
+        };
+
+        let arity = closure_ref.proto.arity;
+
+        if !closure_ref.proto.has_rest && arg_count <= arity {
+            if self.hotspot_counters.is_some() {
+                let fn_name = closure_ref.proto.name.as_deref().unwrap_or("<anon>");
+                let is_jit = closure_ref.jit_fn().is_some();
+                self.record_hotspot_fn(fn_name, is_jit);
+            }
+            if self.call_depth() >= crate::frame::MAX_CALL_DEPTH {
+                return Err(crate::frame::call_depth_exceeded());
+            }
+            let owned = self.frames[frame_idx]._owned_closure.clone();
+            let alloc = self.push_call_frame(&closure_ref.proto, base, arg_start, arg_count)?;
+            let mut frame = crate::frame::CallFrame::new(closure_ref, alloc);
+            frame._owned_closure = owned;
+            frame.return_reg = dest as u16;
+            self.record_call_vm_fast();
+            self.frames.push(frame);
+            return Ok(true);
+        } else if closure_ref.proto.has_rest && arg_count <= arity {
+            let fn_name2 = closure_ref
+                .proto
+                .name
+                .as_deref()
+                .unwrap_or("<anon>")
+                .to_owned();
+            let is_jit2 = closure_ref.jit_fn().is_some();
+            self.record_hotspot_fn(&fn_name2, is_jit2);
+            if self.call_depth() >= crate::frame::MAX_CALL_DEPTH {
+                return Err(crate::frame::call_depth_exceeded());
+            }
+            let owned = self.frames[frame_idx]._owned_closure.clone();
+            let alloc = self.stack.push_frame(&closure_ref.proto);
+            let rest_idx = arity.saturating_sub(1);
+            let regular_count = arg_count.min(rest_idx);
+            let mut failed: Option<crate::error::RuntimeError> = None;
+            for i in 0..regular_count {
+                if let Err(e) = self.stack.mov_cross(alloc, i, base, arg_start + i) {
+                    failed = Some(e);
+                    break;
+                }
+            }
+            if failed.is_none() {
+                for i in regular_count..rest_idx {
+                    if let Err(e) = self.stack.unbox_into_reg(alloc, i, VmValue::null()) {
+                        failed = Some(e);
+                        break;
+                    }
+                }
+            }
+            if failed.is_none() {
+                let rest_items: Vec<VmValue> = if arg_count > rest_idx {
+                    (rest_idx..arg_count)
+                        .map(|i| self.stack.box_reg(base, arg_start + i))
+                        .collect()
+                } else {
+                    vec![]
+                };
+                let rest_nv = self
+                    .heap
+                    .alloc_array_repr(false, vn_types::vm_value::ArrayRepr::boxed(rest_items));
+                if let Err(e) = self.stack.unbox_into_reg(alloc, rest_idx, rest_nv) {
+                    failed = Some(e);
+                }
+            }
+            if let Some(e) = failed {
+                self.stack.pop_frame();
+                return Err(e);
+            }
+            let mut frame = crate::frame::CallFrame::new(closure_ref, alloc);
+            frame._owned_closure = owned;
+            frame.return_reg = dest as u16;
+            self.record_call_vm_fast();
+            self.frames.push(frame);
+            return Ok(true);
+        }
+
+        self.stage.clear();
+        self.stage.push(callee);
+        for i in 0..arg_count {
+            self.stage.push(self.stack.box_reg(base, arg_start + i));
+        }
+        let prepared = self.prepare_call(callee, arg_count)?;
+        self.dispatch_prepared_call(prepared)?;
+        if self.frames.len() > frame_idx + 1 {
+            self.frames.last_mut().unwrap().return_reg = dest as u16;
+            return Ok(true);
+        }
+        let result = self.stage_pop();
+        self.store_call_result(frame_idx, dest, result)?;
+        Ok(false)
+    }
+}

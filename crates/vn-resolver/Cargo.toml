@@ -1,0 +1,19 @@
+[package]
+name = "vn-resolver"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+vn-sem     = { path = "../vn-sem" }
+vn-binder  = { path = "../vn-binder" }
+vn-checker = { path = "../vn-checker" }
+vn-core    = { path = "../vn-core" }
+vn-modules = { path = "../vn-modules" }
+vn-lexer   = { path = "../vn-lexer" }
+vn-parser  = { path = "../vn-parser" }
+rustc-hash   = { workspace = true }
+parking_lot  = { workspace = true }
+postcard     = { workspace = true }
+
+[lints]
+workspace = true

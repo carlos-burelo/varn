@@ -2,9 +2,9 @@
 
 > **Para agentes:** SUB-SKILL REQUERIDA: usar superpowers:subagent-driven-development (recomendado) o superpowers:executing-plans para ejecutar este plan tarea por tarea. Los pasos usan casillas `- [ ]`.
 
-**Meta:** que `vn` compile por un único camino (`Session::compile`), conozca su proyecto por un único modelo (`varn-project`) y que cada comando sea una proyección delgada de ambos.
+**Meta:** que `vn` compile por un único camino (`Session::compile`), conozca su proyecto por un único modelo (`vn-project`) y que cada comando sea una proyección delgada de ambos.
 
-**Arquitectura:** `Failure` tipado (sin ANSI ni exit codes en el pipeline) → crate hoja `varn-project` → `Session` dueña de `Project` + `ModuleResolver` → `Source` → `lower_module` único → `Compilation` por etapas (`Goal`/`Mode`/`CachePolicy`) que sustituye a `DebugSink` → `Executable` que lleva los `@test` → `Policy` → CLI reestructurado → `vn task` → bench/inspect → LSP.
+**Arquitectura:** `Failure` tipado (sin ANSI ni exit codes en el pipeline) → crate hoja `vn-project` → `Session` dueña de `Project` + `ModuleResolver` → `Source` → `lower_module` único → `Compilation` por etapas (`Goal`/`Mode`/`CachePolicy`) que sustituye a `DebugSink` → `Executable` que lleva los `@test` → `Policy` → CLI reestructurado → `vn task` → bench/inspect → LSP.
 
 **Stack:** Rust workspace (`crates/*`), clap 4, postcard, PowerShell para los scripts.
 
@@ -14,7 +14,7 @@
 
 Valen para todas las tareas.
 
-- **Ley 11:** cero comentarios de código, cero tests unitarios. La verificación es la suite `.vn`, `scripts/bytecode-hash.ps1` y `scripts/cli-smoke.ps1`. Los tests Rust existentes en `crates/varn-cli/tests/` se migran, no se amplían.
+- **Ley 11:** cero comentarios de código, cero tests unitarios. La verificación es la suite `.vn`, `scripts/bytecode-hash.ps1` y `scripts/cli-smoke.ps1`. Los tests Rust existentes en `crates/vn-cli/tests/` se migran, no se amplían.
 - **Ley 9:** un cambio, un commit. Un paso «Commit» crea exactamente un commit; las tareas con varios commits lo dicen. Mensaje terminado en `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`. Después de cada commit: `tgrep index .` en la raíz.
 - **Ley 8 y regla de migración:** borrar, no puentear. Ningún adaptador, flag dual ni alias hacia la API vieja. El compilador marca los sitios pendientes; se migran todos en la misma tarea.
 - **Ley 4:** `BTreeMap`/`IndexMap` o `Vec` ordenado donde el orden decida algo. Ley 7: ningún `_ =>` nuevo.
@@ -23,7 +23,7 @@ Valen para todas las tareas.
 - **Límite de archivo:** 400 líneas por archivo; se divide por dominio.
 - **Raíz limpia:** nada suelto en la raíz del repo. Temporales en `target/tmp/`.
 - **Nunca `git add` de directorios:** el usuario puede tener cambios sin commitear. Se añaden archivos por nombre.
-- **Naming:** la salida compilada se llama `Executable` (la `Program` del diseño choca con `varn_core::ast::Program`).
+- **Naming:** la salida compilada se llama `Executable` (la `Program` del diseño choca con `vn_core::ast::Program`).
 
 **Gate de tarea (G1)**, tras cada tarea y antes de su commit:
 
@@ -68,13 +68,13 @@ Entradas que el diseño implica y que ninguna tarea cubriría sin pedirlo. Cada 
 ## Tarea 1: `Failure` tipado y render en el borde
 
 **Archivos:**
-- Modificar: `crates/varn-pipeline/src/error.rs`, `lex.rs`, `parse.rs`, `check.rs`, `execute.rs`, `lib.rs`
-- Crear: `crates/varn-cli/src/render.rs`, `crates/varn-cli/src/exit.rs`
-- Modificar: `crates/varn-cli/src/error.rs`, `main.rs`, todos los `commands/*.rs` que usen `PipelineError`/`CliError`
-- Modificar: `crates/varn-dap/src/driver.rs`, `crates/varn-lsp` donde use `PipelineError`
+- Modificar: `crates/vn-pipeline/src/error.rs`, `lex.rs`, `parse.rs`, `check.rs`, `execute.rs`, `lib.rs`
+- Crear: `crates/vn-cli/src/render.rs`, `crates/vn-cli/src/exit.rs`
+- Modificar: `crates/vn-cli/src/error.rs`, `main.rs`, todos los `commands/*.rs` que usen `PipelineError`/`CliError`
+- Modificar: `crates/vn-dap/src/driver.rs`, `crates/vn-lsp` donde use `PipelineError`
 
 **Interfaces:**
-- Produce en `varn-pipeline`:
+- Produce en `vn-pipeline`:
   ```rust
   pub enum Failure {
       Diagnostics(DiagnosticReport),
@@ -86,21 +86,21 @@ Entradas que el diseño implica y que ninguna tarea cubriría sin pedirlo. Cada 
   pub struct RuntimeFailure { pub message: String, pub frames: Vec<FrameInfo> }
   ```
   `PipelineError` desaparece.
-- Produce en `varn-cli`: `exit.rs` con `pub enum ExitCode { Fatal = 1, Usage = 2, Diagnostics = 3 }` y `impl From<&Failure> for ExitCode`; `render.rs` con `pub fn failure(f: &Failure) -> String`, que contiene el único pie «could not compile `{file}` due to {n} previous error(s)».
+- Produce en `vn-cli`: `exit.rs` con `pub enum ExitCode { Fatal = 1, Usage = 2, Diagnostics = 3 }` y `impl From<&Failure> for ExitCode`; `render.rs` con `pub fn failure(f: &Failure) -> String`, que contiene el único pie «could not compile `{file}` due to {n} previous error(s)».
 
-- [ ] **Paso 1:** Definir `Failure` y reemplazar `PipelineError` en `varn-pipeline`. Los errores de lexer y parser pasan a acumularse en un `DiagnosticBag` (Ley 5); `check::report_diagnostics` deja de formatear y devuelve el `DiagnosticReport` cuando hay errores. `format_runtime_error` de `execute.rs` pasa a `render.rs` y `execute` devuelve `Failure::Runtime`.
+- [ ] **Paso 1:** Definir `Failure` y reemplazar `PipelineError` en `vn-pipeline`. Los errores de lexer y parser pasan a acumularse en un `DiagnosticBag` (Ley 5); `check::report_diagnostics` deja de formatear y devuelve el `DiagnosticReport` cuando hay errores. `format_runtime_error` de `execute.rs` pasa a `render.rs` y `execute` devuelve `Failure::Runtime`.
 - [ ] **Paso 2:** Crear `exit.rs` y `render.rs` en el CLI. `CliError` se reduce a `{ failure: Failure | Usage(String), exit: ExitCode }` o desaparece si `Failure` basta; la regla es que solo el CLI conozca los exit codes. `main.rs` imprime con `render::failure` y sale con el `ExitCode`; la comparación `e.exit_code == 3` se borra.
-- [ ] **Paso 3:** Migrar `varn-dap` y `varn-lsp` a `Failure`. Migrar `crates/varn-cli/tests/{error_corpus,debug_golden}.rs`: el formato de salida no cambia, así que deben pasar sin editar el esperado; si algún golden cambia, el diff se revisa y se declara cuántos eran.
+- [ ] **Paso 3:** Migrar `vn-dap` y `vn-lsp` a `Failure`. Migrar `crates/vn-cli/tests/{error_corpus,debug_golden}.rs`: el formato de salida no cambia, así que deben pasar sin editar el esperado; si algún golden cambia, el diff se revisa y se declara cuántos eran.
 - [ ] **Paso 4: check `eval-syntax-error`** en `cli-smoke.ps1`: `vn eval "let ="` termina con exit code 3 y su salida contiene `(eval)` y `could not compile`.
 - [ ] **Paso 5:** G1. Commit: `pipeline: typed Failure, diagnostics rendered and exit codes decided at the CLI edge`.
 
 ---
 
-## Tarea 2: Crate `varn-project`
+## Tarea 2: Crate `vn-project`
 
 **Archivos:**
-- Crear: `crates/varn-project/{Cargo.toml,src/lib.rs,src/manifest.rs,src/root.rs,src/env.rs}`
-- Modificar: `Cargo.toml` (workspace), `crates/varn-pm/src/manifest.rs` (queda solo `DepOrigin`), `crates/varn-modules/src/artifact.rs` (se va `find_project_root`), `crates/varn-cli/src/env_file.rs` (se borra), `crates/varn-modules/src/std_root.rs`, `crates/varn-resolver/src/graph.rs`, `crates/varn-cli/src/commands/cache.rs`, `crates/varn-cli/src/doctor_impl.rs`, `crates/varn-pipeline/src/cache.rs`, `crates/varn-lsp/src/pipeline/mod.rs`
+- Crear: `crates/vn-project/{Cargo.toml,src/lib.rs,src/manifest.rs,src/root.rs,src/env.rs}`
+- Modificar: `Cargo.toml` (workspace), `crates/vn-pm/src/manifest.rs` (queda solo `DepOrigin`), `crates/vn-modules/src/artifact.rs` (se va `find_project_root`), `crates/vn-cli/src/env_file.rs` (se borra), `crates/vn-modules/src/std_root.rs`, `crates/vn-resolver/src/graph.rs`, `crates/vn-cli/src/commands/cache.rs`, `crates/vn-cli/src/doctor_impl.rs`, `crates/vn-pipeline/src/cache.rs`, `crates/vn-lsp/src/pipeline/mod.rs`
 
 **Interfaces:**
 - Produce:
@@ -126,9 +126,9 @@ Entradas que el diseño implica y que ninguna tarea cubriría sin pedirlo. Cada 
   `ProjectError` incluye la clave desconocida y el archivo.
 - Consume: nada (hoja; `serde`, `serde_json`, std).
 
-- [ ] **Paso 1:** Inventario. `tgrep -n -F -- "varn.toml" .` y `tgrep -n -- "find_project_root|project_root_cached|ProjectManifest"` sobre `crates/`. El repo no contiene manifiestos; el manifiesto se parsea hoy en `varn-pm::ProjectManifest`, `varn-modules::package` y `std_root::project_std_override`, y esos tres lectores se reemplazan por `Manifest`. `vn init` deja de escribir `[package]`.
+- [ ] **Paso 1:** Inventario. `tgrep -n -F -- "varn.toml" .` y `tgrep -n -- "find_project_root|project_root_cached|ProjectManifest"` sobre `crates/`. El repo no contiene manifiestos; el manifiesto se parsea hoy en `vn-pm::ProjectManifest`, `vn-modules::package` y `std_root::project_std_override`, y esos tres lectores se reemplazan por `Manifest`. `vn init` deja de escribir `[package]`.
 - [ ] **Paso 2:** Crear el crate. La regla de descubrimiento es la actual de `find_project_root` (mismos marcadores), parametrizada por `Anchor`; `Anchor::File` parte del directorio del archivo y `Anchor::Cwd` del cwd. El `.env` se lee del `root` con la lógica de `env_file.rs`. La sección `package` desaparece; los campos planos son los únicos.
-- [ ] **Paso 3:** Reemplazar los seis sitios de búsqueda de raíz por `Project`. `varn-modules`, `varn-pm`, `varn-pipeline`, `varn-resolver` y `varn-cli` dependen de `varn-project`. `ProjectManifest` de `varn-pm` se borra y `varn-pm` usa `Manifest`.
+- [ ] **Paso 3:** Reemplazar los seis sitios de búsqueda de raíz por `Project`. `vn-modules`, `vn-pm`, `vn-pipeline`, `vn-resolver` y `vn-cli` dependen de `vn-project`. `ProjectManifest` de `vn-pm` se borra y `vn-pm` usa `Manifest`.
 - [ ] **Paso 4: check `manifest-unknown-key`**: en un directorio temporal, `varn.toml` con la línea `nmae = "x"` y un `.vn`; `vn run` debe fallar y mostrar `nmae` y la ruta del `varn.toml`.
 - [ ] **Paso 5:** G1. Commit: `project: one manifest shape and one root discovery in a leaf crate`.
 
@@ -137,9 +137,9 @@ Entradas que el diseño implica y que ninguna tarea cubriría sin pedirlo. Cada 
 ## Tarea 3: `Session`
 
 **Archivos:**
-- Crear: `crates/varn-pipeline/src/session.rs`
-- Modificar: `crates/varn-resolver/src/module_resolver.rs` (constructor), todos los sitios que llaman `ModuleResolver::new()`: `varn-cli/src/{tester.rs,commands/build.rs,commands/std_bundle.rs,bench/source/mod.rs}`, `varn-pipeline/src/{lib.rs,stdlib_loader.rs}`, `varn-dap/src/driver.rs`, `varn-cli/src/inspect_lsp/*`
-- Modificar: `crates/varn-cli/src/main.rs` (abre la `Session` y la pasa)
+- Crear: `crates/vn-pipeline/src/session.rs`
+- Modificar: `crates/vn-resolver/src/module_resolver.rs` (constructor), todos los sitios que llaman `ModuleResolver::new()`: `vn-cli/src/{tester.rs,commands/build.rs,commands/std_bundle.rs,bench/source/mod.rs}`, `vn-pipeline/src/{lib.rs,stdlib_loader.rs}`, `vn-dap/src/driver.rs`, `vn-cli/src/inspect_lsp/*`
+- Modificar: `crates/vn-cli/src/main.rs` (abre la `Session` y la pasa)
 
 **Interfaces:**
 - Consume: `Project`, `Anchor`, `Failure`.
@@ -164,8 +164,8 @@ Entradas que el diseño implica y que ninguna tarea cubriría sin pedirlo. Cada 
 ## Tarea 4: `Source`
 
 **Archivos:**
-- Crear: `crates/varn-pipeline/src/source.rs`
-- Modificar: `lib.rs` (`read_source`, `canonicalize_path`, `read_source_file` se borran), `varn-cli/src/commands/{build,run,eval,repl,check,debug}.rs`, `varn-cli/src/tester.rs`, `varn-dap/src/driver.rs`
+- Crear: `crates/vn-pipeline/src/source.rs`
+- Modificar: `lib.rs` (`read_source`, `canonicalize_path`, `read_source_file` se borran), `vn-cli/src/commands/{build,run,eval,repl,check,debug}.rs`, `vn-cli/src/tester.rs`, `vn-dap/src/driver.rs`
 
 **Interfaces:**
 - Produce:
@@ -183,7 +183,7 @@ Entradas que el diseño implica y que ninguna tarea cubriría sin pedirlo. Cada 
   ```
   `Source::file` canonicaliza una sola vez y lee por el registro de loaders (el camino que hoy usa `read_source`).
 
-- [ ] **Paso 1:** Implementar y reemplazar `std::fs::read_to_string` + `canonicalize` repetidos en `build`, `dap`, `tester` y `lib.rs`. Los nombres virtuales `"(eval)"` y `"(repl)"` pasan a constantes de una tabla en `varn-cli` (Ley 16).
+- [ ] **Paso 1:** Implementar y reemplazar `std::fs::read_to_string` + `canonicalize` repetidos en `build`, `dap`, `tester` y `lib.rs`. Los nombres virtuales `"(eval)"` y `"(repl)"` pasan a constantes de una tabla en `vn-cli` (Ley 16).
 - [ ] **Paso 2:** G1. Commit: `pipeline: Source is the single identity and reader of what gets compiled`.
 
 ---
@@ -191,14 +191,14 @@ Entradas que el diseño implica y que ninguna tarea cubriría sin pedirlo. Cada 
 ## Tarea 5: `lower_module` único
 
 **Archivos:**
-- Crear: `crates/varn-pipeline/src/lower.rs`
+- Crear: `crates/vn-pipeline/src/lower.rs`
 - Modificar: `compile.rs` (pierde `emit_tir`, `inject_star_reexports`, `resolve_import_slots`, `sorted_export_names`, `report_export_collisions`, `tir_import_sources`, `compile_tir`, que pasan a `lower.rs`), `module_precompile.rs:206-249`, `stdlib_loader.rs:115-153`
 
 **Interfaces:**
 - Produce:
   ```rust
   pub struct LowerInput<'a> {
-      pub program: &'a ast::Program, pub arena: &'a AstArena, pub check: &'a varn_sem::output::CheckResult,
+      pub program: &'a ast::Program, pub arena: &'a AstArena, pub check: &'a vn_sem::output::CheckResult,
       pub exports: &'a ExportMap, pub resolver: &'a dyn ImportResolver, pub source: &'a str,
   }
   pub struct Lowered { pub tir: TirModule, pub proto: FunctionProto }
@@ -216,10 +216,10 @@ Entradas que el diseño implica y que ninguna tarea cubriría sin pedirlo. Cada 
 Es la tarea más grande. Tiene cuatro commits.
 
 **Archivos:**
-- Crear: `crates/varn-pipeline/src/{request.rs,compilation.rs,executable.rs}`
+- Crear: `crates/vn-pipeline/src/{request.rs,compilation.rs,executable.rs}`
 - Modificar: `lex.rs`, `parse.rs`, `check.rs`, `compile.rs`, `lib.rs`, `cache.rs`
-- Borrar: `debug_sink.rs`, `varn-cli/src/debug_sink.rs` (la parte `CliDebugSink`)
-- Modificar: `varn-cli/src/commands/{run,check,eval,repl,debug,build}.rs`, `varn-cli/src/debug_print.rs` (nuevo), `varn-dap/src/driver.rs`
+- Borrar: `debug_sink.rs`, `vn-cli/src/debug_sink.rs` (la parte `CliDebugSink`)
+- Modificar: `vn-cli/src/commands/{run,check,eval,repl,debug,build}.rs`, `vn-cli/src/debug_print.rs` (nuevo), `vn-dap/src/driver.rs`
 
 **Interfaces:**
 - Consume: `Session`, `Source`, `Failure`, `lower_module`.
@@ -255,12 +255,12 @@ Es la tarea más grande. Tiene cuatro commits.
       pub tests: Vec<TestEntry>,
   }
   ```
-  `Executable` sustituye a `CompileOutput`. `Mode::Strict` usa `CheckOptions::compile` y `varn_parser::parse`; `Mode::Tooling` usa `CheckOptions::tooling` y `parse_partial`. `tests` queda vacío hasta la Tarea 9.
+  `Executable` sustituye a `CompileOutput`. `Mode::Strict` usa `CheckOptions::compile` y `vn_parser::parse`; `Mode::Tooling` usa `CheckOptions::tooling` y `parse_partial`. `tests` queda vacío hasta la Tarea 9.
 
 - [ ] **Paso 1 (commit 1):** `Compilation`, `Request`, `Executable` y `Session::compile` para `Goal::Tokens..=Goal::Checked`. Las funciones `lex`, `parse`, `check` pasan a ser etapas internas que no imprimen ni llaman sinks; el `verbose` desaparece del pipeline. Commit: `pipeline: Session::compile with staged Compilation up to the checker`.
 - [x] **Paso 2 (commit 2):** `Goal::Executable` (`Goal::Tir` descartado: ningún comando lo necesita) (lower + grafo + verificación de clases, hoy en `compile::compile`). Commit: `pipeline: Compilation reaches TIR and Executable`.
 - [ ] **Paso 3 (commit 3):** Migrar `run`, `check`, `eval`, `repl`, `build` y `dap`. `run`/`check` ya no pasan por `RunOpts`: arman un `Request` y, para ejecutar, llaman a `Runtime` (que se queda en `execute.rs` con la firma `Runtime::boot(&Executable, &Policy)`; la `Policy` real llega en la Tarea 10, aquí se pasa `CapabilitySet::allow_all()` como hoy). `RunOpts`, `compile_source_for_build` y `execute` se borran. Commit: `pipeline: commands compile through Request; RunOpts removed`.
-- [ ] **Paso 4 (commit 4):** `vn debug` y `--verbose`. `varn-cli/src/debug_print.rs` recibe `&Compilation` y `&DebugFlags` y llama a las funciones de `varn_debug` que hoy invoca `CliDebugSink`; imprime incluso cuando una etapa falló, con lo producido hasta ahí. `debug.rs` pide el `Goal` mínimo que cubra las fases pedidas y `CachePolicy::Bypass`. Los mensajes `--verbose` salen de `timings`, `tokens` y `cache_hit`. Borrar `DebugSink`, `NullSink`, `CliDebugSink`. Verificar a mano `vn debug -p tokens|ast|symbols|check|bytecode` contra la base de `debug_golden`. Commit: `pipeline: debug output is a consumer of Compilation; DebugSink removed`.
+- [ ] **Paso 4 (commit 4):** `vn debug` y `--verbose`. `vn-cli/src/debug_print.rs` recibe `&Compilation` y `&DebugFlags` y llama a las funciones de `vn_debug` que hoy invoca `CliDebugSink`; imprime incluso cuando una etapa falló, con lo producido hasta ahí. `debug.rs` pide el `Goal` mínimo que cubra las fases pedidas y `CachePolicy::Bypass`. Los mensajes `--verbose` salen de `timings`, `tokens` y `cache_hit`. Borrar `DebugSink`, `NullSink`, `CliDebugSink`. Verificar a mano `vn debug -p tokens|ast|symbols|check|bytecode` contra la base de `debug_golden`. Commit: `pipeline: debug output is a consumer of Compilation; DebugSink removed`.
 - [ ] **Paso 5:** G1 tras cada commit (los goldens de `debug_golden.rs` deben pasar sin cambios).
 
 ---
@@ -268,7 +268,7 @@ Es la tarea más grande. Tiene cuatro commits.
 ## Tarea 7: Caché uniforme
 
 **Archivos:**
-- Modificar: `crates/varn-pipeline/src/cache.rs`, `compilation.rs`
+- Modificar: `crates/vn-pipeline/src/cache.rs`, `compilation.rs`
 
 **Interfaces:**
 - Consume: `Request.cache`, `Source::File`.
@@ -285,14 +285,14 @@ Es la tarea más grande. Tiene cuatro commits.
 Va separada de la 7 porque es la comprobación de un modo de fallo, con su propio commit si exige cambios.
 
 - [ ] **Paso 1: check `cache-concurrent-writers`** en `cli-smoke.ps1`: lanzar 8 procesos `vn run` simultáneos sobre el mismo `.vn` con caché fría y comprobar que todos terminan con el mismo stdout y exit code 0.
-- [ ] **Paso 2:** Si el check falla, corregir la causa en `write_artifact_file` (de `varn-modules`) y registrar la evidencia. Si pasa a la primera, no hay commit y se anota en el mensaje de la Tarea 9.
+- [ ] **Paso 2:** Si el check falla, corregir la causa en `write_artifact_file` (de `vn-modules`) y registrar la evidencia. Si pasa a la primera, no hay commit y se anota en el mensaje de la Tarea 9.
 
 ---
 
 ## Tarea 9: `Executable` lleva los tests
 
 **Archivos:**
-- Modificar: `crates/varn-pipeline/src/{executable.rs,check.rs,execute.rs}`, `crates/varn-cli/src/tester.rs`, `crates/varn-cli/src/commands/test.rs`
+- Modificar: `crates/vn-pipeline/src/{executable.rs,check.rs,execute.rs}`, `crates/vn-cli/src/tester.rs`, `crates/vn-cli/src/commands/test.rs`
 - Borrar: `collect_test_targets`, el campo `append`, `test_units` y la concatenación de texto
 
 **Interfaces:**
@@ -303,7 +303,7 @@ Va separada de la 7 porque es la comprobación de un modo de fallo, con su propi
   ```
   `Executable.tests` se rellena desde `CheckResult::test_targets` en la etapa de enlace.
 
-- [ ] **Paso 1:** Investigar cómo invocar una función de módulo por nombre desde `Runtime` (`varn_vm::debug::drive_main` y la API de `Vm`); si los `@test` no son exportables hoy, lo correcto es que `lower_module` los registre en una tabla del módulo (cimiento, Ley 14), no que el runner los busque por nombre en texto.
+- [ ] **Paso 1:** Investigar cómo invocar una función de módulo por nombre desde `Runtime` (`vn_vm::debug::drive_main` y la API de `Vm`); si los `@test` no son exportables hoy, lo correcto es que `lower_module` los registre en una tabla del módulo (cimiento, Ley 14), no que el runner los busque por nombre en texto.
 - [ ] **Paso 2:** Reescribir `tester.rs`: por archivo, `Session::compile(Goal::Executable)` una vez; la unidad de archivo ejecuta el módulo; cada unidad `@test` arranca una máquina, ejecuta el módulo e invoca `run_test`. La semántica de unidades se conserva. Los workers se crean con `stack_size(VM_STACK_BYTES)`.
 - [ ] **Paso 3:** Medir contra la base de la Tarea 0: mismas pasadas por unidad en `vn test`, tiempo de pared menor o igual. Declarar el número en el mensaje.
 - [ ] **Paso 4:** G1. Commit: `test: the compiler registers @test entries; vn test compiles each file once`.
@@ -313,8 +313,8 @@ Va separada de la 7 porque es la comprobación de un modo de fallo, con su propi
 ## Tarea 10: `Policy` y `PermissionArgs`
 
 **Archivos:**
-- Crear: `crates/varn-cli/src/policy.rs`
-- Modificar: `cli.rs` (`RunArgs` pierde los siete `allow_*` y la bandera `--sandbox`, que pasan a `PermissionArgs`), `commands/{run,eval,repl,test,debug,bench}.rs`, `varn-pipeline/src/execute.rs`
+- Crear: `crates/vn-cli/src/policy.rs`
+- Modificar: `cli.rs` (`RunArgs` pierde los siete `allow_*` y la bandera `--sandbox`, que pasan a `PermissionArgs`), `commands/{run,eval,repl,test,debug,bench}.rs`, `vn-pipeline/src/execute.rs`
 
 **Interfaces:**
 - Produce:
@@ -337,17 +337,17 @@ Va separada de la 7 porque es la comprobación de un modo de fallo, con su propi
 Cinco commits.
 
 **Archivos:**
-- Crear: `crates/varn-cli/src/{bootstrap.rs,standalone.rs}`, `crates/varn-cli/src/discover.rs`
+- Crear: `crates/vn-cli/src/{bootstrap.rs,standalone.rs}`, `crates/vn-cli/src/discover.rs`
 - Modificar: `main.rs`, `cli.rs`, `Cargo.toml` (features), `commands/{build,fmt,test,debug}.rs`, `formatter/mod.rs`, `tester.rs`
-- Mover: la búsqueda de linker de `commands/build.rs` a `crates/varn-jit/src/aot/link.rs`
+- Mover: la búsqueda de linker de `commands/build.rs` a `crates/vn-jit/src/aot/link.rs`
 
 **Interfaces:**
-- Produce: `discover::vn_files(root: &Path, filter: &FileFilter) -> Result<Vec<PathBuf>, Failure>` (un recorrido para `fmt` y `test`, ordenado, que respeta `include`/`exclude` del manifiesto y salta `.`-dirs, `target`, `node_modules`); `#[derive(ValueEnum)] enum Target { Bytecode, Exe, Native }`; `varn_jit::aot::link::link_executable(obj: &Path, out: &Path) -> Result<(), LinkError>`; `standalone::try_run() -> Option<ExitCode>`.
+- Produce: `discover::vn_files(root: &Path, filter: &FileFilter) -> Result<Vec<PathBuf>, Failure>` (un recorrido para `fmt` y `test`, ordenado, que respeta `include`/`exclude` del manifiesto y salta `.`-dirs, `target`, `node_modules`); `#[derive(ValueEnum)] enum Target { Bytecode, Exe, Native }`; `vn_jit::aot::link::link_executable(obj: &Path, out: &Path) -> Result<(), LinkError>`; `standalone::try_run() -> Option<ExitCode>`.
 
 - [ ] **Paso 1 (commit):** `main.rs` queda en hilo + `bootstrap::init()` + dispatch. El volcado `VARN_DEBUG_OPS` pasa a `vn debug -p natives`. `implicit_run` consulta `Cli::command().get_subcommands()`. Commit: `cli: main is only thread, bootstrap and dispatch; subcommand list comes from clap`.
 - [ ] **Paso 2 (commit):** Features `lsp`, `dap`, `pm` fuera; se borran los `cfg` y los stubs de `dispatch`. Quedan `clif`, `embed-std`, `dhat-heap`. Commit: `cli: lsp, dap and pm are always built in`.
 - [ ] **Paso 3 (commit):** `discover::vn_files` reemplaza `discover_vn_files` y `discover_test_files`; `fmt` usa el módulo `terminal` en vez de escapes ANSI. Commit: `cli: one file discovery for fmt and test honoring the manifest filters`.
-- [ ] **Paso 4 (commit):** `Target` como `ValueEnum`; se borra `--native`. El linker se muda a `varn_jit::aot::link`, descubre las librerías por entorno (`LIB`, `vswhere`) en vez de versiones fijas del SDK, y en plataformas sin linker soportado devuelve un `LinkError` que lo dice. Commit: `build: Target enum, linker discovery lives with the AOT backend`.
+- [ ] **Paso 4 (commit):** `Target` como `ValueEnum`; se borra `--native`. El linker se muda a `vn_jit::aot::link`, descubre las librerías por entorno (`LIB`, `vswhere`) en vez de versiones fijas del SDK, y en plataformas sin linker soportado devuelve un `LinkError` que lo dice. Commit: `build: Target enum, linker discovery lives with the AOT backend`.
 - [ ] **Paso 5 (commit):** `Target::Exe`: copia `current_exe`, añade el grafo serializado (`ModuleGraphArtifact` con `write_artifact`), `payload_len` (u64 LE) y `MAGIC_VEXE`. `standalone::try_run` lee los últimos 12 bytes; trailer ausente → `None`; trailer presente y grafo ilegible → `Some(ExitCode::Fatal)` con mensaje. **Check `exe-corrupt-trailer`**: tomar un exe generado, truncar el grafo conservando el trailer y comprobar exit code distinto de 0. **Check `exe-runs-elsewhere`**: ejecutar el exe desde otro cwd con argumentos. Commit: `build: --target exe writes the VEXE trailer the standalone reader already expected`.
 - [ ] **Paso 6:** G1 tras cada commit.
 
@@ -356,7 +356,7 @@ Cinco commits.
 ## Tarea 12: `vn task`
 
 **Archivos:**
-- Crear: `crates/varn-cli/src/commands/task.rs`
+- Crear: `crates/vn-cli/src/commands/task.rs`
 - Modificar: `cli.rs`, `commands/mod.rs`, `Cargo.toml` (`shlex`)
 
 **Interfaces:**
@@ -375,15 +375,15 @@ Cinco commits.
 Dos commits.
 
 **Archivos:**
-- Modificar: `crates/varn-cli/src/bench/source/{mod.rs,e2e.rs,bench_pipeline.rs}`, `bench/harness.rs`
-- Mover: `crates/varn-cli/src/inspect_lsp/*` → `crates/varn-lsp/src/inspect/*`
+- Modificar: `crates/vn-cli/src/bench/source/{mod.rs,e2e.rs,bench_pipeline.rs}`, `bench/harness.rs`
+- Mover: `crates/vn-cli/src/inspect_lsp/*` → `crates/vn-lsp/src/inspect/*`
 
 **Interfaces:**
 - Consume: `Compilation.timings`.
-- Produce: `varn_lsp::inspect::run_for(file: &str, eval: Option<&str>, debug: &DebugFlags)`.
+- Produce: `vn_lsp::inspect::run_for(file: &str, eval: Option<&str>, debug: &DebugFlags)`.
 
 - [ ] **Paso 1 (commit):** `bench/source` deja de llamar `phase_lex`, `phase_parse`, `Checker::check_with`, `emit_tir`, `compile_tir`; lee los tiempos de `Compilation` con `CachePolicy::Bypass` y `Goal::Executable`. Los reportes conservan sus columnas. Commit: `bench: compile-phase timings come from Compilation, no reimplemented phases`.
-- [ ] **Paso 2 (commit):** Mover `inspect_lsp` a `varn-lsp`; `vn debug -p lsp` llama a `varn_lsp::inspect::run_for`. `varn-cli` deja de depender de `varn-resolver` y `tower-lsp-f` directamente. Commit: `lsp: the inspector lives with the LSP it inspects`.
+- [ ] **Paso 2 (commit):** Mover `inspect_lsp` a `vn-lsp`; `vn debug -p lsp` llama a `vn_lsp::inspect::run_for`. `vn-cli` deja de depender de `vn-resolver` y `tower-lsp-f` directamente. Commit: `lsp: the inspector lives with the LSP it inspects`.
 - [ ] **Paso 3:** G1 tras cada commit; `docs/CLI_INSPECT.md` se actualiza si cita la ruta.
 
 ---
@@ -391,7 +391,7 @@ Dos commits.
 ## Tarea 14: LSP sobre `Session`, y cierre
 
 **Archivos:**
-- Modificar: `crates/varn-lsp/src/pipeline/mod.rs`, `crates/varn-lsp/src/workspace/mod.rs`
+- Modificar: `crates/vn-lsp/src/pipeline/mod.rs`, `crates/vn-lsp/src/workspace/mod.rs`
 - Modificar: `docs/CLI_REFERENCE.md`, `CHANGELOG.md`, `docs/dev/plans/2026-10-16-plan-unificado.md` (estado)
 
 **Interfaces:**
@@ -430,10 +430,10 @@ plan. Lo que cambió respecto a él, con la razón (el ledger de ejecución no s
   `run`/`build`. Acepta varios archivos y directorios. No hay `Goal::Tir` (sin consumidor).
 - **`Mode::Tooling` se sustituyó por `Session::analyze`**, que devuelve un `Analysis` tipado en
   lugar de una `Compilation` con `Option` en cada etapa.
-- **El renderizado vive en `varn-core`** (`render_report`), con `Display` para `Failure`; el CLI
+- **El renderizado vive en `vn-core`** (`render_report`), con `Display` para `Failure`; el CLI
   decide los exit codes.
 - **Medición del optimizador opt-in** (`Request::measured`), usada por `vn bench`.
-- **`varn-inspect`** como crate propio: el inspector usa `varn-lsp` y `varn-debug`.
+- **`vn-inspect`** como crate propio: el inspector usa `vn-lsp` y `vn-debug`.
 - **Ejecutable `--target exe`** lleva la imagen de la std que usa y no lee `.env`; el trailer es
   `[graph_len u64][image_len u64][VEXE]`.
 - **Tests invocados por el runtime** (Tarea 9) se hicieron en una segunda pasada: grafo con
@@ -443,7 +443,7 @@ plan. Lo que cambió respecto a él, con la razón (el ledger de ejecución no s
 - **El proyecto lo fija el argumento del comando, no el cwd.** `dispatch::project_for` descubre el
   `Project` (archivo, directorio o cwd según el comando) antes de `bootstrap::init`, que carga los `.env`
   y fija el `std` de `varn.toml` desde ese proyecto. `Project::owning` (salta `.vn/packages`) es el
-  alcance de `vn pkg`; `varn-modules` y `varn-pm` ya no tienen buscadores de manifiesto propios y un
+  alcance de `vn pkg`; `vn-modules` y `vn-pm` ya no tienen buscadores de manifiesto propios y un
   manifiesto inválido en un ancestro es un error con su causa. El LSP reabre su `Session` sobre la
-  raíz del workspace en `initialize` y `varn-inspect` recibe la `Session` del comando.
+  raíz del workspace en `initialize` y `vn-inspect` recibe la `Session` del comando.
 

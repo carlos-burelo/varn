@@ -1,0 +1,22 @@
+[package]
+name = "vn-debug"
+version.workspace = true
+edition.workspace = true
+
+[features]
+clif = ["vn-jit/clif"]
+
+[dependencies]
+console       = { workspace = true }
+vn-core     = { path = "../vn-core" }
+vn-emit     = { path = "../vn-emit" }
+vn-tir      = { path = "../vn-tir" }
+vn-types    = { path = "../vn-types" }
+vn-sem      = { path = "../vn-sem" }
+vn-compiler = { path = "../vn-compiler" }
+vn-jit      = { path = "../vn-jit" }
+rustc-hash    = { workspace = true }
+iced-x86      = "1"
+
+[lints]
+workspace = true

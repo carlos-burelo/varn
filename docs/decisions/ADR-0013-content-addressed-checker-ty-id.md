@@ -1,4 +1,4 @@
-> Estado verificado 2026-10-13: VIGENTE — ids `u128` (`crates/varn-sem/src/types/interned/ids.rs:6`), `CONTENT_FLAG` (`hash.rs:6`), asserts de colisión en `interning.rs:20`.
+> Estado verificado 2026-10-13: VIGENTE — ids `u128` (`crates/vn-sem/src/types/interned/ids.rs:6`), `CONTENT_FLAG` (`hash.rs:6`), asserts de colisión en `interning.rs:20`.
 >
 > Histórico. No spec vigente. Código manda. Revalidar antes de usar.
 

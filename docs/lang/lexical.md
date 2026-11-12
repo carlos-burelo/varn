@@ -22,7 +22,7 @@ const [head, _] = [1, 2]
 
 ## 2. Palabras Reservadas
 
-Lista exacta del lexer (`crates/varn-lexer/src/keywords.rs:12-78`):
+Lista exacta del lexer (`crates/vn-lexer/src/keywords.rs:12-78`):
 
 ```
 let  const  var  function  class  struct  interface  type  enum

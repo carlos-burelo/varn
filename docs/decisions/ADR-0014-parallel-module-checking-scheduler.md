@@ -1,4 +1,4 @@
-> Estado verificado 2026-10-13: OBSOLETO — el propio ADR se declara deferred/archived; scheduler sin implementar, checking single-thread; solo prereqs (`Send+Sync` en `crates/varn-resolver/src/graph.rs:140-141`).
+> Estado verificado 2026-10-13: OBSOLETO — el propio ADR se declara deferred/archived; scheduler sin implementar, checking single-thread; solo prereqs (`Send+Sync` en `crates/vn-resolver/src/graph.rs:140-141`).
 >
 > Histórico. No spec vigente. Código manda. Revalidar antes de usar.
 
@@ -30,7 +30,7 @@ Option A — parallelise by **phase** and by **topological level**, not by
 continuous work stealing.
 
 1. **Discovery**: resolve the whole module graph (imports) before checking.
-   This is I/O-bound and already has a canonical resolver (`varn-modules`).
+   This is I/O-bound and already has a canonical resolver (`vn-modules`).
 2. **Level sort**: compute the DAG's level order (a module's level = 1 +
    max(level of its imports)); independent modules share a level.
 3. **Parallel parse + bind**: process each level's modules in parallel on a
@@ -72,7 +72,7 @@ continuous work stealing.
 - **Cache writes**: the on-disk interface cache writes per module; make the
   artifact write path collision-free under concurrency (already uses a unique
   temp name — re-verify).
-- **`thread_local!` pipeline resolver**: `varn-pipeline/src/resolver.rs` holds
+- **`thread_local!` pipeline resolver**: `vn-pipeline/src/resolver.rs` holds
   one resolver per thread; a shared-resolver pool supersedes it.
 
 ## Trigger to implement

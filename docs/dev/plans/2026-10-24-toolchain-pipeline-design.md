@@ -1,7 +1,7 @@
 # Toolchain: un pipeline, una sesión, comandos delgados
 
-Estado: borrador para aprobación. Alcance: `varn-pipeline` y `varn-cli` (más lo que ambos
-arrastran en `varn-dap`, `varn-lsp` y `varn-lsp::inspect`).
+Estado: borrador para aprobación. Alcance: `vn-pipeline` y `vn-cli` (más lo que ambos
+arrastran en `vn-dap`, `vn-lsp` y `vn-lsp::inspect`).
 
 ## Por qué
 
@@ -12,12 +12,12 @@ resolve_import_slots → compile_tir`:
 
 | Ruta | Dónde |
 |---|---|
-| `compile_source` / `compile_source_cached` | `varn-pipeline/src/lib.rs` |
-| `compile_source_inner` (stdlib) | `varn-pipeline/src/stdlib_loader.rs` |
-| `build_module_graph` (dependencias) | `varn-pipeline/src/module_precompile.rs` |
-| `collect_test_targets` | `varn-pipeline/src/check.rs` |
-| fases reimplementadas a mano para medir | `varn-cli/src/bench/source/{mod,e2e}.rs` |
-| `parse_partial` + `check_with(tooling)` | `varn-lsp/src/pipeline/mod.rs` |
+| `compile_source` / `compile_source_cached` | `vn-pipeline/src/lib.rs` |
+| `compile_source_inner` (stdlib) | `vn-pipeline/src/stdlib_loader.rs` |
+| `build_module_graph` (dependencias) | `vn-pipeline/src/module_precompile.rs` |
+| `collect_test_targets` | `vn-pipeline/src/check.rs` |
+| fases reimplementadas a mano para medir | `vn-cli/src/bench/source/{mod,e2e}.rs` |
+| `parse_partial` + `check_with(tooling)` | `vn-lsp/src/pipeline/mod.rs` |
 
 Consecuencias observadas en el código, no supuestas:
 
@@ -41,14 +41,14 @@ Consecuencias observadas en el código, no supuestas:
 - Los workers de `test` se crean con `std::thread::spawn` sin `VM_STACK_BYTES`, mientras que
   `main` y `isolate_spawn` sí lo usan.
 - `fmt` y `test` tienen cada uno su recorrido de directorios; `fmt` imprime ANSI crudo.
-- `inspect_lsp` (cerca de 1000 líneas) solo consume `varn_lsp` y vive en el CLI de usuario.
+- `inspect_lsp` (cerca de 1000 líneas) solo consume `vn_lsp` y vive en el CLI de usuario.
 - `main` abre el propio ejecutable en cada arranque buscando un trailer `VEXE`, y nadie en el
   repo escribe ese trailer: es un lector sin productor.
 - La raíz del proyecto se busca por separado en seis sitios (`std_root`, `env_file`, `cache`,
   `pipeline/cache`, `resolver/graph`, `doctor`), unos partiendo del cwd y otros del directorio
   del archivo de entrada, así que pueden resolver raíces distintas en una misma ejecución.
-- El manifiesto es TOML y se parsea en tres sitios (`varn-pm::ProjectManifest`,
-  `varn-modules::package::RawManifest` y la mini estructura `StdKey` de `std_root`). Acepta
+- El manifiesto es TOML y se parsea en tres sitios (`vn-pm::ProjectManifest`,
+  `vn-modules::package::RawManifest` y la mini estructura `StdKey` de `std_root`). Acepta
   dos nombres de archivo (`varn.toml` y `vn.toml`, con las constantes repetidas en
   `artifact.rs` e `ids.rs`) y hasta tres formas de declarar el nombre (`[package]`,
   `[project]` y campos planos). Hay además tres buscadores de raíz (`find_project_root`,
@@ -75,7 +75,7 @@ Todo esto es una violación de la Ley 8 (varios caminos para el mismo hecho) y d
 - Matriz de la sección 5 de `AGENTS.md`, 4 cuadrantes, `FAILED: 0`.
 - `vn test` sobre `tests/` y `vn run` con caché fría y caliente, mismo perfil `quick`,
   base contra cambio: el tiempo de `vn test` baja; el de `run` no sube.
-- `vn debug -p …` y los goldens existentes en `crates/varn-cli/tests/`.
+- `vn debug -p …` y los goldens existentes en `crates/vn-cli/tests/`.
 
 **Se borra**
 
@@ -154,7 +154,7 @@ comparar números.
 
 ## Proyecto
 
-El formato es TOML (el que ya usa `varn-pm`); el diseño original asumía JSON por un mensaje de
+El formato es TOML (el que ya usa `vn-pm`); el diseño original asumía JSON por un mensaje de
 error desactualizado del LSP, y el código manda.
 
 Un toolchain es comandos sobre un proyecto, así que el proyecto es cimiento (Ley 14) y no un
@@ -165,9 +165,9 @@ añadido posterior.
   `build`, `debug`, `bench`) parten del directorio de ese archivo; los comandos de proyecto
   (`test`, `fmt`, `lint`, `task`, `pkg`, `init`, `cache`) parten del cwd. Los seis
   `find_project_root` sueltos se reemplazan por esa construcción.
-- **Crate `varn-project`**, hoja: manifiesto, descubrimiento de raíz y lectura de `.env`.
-  `varn-modules`, `varn-pm`, `varn-pipeline` y `varn-cli` dependen de él (Ley 1: la
-  definición de proyecto no vive arriba, en `varn-pm`).
+- **Crate `vn-project`**, hoja: manifiesto, descubrimiento de raíz y lectura de `.env`.
+  `vn-modules`, `vn-pm`, `vn-pipeline` y `vn-cli` dependen de él (Ley 1: la
+  definición de proyecto no vive arriba, en `vn-pm`).
 - **Un solo manifiesto, `varn.toml`.** Se borra el alias `vn.toml` y las secciones `[package]`
   y `[project]`; quedan los campos planos (`name`, `version`, `main`, `exports`, `dependencies`, `dev_dependencies`,
   `peer_dependencies`, `workspaces`) más las secciones nuevas. Es un cambio incompatible: la
@@ -178,7 +178,7 @@ añadido posterior.
   Esta tanda define `tasks` y `include`/`exclude` para `fmt` y `test`. `lint`, `doc` y
   `permissions` añaden la suya cuando existan, sin tocar el resto.
 - **Workspaces**: el campo ya existe en el manifiesto. `Project` conoce la raíz del workspace
-  y la de cada miembro; la resolución entre miembros es de `varn-resolver`, y esta tanda no
+  y la de cada miembro; la resolución entre miembros es de `vn-resolver`, y esta tanda no
   la cambia.
 
 ## Comandos
@@ -225,21 +225,21 @@ proceso: `task` llama a `execute` de los demás con la misma `Session`.
   reescritura.
 - `build`: `--target` es un `ValueEnum { Bytecode, Exe, Native }`; se borra `--native`. La
   búsqueda del linker y de las librerías del sistema sale de `build.rs` y vive junto a
-  `varn_jit::aot`, descubriendo el SDK por entorno y no por versiones fijas. En plataformas
+  `vn_jit::aot`, descubriendo el SDK por entorno y no por versiones fijas. En plataformas
   sin linker soportado el error lo dice, en vez de fallar buscando `lld-link`.
 - Un recorrido de archivos `.vn` compartido por `fmt` y `test`. `fmt` usa el módulo
   `terminal`, sin escapes ANSI a mano.
 - Los workers de `test` usan `VM_STACK_BYTES`.
-- `inspect_lsp` se mueve a `varn-lsp` (solo consume sus tipos). El CLI conserva
+- `inspect_lsp` se mueve a `vn-lsp` (solo consume sus tipos). El CLI conserva
   `vn debug -p lsp` como llamada.
 - `compare_tiers` sigue lanzando procesos hijo: es una decisión de aislamiento por tier, no
   una ruta de compilación.
 
 ## LSP y DAP
 
-- `varn-dap` deja de armar su propia sesión: usa `Session` y `Compilation` con `goal ==
+- `vn-dap` deja de armar su propia sesión: usa `Session` y `Compilation` con `goal ==
   Executable`.
-- `varn-lsp` se migra al final, pidiendo `mode == Tooling`. El LSP es la herramienta que
+- `vn-lsp` se migra al final, pidiendo `mode == Tooling`. El LSP es la herramienta que
   hoy funciona mejor. Si `Session` no le sirve sin torcer su API (documentos abiertos
   incrementales, versiones), el defecto está en `Session`, no en el LSP: se rediseña la API
   y no se le añade un adaptador (Ley 8). Si tras ese intento el LSP no puede adoptarla, se
@@ -250,7 +250,7 @@ proceso: `task` llama a `execute` de los demás con la misma `Session`.
 Cada paso es un commit verde y atómico (Ley 9), y cada uno forma parte del diseño final:
 
 1. `Failure` tipado y render en el borde; se borran las copias del pie de error.
-2. `varn-project`: manifiesto único, raíz única, `.env`; el repo no contiene ningún manifiesto; solo `vn init` escribe la forma antigua y se corrige en el mismo paso.
+2. `vn-project`: manifiesto único, raíz única, `.env`; el repo no contiene ningún manifiesto; solo `vn init` escribe la forma antigua y se corrige en el mismo paso.
 3. `Session` dueña del resolver y del `Project`; todos los `ModuleResolver::new()` y
    `find_project_root` pasan a recibirla.
 4. `Source` y lectura/canonicalización únicas.
@@ -262,7 +262,7 @@ Cada paso es un commit verde y atómico (Ley 9), y cada uno forma parte del dise
 10. Estructura del CLI: `main`, `bootstrap`, `standalone`, features fuera, `Target` con
     `Exe`, linker, recorrido de archivos.
 11. `vn task`.
-12. `bench` consume tiempos de `Compilation`; `inspect_lsp` pasa a `varn-lsp`.
+12. `bench` consume tiempos de `Compilation`; `inspect_lsp` pasa a `vn-lsp`.
 13. LSP sobre `Session` en modo `Tooling`.
 
 Tras cada paso: `verify.ps1 -Quick` y el hash del bytecode de `tests/` y `examples/`.
@@ -290,7 +290,7 @@ condicione el diseño (Ley 18: se rehace el test).
 
 ## Riesgos
 
-- Los goldens de `crates/varn-cli/tests/` (`debug_golden`, `error_corpus`) dependen del
+- Los goldens de `crates/vn-cli/tests/` (`debug_golden`, `error_corpus`) dependen del
   formato actual de salida. Se migran en el mismo paso que el render pasa al borde; se
   declara cuántos son y se revisa el diff.
 - `Compilation` retiene tokens, AST y TIR hasta que se descarte. En el CLI de un solo
@@ -305,12 +305,12 @@ condicione el diseño (Ley 18: se rehace el test).
 - Features `lsp`, `dap`, `pm` fuera: un toolchain es un binario con todo.
 - Permisos por defecto sin cambio (todo concedido).
 - `varn.toml` con campos planos y sin sección `package`.
-- Crate nuevo `varn-project` como hoja.
+- Crate nuevo `vn-project` como hoja.
 - `Target::Exe` completa el trailer `VEXE`; el lector sin productor no se deja como está.
 - `vn task` entra en esta tanda; `lint`, `doc` y `upgrade` no.
 - `Session` como nombre del dueño único (podría ser `Toolchain` o `Workspace`).
-- `inspect_lsp` en `varn-lsp` y no en `varn-debug`.
-- El linker junto a `varn_jit::aot` y no en un crate nuevo.
+- `inspect_lsp` en `vn-lsp` y no en `vn-debug`.
+- El linker junto a `vn_jit::aot` y no en un crate nuevo.
 - Orden de los pasos: errores y sesión primero porque todo lo demás los consume.
 - La semántica de unidades de `vn test` se conserva tal cual (el módulo corre una vez por
   unidad).

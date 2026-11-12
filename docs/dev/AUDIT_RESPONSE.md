@@ -16,7 +16,7 @@ Cada conclusión importante cita `Archivo | Símbolo | Comportamiento | Conclusi
 >   tag+payload; el gate `VARN_JIT_ALLOW_REF` se eliminó. `tests/main.vn`
 >   1233/0 en JIT y `VARN_NO_JIT=1`.
 > - **Bala 9 (JIT baja de bytecode): RESUELTA.** El JIT baja **todo** de SSA
->   portable (`varn_types::ssa` + `clif/from_ssa/`); el lowering desde bytecode
+>   portable (`vn_types::ssa` + `clif/from_ssa/`); el lowering desde bytecode
 >   (`clif/body/*`, lattice, safepoint maps) está borrado y el único fallback
 >   es el intérprete. Quedan interpretados los generadores/async declarados
 >   (protocolo state-machine, §8.1 de `COMPILER_ARCHITECTURE.md`).
@@ -42,7 +42,7 @@ Contraste de §I (borrados) y §K (11 pasos) con el código actual.
 | # | Ítem | Estado |
 |---|---|---|
 | 1 | Frame/args/rets/upvalues universales `Vec<VmValue>` → clases GPR/FPR/REF/DYN | **DONE** — `FrameStore` particionado; intérprete con fast-path `reg_class==Gpr` sin tag-check (`ops_math_cmp.rs:144`); GPR/FPR fuera del scan GC (`live_boxed` por clase) |
-| 2 | Lowering nativo solo desde bytecode → desde SSA/TIR | **DONE** — el JIT baja todo de SSA portable (`varn_types::ssa` + `clif/from_ssa/extra.rs`); el lowering desde bytecode (`clif/body/*`, lattice `K`, safepoint maps) está borrado y `-p clif/tiers/bails` inspeccionan la vía SSA. Quedan interpretados los generadores/async declarados (protocolo state-machine, ver `COMPILER_ARCHITECTURE.md` §8.1) |
+| 2 | Lowering nativo solo desde bytecode → desde SSA/TIR | **DONE** — el JIT baja todo de SSA portable (`vn_types::ssa` + `clif/from_ssa/extra.rs`); el lowering desde bytecode (`clif/body/*`, lattice `K`, safepoint maps) está borrado y `-p clif/tiers/bails` inspeccionan la vía SSA. Quedan interpretados los generadores/async declarados (protocolo state-machine, ver `COMPILER_ARCHITECTURE.md` §8.1) |
 | 3 | Meet-a-`Dynamic` + skip de `Float` en regalloc_post | **DONE** (Anexo K2) |
 | 4 | Colapsos `Char→Dynamic`, `Nullable→Dynamic` | **PARCIAL** — `Char→Ref` honesto (K1), anchos (K4); `Nullable→Dynamic` sigue (`ssa/emit/mod.rs:270`) |
 | 5 | `ArrayRepr` mínimo `{Boxed,I64,F64}` | **DONE** (K5) |
@@ -86,21 +86,21 @@ Contraste de §I (borrados) y §K (11 pasos) con el código actual.
 
 
 Mediciones ejecutadas en esta auditoría (no afirmaciones sin dato):
-- `cargo test -p varn-types --test micro_bench_map -- --nocapture`: Shape+ObjData 30.09 ms / FxHashMap 3.02 ms / InlineMap<4> 2.68 ms / Rc<RefCell<InlineMap<4>>> 5.86 ms (100k iters, 3 claves). Speedup Rc<InlineMap<4>> vs Shape: 5.13x.
-- `cargo test -p varn-tir`: 16 passed. `cargo test -p varn-compiler --lib`: 12 passed. `cargo test -p varn-vm --lib`: 1 passed (`error::size_probe::sizes`).
+- `cargo test -p vn-types --test micro_bench_map -- --nocapture`: Shape+ObjData 30.09 ms / FxHashMap 3.02 ms / InlineMap<4> 2.68 ms / Rc<RefCell<InlineMap<4>>> 5.86 ms (100k iters, 3 claves). Speedup Rc<InlineMap<4>> vs Shape: 5.13x.
+- `cargo test -p vn-tir`: 16 passed. `cargo test -p vn-compiler --lib`: 12 passed. `cargo test -p vn-vm --lib`: 1 passed (`error::size_probe::sizes`).
 - Prototipo aislado `tag+payload vs NaN-box` (2M iters, `rustc -O`, `black_box`, fichero fuera del repo): tag 0.77 ns/op, NaN-box 0.52 ns/op, ratio 0.68x. Ver §F para interpretación honesta (el check aislado no decide; los límites sí).
-- `cargo run -p varn-cli --bin vn` BLOQUEADO por error preexistente del bundle stdlib: `std:reflect/introspect:14:8: type mismatch ... returns '#[str, dynamic][]'` + `Expected class member name, got LAngle` (`crates/varn-cli/build.rs:17`). Benchmarks end-to-end `.vn` quedan `Unverified` por esta causa ajena a la auditoría; se sustituyen por microbench aislado + cálculo de footprint + tests unitarios.
+- `cargo run -p vn-cli --bin vn` BLOQUEADO por error preexistente del bundle stdlib: `std:reflect/introspect:14:8: type mismatch ... returns '#[str, dynamic][]'` + `Expected class member name, got LAngle` (`crates/vn-cli/build.rs:17`). Benchmarks end-to-end `.vn` quedan `Unverified` por esta causa ajena a la auditoría; se sustituyen por microbench aislado + cálculo de footprint + tests unitarios.
 
 ---
 
 ## A. Resumen ejecutivo (15 balas)
 
-1. **Fuerte: TIR tipado real.** `TirExpr{kind, ty: BackendTy, res, span}` hace imposible omitir el tipo (`crates/varn-tir/src/node.rs:25`). `BackendTy::{Int,Float,Bool,Char,Str,Bytes,Decimal,BigInt,Array,Nullable…}` (`ty.rs:64-88`).
-2. **Fuerte: SSA real con tipos y pases.** `SsaFunc{blocks,values}` (`varn-compiler/src/ssa/ir.rs:25`), `Binary{op,lhs,rhs,ty:HirType}` (`ir.rs:132`), pases `const_fold>cse>dce>licm>algebraic>cfg` (`passes/mod.rs:32-60`). Los pases no importan `VmValue`; exigen tipo probado.
-3. **Fuerte: selección de opcode tipada.** `bin_opcode(op,ty)`: `Int→AddInt`, `Float→AddFloat` (`compiler/src/lower/mod.rs:6-54`). Opcodes especializados existen (`varn-core/src/opcode.rs:150-175`).
-4. **Fuerte: `SlotKind` como proyección a codegen.** `SlotKind::{Int,Float,Bool,Str,Ref,Dynamic}` (`varn-types/src/register_meta.rs:12-24`), doc: es lo ÚNICO que lee el JIT. `derive_register_meta` + `slot_kind_of` (`ssa/emit/mod.rs:202-268`).
+1. **Fuerte: TIR tipado real.** `TirExpr{kind, ty: BackendTy, res, span}` hace imposible omitir el tipo (`crates/vn-tir/src/node.rs:25`). `BackendTy::{Int,Float,Bool,Char,Str,Bytes,Decimal,BigInt,Array,Nullable…}` (`ty.rs:64-88`).
+2. **Fuerte: SSA real con tipos y pases.** `SsaFunc{blocks,values}` (`vn-compiler/src/ssa/ir.rs:25`), `Binary{op,lhs,rhs,ty:HirType}` (`ir.rs:132`), pases `const_fold>cse>dce>licm>algebraic>cfg` (`passes/mod.rs:32-60`). Los pases no importan `VmValue`; exigen tipo probado.
+3. **Fuerte: selección de opcode tipada.** `bin_opcode(op,ty)`: `Int→AddInt`, `Float→AddFloat` (`compiler/src/lower/mod.rs:6-54`). Opcodes especializados existen (`vn-core/src/opcode.rs:150-175`).
+4. **Fuerte: `SlotKind` como proyección a codegen.** `SlotKind::{Int,Float,Bool,Str,Ref,Dynamic}` (`vn-types/src/register_meta.rs:12-24`), doc: es lo ÚNICO que lee el JIT. `derive_register_meta` + `slot_kind_of` (`ssa/emit/mod.rs:202-268`).
 5. **Fuerte: GC preciso por tag, no conservador.** `update_value: if !is_heap return` (`vm/nursery.rs:283-298`), `trigger_gc/run_minor_gc` filtran `is_heap` (`exec/ctx.rs:343-531`), write barrier old→young (`heap/gc.rs:24-30`).
-6. **Corrección a EXPECTED: no hay `i128` físico.** `VmValue{tag:u64,payload:u64}`, `#[repr(C)]`, align 8, explícito `Not a NaN-box` (`varn-types/src/vm_value.rs:4-28`). El problema es 16B universales, no el tipo `i128` (que solo existe como `HeapObj::BigInt(i128)` en `vm/heap/obj.rs:43`).
+6. **Corrección a EXPECTED: no hay `i128` físico.** `VmValue{tag:u64,payload:u64}`, `#[repr(C)]`, align 8, explícito `Not a NaN-box` (`vn-types/src/vm_value.rs:4-28`). El problema es 16B universales, no el tipo `i128` (que solo existe como `HeapObj::BigInt(i128)` en `vm/heap/obj.rs:43`).
 7. **Problema real: especializados sobre universal.** `AddInt: if a.is_int()&&b.is_int(){…} else {arith::add fallback}` (`exec/dispatch/ops_math_cmp.rs:146-158`). Patrón idéntico en Sub/Mul/Mod/Pow/Div y Float. Smell `Typed IR → Universal Value → Typed opcode` CONFIRMADO.
 8. **Problema real: el intérprete ignora `SlotKind`.** Solo el JIT lo lee (`register_meta.rs:3-9`). El frame del intérprete es `Vec<VmValue>` + ventana `base+reg` (`exec/ctx.rs:28`, `frame.rs:11-28`, `dispatch/ops_math_cmp.rs:39`).
 9. **Problema real: JIT baja de Bytecode, no de SSA.** `clif/lower.rs:3-6`: `.vnc` solo tiene bytecode; `AddInt` SON las proofs; `Variables` reconstruyen SSA. Arquitectura actual `SSA→VmValue→Native`, no `SSA→VM/Native`.
@@ -117,11 +117,11 @@ Mediciones ejecutadas en esta auditoría (no afirmaciones sin dato):
 
 ```
 Source (.vn)
-  ↓  varn-lexer → varn-parser → Program (varn-core::ast)
-  ↓  varn-checker (tipos, binds, expr_table, call_mappings)
-  ↓  emit_module() → TirModule (varn-checker/src/emit/mod.rs:39)
-  ↓  varn-tir :: TirExpr{ty:BackendTy} / TyTable / BackendTy (contrato backend)
-  ↓  varn-compiler::from_tir::compile_module(TirModule) → FunctionProto
+  ↓  vn-lexer → vn-parser → Program (vn-core::ast)
+  ↓  vn-checker (tipos, binds, expr_table, call_mappings)
+  ↓  emit_module() → TirModule (vn-checker/src/emit/mod.rs:39)
+  ↓  vn-tir :: TirExpr{ty:BackendTy} / TyTable / BackendTy (contrato backend)
+  ↓  vn-compiler::from_tir::compile_module(TirModule) → FunctionProto
   │     ├─ from_tir/ty.rs :: lower(BackendTy)→HirType (con colapsos)
   │     ├─ ssa/ir.rs :: SsaFunc/Block/InstKind::Binary{ty}
   │     ├─ passes/* :: const_fold, cse, dce, licm, algebraic, cfg (+escape, fixed_fields, monomorphize)
@@ -129,7 +129,7 @@ Source (.vn)
   │     ├─ ssa/emit/mod.rs :: derive_register_meta → register_meta/param_kinds/return_kind
   │     ├─ lower/mod.rs :: bin_opcode → AddInt/AddFloat/Add…
   │     └─ regalloc/regalloc_post :: coalescer Move + verify (salta Float)
-  ↓  varn-pipeline::compile() (pipeline/src/compile.rs:19): emit + from_tir + module graph
+  ↓  vn-pipeline::compile() (pipeline/src/compile.rs:19): emit + from_tir + module graph
   ↓  FunctionProto{chunk, register_count:u16, register_meta, param_kinds, return_kind} (types/chunk/proto.rs:55-139)
   ├─→ VM intérprete: ExecCtx{stack:Vec<VmValue>, frames} (vm/exec/ctx.rs:28) + dispatch(AddInt con tag-check + fallback)
   └─→ JIT Cranelift: compile(proto,…) (jit/src/lib.rs:434) ← BYTECODE + SlotKind, NO SSA (jit/clif/lower.rs:3)
@@ -139,12 +139,12 @@ Runtime: Heap (nursery + old mark-sweep), HeapStr{Shared,Ext,Slice,Inline37}, Vm
   ObjData dinámico (Shape+transition) + InstanceData compacto (payload [u8]), ArrayRepr{Boxed,I64,F64}.
 ```
 
-Crates (workspace `Cargo.toml:2-22`): `varn-core, varn-lexer, varn-parser, varn-checker, varn-types, varn-tir, varn-op-macros, varn-modules, varn-builtins, varn-runtime, varn-cli (bin vn), varn-lsp, varn-vm, varn-debug, varn-pm, varn-jit, varn-pipeline, varn-compiler, varn-rt, xtask`.
+Crates (workspace `Cargo.toml:2-22`): `vn-core, vn-lexer, vn-parser, vn-checker, vn-types, vn-tir, varn-op-macros, vn-modules, vn-builtins, varn-runtime, vn-cli (bin vn), vn-lsp, vn-vm, vn-debug, vn-pm, vn-jit, vn-pipeline, vn-compiler, vn-rt, xtask`.
 
 Discrepancias docs vs código (prioridad al código):
 - `docs/internals/VM_ARCHITECTURE.md:89`: diagrama `Nursery 4096 Slots` vs texto `NURSERY_CAPACITY=65536` en el mismo párrafo; código usa `is_full/FULL_THRESHOLD 75%` (`heap/gc.rs:19`, `nursery.rs`).
 - `VM_ARCHITECTURE.md:101-113`: dibuja `ObjData=[Header|Shape|fields]` contiguo; código es `shape:Rc + values:Cells + overflow:UnsafeCell<Box<Vec>>>` (`types/value/object.rs:170-181`).
-- `VM_ARCHITECTURE.md:8,19`: habla de crate `varn-jit`; el lado VM real es `varn-vm/src/jit/{mod,tiering}.rs` + `ic_entries` en closure.
+- `VM_ARCHITECTURE.md:8,19`: habla de crate `vn-jit`; el lado VM real es `vn-vm/src/jit/{mod,tiering}.rs` + `ic_entries` en closure.
 - `RUNTIME_ARCHITECTURE.md:28,52`: estado async en `ObjData`; código usa `InstanceData` + `VmBuffer/TaskHandle` (`exec/host/mod.rs:233-393`).
 - `ARCHITECTURE.md:79`: omite `Inline/Ext/Slice` (`heap/str.rs:40`) y `SLOT 16B` forzado (`class_layout.rs:88`).
 
@@ -155,7 +155,7 @@ Discrepancias docs vs código (prioridad al código):
 ### C1. `let a: int = 10; let b: int = 20; let c = a + b;`
 | Etapa | Representación | Evidencia |
 |---|---|---|
-| AST | `HirExpr`/`Program` sin tipo obligatorio en toda variante | `varn-tir/src/node.rs:1-6` (motivación del cambio) |
+| AST | `HirExpr`/`Program` sin tipo obligatorio en toda variante | `vn-tir/src/node.rs:1-6` (motivación del cambio) |
 | Checker→TIR | `TirStmt::Let{local, ty:BackendTy::Int, init:IntLit(10)}`, `Binary{Add, lhs, rhs}: Int` | `node.rs:25,109,285` |
 | TIR→SSA | `lower(Int)→HirType::Int`; `ValueDef{ty:Int}`; `Binary{Add, ty:Int}` | `from_tir/ty.rs:19`, `ssa/ir.rs:20,132` |
 | SSA opt | `const_fold` pliega si ambos const; `algebraic` solo Int (`+0,*1`); `dce` puro si `ty:Int/Float/Bool`; `licm` saca `Add/Sub/Mul/cmp` en Int/Float | `passes/const_fold.rs:83-141`, `algebraic.rs:105-143`, `dce.rs:148-170`, `licm.rs:186-200` |
@@ -186,7 +186,7 @@ Idéntico con `FloatLit(f64)→HirType::Float→AddFloat→SlotKind::Float`. VM:
 Terminología: no existe registro `i128` Rust; existen **slots de 16B** (`tag+payload`). `i128` solo aparece como dato heap `BigInt(i128)` (`vm/heap/obj.rs:43`, comparado en `exec/compare.rs:107,117`).
 
 **Necesarios (mantener 16B):**
-- `VmValue` para `dynamic`, `null/bool`, `SSO len≤5` (`vm_value.rs:248-262`), `heap idx` (`211-216`), `ic_miss{tag:MAX}` (`107-112`). Archivo: `varn-types/src/vm_value.rs`. Conclusión: el contenedor dinámico mínimo de 16B está bien elegido para Varn (ver §F).
+- `VmValue` para `dynamic`, `null/bool`, `SSO len≤5` (`vm_value.rs:248-262`), `heap idx` (`211-216`), `ic_miss{tag:MAX}` (`107-112`). Archivo: `vn-types/src/vm_value.rs`. Conclusión: el contenedor dinámico mínimo de 16B está bien elegido para Varn (ver §F).
 - `ArrayRepr::Boxed(Vec<VmValue>)` para heterogéneos/`Dynamic` (`vm_value.rs:476`).
 - `r0` como slot de staging de llamada en `Dynamic` + flush GC (`ssa/emit/mod.rs:219-220`).
 
@@ -297,7 +297,7 @@ Affected: vm/exec/ctx.rs, frame.rs, exec/calls.rs, closure.rs, exec/host/mod.rs,
 Delete: Lowering nativo exclusivamente desde bytecode
 Reason: acopla Cranelift a VmValue; SSA ya probada se tira y se reconstruye
 Replacement: bajar JIT de SSA/TIR; .vnc conserva proofs + clase/tipo serializada
-Affected: varn-jit/src/clif/lower.rs, body/op_dispatch.rs, abi.rs, varn-vm/src/jit/*, formato .vnc
+Affected: vn-jit/src/clif/lower.rs, body/op_dispatch.rs, abi.rs, vn-vm/src/jit/*, formato .vnc
 
 Delete: Meet-a-Dynamic por reutilización + salto Float en regalloc_post
 Reason: la especialización depende del azar del allocator (matmul 15→3ms)
@@ -365,16 +365,16 @@ Sin capas de compatibilidad, flags duales ni adapters (§25). Git conserva histo
 
 ## L. Plan de verificación
 
-- Tipos: `cargo test -p varn-tir` (hoy 16 passed) + `tir/tests/{backend_ty,coverage,verify_coherence,verify_wellformed}`; nuevos: `Char` escalar, `Nullable(int)` par, `I32/F32` round-trip `TypeTag→BackendTy→HirType→SlotKind`.
-- TIR/SSA: `cargo test -p varn-compiler --lib` (hoy 12 passed) + `tests/60-dce-purity, 61-algebraic-identities, 63-escape-analysis, 74-regalloc-interference`; nuevos: meet nunca degrada int+int, coalescer no mezcla clases, `regalloc_post` no salta Float.
+- Tipos: `cargo test -p vn-tir` (hoy 16 passed) + `tir/tests/{backend_ty,coverage,verify_coherence,verify_wellformed}`; nuevos: `Char` escalar, `Nullable(int)` par, `I32/F32` round-trip `TypeTag→BackendTy→HirType→SlotKind`.
+- TIR/SSA: `cargo test -p vn-compiler --lib` (hoy 12 passed) + `tests/60-dce-purity, 61-algebraic-identities, 63-escape-analysis, 74-regalloc-interference`; nuevos: meet nunca degrada int+int, coalescer no mezcla clases, `regalloc_post` no salta Float.
 - Bytecode: `debug_bytecode` (`pipeline/compile.rs:56`); asserts `AddInt` nunca con operando DYN probado; `GetFixedField` en clases.
-- VM: `cargo test -p varn-vm --lib`; `tests/53-int-overflow, 59-clif-negative-int, 103-boxed-int-range, 108-granular-numerics`; intérprete sin tag-check en fast-path (conteo de branches en `ops_math_cmp.rs`).
+- VM: `cargo test -p vn-vm --lib`; `tests/53-int-overflow, 59-clif-negative-int, 103-boxed-int-range, 108-granular-numerics`; intérprete sin tag-check en fast-path (conteo de branches en `ops_math_cmp.rs`).
 - GC: `tests/53-gc-class-vtable, 65-safepoint-roots`; asserts `GPR/FPR` fuera de `run_minor_gc/trigger_gc` por construcción; `remembered set` sin regresión.
 - ABI: `tests/101-self-recursion-return-kind`; llamadas `int→GPR, float→FPR, ref→REF, dyn→DYN` en VM y JIT con misma tabla.
 - Nativo/JIT: `tests/56-tier-parity, 58-clif-range, 62-jit-osr`; JIT desde SSA produce mismo resultado que intérprete en todo `tests/*.vn`kip.
 - Representación: `size_of<VmValue>==16`, `FieldRepr` round-trip, `InstanceData` compacto (`struct{i8,i8,i16,i32}` ≤8B payload vs 64B hoy), `Array<i64>` sin box en loop.
 - Rendimiento (gates, no solo números sueltos): `int/float arith, loops, calls anidadas, locales, arrays I64/F64/Boxed, structs, dynamic, GC-heavy`; frame 2x menos memoria; `matmul` del comentario `regs.rs` ≥4x estable (hoy 15→3 ms según colisión); mapa 3-claves ya medido como baseline (Shape 30.09 ms vs Inline 2.68 ms: el camino dinámico actual es el lento, no el hash).
-- Bloqueo conocido: `vn` no linka por `std:reflect/introspect` (`varn-cli/build.rs:17`); gates end-to-end `.vn` marcados `Unverified` hasta sanear stdlib. No pertenece a esta migración pero debe sanearse antes de proclamar paridad.
+- Bloqueo conocido: `vn` no linka por `std:reflect/introspect` (`vn-cli/build.rs:17`); gates end-to-end `.vn` marcados `Unverified` hasta sanear stdlib. No pertenece a esta migración pero debe sanearse antes de proclamar paridad.
 
 ---
 
@@ -392,7 +392,7 @@ Sin capas de compatibilidad, flags duales ni adapters (§25). Git conserva histo
 
 ## Anexo — Correcciones aplicadas (K1 + compat std/WIP)
 
-**K1. `char` honesto como `Ref` (heap).** `CharLit` se emitía `HirType::Int` (`from_tir/build.rs`) aunque en runtime es `HeapObj::Char` internado (`vm/exec/calls.rs:28`): mentía al regalloc (clase GPR sin flush GC) y al JIT sobre una referencia viva — riesgo de GC, además del smell `Type→Value→Type`. Cambio en 6 ficheros de `varn-compiler`: `CharLit→ConstChar: Ref`, `BackendTy::Char→Ref`, `CgTy::{Char,Decimal,BigInt}→Ref` (igual que `from_tir::ty` ya hacía con `Decimal/BigInt`), `verify` exige `Ref`, `const_inst_ty` (fold/algebraic) mapea boxed a `Ref`. Tests nuevos: `heap_boxed_scalars_are_ref`, `a_char_literal_lowers_to_ref_and_verifies`. Evidencia: `cargo test -p varn-compiler --lib` 14 passed; suite e2e `34. Char type` en verde.
+**K1. `char` honesto como `Ref` (heap).** `CharLit` se emitía `HirType::Int` (`from_tir/build.rs`) aunque en runtime es `HeapObj::Char` internado (`vm/exec/calls.rs:28`): mentía al regalloc (clase GPR sin flush GC) y al JIT sobre una referencia viva — riesgo de GC, además del smell `Type→Value→Type`. Cambio en 6 ficheros de `vn-compiler`: `CharLit→ConstChar: Ref`, `BackendTy::Char→Ref`, `CgTy::{Char,Decimal,BigInt}→Ref` (igual que `from_tir::ty` ya hacía con `Decimal/BigInt`), `verify` exige `Ref`, `const_inst_ty` (fold/algebraic) mapea boxed a `Ref`. Tests nuevos: `heap_boxed_scalars_are_ref`, `a_char_literal_lowers_to_ref_and_verifies`. Evidencia: `cargo test -p vn-compiler --lib` 14 passed; suite e2e `34. Char type` en verde.
 
 **Compat con el WIP de `std/` (sin tocar su diseño).** El WIP había dejado el bundle sin compilar (genéricos a nivel de método, firmas estrechadas). Mínimo aplicado: revert de `std/reflect/introspect.vn` a HEAD; métodos `MetaKey::{set,get,has,keys}` sin `<Target>`; `assert/assertEqual/assertTrue/assertFalse/assertContains` flexibles `dynamic` (puente hasta migrar `tests/`); `spawnIsolate` flexible; constructor `Request` acepta init Web u posicional; `.message` restaurado en `assertThrows`; accesos `SqlRow` por corchetes en `tests/85,86`.
 
@@ -402,10 +402,10 @@ Sin capas de compatibilidad, flags duales ni adapters (§25). Git conserva histo
 
 **Problema.** `regalloc_post::optimize_function` re-coloreaba por liveness ignorando `SlotKind`: fusionar un registro `Float` con uno `Int` degradaba `register_meta` a `Dynamic` (prueba en `mod.rs:196-220`). Para proteger el ruteo f64 del JIT, el pase **saltaba todas las funciones con algún `Float`** (`mod.rs:51-64`): las funciones float nunca coalescían `Move`s ni compactaban frames.
 
-**Cambio (3 ficheros en `varn-compiler`).** `color_with_base` acepta `kinds: &[SlotKind]` y añade la **compatibilidad de clase como tercera restricción dura** (junto a interferencia y techo de callee-frame): un color toma la clase del primer ocupante; solo la misma clase puede compartirlo; la coalescencia `Move` exige misma clase en ambos extremos y en cada slot del bloque. Se elimina el skip de funciones `Float`; el `meet→Dynamic` queda como defensa en profundidad inalcanzable. Tests: `copies_across_kinds_never_share_a_colour`, `same_kind_copies_still_coalesce` (más los 3 existentes adaptados a la nueva firma).
+**Cambio (3 ficheros en `vn-compiler`).** `color_with_base` acepta `kinds: &[SlotKind]` y añade la **compatibilidad de clase como tercera restricción dura** (junto a interferencia y techo de callee-frame): un color toma la clase del primer ocupante; solo la misma clase puede compartirlo; la coalescencia `Move` exige misma clase en ambos extremos y en cada slot del bloque. Se elimina el skip de funciones `Float`; el `meet→Dynamic` queda como defensa en profundidad inalcanzable. Tests: `copies_across_kinds_never_share_a_colour`, `same_kind_copies_still_coalesce` (más los 3 existentes adaptados a la nueva firma).
 
 **Evidencia.**
-- `cargo test -p varn-compiler --lib`: 16 passed. `cargo clippy -p varn-compiler`: sin avisos nuevos.
+- `cargo test -p vn-compiler --lib`: 16 passed. `cargo clippy -p vn-compiler`: sin avisos nuevos.
 - Suite e2e: **PASSED 1193, FAILED 0**. `--compare-tiers` en `34-char-type, 35-decimal-bigint, 96-math-advanced, 56-tier-parity`: *every tier agrees*.
 - A/B `debug -p bytecode --fn fmix` (función float con copias): con K2 `regs: 8` + 2 `Move` de join; sin K2 `regs: 9` (mismo código): frame 128B vs 144B. Los 2 `Move` restantes son joins no fusionables por interferencia (correcto).
 - `debug -p clif:kinds --fn fmix`: `[Unset, Float×5, Bool, Unset]` — clases intactas tras coalescer; `typeloss`: sin pérdidas.
@@ -425,7 +425,7 @@ Sin capas de compatibilidad, flags duales ni adapters (§25). Git conserva histo
 
 ## Anexo K4 — Tipos numéricos angostos (i8/i16/i32/u8/u16/u32/f32)
 
-**Descubrimiento previo a implementar.** Buena parte de esto YA EXISTÍA, construido por trabajo anterior nunca activado: `crates/varn-checker/src/checker/compat/mod.rs`'s `simple_types_compatible`/`literal_fits_type`/`expr_satisfies_target_type` ya definían exactamente la asignabilidad correcta (`int→i8` exige cast, `i8→int` widening implícito seguro, un literal directo se infiere sin cast con su rango validado en compilación) — nunca se activaba porque `BackendTy` no distinguía el ancho.
+**Descubrimiento previo a implementar.** Buena parte de esto YA EXISTÍA, construido por trabajo anterior nunca activado: `crates/vn-checker/src/checker/compat/mod.rs`'s `simple_types_compatible`/`literal_fits_type`/`expr_satisfies_target_type` ya definían exactamente la asignabilidad correcta (`int→i8` exige cast, `i8→int` widening implícito seguro, un literal directo se infiere sin cast con su rango validado en compilación) — nunca se activaba porque `BackendTy` no distinguía el ancho.
 
 **Cambio.** 8 variantes nuevas en `BackendTy` (`Int8/Int16/Int32/UInt8/UInt16/UInt32/Float32` — `UInt64` deliberadamente fuera: ver abajo). `emit/ty.rs::lower_tag` deja de colapsarlas a `Int`/`Float`. `HirType`/`SlotKind` NO cambian: un ancho angosto vive en el mismo GPR/FPR de 64 bits que `int`/`float` — el ancho solo importa para `field_tag` (activa el layout compacto del Anexo K3 para estos tipos) y para un chequeo de rango nuevo (`InstKind::NarrowRangeCheck` / `OpCode::CheckNarrowRange`), insertado tras un cast explícito (`x as i32`) y tras `-x` unario (el único operador que preserva el ancho en el checker — la aritmética binaria SIEMPRE ensancha a `int`/`float` a propósito, ver bug abajo). Panica en runtime si no cabe, igual que `int` ya hace con su propio desbordamiento.
 
@@ -433,7 +433,7 @@ Sin capas de compatibilidad, flags duales ni adapters (§25). Git conserva histo
 
 **Pendiente, fuera de alcance:**
 - `u64`: necesita aritmética sin signo dedicada (`u64::checked_*` sobre los bits reinterpretados) — reusar la aritmética con signo de `i64` da resultados incorrectos para valores por encima de `i64::MAX`. Aislado, no bloquea nada de lo anterior. `TypeTag::U64` sigue lowereando a `BackendTy::Int`.
-- `ArrayRepr` (`crates/varn-types/src/vm_value.rs`): sigue siendo `{Boxed, I64, F64}` sin distinguir ancho — un `i32[]` compacta a nivel de CAMPO si vive dentro de una clase (Anexo K3), pero el array en sí sigue boxeado elemento-por-elemento salvo que sea `int[]`/`float[]` puro. `VmArray` elige su repr por los VALORES en runtime, no por un tipo estático (ver el comentario de cabecera de `ArrayRepr`) — un array angosto necesita el mecanismo contrario.
+- `ArrayRepr` (`crates/vn-types/src/vm_value.rs`): sigue siendo `{Boxed, I64, F64}` sin distinguir ancho — un `i32[]` compacta a nivel de CAMPO si vive dentro de una clase (Anexo K3), pero el array en sí sigue boxeado elemento-por-elemento salvo que sea `int[]`/`float[]` puro. `VmArray` elige su repr por los VALORES en runtime, no por un tipo estático (ver el comentario de cabecera de `ArrayRepr`) — un array angosto necesita el mecanismo contrario.
 - JIT sigue en `FRAME_LAYOUT_V2_JIT_BAIL = true` (paso 9 del plan) — 0 funciones compiladas, todo interpretado.
 
 **Evidencia.**
@@ -451,13 +451,13 @@ este documento).**
 1. **Runtime**: 7 variantes nuevas en `ArrayRepr` (`I8..U32,F32`, discriminantes 3..9, aditivas) + `VmArray::new_i8/../new_f32`. `element_slotkind`/`get_vm`/`set_vm`/`push_vm`/`pop_vm`/`migrate_to_boxed` en `vm_value.rs` cubren las 7 explícitamente; CSV (siempre `Boxed`, `unreachable!` nombrado) y serialización JSON (arms reales, ensanchan a `i64`/`f64`) igual.
 2. **Checker**: `ExprKind::Array` tipa cada elemento contra el `Array<T>` esperado cuando `T` es angosto, reusando `literal_fits_type`/`expr_satisfies_target_type` (ya existían desde K4, nunca se habían activado para el contexto de un literal de array). `let bad: Array<i8> = [300]` es ahora error de compilación, no truncamiento silencioso en runtime.
 3. **Codegen**: `InstKind::BuildArray` gana `narrow_elem: Option<TypeTag>`, calculado en `from_tir/build.rs` desde `BackendTy::Array(elem_id)` vía `narrow_tag_of` (misma función de K4). Se hila hasta el byte ya libre del segundo operando de bytecode de `BuildArray` (antes siempre `0`; `TypeTag::Null == 0` es el centinela "no angosto, usar el camino de inferencia existente"). El dispatch de la VM llama a la nueva `alloc_array_vm_narrow` cuando ese byte no es cero, construyendo el `ArrayRepr` tipado directo — cero pasos de inferencia por valor.
-4. **Lectura**: `ArrayGetIndex`/JSON ya cubiertos en la capa 1. GC no requirió NINGÚN cambio: ya salta cualquier repr donde `as_boxed()` sea `None` (`crates/varn-vm/src/gc.rs`, `nursery.rs`), lo cual se cumple automáticamente para las 7 variantes nuevas por construcción — confirmado bajo GC real, no solo en principio (ver evidencia).
+4. **Lectura**: `ArrayGetIndex`/JSON ya cubiertos en la capa 1. GC no requirió NINGÚN cambio: ya salta cualquier repr donde `as_boxed()` sea `None` (`crates/vn-vm/src/gc.rs`, `nursery.rs`), lo cual se cumple automáticamente para las 7 variantes nuevas por construcción — confirmado bajo GC real, no solo en principio (ver evidencia).
 
 **Deliberadamente fuera de alcance (documentado en el plan, no un descuido).** El camino de ESCRITURA hacia un array angosto — `arr[i] = v`, `.push(v)` — sigue usando el mecanismo existente de migración-a-`Boxed` en mismatch (`set_vm`/`push_vm`): correcto, no compacto. Activarlo compacto exige antes investigar si el checker siquiera verifica hoy la asignabilidad de `v` contra el tipo de elemento estático del array — pregunta abierta, no respondida por este plan.
 
 **Evidencia.**
 - Suite e2e: 1223/1223 (`tests/109-narrow-array-literals.vn` nuevo, importado a `main.vn`; "NARROW ARRAY LITERALS PASSED").
-- `cargo build --workspace`: limpio. Cada `match` exhaustivo roto por el nuevo campo `narrow_elem` (`ssa/dump.rs`, `ssa/emit/regs.rs`, `ssa/uses.rs` x2) y por las 7 variantes de `ArrayRepr` se resolvió explícitamente — sin `_ =>` nuevo escondiendo un caso sin decidir. Un sitio no enumerado por el plan (`varn-lsp/src/features/compiler_inspect.rs`) apareció durante el build y se corrigió igual.
+- `cargo build --workspace`: limpio. Cada `match` exhaustivo roto por el nuevo campo `narrow_elem` (`ssa/dump.rs`, `ssa/emit/regs.rs`, `ssa/uses.rs` x2) y por las 7 variantes de `ArrayRepr` se resolvió explícitamente — sin `_ =>` nuevo escondiendo un caso sin decidir. Un sitio no enumerado por el plan (`vn-lsp/src/features/compiler_inspect.rs`) apareció durante el build y se corrigió igual.
 - Stress test dedicado (no permanente): `Array<i8>` de 5 elementos declarado antes de 200 000 asignaciones de basura (fuerza colecciones menores repetidas), íntegro tras 8 `minor gc` (`VARN_GC_TRACE=1`); valores en los extremos del rango (`-128`, `127`) sobreviven exactos.
 - `clif/arrays.rs`: doc de módulo actualizado — confirma que el módulo (hoy muerto, `FRAME_LAYOUT_V2_JIT_BAIL = true`) sigue siendo correcto para las 7 variantes nuevas sin cambio de código: el bloque `slow` ya despacha por los accesores totales de `VmArray`, no por un `match` de 3 vías fijo.
 

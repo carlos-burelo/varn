@@ -1,0 +1,124 @@
+use crate::types::{CheckerTyTable, ObjectTypeMember, Type, TypeContext};
+use vn_core::ast::TypeNode;
+use vn_core::TypeKind;
+
+use super::contexts::{is_member_optional, MappedContext};
+use super::keyed_access::collect_type_keys;
+use super::resolve_type_node;
+use super::template::collect_string_literals;
+
+pub(super) fn resolve_mapped_type(
+    key_var: vn_core::Atom,
+    source: &TypeNode,
+    value: &TypeNode,
+    optional: bool,
+    readonly: bool,
+    ctx: Option<&dyn TypeContext>,
+    interner: &vn_core::AtomInterner,
+    table: &mut CheckerTyTable,
+) -> Type {
+    let resolved_source = resolve_type_node(source, ctx, table);
+    let source_obj = if let TypeKind::KeyOf(inner) = &source.kind {
+        Some(resolve_type_node(inner, ctx, table))
+    } else {
+        None
+    };
+    resolve_mapped(
+        interner.try_resolve(key_var).unwrap_or(""),
+        resolved_source,
+        value,
+        optional,
+        readonly,
+        source_obj,
+        ctx,
+        table,
+    )
+}
+
+pub(super) fn resolve_mapped(
+    key_var: &str,
+    source: Type,
+    value_node: &TypeNode,
+    optional: bool,
+    readonly: bool,
+    source_obj: Option<Type>,
+    ctx: Option<&dyn TypeContext>,
+    table: &mut CheckerTyTable,
+) -> Type {
+    let keys = if let Some(obj) = source_obj {
+        let k = collect_type_keys(&obj, ctx, table);
+        if k.is_empty() {
+            collect_string_literals(&source, table)
+        } else {
+            k
+        }
+    } else {
+        collect_string_literals(&source, table)
+    };
+
+    if keys.is_empty() {
+        let key_ty = match table.get(source.0) {
+            TypeKind::Primitive(vn_core::LangPrimitive::Str) => Some(Type::Str),
+            TypeKind::Primitive(vn_core::LangPrimitive::Int) => Some(Type::Int),
+            TypeKind::Primitive(_)
+            | TypeKind::Literal(_)
+            | TypeKind::This
+            | TypeKind::Array(_)
+            | TypeKind::Union(_)
+            | TypeKind::Intersection(_)
+            | TypeKind::Tuple(_)
+            | TypeKind::Named(..)
+            | TypeKind::Generic(..)
+            | TypeKind::TemplateLiteral(_)
+            | TypeKind::Fn(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
+            | TypeKind::Typeof(_)
+            | TypeKind::KeyOf(_)
+            | TypeKind::IndexedAccess { .. }
+            | TypeKind::Mapped { .. }
+            | TypeKind::Conditional { .. }
+            | TypeKind::Infer(_)
+            | TypeKind::EnumVariant { .. }
+            | TypeKind::TypePredicate { .. } => None,
+        };
+        return if key_ty.is_some() {
+            Type::Error
+        } else {
+            Type::Dynamic
+        };
+    }
+
+    let members: Vec<ObjectTypeMember> = keys
+        .into_iter()
+        .map(|key| {
+            let key_atom = table.intern_name(&key);
+            let key_value = Type::named_atom(key_atom, table);
+            let mapped_ctx = MappedContext {
+                inner: ctx,
+                key_var: key_var.to_owned(),
+                key_value,
+            };
+            let value_ty = resolve_type_node(value_node, Some(&mapped_ctx), table);
+            let member_optional = if optional {
+                true
+            } else if let Some(ref obj) = source_obj {
+                is_member_optional(obj, key.as_ref(), ctx, table)
+            } else {
+                false
+            };
+            let value_ty = if member_optional {
+                Type::make_nullable(value_ty, table)
+            } else {
+                value_ty
+            };
+            ObjectTypeMember::Property {
+                name: key,
+                ty: value_ty.0,
+                optional: member_optional,
+                readonly,
+            }
+        })
+        .collect();
+    Type::record(members, table)
+}

@@ -1,0 +1,245 @@
+use std::sync::Arc;
+use vn_core::ast::{InterfaceDecl, InterfaceMember};
+use vn_sem::infer::pattern_lead_name;
+use vn_sem::symbol::{Symbol, SymbolKind};
+use vn_sem::types::{ClassMemberInfo, ClassMemberKind};
+use vn_sem::types::{FunctionParam, FunctionType, Type};
+
+impl<'r> super::Binder<'r> {
+    pub(super) fn bind_interface(&mut self, i: &InterfaceDecl) {
+        let id_rc: Arc<str> = self.declared_type_name(i.id, i.ast_id);
+        let origin_rc: Option<Arc<str>> = if self.source_file.is_empty() {
+            None
+        } else {
+            Some(Arc::from(self.source_file.as_ref()))
+        };
+        let mut sym = Symbol::new(SymbolKind::Interface, i.id, i.range.start.line);
+        sym.ty = Some(Type::named_with_origin(
+            id_rc.clone(),
+            origin_rc,
+            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+        ));
+        sym.col = i.range.start.column;
+        sym.offset = i.range.start.offset;
+        sym.doc = i.doc.as_ref().map(|s| self.intern_local(s.as_str()));
+        sym.type_params = i.type_params.iter().map(|t| t.name).collect();
+        sym.type_param_variances = i.type_params.iter().map(|t| t.variance).collect();
+        sym.type_param_constraints = i
+            .type_params
+            .iter()
+            .map(|t| t.constraint.as_ref().map(|con| self.resolve_type(con)))
+            .collect();
+        sym.type_param_defaults = i
+            .type_params
+            .iter()
+            .map(|t| t.default.as_ref().map(|given| self.resolve_type(given)))
+            .collect();
+        self.define(i.id, sym);
+
+        let child = self
+            .scopes
+            .child(vn_sem::scope::ScopeKind::Interface, self.current);
+        let saved = self.current;
+        self.current = child;
+
+        self.bind_type_params(&i.type_params, i.range.start.line);
+
+        let mut members: Vec<ClassMemberInfo> = Vec::new();
+        for member in &i.body {
+            self.collect_interface_member(member, &mut members);
+        }
+
+        self.record_interfaces(&id_rc, &i.extends);
+        self.declare_kind(id_rc.clone(), vn_sem::bind::DeclKind::Interface);
+        if !members.is_empty() {
+            self.type_members
+                .interfaces
+                .insert(id_rc.clone(), members.clone());
+            self.type_members.flattened.insert(id_rc, members);
+        }
+
+        self.current = saved;
+    }
+
+    fn collect_interface_member(
+        &mut self,
+        member: &InterfaceMember,
+        members: &mut Vec<ClassMemberInfo>,
+    ) {
+        match member {
+            InterfaceMember::Property {
+                key,
+                type_ann,
+                optional,
+                readonly,
+                range,
+                ..
+            } => {
+                let ty = self.resolve_type(type_ann);
+                let key_rc: Arc<str> = Arc::from(self.interner.resolve(*key));
+
+                let mut sym =
+                    Symbol::new(SymbolKind::Property, *key, range.start.line).with_type(ty);
+                sym.col = range.start.column;
+                sym.offset = range.start.offset;
+                sym.has_explicit_type = true;
+                let symbol_id = self.arena.push(sym);
+
+                members.push(ClassMemberInfo {
+                    name: key_rc,
+                    kind: ClassMemberKind::Property,
+                    is_async: false,
+                    is_generator: false,
+                    is_static: false,
+                    is_optional: *optional,
+                    line: range.start.line.saturating_sub(1),
+                    col: range.start.column,
+                    offset: range.start.offset,
+                    ty,
+                    members: Vec::new(),
+                    visibility: None,
+                    is_abstract: false,
+                    is_readonly: *readonly,
+                    is_override: false,
+                    symbol_id: Some(symbol_id),
+                    ..Default::default()
+                });
+            }
+            InterfaceMember::Method {
+                key,
+                type_params,
+                params,
+                return_type,
+                optional,
+                is_async,
+                range,
+            } => {
+                let declared = match return_type {
+                    Some(node) => self.resolve_type(node),
+                    None => {
+                        self.emit(
+                            vn_core::Diagnostic::error(
+                                vn_core::ErrorCode::TypeAnnotationRequired,
+                                format!(
+                                    "interface method '{}' needs a return type annotation",
+                                    self.interner.resolve(*key)
+                                ),
+                            )
+                            .with_range(*range),
+                        );
+                        Type::Error
+                    }
+                };
+                let ret = vn_sem::types::async_fn_return(
+                    declared,
+                    *is_async,
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                );
+                let params_list = params
+                    .iter()
+                    .map(|p| {
+                        let ty = self.param_type(p, super::binding_types::ParamSite::Declared);
+                        FunctionParam {
+                            name: Some(Arc::from(pattern_lead_name(&p.pattern, &self.interner))),
+                            ty: ty.0,
+                            optional: p.is_optional,
+                            is_rest: p.is_rest,
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                let fn_tps: Vec<Arc<str>> = type_params
+                    .iter()
+                    .map(|tp| Arc::from(self.interner.resolve(tp.name)))
+                    .collect();
+
+                let fn_type = Type::fn_(
+                    FunctionType {
+                        params: params_list,
+                        return_type: ret.0,
+                        is_arrow: false,
+                        type_params: fn_tps,
+                        type_param_defaults: Vec::new(),
+                    },
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                );
+
+                let key_rc: Arc<str> = Arc::from(self.interner.resolve(*key));
+                let mut sym =
+                    Symbol::new(SymbolKind::Method, *key, range.start.line).with_type(fn_type);
+                sym.col = range.start.column;
+                sym.offset = range.start.offset;
+                sym.has_explicit_type = return_type.is_some();
+                let symbol_id = self.arena.push(sym);
+
+                members.push(ClassMemberInfo {
+                    name: key_rc,
+                    kind: ClassMemberKind::Method,
+                    is_async: *is_async,
+                    is_generator: false,
+                    is_static: false,
+                    is_optional: *optional,
+                    line: range.start.line.saturating_sub(1),
+                    col: range.start.column,
+                    offset: range.start.offset,
+                    ty: fn_type,
+                    members: Vec::new(),
+                    visibility: None,
+                    is_abstract: false,
+                    is_readonly: false,
+                    is_override: false,
+                    symbol_id: Some(symbol_id),
+                    ..Default::default()
+                });
+            }
+            InterfaceMember::Callable {
+                params,
+                return_type,
+                range,
+            } => {
+                let ret = self.resolve_type(return_type);
+                let params_list = params
+                    .iter()
+                    .map(|p| {
+                        let ty = self.param_type(p, super::binding_types::ParamSite::Declared);
+                        FunctionParam {
+                            name: Some(Arc::from(pattern_lead_name(&p.pattern, &self.interner))),
+                            ty: ty.0,
+                            optional: p.is_optional,
+                            is_rest: p.is_rest,
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                let fn_type = Type::fn_(
+                    FunctionType {
+                        params: params_list,
+                        return_type: ret.0,
+                        is_arrow: false,
+                        type_params: vec![],
+                        type_param_defaults: Vec::new(),
+                    },
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                );
+                members.push(ClassMemberInfo {
+                    name: Arc::from(vn_core::MemberKey::Callable.as_str()),
+                    kind: ClassMemberKind::Method,
+                    is_async: false,
+                    is_generator: false,
+                    is_static: false,
+                    is_optional: false,
+                    line: range.start.line.saturating_sub(1),
+                    col: range.start.column,
+                    offset: range.start.offset,
+                    ty: fn_type,
+                    members: Vec::new(),
+                    visibility: None,
+                    is_abstract: false,
+                    is_readonly: false,
+                    is_override: false,
+                    symbol_id: None,
+                    ..Default::default()
+                });
+            }
+        }
+    }
+}

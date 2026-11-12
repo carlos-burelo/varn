@@ -1,0 +1,203 @@
+use super::member_util::intrinsic_member_info;
+use super::Checker;
+use std::sync::Arc;
+use vn_core::TypeKind;
+use vn_sem::bind::BindResult;
+use vn_sem::types::{ObjectTypeMember, Type};
+
+impl<'r> Checker<'r> {
+    pub(super) fn member_generic(
+        &mut self,
+        name_atom: vn_core::Atom,
+        args_list: vn_sem::types::TyListId,
+        origin_atom: Option<vn_core::Atom>,
+        key: &str,
+        bind: &BindResult,
+    ) -> Option<(Type, Option<usize>)> {
+        let args: Vec<Type> = self
+            .ty_table
+            .get_list(args_list)
+            .iter()
+            .map(|id| Type::resolved(*id))
+            .collect();
+        let base = Type::named_with_origin_atom(
+            name_atom,
+            origin_atom,
+            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+        );
+        self.member_instantiated(&base, args, key, bind)
+    }
+
+    fn member_instantiated(
+        &mut self,
+        base: &Type,
+        args: Vec<Type>,
+        key: &str,
+        bind: &BindResult,
+    ) -> Option<(Type, Option<usize>)> {
+        let TypeKind::Named(name_atom, origin_atom) = self.ty_table.get(base.0) else {
+            return self.find_member_info_uncached(base, key, bind);
+        };
+        let name: Arc<str> = self.resolve_bind_atom(bind, name_atom);
+        let origin: Option<Arc<str>> = origin_atom.map(|o| self.resolve_bind_atom(bind, o));
+        self.find_member_info_uncached(base, key, bind)
+            .map(|(member_ty, sym)| {
+                let mapping = super::member_util::generic_mapping(
+                    self.resolver,
+                    name.as_ref(),
+                    &args,
+                    origin.as_ref(),
+                    bind,
+                );
+                if mapping.is_empty() {
+                    (member_ty, sym)
+                } else {
+                    (
+                        member_ty.map_generics(
+                            &mapping,
+                            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                        ),
+                        sym,
+                    )
+                }
+            })
+    }
+
+    pub(super) fn member_object(
+        &mut self,
+        mid: vn_sem::types::ObjectMembersId,
+        key: &str,
+    ) -> Option<(Type, Option<usize>)> {
+        let members = self.ty_table.get_object_members(mid).to_vec();
+        members.iter().find(|m| m.name() == key).map(|m| {
+            let ty = match m {
+                ObjectTypeMember::Property {
+                    ty, optional: true, ..
+                } => Type::make_nullable(
+                    Type::resolved(*ty),
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                ),
+                ObjectTypeMember::Property { ty, .. } => Type::resolved(*ty),
+                ObjectTypeMember::Method {
+                    params,
+                    return_type,
+                    is_arrow,
+                    optional: true,
+                    type_params,
+                    ..
+                } => Type::make_nullable(
+                    Type::fn_(
+                        vn_sem::types::FunctionType {
+                            params: params.clone(),
+                            return_type: *return_type,
+                            is_arrow: *is_arrow,
+                            type_params: type_params.clone(),
+                            type_param_defaults: Vec::new(),
+                        },
+                        &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                    ),
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                ),
+                ObjectTypeMember::Method {
+                    params,
+                    return_type,
+                    is_arrow,
+                    type_params,
+                    ..
+                } => Type::fn_(
+                    vn_sem::types::FunctionType {
+                        params: params.clone(),
+                        return_type: *return_type,
+                        is_arrow: *is_arrow,
+                        type_params: type_params.clone(),
+                        type_param_defaults: Vec::new(),
+                    },
+                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+                ),
+                ObjectTypeMember::Callable { .. } => Type::Dynamic,
+            };
+            (ty, None)
+        })
+    }
+
+    pub(super) fn member_union(
+        &mut self,
+        list: vn_sem::types::TyListId,
+        key: &str,
+        bind: &BindResult,
+    ) -> Option<(Type, Option<usize>)> {
+        let ids = self.ty_table.get_list(list).to_vec();
+        let infos: Vec<(Type, Option<usize>)> = ids
+            .iter()
+            .filter_map(|id| self.find_member_info_uncached(&Type::resolved(*id), key, bind))
+            .collect();
+        if infos.len() == ids.len() {
+            let first_sid = infos[0].1;
+            let all_same_sid = infos.iter().all(|i| i.1 == first_sid);
+            let types: Vec<Type> = infos.into_iter().map(|i| i.0).collect();
+
+            let collapsed = if types.windows(2).all(|w| w[0] == w[1]) {
+                types[0]
+            } else {
+                Type::union(types, &mut *std::sync::Arc::make_mut(&mut self.ty_table))
+            };
+            Some((collapsed, if all_same_sid { first_sid } else { None }))
+        } else {
+            None
+        }
+    }
+
+    pub(super) fn member_array(
+        &mut self,
+        inner: vn_sem::types::CheckerTyId,
+        key: &str,
+        bind: &BindResult,
+    ) -> Option<(Type, Option<usize>)> {
+        let table = std::sync::Arc::make_mut(&mut self.ty_table);
+        let array_class = Type::builtin(vn_core::BuiltinType::Array, vec![], table);
+        self.member_instantiated(&array_class, vec![Type::resolved(inner)], key, bind)
+    }
+
+    pub(super) fn member_scalar(
+        &self,
+        kind: &vn_sem::types::InternedTypeKind,
+        key: &str,
+        bind: &BindResult,
+    ) -> Option<(Type, Option<usize>)> {
+        match kind {
+            TypeKind::Primitive(vn_core::LangPrimitive::Str) => {
+                if key == vn_core::MemberKey::Length.as_str() {
+                    Some((Type::Int, None))
+                } else {
+                    intrinsic_member_info(bind, vn_core::LangPrimitive::Str.name(), key)
+                }
+            }
+            TypeKind::Tuple(_) if key == vn_core::MemberKey::Length.as_str() => {
+                Some((Type::Int, None))
+            }
+            kind @ (TypeKind::Primitive(_) | TypeKind::Literal(_)) => {
+                let name = kind.lang_name().unwrap_or_default();
+                intrinsic_member_info(bind, name, key)
+            }
+            TypeKind::This
+            | TypeKind::Array(_)
+            | TypeKind::Union(_)
+            | TypeKind::Intersection(_)
+            | TypeKind::Tuple(_)
+            | TypeKind::Named(..)
+            | TypeKind::Generic(..)
+            | TypeKind::TemplateLiteral(_)
+            | TypeKind::Fn(_)
+            | TypeKind::Record(_)
+            | TypeKind::Interface(_)
+            | TypeKind::Typeof(_)
+            | TypeKind::KeyOf(_)
+            | TypeKind::IndexedAccess { .. }
+            | TypeKind::Mapped { .. }
+            | TypeKind::Conditional { .. }
+            | TypeKind::Infer(_)
+            | TypeKind::EnumVariant { .. }
+            | TypeKind::TypePredicate { .. } => None,
+        }
+    }
+}

@@ -1,0 +1,14 @@
+[package]
+name = "vn-emit"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+vn-core    = { path = "../vn-core" }
+vn-sem     = { path = "../vn-sem" }
+vn-tir     = { path = "../vn-tir" }
+vn-modules = { path = "../vn-modules" }
+rustc-hash   = { workspace = true }
+
+[lints]
+workspace = true

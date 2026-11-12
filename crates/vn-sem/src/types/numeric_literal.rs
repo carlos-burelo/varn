@@ -1,0 +1,113 @@
+use super::{CheckerTyTable, Type};
+use vn_core::ast::{AstArena, ExprId, ExprKind, UnaryOp};
+use vn_core::TypeKind;
+
+const F64_EXACT_INT: i64 = 1 << 53;
+
+pub fn const_int_value(arena: &AstArena, expr: ExprId) -> Option<i64> {
+    match &arena.expr(expr).kind {
+        ExprKind::IntLiteral { value, .. } => Some(*value),
+        ExprKind::Paren { expression } => const_int_value(arena, *expression),
+        ExprKind::Unary {
+            op: UnaryOp::Minus,
+            prefix: true,
+            operand,
+            ..
+        } => const_int_value(arena, *operand).and_then(i64::checked_neg),
+        ExprKind::Unary {
+            op: UnaryOp::Plus,
+            prefix: true,
+            operand,
+            ..
+        } => const_int_value(arena, *operand),
+        ExprKind::FloatLiteral { .. }
+        | ExprKind::BigIntLiteral { .. }
+        | ExprKind::DecimalLiteral { .. }
+        | ExprKind::StrLiteral { .. }
+        | ExprKind::CharLiteral { .. }
+        | ExprKind::BoolLiteral { .. }
+        | ExprKind::NullLiteral
+        | ExprKind::Template { .. }
+        | ExprKind::TaggedTemplate { .. }
+        | ExprKind::Identifier { .. }
+        | ExprKind::Missing
+        | ExprKind::This
+        | ExprKind::ImportMeta(_)
+        | ExprKind::Super
+        | ExprKind::Array { .. }
+        | ExprKind::Object { .. }
+        | ExprKind::Tuple { .. }
+        | ExprKind::Unary { .. }
+        | ExprKind::Update { .. }
+        | ExprKind::Binary { .. }
+        | ExprKind::Logical { .. }
+        | ExprKind::Assign { .. }
+        | ExprKind::Conditional { .. }
+        | ExprKind::Member { .. }
+        | ExprKind::Call { .. }
+        | ExprKind::New { .. }
+        | ExprKind::Function { .. }
+        | ExprKind::Arrow { .. }
+        | ExprKind::Sequence { .. }
+        | ExprKind::Await { .. }
+        | ExprKind::Spawn { .. }
+        | ExprKind::Yield { .. }
+        | ExprKind::Spread { .. }
+        | ExprKind::Pipeline { .. }
+        | ExprKind::Range { .. }
+        | ExprKind::NonNull { .. }
+        | ExprKind::Try { .. }
+        | ExprKind::As { .. }
+        | ExprKind::Satisfies { .. }
+        | ExprKind::ClassExpr { .. }
+        | ExprKind::Match { .. }
+        | ExprKind::Is { .. }
+        | ExprKind::With { .. }
+        | ExprKind::MetaAccess { .. } => None,
+    }
+}
+
+pub fn int_literal_adopts(target: &Type, value: i64, table: &CheckerTyTable) -> bool {
+    match table.get(target.0) {
+        TypeKind::Primitive(vn_core::LangPrimitive::Float) => {
+            (-F64_EXACT_INT..=F64_EXACT_INT).contains(&value)
+        }
+        TypeKind::Primitive(
+            vn_core::LangPrimitive::Decimal | vn_core::LangPrimitive::BigInt,
+        ) => true,
+        TypeKind::Union(list) => table
+            .get_list(list)
+            .iter()
+            .any(|m| int_literal_adopts(&Type::resolved(*m), value, table)),
+        TypeKind::Primitive(_)
+        | TypeKind::Literal(_)
+        | TypeKind::This
+        | TypeKind::Array(_)
+        | TypeKind::Intersection(_)
+        | TypeKind::Tuple(_)
+        | TypeKind::Named(..)
+        | TypeKind::Generic(..)
+        | TypeKind::TemplateLiteral(_)
+        | TypeKind::Fn(_)
+        | TypeKind::Record(_)
+        | TypeKind::Interface(_)
+        | TypeKind::Typeof(_)
+        | TypeKind::KeyOf(_)
+        | TypeKind::IndexedAccess { .. }
+        | TypeKind::Mapped { .. }
+        | TypeKind::Conditional { .. }
+        | TypeKind::Infer(_)
+        | TypeKind::EnumVariant { .. }
+        | TypeKind::TypePredicate { .. } => false,
+    }
+}
+
+pub fn literal_operand_class(
+    arena: &AstArena,
+    expr: ExprId,
+    other: &Type,
+    table: &CheckerTyTable,
+) -> Option<Type> {
+    let value = const_int_value(arena, expr)?;
+    int_literal_adopts(other, value, table).then_some(*other)
+}

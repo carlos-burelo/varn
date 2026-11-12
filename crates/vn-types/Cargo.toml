@@ -1,0 +1,26 @@
+[package]
+name = "vn-types"
+version.workspace = true
+edition.workspace = true
+
+# Dev-only layout probe: gated so a normal build does not pay for it.
+# Build with `cargo run -p vn-types --features dev-tools --bin sizeof`.
+[[bin]]
+name = "sizeof"
+path = "src/bin/sizeof.rs"
+required-features = ["dev-tools"]
+
+[features]
+dev-tools = []
+
+[dependencies]
+vn-core    = { path = "../vn-core" }
+
+memchr       = { workspace = true }
+bigdecimal   = { workspace = true }
+num-bigint   = { workspace = true }
+rustc-hash   = { workspace = true }
+serde        = { workspace = true, features = ["rc"] }
+
+[lints]
+workspace = true

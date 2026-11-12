@@ -1,8 +1,8 @@
 # TIR — contrato tipado (estado código)
 
-Emite: `varn-emit::emit_module` (`crates/varn-emit/src/lib.rs`): `(program, ast_arena, bind, expr_table, call_mappings, desugar) -> TirModule`.
+Emite: `vn-emit::emit_module` (`crates/vn-emit/src/lib.rs`): `(program, ast_arena, bind, expr_table, call_mappings, desugar) -> TirModule`.
 
-## `TirModule` (`crates/varn-tir/src/module.rs`)
+## `TirModule` (`crates/vn-tir/src/module.rs`)
 
 `source_file, imports, exports, types: TyTable, classes, class_origins, enums, signatures, functions: Vec<TirFunction>, globals: Vec<BackendTy>, global_names, class_defs, top_level: TirFunction`.
 

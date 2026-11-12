@@ -1,4 +1,4 @@
-> Estado verificado 2026-10-13: VIGENTE — `Frozen`/`FrozenFrame` (`crates/varn-vm/src/exec/scheduler/suspend.rs:11-23`), `suspend_live` (`:62`), `TaskCell` (`task.rs:127`); `tests/154,157-*.vn`.
+> Estado verificado 2026-10-13: VIGENTE — `Frozen`/`FrozenFrame` (`crates/vn-vm/src/exec/scheduler/suspend.rs:11-23`), `suspend_live` (`:62`), `TaskCell` (`task.rs:127`); `tests/154,157-*.vn`.
 >
 > Histórico. No spec vigente. Código manda. Revalidar antes de usar.
 
@@ -72,7 +72,7 @@ Go 11.69s/8.5GB. Lo que queda es el modelo de heap (3 objetos por tarea con su
 entrada de identidad), fuera del alcance de esta decisión.
 
 ## Contexto
-El pase `state_machine` (`varn-compiler`) ya particiona el CFG en cada
+El pase `state_machine` (`vn-compiler`) ya particiona el CFG en cada
 `Await`/`Yield`, ordena en RPO y calcula `state_size = 1 + max_live`
 (`layout.rs`). El runtime no lo consume: `drive_fork` (`scheduler.rs`)
 aparca el `ExecCtx` entero y el GC reúne raíces de todos los forks

@@ -1,4 +1,4 @@
-> Estado verificado 2026-10-13: VIGENTE — `TcpListener`/`TcpStream` en `std/net/socket.vn:134`, `runtime:net` en `crates/varn-builtins/src/modules/runtime/net/`; `tests/111-network-apis-overhaul.vn`.
+> Estado verificado 2026-10-13: VIGENTE — `TcpListener`/`TcpStream` en `std/net/socket.vn:134`, `runtime:net` en `crates/vn-builtins/src/modules/runtime/net/`; `tests/111-network-apis-overhaul.vn`.
 >
 > Histórico. No spec vigente. Código manda. Revalidar antes de usar.
 

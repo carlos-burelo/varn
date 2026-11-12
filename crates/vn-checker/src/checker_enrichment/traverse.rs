@@ -1,0 +1,361 @@
+use crate::checker_call_types::infer_call_type;
+use crate::checker_enrichment::index::EnrichContext;
+use rustc_hash::FxHashMap;
+use std::sync::Arc;
+use vn_core::ast::{AstArena, Decl, StmtId, StmtKind};
+use vn_sem::bind::{BindResult, BindView};
+use vn_sem::types::{CheckerTyTable, Type};
+
+pub(super) fn collect_inferred_return_types_raw(
+    ctx: &EnrichContext,
+    sym_map: &FxHashMap<Arc<str>, Type>,
+    stmt: StmtId,
+    ast_arena: &AstArena,
+    bind: &BindView,
+    current_class: Option<&str>,
+    table: &mut CheckerTyTable,
+) -> Vec<Type> {
+    let mut results = Vec::new();
+    collect_returns_recursive(
+        ctx,
+        sym_map,
+        stmt,
+        ast_arena,
+        bind,
+        current_class,
+        &mut results,
+        table,
+    );
+    results
+}
+fn collect_returns_recursive(
+    ctx: &EnrichContext,
+    sym_map: &FxHashMap<Arc<str>, Type>,
+    stmt: StmtId,
+    ast_arena: &AstArena,
+    bind: &BindView,
+    current_class: Option<&str>,
+    results: &mut Vec<Type>,
+    table: &mut CheckerTyTable,
+) {
+    match &ast_arena.stmt(stmt).kind {
+        StmtKind::Return { argument } => {
+            if let Some(arg) = argument {
+                if let Some(ty) = infer_call_type(
+                    &ctx.fn_map,
+                    &ctx.fn_type_params,
+                    &ctx.class_methods,
+                    sym_map,
+                    *arg,
+                    ast_arena,
+                    Some(bind),
+                    current_class,
+                    &bind.bind.interner,
+                    table,
+                ) {
+                    results.push(ty);
+                } else {
+                    results.push(Type::Dynamic);
+                }
+            } else {
+                results.push(Type::Void);
+            }
+        }
+        StmtKind::Block { stmts } => {
+            for &s in stmts {
+                collect_returns_recursive(
+                    ctx,
+                    sym_map,
+                    s,
+                    ast_arena,
+                    bind,
+                    current_class,
+                    results,
+                    table,
+                );
+            }
+        }
+        StmtKind::If {
+            consequent,
+            alternate,
+            ..
+        } => {
+            let (consequent, alternate) = (*consequent, *alternate);
+            collect_returns_recursive(
+                ctx,
+                sym_map,
+                consequent,
+                ast_arena,
+                bind,
+                current_class,
+                results,
+                table,
+            );
+            if let Some(alt) = alternate {
+                collect_returns_recursive(
+                    ctx,
+                    sym_map,
+                    alt,
+                    ast_arena,
+                    bind,
+                    current_class,
+                    results,
+                    table,
+                );
+            }
+        }
+        StmtKind::While { body, .. } | StmtKind::DoWhile { body, .. } => {
+            collect_returns_recursive(
+                ctx,
+                sym_map,
+                *body,
+                ast_arena,
+                bind,
+                current_class,
+                results,
+                table,
+            );
+        }
+        StmtKind::For { body, .. }
+        | StmtKind::ForIn { body, .. }
+        | StmtKind::ForOf { body, .. } => {
+            collect_returns_recursive(
+                ctx,
+                sym_map,
+                *body,
+                ast_arena,
+                bind,
+                current_class,
+                results,
+                table,
+            );
+        }
+        StmtKind::Try {
+            block,
+            catches,
+            finally,
+        } => {
+            collect_returns_recursive(
+                ctx,
+                sym_map,
+                *block,
+                ast_arena,
+                bind,
+                current_class,
+                results,
+                table,
+            );
+            for c in catches {
+                collect_returns_recursive(
+                    ctx,
+                    sym_map,
+                    c.body,
+                    ast_arena,
+                    bind,
+                    current_class,
+                    results,
+                    table,
+                );
+            }
+            if let Some(f) = finally {
+                collect_returns_recursive(
+                    ctx,
+                    sym_map,
+                    *f,
+                    ast_arena,
+                    bind,
+                    current_class,
+                    results,
+                    table,
+                );
+            }
+        }
+        StmtKind::Labeled { body, .. } => {
+            collect_returns_recursive(
+                ctx,
+                sym_map,
+                *body,
+                ast_arena,
+                bind,
+                current_class,
+                results,
+                table,
+            );
+        }
+        StmtKind::Empty
+        | StmtKind::Expr { .. }
+        | StmtKind::Decl(_)
+        | StmtKind::Error
+        | StmtKind::Break { .. }
+        | StmtKind::Continue { .. }
+        | StmtKind::Throw { .. }
+        | StmtKind::Using { .. }
+        | StmtKind::Debugger => {}
+    }
+}
+
+pub(super) fn enrich_stmts_for_vars(
+    ctx: &EnrichContext,
+    sym_map: &mut FxHashMap<Arc<str>, Type>,
+    stmt: StmtId,
+    ast_arena: &AstArena,
+    bind: &mut BindResult,
+    resolver: &dyn vn_sem::resolver::ImportResolver,
+    current_class: Option<&str>,
+) {
+    enrich_vars_recursive(ctx, sym_map, stmt, ast_arena, bind, resolver, current_class);
+}
+
+fn enrich_vars_recursive(
+    ctx: &EnrichContext,
+    sym_map: &mut FxHashMap<Arc<str>, Type>,
+    stmt: StmtId,
+    ast_arena: &AstArena,
+    bind: &mut BindResult,
+    resolver: &dyn vn_sem::resolver::ImportResolver,
+    current_class: Option<&str>,
+) {
+    match &ast_arena.stmt(stmt).kind {
+        StmtKind::Decl(decl) => {
+            if let Decl::Variable(v) = decl.as_ref() {
+                use vn_sem::infer::pattern_lead_name;
+                for d in &v.declarators {
+                    let name = pattern_lead_name(&d.id, &bind.interner).to_owned();
+                    let scope = bind.scopes.get(bind.global_scope);
+                    let sym_id = match bind.interner.get(&name).and_then(|atom| scope.lookup(atom))
+                    {
+                        Some(id) => id,
+                        None => continue,
+                    };
+                    if bind.arena.get(sym_id).ty.is_some() {
+                        if let Some(existing) = &bind.arena.get(sym_id).ty {
+                            sym_map.entry(Arc::from(name)).or_insert_with(|| *existing);
+                        }
+                        continue;
+                    }
+                    let init = match &d.init {
+                        Some(e) => *e,
+                        None => continue,
+                    };
+                    let mut table =
+                        std::mem::take(&mut *std::sync::Arc::make_mut(&mut bind.ty_table));
+                    let ty = infer_call_type(
+                        &ctx.fn_map,
+                        &ctx.fn_type_params,
+                        &ctx.class_methods,
+                        sym_map,
+                        init,
+                        ast_arena,
+                        Some(&BindView::new(bind, resolver)),
+                        current_class,
+                        &bind.interner,
+                        &mut table,
+                    );
+                    bind.ty_table = std::sync::Arc::new(table);
+                    if let Some(t) = ty {
+                        bind.arena.get_mut(sym_id).ty = Some(t);
+                        sym_map.insert(Arc::from(name), t);
+                    }
+                }
+            }
+        }
+        StmtKind::Block { stmts } => {
+            for &s in stmts {
+                enrich_vars_recursive(ctx, sym_map, s, ast_arena, bind, resolver, current_class);
+            }
+        }
+        StmtKind::If {
+            consequent,
+            alternate,
+            ..
+        } => {
+            let (consequent, alternate) = (*consequent, *alternate);
+            enrich_vars_recursive(
+                ctx,
+                sym_map,
+                consequent,
+                ast_arena,
+                bind,
+                resolver,
+                current_class,
+            );
+            if let Some(alt) = alternate {
+                enrich_vars_recursive(ctx, sym_map, alt, ast_arena, bind, resolver, current_class);
+            }
+        }
+        StmtKind::While { body, .. } | StmtKind::DoWhile { body, .. } => {
+            enrich_vars_recursive(
+                ctx,
+                sym_map,
+                *body,
+                ast_arena,
+                bind,
+                resolver,
+                current_class,
+            );
+        }
+        StmtKind::For { body, .. }
+        | StmtKind::ForIn { body, .. }
+        | StmtKind::ForOf { body, .. } => {
+            enrich_vars_recursive(
+                ctx,
+                sym_map,
+                *body,
+                ast_arena,
+                bind,
+                resolver,
+                current_class,
+            );
+        }
+        StmtKind::Try {
+            block,
+            catches,
+            finally,
+        } => {
+            let (block, finally) = (*block, *finally);
+            enrich_vars_recursive(
+                ctx,
+                sym_map,
+                block,
+                ast_arena,
+                bind,
+                resolver,
+                current_class,
+            );
+            for c in catches {
+                enrich_vars_recursive(
+                    ctx,
+                    sym_map,
+                    c.body,
+                    ast_arena,
+                    bind,
+                    resolver,
+                    current_class,
+                );
+            }
+            if let Some(f) = finally {
+                enrich_vars_recursive(ctx, sym_map, f, ast_arena, bind, resolver, current_class);
+            }
+        }
+        StmtKind::Labeled { body, .. } => {
+            enrich_vars_recursive(
+                ctx,
+                sym_map,
+                *body,
+                ast_arena,
+                bind,
+                resolver,
+                current_class,
+            );
+        }
+        StmtKind::Empty
+        | StmtKind::Expr { .. }
+        | StmtKind::Error
+        | StmtKind::Return { .. }
+        | StmtKind::Break { .. }
+        | StmtKind::Continue { .. }
+        | StmtKind::Throw { .. }
+        | StmtKind::Using { .. }
+        | StmtKind::Debugger => {}
+    }
+}

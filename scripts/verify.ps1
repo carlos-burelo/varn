@@ -226,8 +226,8 @@ if (-not $Quick) {
 }
 
 # 5b. Corpus de errores (lo ejecuta el CI; sin esto un fixture obsoleto solo falla alli)
-Write-StepHeader "5b: Corpus de errores (cargo test -p varn-cli --test error_corpus)"
-cargo test --profile $BuildProfile -p varn-cli --test error_corpus
+Write-StepHeader "5b: Corpus de errores (cargo test -p vn-cli --test error_corpus)"
+cargo test --profile $BuildProfile -p vn-cli --test error_corpus
 if ($LASTEXITCODE -ne 0) {
     Write-Failure "El corpus de errores fallo."
     $failedSteps += "Corpus de errores"

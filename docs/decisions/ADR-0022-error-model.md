@@ -30,7 +30,7 @@ error que no coincide sube al `catch` exterior), `e is T` estrecha el tipo y
 4. **Campos tipados** (`path`, `host`, `port`, `capability`, `position`) y
    `cause` para encadenar, en vez de texto parseable.
 5. **Una sola fuente de verdad** (Ley 16): la tabla canónica vive en
-   `varn-core` (`StdErrorClass`, `ErrorField`). Las clases de Varn en
+   `vn-core` (`StdErrorClass`, `ErrorField`). Las clases de Varn en
    `std:error` se registran con una llamada nativa que valida nombres, padres y
    códigos contra esa tabla al cargar el módulo.
 6. **Los nativos lanzan errores tipados.** `NativeError` lleva la clase y los

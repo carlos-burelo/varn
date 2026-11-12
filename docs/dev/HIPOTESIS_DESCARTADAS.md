@@ -297,8 +297,8 @@ Cuatro comentarios afirmaban garantías que el código no daba:
 
 * `artifact.rs`: *"hash of the compiler crates' sources… stale artifacts
   invalidate automatically"* — no cubría el compilador.
-* `proto.rs`: *"cubre varn-types y varn-compiler"* — nunca cubrió
-  varn-compiler.
+* `proto.rs`: *"cubre vn-types y vn-compiler"* — nunca cubrió
+  vn-compiler.
 * `arena.rs`: *"bump-allocated contiguously, 0.00 ms GC pauses"* — no tenía
   método para alocar. Era código muerto; borrado.
 * `VM_ARCHITECTURE.md`: *"Nursery de 4096 ranuras"* — son 65 536.

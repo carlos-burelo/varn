@@ -30,8 +30,8 @@
 
 ## 3. Palabras Reservadas
 
-Lista exacta del lexer (`crates/varn-lexer/src/keywords.rs:12-78`;
-tokens en `crates/varn-core/src/token/kind.rs:85-155`):
+Lista exacta del lexer (`crates/vn-lexer/src/keywords.rs:12-78`;
+tokens en `crates/vn-core/src/token/kind.rs:85-155`):
 
 ```
 let  const  var  function  class  struct  interface  type  enum
