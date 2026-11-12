@@ -63,7 +63,7 @@ child.stdout.on("data", (chunk) => {
   console.log("CAPS semanticTokens=" + JSON.stringify(c.semanticTokensProvider && { full: !!c.semanticTokensProvider.full, range: !!c.semanticTokensProvider.range }));
   notify("initialized", {});
   notify("textDocument/didOpen", {
-    textDocument: { uri, languageId: "varn", version: 1, text },
+    textDocument: { uri, languageId: "vn", version: 1, text },
   });
   await new Promise((r) => setTimeout(r, 2500));
   const sem = await req("textDocument/semanticTokens/full", { textDocument: { uri } });

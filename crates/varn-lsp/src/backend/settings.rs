@@ -32,14 +32,14 @@ impl Settings {
 
     pub fn inlay_hints_enabled_in(value: &serde_json::Value) -> Option<bool> {
         value
-            .pointer("/Varn/inlayHints/enabled")
+            .pointer("/vn/inlayHints/enabled")
             .or_else(|| value.pointer("/inlayHints/enabled"))
             .and_then(serde_json::Value::as_bool)
     }
 
     pub fn code_lens_enabled_in(value: &serde_json::Value) -> Option<bool> {
         value
-            .pointer("/Varn/codeLens/enabled")
+            .pointer("/vn/codeLens/enabled")
             .or_else(|| value.pointer("/codeLens/enabled"))
             .and_then(serde_json::Value::as_bool)
     }

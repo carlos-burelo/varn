@@ -25,17 +25,17 @@ pub fn execute_command(
             .ok_or_else(|| format!("Document not found: {uri}"))
     };
     match command {
-        "varn.showAst" | "varn.syntaxTree" => Ok(Some(dump_ast_json(&*document()?)?)),
-        "varn.showBytecode" => Ok(Some(serde_json::Value::String(compile_and_disassemble(
+        "vn.showAst" | "vn.syntaxTree" => Ok(Some(dump_ast_json(&*document()?)?)),
+        "vn.showBytecode" => Ok(Some(serde_json::Value::String(compile_and_disassemble(
             &*document()?,
         )?))),
-        "varn.showSSA" => Ok(Some(serde_json::Value::String(compile_and_dump_ssa(
+        "vn.showSSA" => Ok(Some(serde_json::Value::String(compile_and_dump_ssa(
             &*document()?,
         )?))),
-        "varn.getCFG" => Ok(Some(compile_and_get_cfg_json(&*document()?)?)),
-        "varn.memoryStats" => Ok(Some(memory_stats(workspace))),
-        "varn.stdList" => Ok(Some(std_list())),
-        "varn.stdRead" => {
+        "vn.getCFG" => Ok(Some(compile_and_get_cfg_json(&*document()?)?)),
+        "vn.memoryStats" => Ok(Some(memory_stats(workspace))),
+        "vn.stdList" => Ok(Some(std_list())),
+        "vn.stdRead" => {
             let spec = arguments
                 .first()
                 .and_then(|v| v.as_str())

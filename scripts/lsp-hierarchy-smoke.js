@@ -59,7 +59,7 @@ function short(v) {
   const { promisify } = require("util");
   send("initialized", {});
   send("textDocument/didOpen", {
-    textDocument: { uri, languageId: "varn", version: 1, text },
+    textDocument: { uri, languageId: "vn", version: 1, text },
   });
   await new Promise((r) => setTimeout(r, 2500));
   const prep = await req("textDocument/prepareTypeHierarchy", {

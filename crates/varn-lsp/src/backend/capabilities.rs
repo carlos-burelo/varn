@@ -64,14 +64,14 @@ pub fn server_capabilities() -> ServerCapabilities {
 
         execute_command_provider: Some(ExecuteCommandOptions {
             commands: vec![
-                "varn.showAst".to_string(),
-                "varn.syntaxTree".to_string(),
-                "varn.showBytecode".to_string(),
-                "varn.showSSA".to_string(),
-                "varn.getCFG".to_string(),
-                "varn.memoryStats".to_string(),
-                "varn.stdList".to_string(),
-                "varn.stdRead".to_string(),
+                "vn.showAst".to_string(),
+                "vn.syntaxTree".to_string(),
+                "vn.showBytecode".to_string(),
+                "vn.showSSA".to_string(),
+                "vn.getCFG".to_string(),
+                "vn.memoryStats".to_string(),
+                "vn.stdList".to_string(),
+                "vn.stdRead".to_string(),
             ],
             work_done_progress_options: Default::default(),
         }),
@@ -80,7 +80,7 @@ pub fn server_capabilities() -> ServerCapabilities {
             work_done_progress_options: Default::default(),
         })),
         diagnostic_provider: Some(DiagnosticProvider::DiagnosticOptions(DiagnosticOptions {
-            identifier: Some("varn".to_string()),
+            identifier: Some("vn".to_string()),
             inter_file_dependencies: true,
             workspace_diagnostics: true,
             work_done_progress_options: Default::default(),

@@ -27,7 +27,7 @@ pub fn build_code_lenses(
         command: Some(Command {
             title: "▶ Run File".to_string(),
             tooltip: None,
-            command: "varn.runFile".to_string(),
+            command: "vn.runFile".to_string(),
             arguments: Some(vec![uri_arg()]),
         }),
         data: None,
@@ -47,7 +47,7 @@ pub fn build_code_lenses(
         command: Some(Command {
             title: "🔍 View Bytecode".to_string(),
             tooltip: None,
-            command: "varn.showBytecode".to_string(),
+            command: "vn.showBytecode".to_string(),
             arguments: Some(vec![uri_arg()]),
         }),
         data: None,
@@ -67,7 +67,7 @@ pub fn build_code_lenses(
         command: Some(Command {
             title: "🔍 View SSA".to_string(),
             tooltip: None,
-            command: "varn.showSSA".to_string(),
+            command: "vn.showSSA".to_string(),
             arguments: Some(vec![uri_arg()]),
         }),
         data: None,
@@ -79,7 +79,7 @@ pub fn build_code_lenses(
             command: Some(Command {
                 title: "▶ Run as Entry".to_string(),
                 tooltip: None,
-                command: "varn.runMain".to_string(),
+                command: "vn.runMain".to_string(),
                 arguments: Some(vec![uri_arg()]),
             }),
             data: None,
@@ -89,7 +89,7 @@ pub fn build_code_lenses(
             command: Some(Command {
                 title: "⏱️ Benchmark".to_string(),
                 tooltip: None,
-                command: "varn.runBenchmark".to_string(),
+                command: "vn.runBenchmark".to_string(),
                 arguments: Some(vec![uri_arg()]),
             }),
             data: None,
@@ -121,7 +121,7 @@ pub fn build_code_lenses(
                 command: Some(Command {
                     title: "▶ Run Test".to_string(),
                     tooltip: None,
-                    command: "varn.runTest".to_string(),
+                    command: "vn.runTest".to_string(),
                     arguments: Some(vec![
                         uri_arg(),
                         serde_json::Value::String(sym.name().to_owned()),
@@ -148,7 +148,7 @@ pub fn build_code_lenses(
                     command: Some(Command {
                         title,
                         tooltip: None,
-                        command: "varn.findReferences".to_string(),
+                        command: "vn.findReferences".to_string(),
                         arguments: Some(vec![
                             uri_arg(),
                             serde_json::Value::from(sym.line()),

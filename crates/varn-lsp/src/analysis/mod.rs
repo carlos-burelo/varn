@@ -28,7 +28,7 @@ impl AnalysisHandle {
         let (fg_tx, mut fg_rx) = mpsc::unbounded_channel::<Job>();
         let (bg_tx, mut bg_rx) = mpsc::unbounded_channel::<Job>();
         std::thread::Builder::new()
-            .name("varn-analysis".to_owned())
+            .name("vn-analysis".to_owned())
             .spawn(move || {
                 let rt = tokio::runtime::Builder::new_current_thread()
                     .build()

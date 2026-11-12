@@ -42,7 +42,7 @@ impl Backend {
         }
         let items = vec![ConfigurationItem {
             scope_uri: None,
-            section: Some("Varn".to_owned()),
+            section: Some("vn".to_owned()),
         }];
         if let Ok(values) = self.client.configuration(items).await
             && let Some(value) = values.first()

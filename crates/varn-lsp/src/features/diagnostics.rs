@@ -97,7 +97,7 @@ pub fn convert_diagnostics(state: &DocumentState) -> Vec<LspDiagnostic> {
                 code,
                 code_description: None,
                 message: d.message.clone().into(),
-                source: Some("varn".into()),
+                source: Some("vn".into()),
                 tags,
                 related_information,
                 data,

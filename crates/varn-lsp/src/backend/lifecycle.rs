@@ -85,7 +85,7 @@ pub async fn index_workspace(client: Client, analysis: AnalysisHandle, progress_
     let progress = Progress::begin(
         &client,
         progress_supported,
-        "varn/index",
+        "vn/index",
         "Indexing Varn workspace",
     )
     .await;
