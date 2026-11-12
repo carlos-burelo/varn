@@ -6,10 +6,11 @@ use tower_lsp_f::lsp_types::*;
 use super::state::{at, Backend};
 use crate::features::code_action::build_code_action;
 use crate::features::compiler_inspect::execute_command as run_command;
-use crate::features::completion::build_completion_response;
+use crate::features::completion::{build_completion_response, source_with_member_placeholder};
 use crate::features::formatting::build_formatting;
 use crate::features::on_type_formatting::build_on_type_formatting;
 use crate::features::rename::{build_prepare_rename, build_rename};
+use crate::pipeline::run_pipeline;
 
 pub(crate) async fn completion(
     backend: &Backend,
@@ -26,6 +27,17 @@ pub(crate) async fn completion(
     let Some((resp, log)) = backend
         .query("completion", move |an| {
             let state = an.workspace.get_fresh(&uri)?;
+            let state = match source_with_member_placeholder(
+                &state,
+                pos.line,
+                pos.character,
+                trigger_char.as_deref(),
+            ) {
+                Some(patched) => {
+                    std::sync::Arc::new(run_pipeline(patched, uri.clone(), an.workspace.session()))
+                }
+                None => state,
+            };
             let index = an.workspace.index.read().ok();
             Some(build_completion_response(
                 &state,

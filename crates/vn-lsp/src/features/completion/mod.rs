@@ -29,6 +29,34 @@ pub use postfix::build_postfix_completions;
 pub use receivers::{dot_receiver, pattern_receiver, DotVerdict};
 pub use reflection::build_reflection_completions;
 
+const MEMBER_PLACEHOLDER: &str = "__vn_member__";
+
+pub fn source_with_member_placeholder(
+    state: &DocumentState,
+    line: u32,
+    col: u32,
+    trigger_char: Option<&str>,
+) -> Option<String> {
+    let cursor = state.offset_at_line_col(line, col) as usize;
+    let before = state.source.get(..cursor)?;
+    let after = state.source.get(cursor..)?;
+    let continues_word = after
+        .chars()
+        .next()
+        .is_some_and(|c| c.is_alphanumeric() || c == '_');
+    let ends_with_access = before.ends_with('.') || before.ends_with("?.");
+    if !ends_with_access || continues_word {
+        return None;
+    }
+    if receivers::dot_receiver(state, line, col, trigger_char)
+        .info
+        .is_some()
+    {
+        return None;
+    }
+    Some(format!("{before}{MEMBER_PLACEHOLDER}{after}"))
+}
+
 pub fn build_completion_response(
     state: &DocumentState,
     resolver: &vn_resolver::ModuleResolver,
