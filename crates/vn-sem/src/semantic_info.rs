@@ -100,4 +100,6 @@ pub struct ResolvedMemberSummary {
     pub is_async: bool,
     pub is_generator: bool,
     pub doc: Option<Arc<str>>,
+    pub visibility: Option<vn_core::ast::Visibility>,
+    pub owner: Option<Arc<str>>,
 }

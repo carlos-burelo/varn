@@ -74,6 +74,8 @@ pub(super) fn collect_extension_members(
                     .doc
                     .and_then(|d| bind.interner.try_resolve(d))
                     .map(std::sync::Arc::from),
+                visibility: None,
+                owner: None,
             });
         }
     };

@@ -34,6 +34,8 @@ pub fn get_members_of_type(
                 is_async: false,
                 is_generator: false,
                 doc: None,
+                visibility: None,
+                owner: None,
             });
         }
     };
@@ -256,28 +258,28 @@ fn list_nominal(
         for m in &entry.members {
             let kind = super::member_kind::map_class_member_kind(m.kind);
             let mapped = map_ty(&m.ty, table);
-            add_declared(results, seen, m, mapped, kind);
+            add_declared(results, seen, &cn, m, mapped, kind);
         }
     }
     if let Some(entry) = bind.type_members.interfaces.get(&cn) {
         for m in entry {
             let kind = super::member_kind::map_class_member_kind(m.kind);
             let mapped = map_ty(&m.ty, table);
-            add_declared(results, seen, m, mapped, kind);
+            add_declared(results, seen, &cn, m, mapped, kind);
         }
     }
     if let Some(entry) = bind.type_members.enums.get(&cn) {
         for m in entry {
             let kind = super::member_kind::map_class_member_kind(m.kind);
             let mapped = map_ty(&m.ty, table);
-            add_declared(results, seen, m, mapped, kind);
+            add_declared(results, seen, &cn, m, mapped, kind);
         }
     }
     if let Some(entry) = bind.type_members.namespaces.get(&cn) {
         for m in entry {
             let kind = super::member_kind::map_class_member_kind(m.kind);
             let mapped = map_ty(&m.ty, table);
-            add_declared(results, seen, m, mapped, kind);
+            add_declared(results, seen, &cn, m, mapped, kind);
         }
     }
 
@@ -286,14 +288,14 @@ fn list_nominal(
             for m in &entry.members {
                 let kind = super::member_kind::map_class_member_kind(m.kind);
                 let mapped = map_ty(&m.ty, table);
-                add_declared(results, seen, m, mapped, kind);
+                add_declared(results, seen, &cn, m, mapped, kind);
             }
         }
         if let Some(members) = b.flattened_members.get(cn.as_ref()) {
             for m in members {
                 let kind = super::member_kind::map_class_member_kind(m.kind);
                 let mapped = map_ty(&m.ty, table);
-                add_declared(results, seen, m, mapped, kind);
+                add_declared(results, seen, &cn, m, mapped, kind);
             }
         }
     }
@@ -306,7 +308,7 @@ fn list_nominal(
         for m in &entry.members {
             let kind = super::member_kind::map_class_member_kind(m.kind);
             let mapped = map_ty(&m.ty, table);
-            add_declared(results, seen, m, mapped, kind);
+            add_declared(results, seen, &cn, m, mapped, kind);
         }
     }
 }
@@ -314,6 +316,7 @@ fn list_nominal(
 fn add_declared(
     results: &mut Vec<vn_sem::semantic_info::ResolvedMemberSummary>,
     seen: &mut rustc_hash::FxHashSet<Arc<str>>,
+    owner: &Arc<str>,
     m: &vn_sem::types::ClassMemberInfo,
     ty: Type,
     kind: vn_sem::semantic_info::ResolvedMemberKind,
@@ -331,6 +334,8 @@ fn add_declared(
             is_async: m.is_async,
             is_generator: m.is_generator,
             doc: m.doc.clone(),
+            visibility: m.visibility,
+            owner: Some(owner.clone()),
         });
     }
 }

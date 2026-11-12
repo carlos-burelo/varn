@@ -1,6 +1,7 @@
 use crate::document::DocumentState;
 use rustc_hash::FxHashSet;
 use tower_lsp_f::lsp_types::{CompletionItem, CompletionItemKind, InsertTextFormat};
+use vn_core::TokenKind;
 use vn_sem::semantic_info::{NestedTypeKind, ResolvedMemberKind, ResolvedMemberSummary};
 use vn_sem::types::Type;
 
@@ -15,12 +16,16 @@ pub fn build_member_completions(
     info: ReceiverInfo,
     use_snippets: bool,
     prefix: &str,
+    cursor: u32,
 ) -> Vec<CompletionItem> {
+    let (ty, is_instance) = unwrap_class_object(state, info);
+    let viewer = enclosing_class(state, cursor);
     let mut members: Vec<_> = state
-        .members_of_type(&info.ty)
+        .members_of_type(&ty)
         .into_iter()
         .filter(|m| m.kind != ResolvedMemberKind::Constructor)
-        .filter(|m| m.is_static != info.is_instance)
+        .filter(|m| m.is_static != is_instance)
+        .filter(|m| is_accessible(m, viewer.as_deref()))
         .collect();
     members.sort_by(|a, b| a.name.cmp(&b.name));
     let mut seen = FxHashSet::default();
@@ -29,6 +34,46 @@ pub fn build_member_completions(
         .filter(|m| seen.insert(m.name.clone()))
         .map(|m| summary_to_completion_item(state, m, use_snippets, prefix))
         .collect()
+}
+
+fn unwrap_class_object(state: &DocumentState, info: ReceiverInfo) -> (Type, bool) {
+    let table = state.db.types.borrow();
+    if info.ty.builtin_of(&table) == Some(vn_core::BuiltinType::Class) {
+        return (info.ty.builtin_arg(0, &table), false);
+    }
+    (info.ty, info.is_instance)
+}
+
+fn enclosing_class(state: &DocumentState, cursor: u32) -> Option<String> {
+    let tokens = &state.tokens;
+    let mut open_braces: Vec<Option<String>> = Vec::new();
+    let mut pending: Option<String> = None;
+    for (i, tok) in tokens.iter().enumerate() {
+        if tok.offset >= cursor {
+            break;
+        }
+        if matches!(tok.kind, TokenKind::Class | TokenKind::Struct) {
+            pending = tokens
+                .get(i + 1)
+                .filter(|next| next.kind == TokenKind::Identifier)
+                .map(|next| state.lexeme(next).to_owned());
+        } else if tok.kind == TokenKind::LBrace {
+            open_braces.push(pending.take());
+        } else if tok.kind == TokenKind::RBrace {
+            open_braces.pop();
+        }
+    }
+    open_braces.into_iter().rev().flatten().next()
+}
+
+fn is_accessible(member: &ResolvedMemberSummary, viewer: Option<&str>) -> bool {
+    match member.visibility {
+        Some(vn_core::ast::Visibility::Private) => {
+            viewer.is_some_and(|class| member.owner.as_deref() == Some(class))
+        }
+        Some(vn_core::ast::Visibility::Protected) => viewer.is_some(),
+        Some(vn_core::ast::Visibility::Public) | None => true,
+    }
 }
 
 pub fn member_group(kind: ResolvedMemberKind) -> u8 {

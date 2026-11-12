@@ -181,7 +181,7 @@ pub fn build_completion_response(
     if let Some(info) = verdict.info {
         let ty_text = state.db.ty_text(&info.ty);
         let inst = info.is_instance;
-        let mut items = build_member_completions(state, info, true, &prefix);
+        let mut items = build_member_completions(state, info, true, &prefix, cursor_offset as u32);
         let mem = items.len();
         let postfix_items = build_postfix_completions(state, line, col);
         let post = postfix_items.len();
@@ -215,7 +215,7 @@ pub fn build_completion_response(
 
     if let Some(info) = receivers::pattern_receiver(state, line, col) {
         let ty_text = state.db.ty_text(&info.ty);
-        let items = build_member_completions(state, info, false, &prefix);
+        let items = build_member_completions(state, info, false, &prefix, cursor_offset as u32);
         let log = format!(
             "cmp {lc} trg={trig} pre={prefix:?} pattern ty={ty_text} items={} {}ms",
             items.len(),

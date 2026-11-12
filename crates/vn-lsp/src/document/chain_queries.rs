@@ -19,6 +19,8 @@ fn summary_from_resolution(
         is_async: false,
         is_generator: false,
         doc: None,
+        visibility: None,
+        owner: None,
     }
 }
 
@@ -49,6 +51,8 @@ fn summary_from_class_member(
         is_async: m.is_async,
         is_generator: m.is_generator,
         doc: m.doc.clone(),
+        visibility: None,
+        owner: None,
     }
 }
 
@@ -71,6 +75,8 @@ fn summary_of(
         is_async: false,
         is_generator: false,
         doc: None,
+        visibility: None,
+        owner: None,
     }
 }
 
