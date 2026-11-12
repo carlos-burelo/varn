@@ -8,8 +8,15 @@ use vn_types::{FunctionProto, PoolEntry};
 use crate::tiers::Tier;
 use crate::walk::constants_for_inspect;
 
+#[derive(Clone, Copy, Debug)]
+pub struct TierPolicy {
+    pub calls_with_loops: u32,
+    pub calls_without_loops: u32,
+}
+
 pub struct CompiledFunction {
     pub name: String,
+    pub runtime: String,
     pub tier: Tier,
     pub inspection: Option<ClifInspection>,
     lines: Vec<u32>,
@@ -42,21 +49,44 @@ impl CompiledFunction {
     }
 }
 
-pub fn collect(proto: &FunctionProto, helpers: &JitHelpers) -> Vec<CompiledFunction> {
+pub fn collect(
+    proto: &FunctionProto,
+    helpers: &JitHelpers,
+    policy: TierPolicy,
+) -> Vec<CompiledFunction> {
     let Ok(isa) = vn_jit::clif::shared_isa() else {
         return Vec::new();
     };
     let mut functions = Vec::new();
-    walk(proto, helpers, isa, &mut functions);
+    walk(proto, helpers, isa, policy, true, &mut functions);
     functions
+}
+
+fn runtime_note(proto: &FunctionProto, policy: TierPolicy, is_entry: bool) -> String {
+    let threshold = if proto.has_backedge() {
+        policy.calls_with_loops
+    } else {
+        policy.calls_without_loops
+    };
+    if is_entry && !proto.has_backedge() {
+        "the module body runs once and has no loop: the VM interprets it and never compiles it"
+            .to_owned()
+    } else if threshold <= 1 {
+        "the VM compiles it on its first call".to_owned()
+    } else {
+        format!("the VM compiles it after {threshold} calls")
+    }
 }
 
 fn walk(
     proto: &FunctionProto,
     helpers: &JitHelpers,
     isa: &vn_jit::OwnedTargetIsa,
+    policy: TierPolicy,
+    is_entry: bool,
     out: &mut Vec<CompiledFunction>,
 ) {
+    let runtime = runtime_note(proto, policy, is_entry);
     let name = proto.name.as_deref().unwrap_or("<module>").to_owned();
     let lines = (0..proto.chunk.code.len())
         .map(|offset| proto.chunk.lines.get_line(offset))
@@ -64,6 +94,7 @@ fn walk(
     if let Some(reason) = gate_reason(proto) {
         out.push(CompiledFunction {
             name,
+            runtime,
             tier: Tier::Gate(reason),
             inspection: None,
             lines,
@@ -77,6 +108,7 @@ fn walk(
         };
         out.push(CompiledFunction {
             name,
+            runtime,
             tier,
             inspection: Some(inspection),
             lines,
@@ -84,7 +116,7 @@ fn walk(
     }
     for entry in &proto.chunk.constants {
         if let PoolEntry::Function(function) = entry {
-            walk(function, helpers, isa, out);
+            walk(function, helpers, isa, policy, false, out);
         }
     }
 }
@@ -101,7 +133,7 @@ fn header(title: &str, functions: &[CompiledFunction]) -> String {
     )
 }
 
-pub fn render_machine_code(functions: &[CompiledFunction]) -> String {
+pub fn render_machine_code(functions: &[CompiledFunction], with_wrapper: bool) -> String {
     let mut out = header(
         &format!("Varn machine code made by Cranelift for {}", host()),
         functions,
@@ -112,11 +144,12 @@ pub fn render_machine_code(functions: &[CompiledFunction]) -> String {
             function.name,
             function.describe()
         ));
+        out.push_str(&format!("  ; at run time: {}\n", function.runtime));
         let Some(inspection) = &function.inspection else {
             continue;
         };
         if let Some(code) = &inspection.code {
-            render_code(function, inspection, code, &mut out);
+            render_code(function, inspection, code, with_wrapper, &mut out);
         }
     }
     out
@@ -126,6 +159,7 @@ fn render_code(
     function: &CompiledFunction,
     inspection: &ClifInspection,
     code: &CodeBytes,
+    with_wrapper: bool,
     out: &mut String,
 ) {
     for reason in &inspection.fa_reasons {
@@ -142,8 +176,10 @@ fn render_code(
         code.raw_off as u64,
         out,
     );
-    out.push_str("  ; entry wrapper, called by the VM\n");
-    push_instructions(function, &[], &code.bytes[entry..], entry as u64, out);
+    if with_wrapper {
+        out.push_str("  ; entry wrapper, called by the VM\n");
+        push_instructions(function, &[], &code.bytes[entry..], entry as u64, out);
+    }
 }
 
 fn push_instructions(
@@ -179,6 +215,7 @@ pub fn render_clif(functions: &[CompiledFunction]) -> String {
             function.name,
             function.describe()
         ));
+        out.push_str(&format!("  ; at run time: {}\n", function.runtime));
         let Some(ir) = function
             .inspection
             .as_ref()
