@@ -7,13 +7,11 @@ use crate::util::converters::to_completion_kind;
 
 pub fn build_scope_completions(
     state: &DocumentState,
-    line: u32,
-    col: u32,
+    cursor_offset: u32,
     prefix: &str,
 ) -> Vec<CompletionItem> {
     let mut items: Vec<CompletionItem> = Vec::new();
 
-    let cursor_offset = state.offset_at_line_col(line, col);
     let mut scope_id = state.db.scope_at_offset(cursor_offset);
 
     let mut seen_names = FxHashSet::default();
@@ -32,7 +30,7 @@ pub fn build_scope_completions(
                 SymbolKind::Var | SymbolKind::Let | SymbolKind::Const
             ) && sym.line != 0
                 && sym.line != u32::MAX
-                && (sym.line - 1, sym.col) > (line, col)
+                && sym.offset > cursor_offset
             {
                 continue;
             }

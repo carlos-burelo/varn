@@ -109,7 +109,7 @@ pub fn build_postfix_completions(
     if !typed.chars().all(|c| c.is_alphanumeric() || c == '_') {
         return Vec::new();
     }
-    let before_dot = prefix[..dot_pos].as_bytes();
+    let before_dot = &prefix.as_bytes()[..dot_pos];
     if before_dot.last().is_some_and(|b| matches!(b, b'.' | b'?')) {
         return Vec::new();
     }
@@ -127,11 +127,11 @@ pub fn build_postfix_completions(
     let replace_range = Range {
         start: Position {
             line,
-            character: expr_start_col as u32,
+            character: super::columns::utf16_column(&state.source, line, expr_start_col as u32),
         },
         end: Position {
             line,
-            character: col,
+            character: super::columns::utf16_column(&state.source, line, col),
         },
     };
 

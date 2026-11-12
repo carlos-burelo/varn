@@ -14,7 +14,8 @@ pub fn build_call_argument_completions(
         .position(|t| t.line > line || (t.line == line && t.col >= col))
         .unwrap_or(state.tokens.len());
 
-    current_idx = current_idx.saturating_sub(1);
+    let last = state.tokens.len().checked_sub(1)?;
+    current_idx = current_idx.saturating_sub(1).min(last);
 
     let mut balance = 0_i32;
     let mut lparen_idx = None;

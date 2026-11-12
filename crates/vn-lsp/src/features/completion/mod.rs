@@ -1,5 +1,6 @@
 mod autoimport;
 mod calls;
+mod columns;
 mod imports;
 mod keywords;
 mod lexical;
@@ -10,6 +11,7 @@ pub mod receivers;
 use rustc_hash::FxHashSet;
 pub mod reflection;
 pub(crate) mod scope;
+mod site;
 
 use std::time::Instant;
 use tower_lsp_f::lsp_types::{
@@ -21,6 +23,7 @@ use crate::document::{
     import_path_at, named_import_module_at, named_imported_names_at, DocumentState,
 };
 use crate::index::ProjectIndex;
+use vn_sem::semantic_info::ResolvedMemberKind;
 
 pub use imports::{
     build_import_completions, build_module_export_completions, resolve_relative_module_debug,
@@ -69,6 +72,8 @@ pub fn build_completion_response(
 ) -> (Option<CompletionResponse>, Option<String>) {
     let start = Instant::now();
     let ms = || start.elapsed().as_millis();
+    let col_utf16 = col;
+    let col = columns::byte_column(&state.source, line, col_utf16);
     let prefix = get_word_prefix(&state.source, line, col).unwrap_or_default();
     let trig = compact_trigger(trigger_char, &trigger_kind);
     let lc = format!("{}:{}", line + 1, col + 1);
@@ -92,11 +97,15 @@ pub fn build_completion_response(
                         range: Range {
                             start: Position {
                                 line,
-                                character: ctx.content_start_col,
+                                character: columns::utf16_column(
+                                    &state.source,
+                                    line,
+                                    ctx.content_start_col,
+                                ),
                             },
                             end: Position {
                                 line,
-                                character: col,
+                                character: col_utf16,
                             },
                         },
                         new_text: full_label,
@@ -141,7 +150,7 @@ pub fn build_completion_response(
         );
     }
 
-    let cursor_offset = state.offset_at_line_col(line, col) as usize;
+    let cursor_offset = state.offset_at_line_col(line, col_utf16) as usize;
     let context = lexical::lexical_context(&state.source, cursor_offset);
     if context != lexical::LexicalContext::Code {
         return (
@@ -170,7 +179,7 @@ pub fn build_completion_response(
         );
     }
 
-    let verdict = receivers::dot_receiver(state, line, col, trigger_char);
+    let verdict = receivers::dot_receiver(state, line, col_utf16, trigger_char);
     let dot_miss = verdict.info.is_none().then(|| {
         format!(
             "dotmiss={}({})",
@@ -227,9 +236,13 @@ pub fn build_completion_response(
         );
     }
 
-    if let Some(items) = calls::build_call_argument_completions(state, line, col) {
+    let named_arguments = calls::build_call_argument_completions(state, line, col);
+
+    let site = site::completion_site(state, cursor_offset as u32);
+    if let site::CompletionSite::ObjectKeys { type_name, present } = &site {
+        let items = object_key_completions(state, type_name, present);
         let log = format!(
-            "cmp {lc} trg={trig} pre={prefix:?} callargs items={} {}ms",
+            "cmp {lc} trg={trig} pre={prefix:?} object-keys type={type_name} items={} {}ms",
             items.len(),
             ms()
         );
@@ -239,8 +252,14 @@ pub fn build_completion_response(
         );
     }
 
-    let (mut items, scope_n) = build_completions(state, line, col);
-    let kw_n = items.len() - scope_n;
+    let (mut items, scope_n) = build_completions(state, line, col, cursor_offset as u32);
+    let (items_kept, scope_n) = restrict_to_site(items, scope_n, &site);
+    items = items_kept;
+    let named_n = named_arguments.as_ref().map_or(0, Vec::len);
+    if let Some(named) = named_arguments {
+        items.splice(0..0, named);
+    }
+    let kw_n = items.len() - scope_n - named_n;
 
     let mut auto_n = 0;
     if let Some(idx) = index
@@ -359,15 +378,92 @@ fn get_word_prefix(source: &str, line: u32, col: u32) -> Option<String> {
     }
 }
 
+fn keyword_contexts(label: &str) -> u8 {
+    keywords::KEYWORDS
+        .iter()
+        .find(|entry| entry.label == label)
+        .map_or(0, |entry| entry.contexts)
+}
+
+fn restrict_to_site(
+    items: Vec<CompletionItem>,
+    scope_n: usize,
+    site: &site::CompletionSite,
+) -> (Vec<CompletionItem>, usize) {
+    use site::CompletionSite as Site;
+    let (scope_kinds, keyword_mask): (Option<&[CompletionItemKind]>, u8) = match site {
+        Site::Statement => (None, keywords::STATEMENT | keywords::EXPRESSION),
+        Site::Expression | Site::ObjectKeys { .. } => (None, keywords::EXPRESSION),
+        Site::ClassBody => (Some(&[]), keywords::MEMBER),
+        Site::InterfaceBody => (Some(&[]), keywords::INTERFACE_MEMBER),
+        Site::EnumBody => (Some(&[]), 0),
+        Site::AfterExport => (Some(&[]), keywords::EXPORT),
+        Site::Type => (
+            Some(&[
+                CompletionItemKind::Class,
+                CompletionItemKind::Interface,
+                CompletionItemKind::Enum,
+                CompletionItemKind::TypeParameter,
+                CompletionItemKind::Module,
+            ]),
+            keywords::TYPE,
+        ),
+        Site::NewTarget | Site::ExtendsClass => (Some(&[CompletionItemKind::Class]), 0),
+        Site::ExtendsInterface | Site::Implements => (Some(&[CompletionItemKind::Interface]), 0),
+    };
+    let mut kept = Vec::with_capacity(items.len());
+    let mut kept_scope = 0;
+    for (index, item) in items.into_iter().enumerate() {
+        let is_scope = index < scope_n;
+        let keep = if is_scope {
+            scope_kinds.is_none_or(|kinds| item.kind.is_some_and(|kind| kinds.contains(&kind)))
+        } else {
+            keyword_contexts(&item.label) & keyword_mask != 0
+        };
+        if keep {
+            if is_scope {
+                kept_scope += 1;
+            }
+            kept.push(item);
+        }
+    }
+    (kept, kept_scope)
+}
+
+fn object_key_completions(
+    state: &DocumentState,
+    type_name: &str,
+    present: &[String],
+) -> Vec<CompletionItem> {
+    let ty = state.db.named_type(type_name);
+    state
+        .members_of_type(&ty)
+        .into_iter()
+        .filter(|m| !m.is_static)
+        .filter(|m| m.kind != ResolvedMemberKind::Constructor)
+        .filter(|m| !present.iter().any(|key| key.as_str() == m.name.as_ref()))
+        .map(|m| CompletionItem {
+            label: m.name.to_string(),
+            kind: Some(CompletionItemKind::Field),
+            detail: Some(state.ty_text(&m.ty)),
+            insert_text: Some(format!("{}: $0", m.name)),
+            insert_text_format: Some(InsertTextFormat::Snippet),
+            sort_text: Some(format!("0_{}", m.name)),
+            ..Default::default()
+        })
+        .collect()
+}
+
 pub fn build_completions(
     state: &DocumentState,
     line: u32,
     col: u32,
+    cursor_offset: u32,
 ) -> (Vec<CompletionItem>, usize) {
     let mut items: Vec<CompletionItem> = Vec::with_capacity(160);
 
     let prefix = get_word_prefix(&state.source, line, col).unwrap_or_default();
-    let scope_items = scope::build_scope_completions(state, line, col, &prefix);
+    let scope_items = scope::build_scope_completions(state, cursor_offset, &prefix);
     let scope_n = scope_items.len();
     items.extend(scope_items);
 
