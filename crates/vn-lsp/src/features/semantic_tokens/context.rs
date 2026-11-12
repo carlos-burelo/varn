@@ -15,6 +15,9 @@ pub struct TokenContext {
     pub function_type_parameter: bool,
     pub enum_member_declaration: bool,
     pub declared: Option<SymbolId>,
+    pub prev_is_colon_colon: bool,
+    pub pattern: Option<super::roles::PatternRole>,
+    pub member: Option<super::roles::MemberRole>,
 }
 
 impl TokenContext {
@@ -46,6 +49,9 @@ impl TokenContext {
             function_type_parameter: function_type_parameter(state, index),
             enum_member_declaration: declarations.is_enum_member(tok.offset),
             declared: declarations.symbol_at(tok.offset),
+            prev_is_colon_colon: prev == Some(TokenKind::ColonColon),
+            pattern: declarations.pattern_role(tok.offset),
+            member: declarations.member_role(tok.offset),
         }
     }
 }

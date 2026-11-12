@@ -15,6 +15,7 @@ pub struct DeclarationIndex {
     by_offset: FxHashMap<u32, SymbolId>,
     token_of: FxHashMap<SymbolId, usize>,
     enum_members: FxHashSet<u32>,
+    roles: super::roles::Roles,
 }
 
 impl DeclarationIndex {
@@ -35,7 +36,16 @@ impl DeclarationIndex {
             by_offset,
             token_of,
             enum_members: enum_member_offsets(state),
+            roles: super::roles::Roles::of(state),
         }
+    }
+
+    pub fn pattern_role(&self, offset: u32) -> Option<super::roles::PatternRole> {
+        self.roles.patterns.get(&offset).copied()
+    }
+
+    pub fn member_role(&self, offset: u32) -> Option<super::roles::MemberRole> {
+        self.roles.members.get(&offset).copied()
     }
 
     pub fn is_enum_member(&self, offset: u32) -> bool {
@@ -146,6 +156,14 @@ pub fn modifiers_of(
 
     let mut bits = 0;
     let declared = declarations.symbol_at(tok.offset);
+    if declared.is_none() {
+        if declarations.pattern_role(tok.offset) == Some(super::roles::PatternRole::Binding) {
+            return MOD_DECLARATION;
+        }
+        if declarations.member_role(tok.offset).is_some() {
+            return MOD_DECLARATION | declaration_modifiers(state, index);
+        }
+    }
     if declarations.is_enum_member(tok.offset) {
         return MOD_DECLARATION;
     }

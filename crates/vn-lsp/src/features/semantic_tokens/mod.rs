@@ -1,6 +1,7 @@
 mod classify;
 mod context;
 mod modifiers;
+mod roles;
 
 use once_cell::sync::Lazy;
 use tower_lsp_f::lsp_types::{SemanticTokenModifiers, SemanticTokenTypes, SemanticTokensLegend};

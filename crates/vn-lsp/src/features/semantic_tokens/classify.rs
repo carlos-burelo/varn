@@ -54,6 +54,24 @@ pub fn resolve_token(state: &DocumentState, tok: &TokenRecord, ctx: &TokenContex
         return Some(declared_tt(state, state.db.bind.arena.get(id)));
     }
 
+    if let Some(role) = ctx.pattern {
+        return Some(match role {
+            super::roles::PatternRole::Variant => TT_ENUM_MEMBER,
+            super::roles::PatternRole::Binding => TT_VARIABLE,
+        });
+    }
+
+    if let Some(role) = ctx.member {
+        return Some(match role {
+            super::roles::MemberRole::Method => TT_METHOD,
+            super::roles::MemberRole::Property => TT_PROPERTY,
+        });
+    }
+
+    if ctx.prev_is_colon_colon && tok.kind == Identifier {
+        return Some(TT_PROPERTY);
+    }
+
     if ctx.prev_is_at && tok.kind == Identifier {
         return Some(TT_DECORATOR);
     }

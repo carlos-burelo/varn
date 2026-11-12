@@ -163,7 +163,12 @@ fn test_root_scope_isolation_from_unreachable_type_parameters() {
         &test_resolver(),
     );
 
-    let (root_items, _) = vn_lsp::features::completion::build_completions(&state, 4, 0, state.offset_at_line_col(4, 0));
+    let (root_items, _) = vn_lsp::features::completion::build_completions(
+        &state,
+        4,
+        0,
+        state.offset_at_line_col(4, 0),
+    );
     let root_labels: Vec<&str> = root_items.iter().map(|i| i.label.as_str()).collect();
 
     assert!(
