@@ -6,6 +6,7 @@ mod keywords;
 mod lexical;
 pub mod members;
 pub mod postfix;
+pub mod probe;
 pub mod receiver_literals;
 pub mod receivers;
 use rustc_hash::FxHashSet;
@@ -33,14 +34,12 @@ pub use postfix::build_postfix_completions;
 pub use receivers::{dot_receiver, pattern_receiver, DotVerdict};
 pub use reflection::build_reflection_completions;
 
-const MEMBER_PLACEHOLDER: &str = "__vn_member__";
-
-pub fn source_with_member_placeholder(
+pub fn patched_source_for_member(
     state: &DocumentState,
     line: u32,
     col: u32,
     trigger_char: Option<&str>,
-) -> Option<String> {
+) -> Option<probe::ProbedSource> {
     let cursor = state.offset_at_line_col(line, col) as usize;
     let before = state.source.get(..cursor)?;
     let after = state.source.get(cursor..)?;
@@ -52,13 +51,23 @@ pub fn source_with_member_placeholder(
     if !ends_with_access || continues_word {
         return None;
     }
-    if receivers::dot_receiver(state, line, col, trigger_char)
-        .info
-        .is_some()
+    let verdict = receivers::dot_receiver(state, line, col, trigger_char);
+    if let Some(info) = &verdict.info
+        && (!info.is_instance || !matches!(verdict.stage, "spatial" | "scope"))
     {
         return None;
     }
-    Some(format!("{before}{MEMBER_PLACEHOLDER}{after}"))
+    if let Some(probed) = probe::probed_source(state, cursor as u32) {
+        return Some(probed);
+    }
+    if verdict.info.is_some() {
+        return None;
+    }
+    Some(probe::ProbedSource {
+        text: format!("{before}{}{after}", probe::MEMBER_PLACEHOLDER),
+        line,
+        character: col,
+    })
 }
 
 pub fn build_completion_response(
