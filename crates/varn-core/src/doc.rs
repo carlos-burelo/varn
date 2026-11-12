@@ -143,7 +143,7 @@ impl DocComment {
         }
 
         if let Some(ex) = &self.example {
-            out.push_str("**Example**\n\n```Varn\n");
+            out.push_str("**Example**\n\n```vn\n");
             out.push_str(ex.trim());
             out.push_str("\n```\n\n");
         }

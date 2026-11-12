@@ -230,8 +230,7 @@ fn hover_text(h: &tower_lsp_f::lsp_types::Hover) -> String {
 }
 
 fn one_line(s: &str, n: usize) -> String {
-    s.replace("```varn\n", "")
-        .replace("```Varn\n", "")
+    s.replace("```vn\n", "")
         .replace('\n', " ")
         .chars()
         .take(n)

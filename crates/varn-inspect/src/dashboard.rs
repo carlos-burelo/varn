@@ -52,8 +52,7 @@ pub fn debug_lsp(session: &varn_pipeline::Session, path: &str, source: &str, fla
             {
                 let content = if let Contents::MarkupContent(m) = hover.contents {
                     m.value
-                        .replace("```varn\n", "")
-                        .replace("```Varn\n", "")
+                        .replace("```vn\n", "")
                         .replace("\n```", "")
                         .replace("```", "")
                 } else {
