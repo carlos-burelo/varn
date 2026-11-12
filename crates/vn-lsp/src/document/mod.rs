@@ -147,10 +147,7 @@ impl DocumentState {
         self.members_of_type(&ty)
     }
 
-    pub fn members_of_type(
-        &self,
-        ty: &Type,
-    ) -> Vec<vn_sem::semantic_info::ResolvedMemberSummary> {
+    pub fn members_of_type(&self, ty: &Type) -> Vec<vn_sem::semantic_info::ResolvedMemberSummary> {
         vn_checker::get_members_of_type(
             self.resolver.as_ref(),
             ty,
@@ -192,6 +189,11 @@ impl DocumentState {
 
     pub fn expr_entry_at_offset(&self, offset: u32) -> Option<&vn_sem::output::TypeEntry> {
         let ast_id = self.spatial_index.innermost_at(offset)?;
+        self.db.expr_table.get(&ast_id)
+    }
+
+    pub fn expr_entry_ending_at(&self, end: u32) -> Option<&vn_sem::output::TypeEntry> {
+        let ast_id = self.spatial_index.innermost_ending_at(end)?;
         self.db.expr_table.get(&ast_id)
     }
 

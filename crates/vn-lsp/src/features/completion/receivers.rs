@@ -132,6 +132,11 @@ pub fn dot_receiver(
         );
     }
 
+    if let Some(entry) = state.expr_entry_ending_at(before.end) {
+        let is_instance = !receiver_is_type_name(state, before);
+        return hit(state, "ending", before, entry.ty, is_instance);
+    }
+
     if let Some((_, ty)) = state.db.resolve_at(state.lexeme(before), before.offset) {
         return hit(
             state,

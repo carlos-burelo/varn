@@ -63,6 +63,14 @@ impl SpatialIndex {
         best.map(|(_, id)| id)
     }
 
+    pub fn innermost_ending_at(&self, end: u32) -> Option<AstId> {
+        self.entries
+            .iter()
+            .filter(|entry| entry.end == end)
+            .min_by_key(|entry| entry.end.saturating_sub(entry.start))
+            .map(|entry| entry.expr.index())
+    }
+
     pub fn exprs(&self) -> impl Iterator<Item = ExprId> + '_ {
         self.entries.iter().map(|e| e.expr)
     }
