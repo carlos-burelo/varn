@@ -125,7 +125,7 @@ pub fn generate_interface_impl_action(
             )];
 
             return Some(CodeActionResponse::CodeAction(CodeAction {
-                title: format!("💡 Implement missing members of interface '{}'", iface_name),
+                title: format!("Implement missing members of interface '{}'", iface_name),
                 kind: Some(CodeActionKind::QuickFix),
                 diagnostics: None,
                 edit: Some(crate::features::workspace_edit::doc_edits(doc_edits)),

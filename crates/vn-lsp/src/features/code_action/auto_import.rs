@@ -101,7 +101,7 @@ fn create_import_action(
     };
 
     Some(CodeActionResponse::CodeAction(CodeAction {
-        title: format!("💡 Import {{ {sym_name} }} from \"{module}\""),
+        title: format!("Import {{ {sym_name} }} from \"{module}\""),
         kind: Some(CodeActionKind::QuickFix),
         diagnostics: Some(vec![diag.clone()]),
         edit: Some(crate::features::workspace_edit::doc_edits(vec![(

@@ -57,7 +57,7 @@ pub fn generate_match_arms_action(
     )];
 
     Some(CodeActionResponse::CodeAction(CodeAction {
-        title: format!("💡 Fill missing match arms ({})", gap.missing.join(", ")),
+        title: format!("Fill missing match arms ({})", gap.missing.join(", ")),
         kind: Some(CodeActionKind::QuickFix),
         diagnostics: None,
         edit: Some(crate::features::workspace_edit::doc_edits(doc_edits)),

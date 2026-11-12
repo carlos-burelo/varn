@@ -25,7 +25,7 @@ pub fn build_code_lenses(
             },
         },
         command: Some(Command {
-            title: "▶ Run File".to_string(),
+            title: "Run File".to_string(),
             tooltip: None,
             command: "vn.runFile".to_string(),
             arguments: Some(vec![uri_arg()]),
@@ -45,7 +45,7 @@ pub fn build_code_lenses(
             },
         },
         command: Some(Command {
-            title: "🔍 View Bytecode".to_string(),
+            title: "View Bytecode".to_string(),
             tooltip: None,
             command: "vn.showBytecode".to_string(),
             arguments: Some(vec![uri_arg()]),
@@ -65,7 +65,7 @@ pub fn build_code_lenses(
             },
         },
         command: Some(Command {
-            title: "🔍 View SSA".to_string(),
+            title: "View SSA".to_string(),
             tooltip: None,
             command: "vn.showSSA".to_string(),
             arguments: Some(vec![uri_arg()]),
@@ -77,7 +77,7 @@ pub fn build_code_lenses(
         lenses.push(CodeLens {
             range,
             command: Some(Command {
-                title: "▶ Run as Entry".to_string(),
+                title: "Run as Entry".to_string(),
                 tooltip: None,
                 command: "vn.runMain".to_string(),
                 arguments: Some(vec![uri_arg()]),
@@ -119,7 +119,7 @@ pub fn build_code_lenses(
             lenses.push(CodeLens {
                 range: sym_range,
                 command: Some(Command {
-                    title: "▶ Run Test".to_string(),
+                    title: "Run Test".to_string(),
                     tooltip: None,
                     command: "vn.runTest".to_string(),
                     arguments: Some(vec![
