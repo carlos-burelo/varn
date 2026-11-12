@@ -179,7 +179,7 @@ impl super::Scanner<'_> {
 
         while !self.is_eof() {
             let c = self.peek(0);
-            if c.is_ascii_lowercase() {
+            if c.is_ascii_alphanumeric() || c == b'_' {
                 self.cur_col += 1;
                 self.pos += 1;
             } else {

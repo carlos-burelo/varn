@@ -80,7 +80,7 @@ impl super::Scanner<'_> {
                     continue;
                 }
 
-                if self.can_start_regex() && next != b'=' {
+                if self.can_start_regex() {
                     self.scan_regex(&mut tokens, &mut lexemes);
                 } else {
                     self.scan_operator(&mut tokens, &mut lexemes);

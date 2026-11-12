@@ -18,6 +18,7 @@ pub const CLASS: &str = "Regex";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PatternError {
     UnknownFlag(char),
+    RepeatedFlag(char),
     Invalid(String),
 }
 
@@ -28,6 +29,7 @@ impl fmt::Display for PatternError {
                 f,
                 "unknown regex flag '{flag}': the flags are i, m, s and x; matching is always global"
             ),
+            Self::RepeatedFlag(flag) => write!(f, "repeated regex flag '{flag}': each flag is written once"),
             Self::Invalid(why) => write!(f, "Invalid regex pattern: {why}"),
         }
     }
@@ -36,6 +38,13 @@ impl fmt::Display for PatternError {
 pub fn compile(pattern: &str, flags: &str) -> Result<regex::Regex, PatternError> {
     if let Some(bad) = flags.chars().find(|c| !FLAGS.contains(c)) {
         return Err(PatternError::UnknownFlag(bad));
+    }
+    if let Some(repeated) = flags
+        .char_indices()
+        .find(|(at, c)| flags[..*at].contains(*c))
+        .map(|(_, c)| c)
+    {
+        return Err(PatternError::RepeatedFlag(repeated));
     }
     regex::RegexBuilder::new(pattern)
         .case_insensitive(flags.contains(CASE_INSENSITIVE))

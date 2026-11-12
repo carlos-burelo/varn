@@ -1,0 +1,2 @@
+// expect: error[VN2021]
+const repeated = /a/ii

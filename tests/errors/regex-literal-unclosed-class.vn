@@ -1,0 +1,2 @@
+// expect: error[VN1005]
+const open = /[a-z

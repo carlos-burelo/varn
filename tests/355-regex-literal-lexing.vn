@@ -1,0 +1,173 @@
+import { describe, it, expect } from "std:test";
+
+function first(text: str): str {
+    return /\w+/.exec(text)!.match;
+}
+
+function early(text: str): bool {
+    return /^ok/.test(text);
+}
+
+function arrow(): Regex {
+    return /arrow/;
+}
+
+const ratio = 12 / 4 / 3;
+const parts = [8, 2];
+const quotient = parts[0] / parts[1];
+const grouped = (9) / 3;
+let counter = 10;
+counter++;
+const afterPostfix = counter / 11;
+
+await describe("355 regex literal lexing", async () => {
+    await it("a literal starts an expression after every operator that expects a value", async () => {
+        const a = [/x/, /y/];
+        expect(a.length).toBe(2);
+        const o = { re: /z/ };
+        expect(o.re.test("z")).toBe(true);
+        const negated = !/q/.test("a");
+        expect(negated).toBe(true);
+        const both = /a/.test("a") && /b/.test("b");
+        expect(both).toBe(true);
+        const either = /a/.test("z") || /b/.test("b");
+        expect(either).toBe(true);
+        const chosen = counter > 0 ? /yes/ : /no/;
+        expect(chosen.pattern).toBe("yes");
+    });
+
+    await it("a literal is a value after return, an arrow and a call argument", async () => {
+        expect(early("ok then")).toBe(true);
+        expect(early("no")).toBe(false);
+        expect(arrow().pattern).toBe("arrow");
+        const make = (): Regex => /made/;
+        expect(make().pattern).toBe("made");
+        expect([1, 2].map((n: int) => /\d/.test(`${n}`)).length).toBe(2);
+        expect(first("  word again")).toBe("word");
+    });
+
+    await it("a slash after a value is a division, a postfix, a call or an index", async () => {
+        expect(ratio).toBe(1);
+        expect(quotient).toBe(4);
+        expect(grouped).toBe(3);
+        expect(afterPostfix).toBe(1);
+        const items = [6];
+        expect(items[0] / 2).toBe(3);
+        expect(items.length / 1).toBe(1);
+    });
+
+    await it("a compound division assignment is not a literal", async () => {
+        let n = 20;
+        n /= 4;
+        expect(n).toBe(5);
+        n /= 5;
+        expect(n).toBe(1);
+        expect(/=/.test("a=b")).toBe(true);
+    });
+
+    await it("a literal may hold slashes in a class, an escape or a comment-like text", async () => {
+        expect(/[/]/.test("/")).toBe(true);
+        expect(/[//]/.test("/")).toBe(true);
+        expect(/a\/\/b/.test("a//b")).toBe(true);
+        expect(/https?:\/\/x/.test("http://x")).toBe(true);
+        expect(/\/\*.*\*\//.test("/* c */")).toBe(true);
+    });
+
+    await it("a comment after a literal is a comment", async () => {
+        const re = /trail/; // not part of the pattern
+        expect(re.pattern).toBe("trail");
+        const re2 = /block/; /* also a comment */
+        expect(re2.pattern).toBe("block");
+    });
+
+    await it("a literal inside a template expression", async () => {
+        expect(`${/a+/.exec("caab")!.match}`).toBe("aa");
+        expect(`n=${"a1b".replace(/\d/, "#")}`).toBe("n=a#b");
+    });
+
+    await it("the pattern keeps its escapes exactly as written", async () => {
+        expect(/\d+\.\d*/.pattern).toBe("\\d+\\.\\d*");
+        expect(/\\/.pattern).toBe("\\\\");
+        expect(/\n/.pattern).toBe("\\n");
+        expect(/[\]]/.pattern).toBe("[\\]]");
+    });
+
+    await it("flags are kept in the order written and apply together", async () => {
+        const re = /^a.b$/ims;
+        expect(re.flags).toBe("ims");
+        expect(re.test("A\nB")).toBe(true);
+        expect(/a/.flags).toBe("");
+        expect(/a/i.flags).toBe("i");
+    });
+
+    await it("a literal supports the usual regular expression features", async () => {
+        expect(/colou?r/.test("color")).toBe(true);
+        expect(/a{2,3}/.exec("caaaa")!.match).toBe("aaa");
+        expect(/a+?/.exec("aaa")!.match).toBe("a");
+        expect(/(?:ab)+/.exec("ababx")!.match).toBe("abab");
+        expect(/\bcat\b/.test("a cat sat")).toBe(true);
+        expect(/\bcat\b/.test("concatenate")).toBe(false);
+        expect(/[a-c]+/.exec("xxabcabcx")!.match).toBe("abcabc");
+        expect(/[^0-9]+/.exec("12ab34")!.match).toBe("ab");
+        expect(/^$/.test("")).toBe(true);
+    });
+
+    await it("groups are indexed from zero in the order of their opening parenthesis", async () => {
+        const m = /((a)(b))(c)/.exec("abc")!;
+        expect(m.groups[0]).toBe("ab");
+        expect(m.groups[1]).toBe("a");
+        expect(m.groups[2]).toBe("b");
+        expect(m.groups[3]).toBe("c");
+    });
+
+    await it("an empty match and no match are told apart", async () => {
+        expect(/a*/.exec("b")!.match).toBe("");
+        expect(/a/.exec("b")).toBe(null);
+        expect(/z/.findAll("abc").length).toBe(0);
+    });
+
+    await it("findAll returns every non overlapping match in order", async () => {
+        const all = /\d+/.findAll("a1 b22 c333");
+        expect(all.length).toBe(3);
+        expect(all[0].match).toBe("1");
+        expect(all[1].match).toBe("22");
+        expect(all[2].match).toBe("333");
+        expect(all[2].index).toBe(8);
+    });
+
+    await it("a literal inside a function default and a class field", async () => {
+        class Holder {
+            pattern: Regex = /held/;
+            check(text: str): bool {
+                return this.pattern.test(text);
+            }
+        }
+        const h = new Holder();
+        expect(h.check("is held")).toBe(true);
+        expect(h.check("nope")).toBe(false);
+    });
+
+    await it("a literal can be chained on directly", async () => {
+        expect(/a/.pattern.length).toBe(1);
+        expect(/(\w+)@(\w+)/.exec("me@host")!.groups[1]).toBe("host");
+        expect("a-b".split(/-/).length).toBe(2);
+    });
+
+    await it("matching is case sensitive unless the flag is given", async () => {
+        expect(/abc/.test("ABC")).toBe(false);
+        expect(/abc/i.test("ABC")).toBe(true);
+        expect(/[a-z]+/i.exec("123XyZ")!.match).toBe("XyZ");
+    });
+
+    await it("multiline anchors move to every line while the default does not", async () => {
+        expect(/^b/.test("a\nb")).toBe(false);
+        expect(/^b/m.test("a\nb")).toBe(true);
+        expect(/a$/.test("a\nb")).toBe(false);
+        expect(/a$/m.test("a\nb")).toBe(true);
+    });
+
+    await it("the dot does not cross a newline unless the s flag is given", async () => {
+        expect(/a.b/.test("a\nb")).toBe(false);
+        expect(/a.b/s.test("a\nb")).toBe(true);
+    });
+});
