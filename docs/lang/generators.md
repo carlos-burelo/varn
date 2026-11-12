@@ -8,7 +8,7 @@
 
 Una función marcada con `*` es un **generador**: cada vez que se llama a `.next()`, la ejecución avanza hasta el siguiente `yield` y se detiene, devolviendo `{ value, done }`.
 
-```varn
+```vn
 function* range_gen(start: int, end: int) {
     let i = start
     while (i < end) {
@@ -33,7 +33,7 @@ assertTrue("gen done",    gend.done)   // value es null cuando done === true
 
 ## 2. Generadores Infinitos
 
-```varn
+```vn
 function* fib_gen() {
     let a = 0
     let b = 1
@@ -62,7 +62,7 @@ assertTrue("fib gen [7]", fibs[7] === 13)
 
 Los generadores pueden hacer `yield` de cualquier tipo de heap: strings, arrays, objetos, otros generadores.
 
-```varn
+```vn
 function* yieldsStrings() {
     yield "a string"
 }
@@ -86,7 +86,7 @@ assertTrue("yielded object", obj.a === 1 && obj.b === 2)
 
 ## 4. Generadores que Acceden a Estado Global
 
-```varn
+```vn
 let moduleCounter = 0
 function bumpCounter(): int {
     moduleCounter = moduleCounter + 1
@@ -108,7 +108,7 @@ assertTrue("gen sees module state, second", counted.next().value === 2)
 
 El valor del `return` final es accesible en el último `next()` con `done === true`:
 
-```varn
+```vn
 function* returnsAHeapValue() {
     yield [1]
     return [9, 9]
@@ -124,7 +124,7 @@ assertTrue("returned heap value", finalResult.done && finalResult.value[0] === 9
 
 ## 6. Generadores Anidados (Yield de Generadores)
 
-```varn
+```vn
 function* inner() {
     yield 41
 }
@@ -140,7 +140,7 @@ assertTrue("generator yields a generator", nested.next().value === 41)
 
 ## 7. Generadores en `for...of`
 
-```varn
+```vn
 const gen = range_gen(0, 5)
 // Consumo manual:
 gen.next()   // { value: 0, done: false }
@@ -158,7 +158,7 @@ for (let i = 0; i < 8; i = i + 1) {
 
 Combinan `async`/`await` con `yield` para producir valores de forma asíncrona.
 
-```varn
+```vn
 async function tenTimes(n: int): int {
     return n * 10
 }
@@ -179,7 +179,7 @@ assertTrue("async gen done",   manual.next().done)
 
 ### `await` entre yields
 
-```varn
+```vn
 async function* awaitsBetweenYields() {
     const first = await tenTimes(4)    // 40
     yield first
@@ -194,7 +194,7 @@ assertTrue("await between yields",     between.next().value === 50)
 
 ### Heap values desde async generators
 
-```varn
+```vn
 async function* yieldsHeapValues() {
     yield [await tenTimes(1), await tenTimes(2)]   // [10, 20]
 }
@@ -204,7 +204,7 @@ assertTrue("async gen heap value", heaps.length === 2 && heaps[1] === 20)
 
 ### `for await` sobre async generators
 
-```varn
+```vn
 let total = 0
 for await (const v of awaitsThenYields()) {
     total = total + v
@@ -221,7 +221,7 @@ assertTrue("plain for over async gen", plain === 60)
 
 ### Manejo de errores dentro de async generators
 
-```varn
+```vn
 async function* catchesItsOwnRejection() {
     try {
         await failing()
@@ -235,7 +235,7 @@ assertTrue("async gen catches rejection", catchesItsOwnRejection().next().value 
 
 ### `await` de suspensiones reales
 
-```varn
+```vn
 async function* awaitsSleep() {
     await sleep(1)
     yield 7

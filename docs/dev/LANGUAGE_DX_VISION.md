@@ -22,7 +22,7 @@ antes de implementarla.
 
 ### Guardas en `match`
 
-```varn
+```vn
 const clasificacion = match (numero) {
     n if n < 0 => "Negativo",
     n if n % 2 === 0 => "Par",
@@ -32,7 +32,7 @@ const clasificacion = match (numero) {
 
 ### Type guards
 
-```varn
+```vn
 function esCadena(v: dynamic): v is str {
     return typeof v === "str"
 }
@@ -40,7 +40,7 @@ function esCadena(v: dynamic): v is str {
 
 ### Constructores primarios
 
-```varn
+```vn
 class Usuario(public nombre: str, public edad: int, private rol: str = "guest") {}
 ```
 
@@ -48,7 +48,7 @@ class Usuario(public nombre: str, public edad: int, private rol: str = "guest") 
 
 Que `|>` espere implícitamente cada etapa `async`:
 
-```varn
+```vn
 const datos = await url
     |> http.get(_)
     |> json.parse(_)

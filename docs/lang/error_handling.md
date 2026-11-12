@@ -2,7 +2,7 @@
 
 ## 1. `throw` + `try/catch/finally`
 
-```varn
+```vn
 function safeDivide(a: int, b: int): float {
     try {
         if (b === 0) throw new RangeError("division by zero");
@@ -22,7 +22,7 @@ function withFinally(): int {
 
 `tests/11-errors.vn`. `finally` corre aunque haya `return`. Captura básica:
 
-```varn
+```vn
 try {
     throw new TypeError("bad type");
 } catch (e) {
@@ -34,7 +34,7 @@ try {
 
 ## 2. `try` prefijo (operador, no bloque)
 
-```varn
+```vn
 let x: int = try parse_positive(a);
 let y: int = try parse_positive(b);
 return Result.Ok(x + y);
@@ -44,7 +44,7 @@ return Result.Ok(x + y);
 
 ## 3. Multi-catch tipado
 
-```varn
+```vn
 } catch (e: TypeError) {
     return `caught TypeError: ${e.message}`;
 } catch (e: RangeError) {

@@ -17,7 +17,7 @@ no alocar). Las clases de usuario ni siquiera pueden declarar
 `value` un `dynamic` y reintroduce dispatch por nombre (§34).
 
 ## Decisión
-```varn
+```vn
 interface Iterable<T> { iter(): Iterator<T> }
 interface Iterator<T> { next(): Option<T> }
 ```

@@ -8,7 +8,7 @@
 
 ### Forma estándar
 
-```varn
+```vn
 class Animal {                         // tests/12-classes.vn
     name: str
     constructor(n: str) { this.name = n }
@@ -19,7 +19,7 @@ class Animal {                         // tests/12-classes.vn
 
 ### Clases con visibilidad de campos
 
-```varn
+```vn
 class Temperature {                    // tests/12-classes.vn
     private _celsius: float
     constructor(c: float) { this._celsius = c }
@@ -41,7 +41,7 @@ assertTrue("setter works",      t.celsius === 0.0)
 
 ### Estilo C#/Kotlin: parámetros en la declaración de clase
 
-```varn
+```vn
 class User(public id: int, public name: str, private role: str = "guest") {
     greet(): str {
         return `User #${this.id}: ${this.name} [${this.role}]`
@@ -59,7 +59,7 @@ let u2 = new User(2, "Bob")   // usa el default "guest"
 assertTrue("default role", u2.getRole() === "guest")
 ```
 
-```varn
+```vn
 class Point(x: int, y: int) {    // sin modificador de acceso: campos públicos
     sum(): int { return this.x + this.y }
 }
@@ -69,7 +69,7 @@ assertTrue("sum", pt.sum() === 35)
 
 ### Estilo TypeScript: parámetros con modificadores en el constructor
 
-```varn
+```vn
 class Hero {
     constructor(public id: int, public name: str, private power: float = 95.5) {}
     getPower(): float { return this.power }
@@ -85,7 +85,7 @@ assertTrue("power", h.getPower() === 95.5)
 
 ## 3. Herencia
 
-```varn
+```vn
 class Dog extends Animal {             // tests/12-classes.vn
     constructor(n: str) { super(n) }
     override speak() { return "Woof" }
@@ -110,7 +110,7 @@ assertTrue("instanceof Animal",    pd instanceof Animal)
 
 ## 4. Clases Abstractas
 
-```varn
+```vn
 abstract class Shape {               // tests/12-classes.vn
     abstract area(): float
     describe(): str { return `shape with area ${this.area()}` }
@@ -136,7 +136,7 @@ assertTrue("abstract describe", circ.describe().startsWith("shape with area"))
 
 ## 5. Métodos y Campos Estáticos
 
-```varn
+```vn
 class IdGen {                         // tests/12-classes.vn
     private static _next: int = 1
     static next(): int {
@@ -157,7 +157,7 @@ assertTrue("static reset",    IdGen.next() === 1)
 
 ## 6. Clases Genéricas
 
-```varn
+```vn
 class Box<T> {                        // tests/14-generics.vn
     value: T
     constructor(v: T) { this.value = v }
@@ -178,7 +178,7 @@ class Node<T> {                       // tests/23-objects.vn
 
 Las extensiones añaden métodos a un tipo existente sin modificar su definición original.
 
-```varn
+```vn
 extension StringUtils on str {         // tests/25-extensions.vn
     shout(): str { return this + "!" }
     times(n: int): str {
@@ -196,7 +196,7 @@ assertTrue("str times", "ab".times(3) === "ababab")
 
 Extensiones con `get`/`set` (NO-VERIFICADO: sin cita en `tests/*.vn`):
 
-```varn
+```vn
 extension SlotAccessor on Slot {
     get label(): str { return "Slot(" + this.value + ")" }
     set label(s: str) { this.value = s.length }
@@ -206,7 +206,7 @@ assertTrue("slot getter", slot.label === "Slot(5)")
 
 Extensiones sobre primitivos:
 
-```varn
+```vn
 extension IntUtils on int {
     isEven(): bool { return this % 2 === 0 }
     clamp(lo: int, hi: int): int {
@@ -221,7 +221,7 @@ assertTrue("int clamp",  (2).clamp(5, 10) === 5)
 
 Extensiones sobre clases propias:
 
-```varn
+```vn
 extension PointOps on Point {          // tests/28-extensions-comprehensive.vn
     distanceTo(other: Point): float {
         let dx: float = this.x - other.x
@@ -246,7 +246,7 @@ Los decoradores son funciones aplicadas a clases o métodos en tiempo de declara
 
 ### Decoradores de clase
 
-```varn
+```vn
 import { ClassRef, FunctionRef } from "std:reflect"   // tests/27-decorators.vn
 // los bloques siguientes de esta sección reutilizan este import
 
@@ -263,7 +263,7 @@ assertTrue("class deco name",   deco_log[0] === "DecoratedA")
 
 ### Decoradores con argumentos
 
-```varn
+```vn
 function markDeco(label: str) {
     return (cls: ClassRef) => {
         deco_log.push(label + ":" + cls.name)
@@ -279,7 +279,7 @@ assertTrue("outer second", deco_log[2] === "outer:DecoratedB")
 
 ### Metadatos con `MetaKey`
 
-```varn
+```vn
 const RouteKey = MetaKey.create<str>()
 function routeDeco(path: str) {
     return (cls: ClassRef) => { RouteKey.set(cls, path) }
@@ -296,7 +296,7 @@ assertTrue("meta route", RouteKey.get(ItemController) === "/api/items")
 Los contextos (`MethodContext`, `GetterContext`, `SetterContext`,
 `ConstructorContext`, `PropertyContext`) son globales: no se importan.
 
-```varn
+```vn
 function logMethod(fn: FunctionRef, ctx: MethodContext): FunctionRef {
     const name = ctx.name
     return (...args: int[]) => {
@@ -314,7 +314,7 @@ assertTrue("method deco result", (new DecoratedCalc()).mul(3, 5) === 15)
 
 ### Decoradores de accessors y propiedades
 
-```varn
+```vn
 function watchGet(fn: FunctionRef, ctx: GetterContext): FunctionRef {
     return (...args: dynamic[]) => {
         getter_log.push(ctx.name + ":" + ctx.kind)
@@ -350,7 +350,7 @@ Clona un objeto o instancia de clase sobreescribiendo solo los campos especifica
 
 ### En instancias de clase
 
-```varn
+```vn
 class User(public id: int, public name: str, public role: str = "guest") {}
 // tests/89-raw-strings-and-with-expressions.vn
 
@@ -365,7 +365,7 @@ assertTrue("u1 inmutable", u1.name === "Alice")
 
 ### En objetos planos
 
-```varn
+```vn
 let baseConfig = { host: "localhost", port: 3000, debug: true }
 let prodConfig = baseConfig with { port: 8080, debug: false }
 
@@ -376,7 +376,7 @@ assertTrue("baseConfig intacto", baseConfig.port === 3000)
 
 ### Cadenas de `with`
 
-```varn
+```vn
 class ServerNode(public host: str, public port: int, public isMaster: bool = false) {}
 
 let node1 = new ServerNode("10.0.0.1", 5000, false)
@@ -392,7 +392,7 @@ assertTrue("node3 isMaster", node3.isMaster === true)
 
 ## 10. Errores y Excepciones Personalizadas
 
-```varn
+```vn
 class ValidationError extends Error {   // tests/11-errors.vn
     field: str
     constructor(field: str, msg: str) {
@@ -418,7 +418,7 @@ try {
 
 ## 11. Patrón Builder (Método Chaining)
 
-```varn
+```vn
 class Builder {                       // tests/23-objects.vn
     private parts: str[]
     constructor() { this.parts = [] }
@@ -438,7 +438,7 @@ assertTrue("builder pattern", result === "hello from builder")
 
 `struct` es un tipo valor nominal: una clase restringida cuyos campos, en orden, son su constructor.
 
-```varn
+```vn
 // tests/334-struct.vn
 struct Point {
     x: int;

@@ -8,7 +8,7 @@
 
 Ver [`lexical.md`](lexical.md) para la especificación completa de literales.
 
-```varn
+```vn
 42          // int
 3.14        // float
 1.5d        // decimal
@@ -24,7 +24,7 @@ null        // null
 
 ## 2. Variables
 
-```varn
+```vn
 let x = 42          // mutable
 const y = "hello"   // inmutable (alias: const)
 // `var` no existe: el compilador lo rechaza (VN2002)
@@ -60,7 +60,7 @@ const explicit: str = "world"
 | 16 | `\|>` (pipeline) |
 | 17 | `=`, `??=` |
 
-```varn
+```vn
 assertTrue("precedence *+",    2 + 3 * 4 === 14)    // tests/01-arithmetic.vn
 assertTrue("precedence parens",(2 + 3) * 4 === 20)
 ```
@@ -69,7 +69,7 @@ assertTrue("precedence parens",(2 + 3) * 4 === 20)
 
 ## 4. Literals de Array
 
-```varn
+```vn
 const nums = [3, 1, 4, 1, 5, 9]     // tests/05-arrays.vn
 const spread = [...[1, 2], ...[3, 4]]   // spread
 let explicitGeneric: Array<int> = [10, 20, 30]
@@ -86,7 +86,7 @@ let sliceInc = nums[1..=4]
 
 ## 5. Literals de Objeto
 
-```varn
+```vn
 const obj1 = { a: 1, b: 2, c: 3 }    // tests/06-destructuring.vn
 const base = { x: 1, y: 2 }
 const ext  = { ...base, z: 3 }        // spread en objeto
@@ -96,7 +96,7 @@ const ext  = { ...base, z: 3 }        // spread en objeto
 
 ## 6. Tuplas y Structs (Inmutables)
 
-```varn
+```vn
 struct Release { name: str; v: int }
 let t = (1, "hello", true)       // Tuple  (tests/69-tuples-structs.vn)
 let r = new Release("Varn", 1)   // Struct
@@ -112,7 +112,7 @@ assertTrue("struct eq", r == r2)
 
 ## 7. Llamadas a Funciones y Métodos
 
-```varn
+```vn
 // Positional
 assertTrue("int add", 1 + 2 === 3)
 identity<int>(42)        // con parámetro de tipo explícito
@@ -132,7 +132,7 @@ new Builder().add("hello").add("world").build()
 
 ### De objetos
 
-```varn
+```vn
 const obj1 = { a: 1, b: 2, c: 3 }
 const { a, b } = obj1                         // extracción directa
 const { a: renamed } = obj1                   // renombrado
@@ -142,7 +142,7 @@ const { point: { x: nx, y: ny } } = nested    // nested destructuring
 
 ### De arrays
 
-```varn
+```vn
 const [f1, f2, f3] = [10, 20, 30]
 const [skip1, _, skip3] = [100, 200, 300]    // _ descarta elemento
 const [head, ...tail] = [1, 2, 3, 4]         // rest
@@ -151,7 +151,7 @@ const { coords: [cx, cy] } = { coords: [5, 6] }  // array en objeto
 
 ### De tuplas
 
-```varn
+```vn
 const (code, label) = (200, "OK")            // los paréntesis desestructuran una tupla
 const [a, b] = (1, 2)                         // error VN3001: una tupla se desestructura con (a, b)
 ```
@@ -162,7 +162,7 @@ El lado izquierdo de `=` puede ser un literal de array, tupla u objeto cuyas hoj
 miembros o índices ya declarados (`tests/337-destructuring-assignment.vn`). El lado derecho se evalúa
 una sola vez y el valor de la expresión es ese lado derecho.
 
-```varn
+```vn
 let a = 1
 let b = 2
 ;(a, b) = (b, a)                              // intercambio
@@ -179,7 +179,7 @@ Las reglas son las de la declaración: `(a, b)` exige una tupla de esa aridad (`
 
 ## 9. Closures y Lambdas
 
-```varn
+```vn
 // Lambda expresión
 const double = (n: int) => n * 2
 const inc    = (n: int) => n + 1
@@ -211,7 +211,7 @@ assertTrue("counter1 second", cnt1() === 2)
 
 ### Composición de funciones
 
-```varn
+```vn
 function compose<A, B, C>(f: (a:B) => C, g: (b:A) => B): (c:A) => C {
     return (x: A) => f(g(x))
 }
@@ -223,7 +223,7 @@ assertTrue("compose", doubleInc(4) === 10)   // tests/07-closures.vn
 
 ## 10. Match Expressions
 
-```varn
+```vn
 function describeNum(n: int): str {
     return match (n) {        // tests/10-match.vn
         0 => "zero",
@@ -238,7 +238,7 @@ assertTrue("match other", describeNum(99) === "other")
 
 Match sobre enums con payload (`tests/41-advanced-enums.vn`):
 
-```varn
+```vn
 enum R { A(int), B(str) }
 
 let x = R.A(42)
@@ -251,7 +251,7 @@ assertTrue("match ok", v === 42)
 
 Match en métodos de enum:
 
-```varn
+```vn
 area(): float {
     return match (this) {
         Circle(radius)           => 3.14159 * radius * radius,
@@ -264,7 +264,7 @@ area(): float {
 
 ## 11. Pipeline Operator (`|>`)
 
-```varn
+```vn
 function double2(n: int): int { return n * 2 }
 function addN(n: int, x: int): int { return n + x }
 
@@ -281,7 +281,7 @@ assertTrue("pipe chained", piped === 12)
 
 ## 12. `with` Expressions
 
-```varn
+```vn
 let u1 = new User(10, "Alice", "admin")
 let u2 = u1 with { name: "Bob", role: "editor" }  // tests/89-raw-strings-and-with-expressions.vn
 ```
@@ -292,7 +292,7 @@ Ver [`classes_objects.md`](classes_objects.md) §9 para detalles completos.
 
 ## 13. Null Coalescing (`??`) y Optional Chaining (`?.`)
 
-```varn
+```vn
 assertTrue("?? left null",     (null ?? 99) === 99)      // tests/08-null-safety.vn
 assertTrue("?. non-null",      p1?.address?.city === "NY")
 assertTrue("?. + ??",          (p3?.name ?? "anon") === "anon")
@@ -303,7 +303,7 @@ assertTrue("?? chained",       (null ?? null ?? 7) === 7)
 
 ## 14. Null-Coalescing Assignment (`??=`)
 
-```varn
+```vn
 let a: int? = null
 a ??= 42     // asigna solo si es null (tests/87-primary-constructors-nullish-assign.vn)
 a ??= 999    // no hace nada: a ya es 42
@@ -321,7 +321,7 @@ items[1] ??= "overwritten_1"   // no cambia: "existing"
 
 ## 15. Template Literals y Tagged Templates
 
-```varn
+```vn
 // Interpolación estándar
 const tval = 42
 assertTrue("template", `answer = ${tval}` === "answer = 42")  // tests/04-templates.vn
@@ -348,7 +348,7 @@ let rows = db.sql`SELECT * FROM users WHERE role = ${targetRole} AND active = ${
 
 ## 16. `instanceof` y `typeof`
 
-```varn
+```vn
 assertTrue("instanceof Dog",  pd instanceof Dog)           // tests/12-classes.vn
 assertTrue("instanceof Error", ve instanceof Error)        // tests/11-errors.vn
 
@@ -360,7 +360,7 @@ assertTrue("instanceof Error", ve instanceof Error)        // tests/11-errors.vn
 
 ## 17. `is` (Type Assertion / Narrowing)
 
-```varn
+```vn
 function describeChar(c: char): str {
     if (c is char) return "yes"   // tests/34-char-type.vn
     return "no"
@@ -372,7 +372,7 @@ function describeChar(c: char): str {
 
 ## 18. Cast Explícito (`as`)
 
-```varn
+```vn
 let jsonObj = JSON.parse("{\"message\": \"hello\", \"status\": 200}")
 let status = (jsonObj as dynamic).status    // tests/82-std-csv.vn
 assertEqual(status, 200)
@@ -382,7 +382,7 @@ assertEqual(status, 200)
 
 ## 19. `new` — Creación de Instancias
 
-```varn
+```vn
 const map = new Map<str, int>()         // tests/17-map-set.vn
 const intBox = new Box<int>(10)         // tests/14-generics.vn
 const b = new Box(1)                    // deduce Box<int> (tests/190-generic-instantiation-from-new.vn)
@@ -394,7 +394,7 @@ const db = new Database(":memory:")     // tests/85-stdlib-sqlite-ws-archive.vn
 
 ## 20. Operador Ternario
 
-```varn
+```vn
 const label = n < 0 ? "neg" : n === 0 ? "zero" : "pos"  // tests/09-control-flow.vn
 ```
 
@@ -402,7 +402,7 @@ const label = n < 0 ? "neg" : n === 0 ? "zero" : "pos"  // tests/09-control-flow
 
 ## 21. Spread (`...`) en Expresiones
 
-```varn
+```vn
 const spread = [...[1, 2], ...[3, 4]]          // array spread
 const ext    = { ...base, z: 3 }               // object spread
 function rolesDeco(...r: str[]) { /* rest params */ }   // rest parameters

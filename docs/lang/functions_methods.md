@@ -8,7 +8,7 @@
 
 ### Forma estándar
 
-```varn
+```vn
 function add(a: int, b: int): int {
     return a + b
 }
@@ -22,7 +22,7 @@ function greet(name: str): void {
 
 Cuando el tipo de retorno se puede inferir, la anotación es opcional:
 
-```varn
+```vn
 function double(n: int) { return n * 2 }   // retorno inferido: int
 ```
 
@@ -32,7 +32,7 @@ function double(n: int) { return n * 2 }   // retorno inferido: int
 
 Los parámetros pueden pasarse por nombre en cualquier orden:
 
-```varn
+```vn
 function describe(name: str, age: int, city: str | null = null): str {
     if (city == null) { city = "Unknown" }
     return name + " is " + age.toString() + " years old and lives in " + city
@@ -53,7 +53,7 @@ assertTrue("mixed", describe("Charlie", age: 40) == "Charlie is 40 years old and
 
 ## 3. Parámetros con Valor por Defecto
 
-```varn
+```vn
 function describe(name: str, age: int, city: str | null = null): str { /* … */ }
 // tests/40-named-arguments.vn
 
@@ -68,7 +68,7 @@ function greet(greeting: str, formal: bool | null = null): str {
 
 ## 4. Funciones Genéricas
 
-```varn
+```vn
 function identity<T>(v: T): T { return v }                     // tests/14-generics.vn
 assertTrue("generic id int",  identity<int>(42) === 42)
 assertTrue("generic id str",  identity<str>("hi") === "hi")
@@ -84,7 +84,7 @@ assertTrue("generic fn infer", applyFunc((x: int) => x.toString(), 123) === "123
 
 Funciones genéricas con named args:
 
-```varn
+```vn
 function identity<T>(value: T, label: str): T { return value }
 assertTrue("generic named args", identity<int>(value: 42, label: "Answer") == 42)
 // tests/40-named-arguments.vn
@@ -94,7 +94,7 @@ assertTrue("generic named args", identity<int>(value: 42, label: "Answer") == 42
 
 ## 5. Funciones de Orden Superior (HOF)
 
-```varn
+```vn
 function pipe<A, B, C>(f: (A) => B, g: (B) => C): (A) => C {
     return (x: A) => g(f(x))
 }
@@ -118,7 +118,7 @@ assertTrue("flip result", flippedSub(3, 10) === 7)
 
 ## 6. Closures
 
-```varn
+```vn
 function makeAdder(n: int): (a: int) => int {
     return (x: int) => x + n       // captura 'n' del ámbito exterior
 }
@@ -145,7 +145,7 @@ assertTrue("counter second", cnt() === 2)
 
 ## 7. Funciones Recursivas
 
-```varn
+```vn
 function fib(n: int): int {
     if (n <= 1) return n
     return fib(n - 1) + fib(n - 2)
@@ -161,7 +161,7 @@ assertTrue("power 2^10", power(2, 10) === 1024)
 
 ### Recursión mutua
 
-```varn
+```vn
 function isEven2(n: int): bool {
     if (n === 0) return true
     return isOdd2(n - 1)
@@ -178,7 +178,7 @@ assertTrue("mutual odd",  isOdd2(7))
 
 ## 8. Funciones Asíncronas (`async`)
 
-```varn
+```vn
 import { sleep, spawn, parallel } from "std:task"
 
 async function asyncAdd(a: int, b: int): int {
@@ -199,7 +199,7 @@ Ver [`async_concurrency.md`](async_concurrency.md) para cobertura completa.
 
 ## 9. Generadores (`function*`)
 
-```varn
+```vn
 function* range_gen(start: int, end: int) {
     let i = start
     while (i < end) {
@@ -223,7 +223,7 @@ Ver [`generators.md`](generators.md) para cobertura completa.
 
 Funciones que reciben strings e interpolaciones de un template literal:
 
-```varn
+```vn
 function customTag(strings: str[], ...values: dynamic[]): str {
     let res = ""
     for (let i = 0; i < strings.length; i = i + 1) {
@@ -244,7 +244,7 @@ assertEqual(output, "Language: [Varn], Version: [1]!")
 
 ## 11. Memoización con Genéricos
 
-```varn
+```vn
 function memoize<T>(f: (a:int) => T): (int) => T {
     const cache: T[] = []
     const seen: bool[] = []
@@ -269,7 +269,7 @@ assertTrue("memoize called once", callCount === 1)
 
 ## 12. Acumuladores Genéricos
 
-```varn
+```vn
 function makeAccumulator<T>(init: T, combine: (T, T) => T): (v: T) => T {
     let state = init
     return (v: T) => {
@@ -294,7 +294,7 @@ assertTrue("accumulator str", built === "foobar!")
 
 ## 13. Firmas de Tipos de Función
 
-```varn
+```vn
 // Función que recibe una función
 function compose<A, B, C>(f: (a:B) => C, g: (b:A) => B): (c:A) => C
 

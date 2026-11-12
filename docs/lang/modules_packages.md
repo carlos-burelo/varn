@@ -8,7 +8,7 @@
 
 ### Importación nombrada desde stdlib
 
-```varn
+```vn
 import { sleep, TaskGroup, spawn, parallel } from "std:task"   // tests/21-async.vn
 import { channel, Sender, Receiver, ChannelClosed, spawnIsolate } from "std:task"   // tests/47-isolates-multithread.vn
 import { describe, it, expect } from "std:test"   // tests/21-async.vn
@@ -24,7 +24,7 @@ con `tests/*.vn`).
 
 ### Importación desde módulo local
 
-```varn
+```vn
 import { workerMain } from "./some-module"
 ```
 
@@ -32,7 +32,7 @@ import { workerMain } from "./some-module"
 
 ## 2. Declaraciones `export`
 
-```varn
+```vn
 export async function workerMain(rx: Receiver<ValueMsg>, tx: Sender<int>) {
     // ...
 }
@@ -47,7 +47,7 @@ Solo las funciones exportadas (`export`) de nivel superior pueden usarse con `sp
 
 Las variables declaradas en el nivel superior del módulo son accesibles desde todos los ámbitos del archivo, incluyendo dentro de generadores y funciones:
 
-```varn
+```vn
 let moduleCounter = 0
 function bumpCounter(): int {
     moduleCounter = moduleCounter + 1
@@ -67,7 +67,7 @@ function* touchesModuleState() {
 Ver `standard_library.md` (mapa: `../STDLIB_ARCHITECTURE.md`). Aquí solo los
 imports ejercitados:
 
-```varn
+```vn
 import { sleep, TaskGroup, spawn, parallel } from "std:task"   // tests/21-async.vn
 import { channel, Sender, Receiver, ChannelClosed, spawnIsolate } from "std:task"   // tests/47-isolates-multithread.vn
 import { describe, it, expect } from "std:test"   // tests/21-async.vn

@@ -39,7 +39,7 @@ Todos son tipos canónicos únicos; **nunca** se aceptan aliases como `string`, 
 
 ### 2.1 Arrays
 
-```varn
+```vn
 const nums: int[] = [3, 1, 4, 1, 5]       // tests/05-arrays.vn
 let explicitGeneric: Array<int> = [10, 20, 30]  // tests/05-arrays.vn
 let explicitBracket: int[] = explicitGeneric     // Asignable mutuamente
@@ -52,7 +52,7 @@ let nested: int[][] = [[1, 2], [3, 4]]           // 2D array
 
 Colecciones heterogéneas inmutables con igualdad estructural:
 
-```varn
+```vn
 let t1 = (1, "hello", true)    // tests/69-tuples-records.vn
 assertTrue("tuple elem 0", t1[0] == 1)
 assertTrue("tuple length", t1.length == 3)
@@ -65,7 +65,7 @@ assertTrue("tuple eq true", t1 == t2)   // igualdad estructural profunda
 
 Tipo valor nominal con igualdad por contenido (ver `docs/lang/classes_objects.md`, sección Structs):
 
-```varn
+```vn
 struct Release { name: str; version: int }   // tests/69-tuples-structs.vn
 
 let r1 = new Release("Varn", 1)
@@ -91,7 +91,7 @@ incompatibles en cualquier nivel. Para claves abiertas se declara un diccionario
 Contenedores asociativos dinámicos mutables (`tests/17-map-set.vn`,
 `tests/24-record.vn`):
 
-```varn
+```vn
 // Diccionario: firma de índice { [key: K]: V } + literal de objeto
 const scores: { [key: str]: int } = {   // tests/24-record.vn
     "alice": 95,
@@ -108,7 +108,7 @@ assertTrue("map set dave",    scores["dave"] === 60)
 
 `Map<K, V>` es una colección aparte (`tests/17-map-set.vn`):
 
-```varn
+```vn
 const m = new Map<str, int>()
 m.set("a", 1)
 assertTrue("map get", m.get("a") === 1)
@@ -131,7 +131,7 @@ assertTrue("map size", m.size === 1)
 
 ### 2.6 Set
 
-```varn
+```vn
 const set = new Set<str>()
 set.add("x")
 set.add("x")     // duplicado ignorado
@@ -144,7 +144,7 @@ assertTrue("set size dedup", set.size === 2)
 
 El sistema de tipos distingue entre un tipo no-nulo y su versión nulable:
 
-```varn
+```vn
 const a: str? = null       // str | null  (tests/30-nullable-types.vn)
 const b: str? = "hello"
 const f: int?[] = [1, null, 3]   // array de int nulables
@@ -165,7 +165,7 @@ const j: int?[]? = null           // array nulo de int nulables
 
 ## 4. Uniones de Tipos
 
-```varn
+```vn
 type StringOrInt = str | int    // tests/15-unions.vn
 type MaybeStr = str | null
 
@@ -182,7 +182,7 @@ assertTrue("union int branch", processValue(42) === "number: 42")
 
 ### Tipos unión de clases
 
-```varn
+```vn
 type Shape2 = Square2 | Circle2    // tests/15-unions.vn
 
 function totalArea(shapes: Shape2[]): float {
@@ -200,7 +200,7 @@ function totalArea(shapes: Shape2[]): float {
 
 ### 5.1 Enums simples
 
-```varn
+```vn
 enum Direction { North, South, East, West }    // tests/16-enums.vn
 
 const dir: Direction = Direction.North
@@ -210,14 +210,14 @@ assertTrue("enum rawValue", Direction.East.rawValue === 2)
 
 ### 5.2 Enums con valores explícitos
 
-```varn
+```vn
 enum HttpMethod { GET = 0, POST = 1, PUT = 2, DELETE = 3 }   // tests/16-enums.vn
 assertTrue("enum explicit", HttpMethod.POST.rawValue === 1)
 ```
 
 ### 5.3 Enums con payload (ADTs)
 
-```varn
+```vn
 enum Token {                          // tests/41-advanced-enums.vn
     Identifier(name: str),
     Number(value: float),
@@ -234,7 +234,7 @@ assertTrue("named payload", t2.name === "hello")
 
 ### 5.4 Enums con campos compartidos y constructor
 
-```varn
+```vn
 enum HttpStatus {
     Ok(200, "OK"),
     NotFound(404, "Not Found");
@@ -253,7 +253,7 @@ assertTrue("shared field message",     HttpStatus.Ok.message === "OK")
 
 ### 5.5 Enums con métodos y pattern matching en `this`
 
-```varn
+```vn
 enum Shape {
     Circle(radius: float),
     Rectangle(width: float, height: float);
@@ -271,7 +271,7 @@ assertTrue("rect area",   Shape.Rectangle(10.0, 20.0).area() === 200.0)
 
 ### 5.6 Enums genéricos
 
-```varn
+```vn
 enum Result<T, E> {
     Ok(value: T),
     Err(error: E)
@@ -284,7 +284,7 @@ const resOk = Result.Ok<int, str>(42)
 
 ## 6. Interfaces
 
-```varn
+```vn
 interface Printable {            // tests/13-interfaces.vn
     toString(): str
 }
@@ -298,7 +298,7 @@ interface Printable {            // tests/13-interfaces.vn
 
 Ver también [`classes_objects.md`](classes_objects.md).
 
-```varn
+```vn
 class Animal {                        // tests/12-classes.vn
     name: str
     constructor(n: str) { this.name = n }
@@ -336,7 +336,7 @@ Contratos que se comprueban en la declaración:
 
 ## 8. Generics
 
-```varn
+```vn
 class Box<T> {                        // tests/14-generics.vn
     value: T
     constructor(v: T) { this.value = v }
@@ -355,7 +355,7 @@ assertTrue("generic box map", strBox.get() === "value=10")
 
 Interfaces genéricas:
 
-```varn
+```vn
 interface Comparable<T> {
     compareTo(other: T): int
 }
@@ -366,7 +366,7 @@ interface Comparable<T> {
 `new` deduce los argumentos de tipo de los argumentos del constructor,
 igual que una llamada genérica (tests/190-generic-instantiation-from-new.vn):
 
-```varn
+```vn
 const b = new Box(1)              // Box<int>
 const p = new Pair(1, "uno")      // Pair<int, str>
 const t = new Tagged(5, 7)        // label: L? con un int fija L = int
@@ -409,7 +409,7 @@ Implícitas solo `int → bigint` e `int → decimal` (exactas). Un **literal**
 entero adopta `float`/`decimal`/`bigint` del contexto si es exactamente
 representable (`|n| ≤ 2^53` para `float`). Todo lo demás se escribe con `as`.
 
-```varn
+```vn
 const i: int = 42
 const d: decimal = i          // implícito: exacto
 const bi: bigint = i          // implícito: exacto
@@ -440,7 +440,7 @@ Con `dynamic` la aritmética mezclada `int ⊕ float` se resuelve en runtime a
 
 El checker estrecha automáticamente el tipo dentro de bloques condicionales:
 
-```varn
+```vn
 function processOptional(val: str?): int {
     if (val !== null) {
         return val.length   // val se estrecha a 'str' aquí (tests/79-control-flow-narrowing.vn)
@@ -613,7 +613,7 @@ lo leen y lo cambian.
 
 Tipo dinámico para valores cuya naturaleza se determina en tiempo de ejecución:
 
-```varn
+```vn
 function processTypeof(val: dynamic): str {    // tests/79-control-flow-narrowing.vn
     if (typeof val === "str") {
         return val.toUpperCase()
@@ -628,7 +628,7 @@ function processTypeof(val: dynamic): str {    // tests/79-control-flow-narrowin
 
 ## 12. Rangos
 
-```varn
+```vn
 const r1 = 0..5     // rango exclusivo [0, 5) (tests/18-ranges.vn)
 const r2 = 1..=5    // rango inclusivo [1, 5]
 
@@ -645,7 +645,7 @@ const r3 = Range.from(5, 10)
 
 Indexación directa con rangos en strings y arrays:
 
-```varn
+```vn
 let text = "Hello, World!"
 let greeting = text[0..5]     // "Hello"  (tests/88-range-indexing.vn)
 let greetingInc = text[0..=4] // "Hello"

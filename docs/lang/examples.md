@@ -8,7 +8,7 @@ Colección de ejemplos completos extraídos directamente de los archivos de prue
 
 ## 01 — Aritmética (`tests/01-arithmetic.vn`)
 
-```varn
+```vn
 assertTrue("int add",          1 + 2 === 3)
 assertTrue("int sub negative", 3 - 5 === -2)
 assertTrue("int mul zero",     42 * 0 === 0)
@@ -30,7 +30,7 @@ assertTrue("right shift",      64 >> 2 === 16)
 
 ## 02 — Booleanos (`tests/02-boolean.vn`)
 
-```varn
+```vn
 assertTrue("and short-circuit", (false && (1/0 === 0)) === false)
 assertTrue("or short-circuit",  true  || (1/0 === 0) === true)
 assertTrue("not not",           !!true === true)
@@ -43,7 +43,7 @@ assertTrue("triple eq null",    null === null)
 
 ## 03 — Cadenas de Texto (`tests/03-strings.vn`)
 
-```varn
+```vn
 const s = "  Hello, World!  "
 assertTrue("trim",           s.trim() === "Hello, World!")
 assertTrue("toUpperCase",    "hello".toUpperCase() === "HELLO")
@@ -71,7 +71,7 @@ assertTrue("str.join sep",   str.join(["a", "b", "c"], "-") === "a-b-c")
 
 ## 04 — Template Literals (`tests/04-templates.vn`)
 
-```varn
+```vn
 const tval = 42
 assertTrue("simple template",   `answer = ${tval}` === "answer = 42")
 assertTrue("expr in template",  `${tval * 2}` === "84")
@@ -83,7 +83,7 @@ assertTrue("template + concat", `a${1 + 1}b` + "c" === "a2bc")
 
 ## 05 — Arrays (`tests/05-arrays.vn`)
 
-```varn
+```vn
 const nums = [3, 1, 4, 1, 5, 9, 2, 6]
 assertTrue("length",  nums.length === 8)
 assertTrue("indexOf", nums.indexOf(5) === 4)
@@ -120,7 +120,7 @@ assertTrue("Array<T> to T[]", explicitBracket[1] === 20)
 
 ## 06 — Destructuring (`tests/06-destructuring.vn`)
 
-```varn
+```vn
 const obj1 = { a: 1, b: 2, c: 3 }
 const { a, b } = obj1
 assertTrue("obj destr basic", a === 1 && b === 2)
@@ -146,7 +146,7 @@ assertTrue("obj spread z", ext.z === 3)
 
 ## 07 — Closures (`tests/07-closures.vn`)
 
-```varn
+```vn
 function makeAdder(n: int): (a: int) => int {
     return (x: int) => x + n
 }
@@ -175,7 +175,7 @@ assertTrue("compose", doubleInc(4) === 10)
 
 ## 08 — Null Safety (`tests/08-null-safety.vn`)
 
-```varn
+```vn
 interface Profile { name: str; address?: Address }
 
 const p1: Profile? = { name: "Alice", address: { city: "NY" } }
@@ -194,7 +194,7 @@ assertTrue("?? chained",        (null ?? null ?? 7) === 7)
 
 ## 09 — Control de Flujo (`tests/09-control-flow.vn`)
 
-```varn
+```vn
 function classify(n: int): str {
     return n < 0 ? "neg" : n === 0 ? "zero" : "pos"
 }
@@ -236,7 +236,7 @@ assertTrue("for-in key count", keyCount === 3)
 
 ## 10 — Match (`tests/10-match.vn`)
 
-```varn
+```vn
 function describeNum(n: int): str {
     return match (n) {
         0 => "zero",
@@ -253,7 +253,7 @@ assertTrue("match other", describeNum(99) === "other")
 
 ## 11 — Manejo de Errores (`tests/11-errors.vn`)
 
-```varn
+```vn
 // try/catch
 try {
     throw new TypeError("bad type")
@@ -283,7 +283,7 @@ assertTrue("finally ran",          finallyRan)
 
 ## 16 — Enums (`tests/16-enums.vn`)
 
-```varn
+```vn
 enum Direction { North, South, East, West }
 enum HttpMethod { GET = 0, POST = 1, PUT = 2, DELETE = 3 }
 
@@ -306,7 +306,7 @@ function describeDir(d: Direction): str {
 
 ## 19 — Pipeline (`tests/19-pipeline.vn`)
 
-```varn
+```vn
 assertTrue("pipe simple",      5 |> double2 === 10)
 assertTrue("pipe placeholder", 7 |> addN(_, 3) === 10)
 assertTrue("pipe multi _",     4 |> addN(_, _) === 8)
@@ -319,7 +319,7 @@ assertTrue("pipe chained", piped === 12)
 
 ## 20 — Generadores (`tests/20-generators.vn`)
 
-```varn
+```vn
 function* range_gen(start: int, end: int) {
     let i = start
     while (i < end) { yield i; i = i + 1 }
@@ -345,7 +345,7 @@ assertTrue("fib gen [7]", fibs[7] === 13)
 
 ## 21 — Async/Await (`tests/21-async.vn`)
 
-```varn
+```vn
 import { sleep, TaskGroup, spawn, parallel } from "std:task"
 
 async function asyncAdd(a: int, b: int): int { return a + b }
@@ -368,7 +368,7 @@ await runAsync()
 
 ## 25 — Extension Methods (`tests/25-extensions.vn`)
 
-```varn
+```vn
 extension StringUtils on str {
     shout(): str { return this + "!" }
     times(n: int): str {
@@ -396,7 +396,7 @@ assertTrue("int clamp lo", (2).clamp(5, 10) === 5)
 
 ## 41 — Enums Avanzados (`tests/41-advanced-enums.vn`)
 
-```varn
+```vn
 // Payload variant
 enum Token {
     Identifier(name: str),
@@ -439,7 +439,7 @@ assertTrue("generic enum Ok", valOk === 42)
 
 ## 47 — Isolates (`tests/47-isolates-multithread.vn`)
 
-```varn
+```vn
 import { spawnIsolate, channel, Sender, Receiver } from "std:task"
 
 export async function workerMain(rx: Receiver<ValueMsg>, tx: Sender<int>) {
@@ -459,7 +459,7 @@ await h1.join()
 
 ## 69 — Tuples y Records (`tests/69-tuples-records.vn`)
 
-```varn
+```vn
 let t1 = (1, "hello", true)
 assertTrue("tuple elem 0", t1[0] == 1)
 assertTrue("tuple length", t1.length == 3)
@@ -482,7 +482,7 @@ assertTrue("nested eq true", nested1 == nested2)
 
 ## 86 — Tagged Templates (`tests/86-tagged-templates.vn`)
 
-```varn
+```vn
 function customTag(strings: str[], ...values: dynamic[]): str {
     let res = ""
     for (let i = 0; i < strings.length; i = i + 1) {
@@ -505,7 +505,7 @@ let rows = db.sql`SELECT * FROM users WHERE role = ${targetRole} AND active = ${
 
 ## 87 — Primary Constructors y `??=` (`tests/87-primary-constructors-nullish-assign.vn`)
 
-```varn
+```vn
 // C# style primary constructor
 class User(public id: int, public name: str, private role: str = "guest") {
     greet(): str { return `User #${this.id}: ${this.name} [${this.role}]` }
@@ -530,7 +530,7 @@ assertEqual(a, 42)
 
 ## 88 — Range Indexing (`tests/88-range-indexing.vn`)
 
-```varn
+```vn
 let text = "Hello, World!"
 let greeting = text[0..5]
 assertEqual(greeting, "Hello")
@@ -553,7 +553,7 @@ assertEqual(picked[0], "banana")
 
 ## 89 — Raw Strings y `with` (`tests/89-raw-strings-and-with-expressions.vn`)
 
-```varn
+```vn
 // Raw String Literals
 let jsonStr = """{
   "name": "Varn",

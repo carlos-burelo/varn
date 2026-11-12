@@ -84,7 +84,7 @@ Estos identificadores tienen significado especial pero **no** son palabras reser
 
 En destructuring y en el operador pipeline, `_` tiene significado especial:
 
-```varn
+```vn
 // Descarte en destructuring de array
 const [skip1, _, skip3] = [100, 200, 300]
 assertTrue("arr destr skip", skip1 === 100 && skip3 === 300)

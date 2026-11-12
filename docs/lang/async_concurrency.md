@@ -8,7 +8,7 @@
 
 ### Funciones asíncronas
 
-```varn
+```vn
 import { sleep, spawn, parallel } from "std:task"
 // tests/21-async.vn
 
@@ -35,7 +35,7 @@ await runAsync()   // top-level await en módulo
 
 ### Manejo de errores en async
 
-```varn
+```vn
 async function asyncError(): str {
     try {
         throw new Error("async fail")
@@ -51,7 +51,7 @@ assertTrue("async catch", r3 === "caught:async fail")
 
 ## 2. `spawn` — Tareas concurrentes
 
-```varn
+```vn
 const h1 = spawn(asyncAdd(1, 2))
 assertTrue("spawn handle await", await h1 === 3)   // tests/21-async.vn
 ```
@@ -60,7 +60,7 @@ assertTrue("spawn handle await", await h1 === 3)   // tests/21-async.vn
 
 ## 3. `parallel` — Ejecución paralela
 
-```varn
+```vn
 const all = await parallel([
     asyncSquare(2),
     asyncSquare(3),
@@ -78,7 +78,7 @@ Ejecuta todas las tareas en paralelo y devuelve los resultados en el mismo orden
 
 ### Combinadores (`Task.all`, `allSettled`, `race`)
 
-```varn
+```vn
 import { Task, delay } from "std:task"
 
 let winner = await Task.race([fastTask, slowTask])   // tests/97-stdlib-task-combinators.vn
@@ -93,7 +93,7 @@ let settled = await Task.allSettled([okTask, errTask])   // tests/97-stdlib-task
 
 ## 4. `TaskGroup` — Grupos de tareas
 
-```varn
+```vn
 using group = new TaskGroup<int>()   // tests/21-async.vn
 const g1 = group.spawn(asyncAdd(7, 8))
 const g2 = group.spawn(asyncAdd(9, 10))
@@ -112,7 +112,7 @@ Timeout en `join(ms)` y mensaje de error: NO-VERIFICADOS (sin test).
 se descartan en vez de seguir consumiendo drive). Los hijos ya completados no
 se ven afectados; `join()` posterior lanza `Error("TaskGroup is cancelled")`.
 
-```varn
+```vn
 using cancelGroup = new TaskGroup<int>()
 const c1 = cancelGroup.spawn(asyncAdd(10, 20))
 cancelGroup.cancel()
@@ -126,7 +126,7 @@ try {
 
 ### Disposición asíncrona (`disposeAsync`, `tests/21-async.vn`)
 
-```varn
+```vn
 using disposeGroup = new TaskGroup<int>()
 const d1 = disposeGroup.spawn(asyncAdd(30, 40))
 await disposeGroup.disposeAsync()
@@ -143,7 +143,7 @@ try {
 
 Un **isolate** es una unidad de ejecución aislada con su propio heap, GC y espacio de memoria. Se comunica con el hilo principal y otros isolates exclusivamente a través de **canales tipados**.
 
-```varn
+```vn
 import { spawnIsolate, channel, Sender, Receiver, ChannelClosed } from "std:task"
 // tests/47-isolates-multithread.vn
 
@@ -165,7 +165,7 @@ await h1.join()
 
 ### Restricciones de `spawnIsolate`
 
-```varn
+```vn
 // Solo funciones top-level exportadas son válidas
 let threwAnon = false
 try {
@@ -185,7 +185,7 @@ try {
 
 ### Worker con múltiples argumentos
 
-```varn
+```vn
 export async function workerArgs(tx: Sender<str>, num: int, text: str, arr: Array<int>, obj: { x: str }) {
     assertTrue("num arg",    num === 42)
     assertTrue("text arg",   text === "hello")
@@ -205,7 +205,7 @@ así el hijo no re-ejecuta la suite. `import.meta.main` es `true` solo en el
 módulo de entrada del proceso; en módulos importados y en los que carga un
 isolate es `false` (`tests/228-import-meta-main.vn`).
 
-```varn
+```vn
 if (import.meta.main) {
     await run()
 }
@@ -215,7 +215,7 @@ if (import.meta.main) {
 
 ## 6. Canales Tipados (`channel`)
 
-```varn
+```vn
 import { channel, ChannelClosed, Sender, Receiver } from "std:task"
 // tests/54-channels.vn
 
@@ -228,7 +228,7 @@ assertTrue("ch recv 2", await ch.rx.receive() === 2)
 
 ### Close y `ChannelClosed`
 
-```varn
+```vn
 const ch = channel<str>(1)
 ch.tx.close()
 let typed = false
@@ -250,7 +250,7 @@ assertTrue("send closed typed", sendClosed)
 
 ### `for await` sobre canal
 
-```varn
+```vn
 const ch = channel<int>(4)
 await ch.tx.send(10)
 await ch.tx.send(20)
@@ -264,7 +264,7 @@ assertTrue("for-await drains", sum === 30)
 
 ### `using` para auto-close del Sender
 
-```varn
+```vn
 const ch = channel<int>(1)
 {
     using tx = ch.tx      // tx.dispose() cierra el canal al salir del bloque
@@ -278,7 +278,7 @@ assertTrue("closed after dispose", closed)
 
 ### Canal cross-isolate
 
-```varn
+```vn
 export async function echoWorker(rx: Receiver<int>, tx: Sender<int>) {
     for await (const v of rx) {
         await tx.send(v * 2)
@@ -301,7 +301,7 @@ await handle.join()
 
 Para comunicaciones con ciclo de vida bien definido:
 
-```varn
+```vn
 enum Msg { Val(int), Exit }
 
 export async function workerDialog(rx: Receiver<Msg>, tx: Sender<int>) {
@@ -327,7 +327,7 @@ await h3.join()
 
 ## 8. `sleep`
 
-```varn
+```vn
 await sleep(1)    // pausa de ~1ms (disponible en pruebas como tests/21-async.vn)
 ```
 
@@ -337,7 +337,7 @@ await sleep(1)    // pausa de ~1ms (disponible en pruebas como tests/21-async.vn
 
 Varn soporta `await` a nivel de módulo:
 
-```varn
+```vn
 await runAsync()          // tests/21-async.vn
 await runAsyncGenerators()   // tests/77-async-generators.vn
 await testIsolates()         // tests/47-isolates-multithread.vn

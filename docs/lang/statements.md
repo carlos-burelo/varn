@@ -6,7 +6,7 @@
 
 ## 1. Declaración de Variables
 
-```varn
+```vn
 let x = 42              // mutable
 const y = "hello"       // inmutable
 // `var` no existe: el compilador lo rechaza (VN2002)
@@ -19,7 +19,7 @@ const explicit: str? = null
 
 ## 2. Asignación y Asignación Compuesta
 
-```varn
+```vn
 x = x + 1          // asignación simple
 a ??= 42            // null-coalescing assignment
 cfg.timeout ??= 3000   // en propiedad de objeto
@@ -32,7 +32,7 @@ items[0] ??= "filled"  // en índice de array
 
 Un bloque `{ }` agrupa sentencias y crea un nuevo ámbito léxico:
 
-```varn
+```vn
 {
     const local = 42   // solo visible dentro de este bloque
     let sum = 0
@@ -44,7 +44,7 @@ Un bloque `{ }` agrupa sentencias y crea un nuevo ámbito léxico:
 
 ## 4. Condicionales (`if / else`)
 
-```varn
+```vn
 function classify(n: int): str {
     if (n < 0) return "neg"
     else if (n === 0) return "zero"
@@ -54,7 +54,7 @@ function classify(n: int): str {
 
 Con bloques:
 
-```varn
+```vn
 if (val !== null) {
     return val.length     // type narrowed to str (tests/79-control-flow-narrowing.vn)
 }
@@ -64,7 +64,7 @@ if (val !== null) {
 
 ## 5. Match Expressions
 
-```varn
+```vn
 function describeNum(n: int): str {
     return match (n) {        // tests/10-match.vn
         0 => "zero",
@@ -77,7 +77,7 @@ function describeNum(n: int): str {
 
 Match sobre enum con payload (`tests/41-advanced-enums.vn`):
 
-```varn
+```vn
 let v = match x {
     A(n) => n,       // desestructura el payload
     B(_) => -1,
@@ -86,7 +86,7 @@ let v = match x {
 
 Match anidado en `this` (`tests/41-advanced-enums.vn`, `tests/189-enum-variant-slots.vn`):
 
-```varn
+```vn
 area(): float {
     return match (this) {
         Circle(radius)           => 3.14159 * radius * radius,
@@ -99,7 +99,7 @@ area(): float {
 
 ## 6. Bucle `while`
 
-```varn
+```vn
 let i = 0
 while (i < arr.length) {
     if (arr[i] > threshold) { break }
@@ -112,7 +112,7 @@ while (i < arr.length) {
 
 ## 7. Bucle `for` (estilo C)
 
-```varn
+```vn
 for (let i = 0; i <= max; i = i + 1) {
     if (i % 2 === 0) continue
     total = total + i
@@ -126,7 +126,7 @@ for (let i = 0; i <= max; i = i + 1) {
 
 Itera sobre arrays, rangos, generadores e iterables:
 
-```varn
+```vn
 let forOfSum = 0
 for (const n of [10, 20, 30]) {
     forOfSum = forOfSum + n
@@ -160,7 +160,7 @@ for (let i = 0; i < 8; i = i + 1) {
 
 Itera sobre las claves de un objeto:
 
-```varn
+```vn
 const obj2 = { x: 1, y: 2, z: 3 }
 let keyCount = 0
 for (const k in obj2) {
@@ -175,7 +175,7 @@ assertTrue("for-in key count", keyCount === 3)   // tests/09-control-flow.vn
 
 Consume iterables asíncronos, como canales o async generators:
 
-```varn
+```vn
 for await (const v of ch.rx) {         // tests/54-channels.vn
     sum = sum + v
 }
@@ -197,7 +197,7 @@ for await (const v of awaitsThenYields()) {   // tests/77-async-generators.vn
 
 ## 11. `break` y `continue`
 
-```varn
+```vn
 while (i < arr.length) {
     if (arr[i] > threshold) { break }   // sale del bucle
     i = i + 1
@@ -213,7 +213,7 @@ for (let i = 0; i <= max; i = i + 1) {
 
 ## 12. `return`
 
-```varn
+```vn
 function firstAbove(arr: int[], threshold: int): int {
     let i = 0
     while (i < arr.length) {
@@ -226,7 +226,7 @@ function firstAbove(arr: int[], threshold: int): int {
 
 `return` dentro de `try/catch` ejecuta correctamente el `finally`:
 
-```varn
+```vn
 function withFinally(): int {
     try {
         return 42
@@ -241,7 +241,7 @@ assertTrue("finally ran", finallyRan)   // tests/11-errors.vn
 
 ## 13. Manejo de Errores (`try / catch / finally`)
 
-```varn
+```vn
 function safeDivide(a: int, b: int): float {
     try {
         if (b === 0) throw new RangeError("division by zero")
@@ -264,7 +264,7 @@ try {
 
 ### Tipos de error incorporados
 
-```varn
+```vn
 throw new Error("mensaje")
 throw new TypeError("bad type")
 throw new RangeError("too big")
@@ -272,7 +272,7 @@ throw new RangeError("too big")
 
 ### Catch con `instanceof`
 
-```varn
+```vn
 try {
     throw new RangeError("too big")
 } catch (e) {
@@ -283,7 +283,7 @@ assertTrue("catch instanceof", isRangeError)   // tests/11-errors.vn
 
 ### Rethrow
 
-```varn
+```vn
 try {
     try {
         throw new Error("inner")
@@ -300,7 +300,7 @@ try {
 
 Salir de un `try/catch` por `break`, `continue` o `return` cierra correctamente la región guardada:
 
-```varn
+```vn
 function conBreak(): void {
     for (let i = 0; i < 3; i = i + 1) {
         try {
@@ -325,7 +325,7 @@ assertTrue("return no deja handler colgante", capturaEnElSitioCorrecto("return")
 
 ## 14. `throw`
 
-```varn
+```vn
 throw new Error("mensaje")
 throw new TypeError("bad type")
 throw new ValidationError("email", "invalid format")
@@ -338,7 +338,7 @@ throw e    // re-lanzar una excepción capturada
 
 Gestión de recursos con disposición automática al salir del bloque:
 
-```varn
+```vn
 using group = new TaskGroup<int>()   // tests/21-async.vn
 const g1 = group.spawn(asyncAdd(7, 8))
 const joined = await group.join()
@@ -362,7 +362,7 @@ using file = File.open(path, "w");   // tests/45-simple-file-test.vn
 
 ## 16. Operador Ternario
 
-```varn
+```vn
 function classify(n: int): str {
     return n < 0 ? "neg" : n === 0 ? "zero" : "pos"
 }
@@ -378,7 +378,7 @@ assertTrue("nested ternary pos",  classify(1) === "pos")
 
 Cualquier expresión puede usarse como sentencia (útil para efectos secundarios):
 
-```varn
+```vn
 counter = counter + 1
 [10, 20, 30].forEach((n) => { counter = counter + n })
 IdGen.reset()
@@ -389,7 +389,7 @@ mut.push(4)
 
 ## 18. Expresión `assert` (función de test)
 
-```varn
+```vn
 assertTrue("mensaje", condición_booleana)
 // Lanza error si la condición es falsa. Presente en casi todos los tests.
 assertTrue("int add", 1 + 2 === 3)
@@ -402,7 +402,7 @@ assertTrue("trim",    s.trim() === "Hello, World!")
 
 La condición puede ser una declaración sobre un valor anulable. El cuerpo corre solo si el valor no es `null`, y el nombre ya llega estrechado a su tipo sin `null`:
 
-```varn
+```vn
 if (const i = items.indexOf(x)) {
     print(i + 1)          // i: int
 } else {
