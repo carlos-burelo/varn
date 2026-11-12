@@ -3,40 +3,79 @@ use vn_core::TokenKind;
 use vn_sem::semantic_info::ResolvedMemberKind;
 use vn_sem::symbol::{SymbolId, SymbolKind};
 
-use super::{MOD_ABSTRACT, MOD_ASYNC, MOD_DECLARATION, MOD_DEPRECATED, MOD_READONLY, MOD_STATIC};
+use super::{
+    MOD_ABSTRACT, MOD_ASYNC, MOD_DECLARATION, MOD_DEFAULT_LIBRARY, MOD_DEPRECATED, MOD_READONLY,
+    MOD_STATIC,
+};
 use crate::document::{DocumentState, TokenRecord};
 
-const NAME_SEARCH_WINDOW: usize = 8;
+const STD_MODULE_PREFIX: &str = "std:";
 
 pub struct DeclarationIndex {
     by_offset: FxHashMap<u32, SymbolId>,
+    token_of: FxHashMap<SymbolId, usize>,
 }
 
 impl DeclarationIndex {
     pub fn build(state: &DocumentState) -> Self {
         let mut by_offset = FxHashMap::default();
+        let mut token_of = FxHashMap::default();
         for (id, symbol) in state.db.bind.arena.all().iter().enumerate() {
             if symbol.origin_module.is_some() {
                 continue;
             }
-            let name = state.name(symbol.name);
             let first = state.tokens.partition_point(|t| t.offset < symbol.offset);
-            let name_token = state.tokens[first..]
-                .iter()
-                .take(NAME_SEARCH_WINDOW)
-                .find(|t| t.kind == TokenKind::Identifier && state.lexeme(t) == name);
-            if let Some(token) = name_token {
-                by_offset.entry(token.offset).or_insert(id);
+            if let Some(index) = declared_name_token(state, first, state.name(symbol.name)) {
+                by_offset.entry(state.tokens[index].offset).or_insert(id);
+                token_of.entry(id).or_insert(index);
             }
         }
-        Self { by_offset }
+        Self {
+            by_offset,
+            token_of,
+        }
     }
-}
 
-impl DeclarationIndex {
     pub fn symbol_at(&self, offset: u32) -> Option<SymbolId> {
         self.by_offset.get(&offset).copied()
     }
+}
+
+fn declared_name_token(state: &DocumentState, first: usize, name: &str) -> Option<usize> {
+    let tokens = &state.tokens;
+    let mut i = first;
+    while i < tokens.len() {
+        let kind = tokens[i].kind;
+        if kind == TokenKind::At {
+            i += 2;
+            if tokens.get(i).map(|t| t.kind) == Some(TokenKind::LParen) {
+                i = skip_parens(state, i);
+            }
+        } else if kind == TokenKind::Identifier {
+            return (state.lexeme(&tokens[i]) == name).then_some(i);
+        } else if kind.is_keyword() || kind == TokenKind::Dot {
+            i += 1;
+        } else {
+            return None;
+        }
+    }
+    None
+}
+
+fn skip_parens(state: &DocumentState, open: usize) -> usize {
+    let mut depth = 0usize;
+    for (offset, tok) in state.tokens[open..].iter().enumerate() {
+        if tok.kind == TokenKind::LParen {
+            depth += 1;
+        }
+        if tok.kind == TokenKind::RParen {
+            depth -= 1;
+            if depth == 0 {
+                return open + offset + 1;
+            }
+        }
+    }
+    state.tokens.len()
 }
 
 pub fn modifiers_of(
@@ -45,12 +84,12 @@ pub fn modifiers_of(
     index: usize,
     tok: &TokenRecord,
 ) -> u32 {
-    let mut bits = 0;
     if tok.kind == TokenKind::This {
         return MOD_READONLY;
     }
 
-    let declared = declarations.by_offset.get(&tok.offset).copied();
+    let mut bits = 0;
+    let declared = declarations.symbol_at(tok.offset);
     let referenced = state
         .db
         .expr_types
@@ -73,6 +112,17 @@ pub fn modifiers_of(
         }
         if symbol.deprecated.is_some() {
             bits |= MOD_DEPRECATED;
+        }
+        if symbol
+            .origin_module
+            .is_some_and(|module| state.name(module).starts_with(STD_MODULE_PREFIX))
+        {
+            bits |= MOD_DEFAULT_LIBRARY;
+        }
+        if declared.is_none()
+            && let Some(&declaration) = declarations.token_of.get(&id)
+        {
+            bits |= declaration_modifiers(state, declaration);
         }
     }
 

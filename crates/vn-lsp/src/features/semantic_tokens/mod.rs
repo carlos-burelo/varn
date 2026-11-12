@@ -23,6 +23,10 @@ pub static LEGEND: Lazy<SemanticTokensLegend> = Lazy::new(|| SemanticTokensLegen
         SemanticTokenTypes::Namespace.into(),
         SemanticTokenTypes::Interface.into(),
         SemanticTokenTypes::TypeParameter.into(),
+        SemanticTokenTypes::Method.into(),
+        SemanticTokenTypes::Enum.into(),
+        SemanticTokenTypes::Decorator.into(),
+        SemanticTokenTypes::Regexp.into(),
     ],
     token_modifiers: vec![
         SemanticTokenModifiers::Declaration.into(),
@@ -31,6 +35,7 @@ pub static LEGEND: Lazy<SemanticTokensLegend> = Lazy::new(|| SemanticTokensLegen
         SemanticTokenModifiers::Static.into(),
         SemanticTokenModifiers::Abstract.into(),
         SemanticTokenModifiers::Deprecated.into(),
+        SemanticTokenModifiers::DefaultLibrary.into(),
     ],
 });
 
@@ -47,6 +52,10 @@ pub const TT_ENUM_MEMBER: u32 = 9;
 pub const TT_NAMESPACE: u32 = 10;
 pub const TT_INTERFACE: u32 = 11;
 pub const TT_TYPE_PARAMETER: u32 = 12;
+pub const TT_METHOD: u32 = 13;
+pub const TT_ENUM: u32 = 14;
+pub const TT_DECORATOR: u32 = 15;
+pub const TT_REGEXP: u32 = 16;
 
 pub const MOD_DECLARATION: u32 = 1 << 0;
 pub const MOD_READONLY: u32 = 1 << 1;
@@ -54,6 +63,7 @@ pub const MOD_ASYNC: u32 = 1 << 2;
 pub const MOD_STATIC: u32 = 1 << 3;
 pub const MOD_ABSTRACT: u32 = 1 << 4;
 pub const MOD_DEPRECATED: u32 = 1 << 5;
+pub const MOD_DEFAULT_LIBRARY: u32 = 1 << 6;
 
 pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
     let tokens = &state.tokens;
@@ -66,6 +76,7 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
         let colorable = tok.kind == TokenKind::Identifier
             || tok.kind.is_keyword()
             || tok.kind.is_literal()
+            || tok.kind == TokenKind::RegularExpression
             || matches!(
                 tok.kind,
                 TokenKind::Arrow | TokenKind::FatArrow | TokenKind::PipeGt
@@ -82,6 +93,12 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
             .checked_sub(1)
             .and_then(|j| tokens.get(j))
             .map(|t| t.kind == TokenKind::Dot)
+            .unwrap_or(false);
+
+        let prev_is_at = i
+            .checked_sub(1)
+            .and_then(|j| tokens.get(j))
+            .map(|t| t.kind == TokenKind::At)
             .unwrap_or(false);
 
         let next_is_colon = tokens
@@ -107,6 +124,7 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
             state,
             tok,
             prev_is_dot,
+            prev_is_at,
             prev2_is_enum,
             next_is_lparen,
             next_is_colon,

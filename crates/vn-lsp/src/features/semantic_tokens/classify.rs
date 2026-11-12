@@ -3,8 +3,9 @@ use vn_sem::symbol::SymbolKind;
 use vn_sem::types::Type;
 
 use super::{
-    TT_CLASS, TT_ENUM_MEMBER, TT_FUNCTION, TT_INTERFACE, TT_KEYWORD, TT_NAMESPACE, TT_NUMBER,
-    TT_PARAMETER, TT_PROPERTY, TT_STRING, TT_TYPE, TT_TYPE_PARAMETER, TT_VARIABLE,
+    TT_CLASS, TT_DECORATOR, TT_ENUM, TT_ENUM_MEMBER, TT_FUNCTION, TT_INTERFACE, TT_KEYWORD,
+    TT_METHOD, TT_NAMESPACE, TT_NUMBER, TT_PARAMETER, TT_PROPERTY, TT_REGEXP, TT_STRING, TT_TYPE,
+    TT_TYPE_PARAMETER, TT_VARIABLE,
 };
 use crate::document::{DocumentState, TokenRecord};
 
@@ -12,6 +13,7 @@ pub fn resolve_token(
     state: &DocumentState,
     tok: &TokenRecord,
     prev_is_dot: bool,
+    prev_is_at: bool,
     prev2_is_enum: bool,
     next_is_lparen: bool,
     next_is_colon: bool,
@@ -23,28 +25,33 @@ pub fn resolve_token(
         True | False | Null => return Some(TT_KEYWORD),
         This => return Some(TT_VARIABLE),
         Void => return Some(TT_TYPE),
+        RegularExpression => return Some(TT_REGEXP),
         Arrow | FatArrow | PipeGt => return Some(TT_KEYWORD),
         IntegerLiteral | FloatLiteral | BinaryLiteral | OctalLiteral | HexLiteral
         | BigIntLiteral | DecimalLiteral => return Some(TT_NUMBER),
         Str | Char | Template | TemplateHead | TemplateMiddle | TemplateTail => {
             return Some(TT_STRING)
         }
-        EOF | Dynamic | Identifier | RegularExpression | LParen | RParen | LBrace | RBrace
-        | LBracket | RBracket | LAngle | RAngle | Semicolon | Comma | Dot | DotDot | DotDotDot
-        | DotDotEq | Colon | ColonColon | Question | QuestionDot | QuestionLBracket
-        | QuestionQuestion | QuestionQuestionEq | Plus | PlusPlus | PlusEq | Minus | MinusMinus
-        | MinusEq | Star | StarStar | StarEq | StarStarEq | Slash | SlashEq | Percent
-        | PercentEq | Amp | AmpAmp | AmpEq | AmpAmpEq | Pipe | PipePipe | PipeEq | PipePipeEq
-        | Caret | CaretEq | Tilde | LtLt | LtLtEq | GtGt | GtGtEq | GtGtGt | GtGtGtEq | Eq
-        | EqEq | EqEqEq | Bang | BangEq | BangEqEq | Lt | LtEq | Gt | GtEq | Let | Const | Var
-        | Function | Class | Struct | Interface | Type | Enum | Namespace | Module | Extension
-        | On | If | Else | Switch | Case | Default | While | For | Do | Break | Continue
-        | Return | Throw | Try | Catch | Finally | Using | With | Import | Export | From | As
-        | Async | Await | Yield | New | Super | Delete | Typeof | Instanceof | In | Of | Is
-        | Public | Private | Protected | Static | Abstract | Override | Readonly | Mut | Out
-        | Declare | Native | Extends | Implements | Get | Set | Constructor | Destructor
-        | Match | At | Hash | Backslash | Dollar | Backtick | Newline | Whitespace | DocComment
-        | Placeholder | Spawn | Parallel | Start | RawStr => {}
+        EOF | Dynamic | Identifier | LParen | RParen | LBrace | RBrace | LBracket | RBracket
+        | LAngle | RAngle | Semicolon | Comma | Dot | DotDot | DotDotDot | DotDotEq | Colon
+        | ColonColon | Question | QuestionDot | QuestionLBracket | QuestionQuestion
+        | QuestionQuestionEq | Plus | PlusPlus | PlusEq | Minus | MinusMinus | MinusEq | Star
+        | StarStar | StarEq | StarStarEq | Slash | SlashEq | Percent | PercentEq | Amp | AmpAmp
+        | AmpEq | AmpAmpEq | Pipe | PipePipe | PipeEq | PipePipeEq | Caret | CaretEq | Tilde
+        | LtLt | LtLtEq | GtGt | GtGtEq | GtGtGt | GtGtGtEq | Eq | EqEq | EqEqEq | Bang
+        | BangEq | BangEqEq | Lt | LtEq | Gt | GtEq | Let | Const | Var | Function | Class
+        | Struct | Interface | Type | Enum | Namespace | Module | Extension | On | If | Else
+        | Switch | Case | Default | While | For | Do | Break | Continue | Return | Throw | Try
+        | Catch | Finally | Using | With | Import | Export | From | As | Async | Await | Yield
+        | New | Super | Delete | Typeof | Instanceof | In | Of | Is | Public | Private
+        | Protected | Static | Abstract | Override | Readonly | Mut | Out | Declare | Native
+        | Extends | Implements | Get | Set | Constructor | Destructor | Match | At | Hash
+        | Backslash | Dollar | Backtick | Newline | Whitespace | DocComment | Placeholder
+        | Spawn | Parallel | Start | RawStr => {}
+    }
+
+    if prev_is_at && tok.kind == Identifier {
+        return Some(TT_DECORATOR);
     }
 
     if tok.kind.is_keyword() && !prev_is_dot && !getset_as_ident {
@@ -60,7 +67,7 @@ pub fn resolve_token(
             vn_sem::semantic_info::ResolvedMemberKind::EnumMember => TT_ENUM_MEMBER,
             vn_sem::semantic_info::ResolvedMemberKind::Method
             | vn_sem::semantic_info::ResolvedMemberKind::StaticMethod
-            | vn_sem::semantic_info::ResolvedMemberKind::ExtensionMethod => TT_FUNCTION,
+            | vn_sem::semantic_info::ResolvedMemberKind::ExtensionMethod => TT_METHOD,
             vn_sem::semantic_info::ResolvedMemberKind::Property
             | vn_sem::semantic_info::ResolvedMemberKind::StaticProperty
             | vn_sem::semantic_info::ResolvedMemberKind::ExtensionProperty
@@ -71,7 +78,7 @@ pub fn resolve_token(
             vn_sem::semantic_info::ResolvedMemberKind::NestedType(k) => match k {
                 vn_sem::semantic_info::NestedTypeKind::Interface => TT_INTERFACE,
                 vn_sem::semantic_info::NestedTypeKind::Namespace => TT_NAMESPACE,
-                vn_sem::semantic_info::NestedTypeKind::Enum => TT_TYPE,
+                vn_sem::semantic_info::NestedTypeKind::Enum => TT_ENUM,
                 vn_sem::semantic_info::NestedTypeKind::Class => TT_CLASS,
             },
         });
@@ -94,7 +101,7 @@ pub fn resolve_token(
 
     if prev_is_dot {
         return Some(if next_is_lparen {
-            TT_FUNCTION
+            TT_METHOD
         } else {
             TT_PROPERTY
         });
@@ -147,11 +154,13 @@ pub fn declared_tt(state: &DocumentState, symbol: &vn_sem::symbol::Symbol) -> u3
 fn symbol_tt(state: &DocumentState, kind: SymbolKind, ty: Option<&Type>, prev_is_dot: bool) -> u32 {
     let is_fn = ty.is_some_and(|ty| matches!(state.db.ty_kind(ty), TypeKind::Fn(_)));
     match kind {
-        SymbolKind::Function | SymbolKind::Method => TT_FUNCTION,
+        SymbolKind::Function => TT_FUNCTION,
+        SymbolKind::Method => TT_METHOD,
         SymbolKind::Class | SymbolKind::Extension => TT_CLASS,
         SymbolKind::Interface => TT_INTERFACE,
         SymbolKind::Namespace => TT_NAMESPACE,
-        SymbolKind::TypeAlias | SymbolKind::Enum => TT_TYPE,
+        SymbolKind::TypeAlias => TT_TYPE,
+        SymbolKind::Enum => TT_ENUM,
         SymbolKind::EnumMember => TT_ENUM_MEMBER,
         SymbolKind::TypeParameter => TT_TYPE_PARAMETER,
         SymbolKind::Parameter => {
