@@ -65,11 +65,55 @@ pub const MOD_ABSTRACT: u32 = 1 << 4;
 pub const MOD_DEPRECATED: u32 = 1 << 5;
 pub const MOD_DEFAULT_LIBRARY: u32 = 1 << 6;
 
+struct Utf16Columns<'a> {
+    source: &'a str,
+    line_starts: Vec<usize>,
+    ascii: bool,
+}
+
+impl<'a> Utf16Columns<'a> {
+    fn of(source: &'a str) -> Self {
+        let mut line_starts = vec![0];
+        line_starts.extend(
+            source
+                .bytes()
+                .enumerate()
+                .filter(|(_, byte)| *byte == b'\n')
+                .map(|(index, _)| index + 1),
+        );
+        Self {
+            source,
+            line_starts,
+            ascii: source.is_ascii(),
+        }
+    }
+
+    fn range(&self, line: u32, byte_start: usize, byte_len: usize) -> (u32, u32) {
+        let line_start = self.line_starts.get(line as usize).copied().unwrap_or(0);
+        if self.ascii || byte_start < line_start {
+            return (
+                (byte_start - line_start.min(byte_start)) as u32,
+                byte_len as u32,
+            );
+        }
+        let units = |from: usize, to: usize| {
+            self.source
+                .get(from..to)
+                .map_or(to - from, |text| text.encode_utf16().count()) as u32
+        };
+        (
+            units(line_start, byte_start),
+            units(byte_start, (byte_start + byte_len).min(self.source.len())),
+        )
+    }
+}
+
 pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
     let tokens = &state.tokens;
     let mut result = Vec::with_capacity(tokens.len() * 5);
     let mut prev_line: u32 = 0;
     let mut prev_col: u32 = 0;
+    let columns = Utf16Columns::of(&state.source);
     let declarations = modifiers::DeclarationIndex::build(state);
 
     for (i, tok) in tokens.iter().enumerate() {
@@ -261,6 +305,8 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
             | TokenKind::Start
             | TokenKind::RawStr => (tok.col, tok.length),
         };
+        let byte_start = tok.offset as usize + (emit_col - tok.col) as usize;
+        let (emit_col, emit_len) = columns.range(tok.line, byte_start, emit_len as usize);
         if emit_len == 0 {
             continue;
         }
