@@ -27,7 +27,7 @@ pub fn run_doctor() -> CliResult<()> {
     match vn_modules::provider::get().and_then(|p| p.std_provenance()) {
         Some((desc, prov)) => {
             let origin = match prov {
-                vn_modules::std_root::StdProvenance::ProjectOverride => "varn.toml override",
+                vn_modules::std_root::StdProvenance::ProjectOverride => "vn.toml override",
                 vn_modules::std_root::StdProvenance::Env => "VN_STD",
                 vn_modules::std_root::StdProvenance::DevCheckout => {
                     "dev checkout (std/ next to binary)"

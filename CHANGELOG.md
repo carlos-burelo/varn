@@ -7,6 +7,7 @@ Versionado: ver [`docs/STABILITY.md`](docs/STABILITY.md).
 
 ### Changed (incompatible)
 
+- Crates, environment variables, the manifest and the lockfile are named for the `vn` program: the crates are `vn-*` (`crates/vn-core`, `vn_core`), the variables are `VN_*` (`VN_NO_JIT`, `VN_STD`, `VN_CACHE_DIR`), the manifest is `vn.toml` and the lockfile `vn.lock`, and the language server's commands are `vn.*` with `vn` as its language id, configuration section and diagnostic source.
 - `+` needs two strings or two numbers: `"n=" + n` is `VN3010`, use a template literal (`` `n=${n}` ``).
 - `x as T` between unrelated types is `VN3014`. Unions, arrays, numbers and int enums keep working; a conversion out of a generic `T` goes through `dynamic`.
 - `this` outside a class, enum or extension is `VN4115`.
@@ -16,23 +17,23 @@ Versionado: ver [`docs/STABILITY.md`](docs/STABILITY.md).
 - The right operand of `in` cannot be a scalar.
 - Reading a property of an `int`, `float` or `bool` at runtime is an error instead of `null`.
 
-- The manifest is `varn.toml` only, in one flat shape. `vn.toml`, `[package]` and `[project]` are gone and an unknown key is an error. `vn init` writes the flat form.
+- The manifest is `vn.toml` only, in one flat shape. `[package]` and `[project]` are gone and an unknown key is an error. `vn init` writes the flat form.
 - `vn build --native` is gone: use `--target native` (`--target` is now `bytecode`, `exe` or `native`).
 - `vn` is always built with the language server, the debug adapter and the package manager; the `lsp`, `dap` and `pm` features no longer exist.
-- `VARN_DEBUG_OPS` is replaced by `vn debug --natives`.
+- `VN_DEBUG_OPS` is replaced by `vn debug --natives`.
 - A path given to `vn fmt` that does not exist is an error, and a standalone executable whose trailer cannot be read is an error instead of starting the normal CLI.
 - `vn pkg` installs dependencies in alphabetical order and reports an unreadable dependency manifest instead of skipping its dependencies.
 - `vn fmt` and `vn test` fail on a path that does not exist, and `vn fmt` fails on a directory it cannot read.
-- `varn.toml` accepts `description`, `license`, `repository`, `homepage`, `authors` and `keywords` besides the fields listed in the CLI reference; every other unknown key is an error.
+- `vn.toml` accepts `description`, `license`, `repository`, `homepage`, `authors` and `keywords` besides the fields listed in the CLI reference; every other unknown key is an error.
 - `vn debug`, `vn eval`, `vn repl` and `vn test` accept the same `--allow-*` and `--sandbox` flags as `vn run`, and a bad `--phase` spec exits with the usage code.
 
 ### Added
 
-- `[fmt]` and `[test]` sections in `varn.toml` with `include`/`exclude` patterns for the files `vn fmt` and `vn test` visit; `vn bench` accepts the permission flags.
-- `vn task`: run the command lines declared under `[tasks]` in `varn.toml`.
+- `[fmt]` and `[test]` sections in `vn.toml` with `include`/`exclude` patterns for the files `vn fmt` and `vn test` visit; `vn bench` accepts the permission flags.
+- `vn task`: run the command lines declared under `[tasks]` in `vn.toml`.
 - `vn build --target exe`: a self-contained executable made of the running `vn`, the std image it uses and the compiled module graph.
-- `.env` files and the `std` key of `varn.toml` come from the project of the file or directory the command receives, not from the working directory; `vn pkg` works on the project that owns the installed packages, and an invalid `varn.toml` in an ancestor directory is an error that names the file.
-- `vn check` takes any number of files and directories (none: the `main` of `varn.toml`) and type-checks each one with all its dependencies without generating code; emission errors only show up in `vn run` and `vn build`.
+- `.env` files and the `std` key of `vn.toml` come from the project of the file or directory the command receives, not from the working directory; `vn pkg` works on the project that owns the installed packages, and an invalid `vn.toml` in an ancestor directory is an error that names the file.
+- `vn check` takes any number of files and directories (none: the `main` of `vn.toml`) and type-checks each one with all its dependencies without generating code; emission errors only show up in `vn run` and `vn build`.
 - `.vn/.env`, the file `vn init` creates, is now read with the other `.env` files.
 
 ### Fixed

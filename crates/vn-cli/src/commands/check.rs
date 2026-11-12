@@ -50,7 +50,7 @@ fn targets(session: &pipeline::Session, requested: &[String]) -> Result<Vec<Path
     if requested.is_empty() {
         let main =
             project.manifest.main.as_deref().ok_or_else(|| {
-                CliError::usage("no files given and varn.toml declares no 'main'")
+                CliError::usage("no files given and vn.toml declares no 'main'")
             })?;
         return Ok(vec![project.root.join(main)]);
     }

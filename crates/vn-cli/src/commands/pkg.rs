@@ -7,7 +7,7 @@ pub fn manifest_path(project: &Project) -> Result<&Path, CliError> {
     project
         .manifest_path
         .as_deref()
-        .ok_or_else(|| CliError::fatal("no varn.toml found — run `vn init` first"))
+        .ok_or_else(|| CliError::fatal("no vn.toml found — run `vn init` first"))
 }
 
 pub fn execute(project: &Project, cmd: PkgCommands) -> Result<(), CliError> {
@@ -69,7 +69,7 @@ fn execute_doctor(project: &Project) -> Result<(), CliError> {
 
     let lock_path = vn_pm::lockfile::lock_path(project_root);
     if !lock_path.exists() {
-        terminal::info("No varn.lock found. Run `vn pkg install` to generate lockfile.");
+        terminal::info("No vn.lock found. Run `vn pkg install` to generate lockfile.");
         return Ok(());
     }
 

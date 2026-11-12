@@ -24,7 +24,7 @@ pub fn execute(project: &Project) -> Result<(), CliError> {
         let deps =
             vn_pm::parse_dependencies(&project.manifest.dependencies).map_err(CliError::fatal)?;
         if deps.is_empty() {
-            terminal::log("No dependencies declared in varn.toml.");
+            terminal::log("No dependencies declared in vn.toml.");
             return Ok(());
         }
         terminal::log(format!("Resolving {} dependency(ies)...", deps.len()));

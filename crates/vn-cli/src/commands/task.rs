@@ -21,7 +21,7 @@ pub fn execute(session: &Arc<Session>, args: TaskArgs) -> Result<(), CliError> {
 
 fn list(tasks: &BTreeMap<String, Vec<String>>) {
     if tasks.is_empty() {
-        terminal::log("No tasks declared in varn.toml.");
+        terminal::log("No tasks declared in vn.toml.");
         return;
     }
     for (name, lines) in tasks {

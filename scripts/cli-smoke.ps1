@@ -91,7 +91,7 @@ Check "check-without-arguments-needs-main" {
 Check "env-and-project-follow-the-file-not-the-cwd" {
     $proj = Join-Path $work "anchor"
     New-Item -ItemType Directory -Force (Join-Path $proj "sub"), (Join-Path $work "elsewhere") | Out-Null
-    Set-Content (Join-Path $proj "varn.toml") 'name = "anchor"'
+    Set-Content (Join-Path $proj "vn.toml") 'name = "anchor"'
     Set-Content (Join-Path $proj ".env") 'ANCHOR_PROBE=from-project'
     Set-Content (Join-Path $proj "sub\probe.vn") 'import { Env } from "std:env"; print(Env.get("ANCHOR_PROBE", "unset"));'
     Push-Location (Join-Path $work "elsewhere")
@@ -103,8 +103,8 @@ Check "pkg-commands-use-the-project-that-owns-installed-packages" {
     $proj = Join-Path $work "owner"
     $dep = Join-Path $proj ".vn\packages\dep"
     New-Item -ItemType Directory -Force $dep | Out-Null
-    Set-Content (Join-Path $proj "varn.toml") 'name = "owner-project"'
-    Set-Content (Join-Path $dep "varn.toml") 'name = "dep"'
+    Set-Content (Join-Path $proj "vn.toml") 'name = "owner-project"'
+    Set-Content (Join-Path $dep "vn.toml") 'name = "dep"'
     Push-Location $dep
     try { $r = Vn pkg tree } finally { Pop-Location }
     $r.Code -eq 0 -and $r.Out -match "owner-project"
@@ -113,8 +113,8 @@ Check "pkg-commands-use-the-project-that-owns-installed-packages" {
 Check "invalid-ancestor-manifest-is-reported-when-resolving-a-package" {
     $root = Join-Path $work "ancestor"
     New-Item -ItemType Directory -Force (Join-Path $root "sub") | Out-Null
-    Set-Content (Join-Path $root "varn.toml") 'bogus = 1'
-    Set-Content (Join-Path $root "sub\varn.toml") 'name = "sub"'
+    Set-Content (Join-Path $root "vn.toml") 'bogus = 1'
+    Set-Content (Join-Path $root "sub\vn.toml") 'name = "sub"'
     $f = Join-Path $root "sub\a.vn"
     Set-Content $f 'import { x } from "nopkg"; print(x);'
     $r = Vn run $f
@@ -142,10 +142,10 @@ Check "init-writes-a-manifest-pkg-reads" {
 Check "manifest-unknown-key-is-named" {
     $dir = Join-Path $work "badmanifest"
     New-Item -ItemType Directory -Force $dir | Out-Null
-    Set-Content (Join-Path $dir "varn.toml") 'nmae = "x"' -Encoding utf8
+    Set-Content (Join-Path $dir "vn.toml") 'nmae = "x"' -Encoding utf8
     $f = Write-Vn "badmanifest\hello.vn" 'print("hi");'
     $r = Vn run $f
-    $r.Code -ne 0 -and $r.Out -match "nmae" -and $r.Out -match "varn.toml"
+    $r.Code -ne 0 -and $r.Out -match "nmae" -and $r.Out -match "vn.toml"
 }
 
 Check "cache-hit-on-second-run" {
@@ -222,7 +222,7 @@ Check "exe-corrupt-trailer-is-an-error" {
 
 function Write-Tasks($dir, $toml) {
     New-Item -ItemType Directory -Force (Join-Path $work $dir) | Out-Null
-    Set-Content (Join-Path (Join-Path $work $dir) "varn.toml") $toml -Encoding utf8
+    Set-Content (Join-Path (Join-Path $work $dir) "vn.toml") $toml -Encoding utf8
     Join-Path $work $dir
 }
 
@@ -268,9 +268,9 @@ Check "package-manifest-metadata-is-accepted" {
     $dir = Join-Path $work "pkgmeta"
     $pkg = Join-Path $dir ".vn/packages/foo"
     New-Item -ItemType Directory -Force $pkg | Out-Null
-    Set-Content (Join-Path $pkg "varn.toml") "name = `"foo`"`nversion = `"1.0.0`"`ndescription = `"metadata`"`nlicense = `"MIT`"" -Encoding utf8
+    Set-Content (Join-Path $pkg "vn.toml") "name = `"foo`"`nversion = `"1.0.0`"`ndescription = `"metadata`"`nlicense = `"MIT`"" -Encoding utf8
     Set-Content (Join-Path $pkg "index.vn") 'export const x: int = 41' -Encoding utf8
-    Set-Content (Join-Path $dir "varn.toml") "name = `"app`"`ndescription = `"demo`"" -Encoding utf8
+    Set-Content (Join-Path $dir "vn.toml") "name = `"app`"`ndescription = `"demo`"" -Encoding utf8
     $main = Join-Path $dir "main.vn"
     Set-Content $main "import { x } from `"pkg:foo`"`nprint(x + 1)" -Encoding utf8
     $r = Vn run $main
@@ -321,7 +321,7 @@ Check "manifest-filters-limit-fmt-and-test" {
     Set-Content (Join-Path $dir "src/s.vn") 'let x = 1' -Encoding utf8
     Set-Content (Join-Path $dir "tests/a1.vn") 'print("t")' -Encoding utf8
     Set-Content (Join-Path $dir "tests/b1.vn") 'print("t")' -Encoding utf8
-    Set-Content (Join-Path $dir "varn.toml") "[fmt]`nexclude = [`"gen/**`"]`n`n[test]`ninclude = [`"tests/a*.vn`"]" -Encoding utf8
+    Set-Content (Join-Path $dir "vn.toml") "[fmt]`nexclude = [`"gen/**`"]`n`n[test]`ninclude = [`"tests/a*.vn`"]" -Encoding utf8
     Push-Location $dir
     try {
         $fmt = Vn fmt --check .

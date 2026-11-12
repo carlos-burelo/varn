@@ -8,7 +8,7 @@ viva; esta página la resume.
 | Comando | Uso | Notas |
 |---|---|---|
 | `run` | `vn run [OPTIONS] [FILE] [-- ARGS...]` | `-e/--eval CODE`, `-v`, `--trace`, permisos (abajo), `--compare-tiers` (corre el programa en intérprete, JIT y JIT tier 1 y compara salidas) |
-| `check` | `vn check [-v] [PATH...]` | Verifica tipos de cada archivo y de todas sus dependencias sin generar código; los directorios se recorren recursivamente y sin argumentos se usa `main` de `varn.toml`. Sale con 3 si algún archivo tiene diagnósticos. Los errores de emisión (p. ej. demasiadas constantes) solo aparecen en `run`/`build` |
+| `check` | `vn check [-v] [PATH...]` | Verifica tipos de cada archivo y de todas sus dependencias sin generar código; los directorios se recorren recursivamente y sin argumentos se usa `main` de `vn.toml`. Sale con 3 si algún archivo tiene diagnósticos. Los errores de emisión (p. ej. demasiadas constantes) solo aparecen en `run`/`build` |
 | `eval` | `vn eval [-v] [permisos] CODE` | Evalúa una expresión/programa corto |
 | `repl` | `vn repl [--debug-bytecode] [permisos]` | Bucle interactivo; cada línea es un programa aparte |
 | `test` | `vn test [PATH] [-f FILTER] [-j JOBS] [--fail-fast] [-v] [permisos]` | Ejecuta cada `.vn` de PATH (por defecto `tests/`, un nivel) |
@@ -39,13 +39,13 @@ lo pedido. `--sandbox` lo niega todo. Detalle en
 |---|---|
 | `init` | `vn init [DIR] [--name NAME]` |
 | `pkg` | `vn pkg add ALIAS ORIGIN` · `remove ALIAS` · `install` · `update` · `tree` · `doctor` · `clean` |
-| `task` | `vn task [NAME] [-- ARGS...]` — sin nombre lista las tareas de `varn.toml`; con nombre ejecuta sus líneas en orden desde la raíz del proyecto |
+| `task` | `vn task [NAME] [-- ARGS...]` — sin nombre lista las tareas de `vn.toml`; con nombre ejecuta sus líneas en orden desde la raíz del proyecto |
 | `cache` | `vn cache clean` |
 | `doctor` | `vn doctor` — diagnóstico de instalación y de la std resuelta |
 
-## El manifiesto `varn.toml`
+## El manifiesto `vn.toml`
 
-Un solo archivo, `varn.toml`, con campos planos: `name`, `version`, `main`, `std`,
+Un solo archivo, `vn.toml`, con campos planos: `name`, `version`, `main`, `std`,
 `exports`, `dependencies`, `dev_dependencies`, `peer_dependencies`, `workspaces` y
 `tasks`, `fmt` y `test`. Una clave desconocida es un error que nombra la clave y el archivo. Las
 secciones `[package]` y `[project]` y el nombre `vn.toml` ya no existen.
@@ -68,10 +68,10 @@ proyecto con `*`, `?` y `**`, que limitan los archivos que `vn fmt` y `vn test` 
 Cada línea de una tarea es una línea de comando de `vn` (sin el `vn`); la primera que
 falla corta la secuencia, `task otra` dentro de una tarea la encadena y un ciclo es un
 error. Los argumentos tras `--` se añaden a la última línea. La raíz del proyecto es el
-directorio con `varn.toml` más cercano al archivo (comandos con archivo) o al cwd
+directorio con `vn.toml` más cercano al archivo (comandos con archivo) o al cwd
 (comandos de proyecto). Al arrancar, antes de interpretar el comando, se leen en este orden de prioridad `.env.local`,
 `.env` y `.vn/.env` del cwd y de la raíz del proyecto que contiene el cwd; lo mismo vale
-para el `std` de `varn.toml`. `vn task` entra en la raíz del proyecto después de eso.
+para el `std` de `vn.toml`. `vn task` entra en la raíz del proyecto después de eso.
 
 ## Herramientas de editor
 

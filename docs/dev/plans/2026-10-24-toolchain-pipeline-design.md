@@ -49,7 +49,7 @@ Consecuencias observadas en el código, no supuestas:
   del archivo de entrada, así que pueden resolver raíces distintas en una misma ejecución.
 - El manifiesto es TOML y se parsea en tres sitios (`vn-pm::ProjectManifest`,
   `vn-modules::package::RawManifest` y la mini estructura `StdKey` de `std_root`). Acepta
-  dos nombres de archivo (`varn.toml` y `vn.toml`, con las constantes repetidas en
+  dos nombres de archivo (`vn.toml` y `vn.toml`, con las constantes repetidas en
   `artifact.rs` e `ids.rs`) y hasta tres formas de declarar el nombre (`[package]`,
   `[project]` y campos planos). Hay además tres buscadores de raíz (`find_project_root`,
   `project_root_cached` y `find_project_manifest`) con reglas ligeramente distintas.
@@ -168,7 +168,7 @@ añadido posterior.
 - **Crate `vn-project`**, hoja: manifiesto, descubrimiento de raíz y lectura de `.env`.
   `vn-modules`, `vn-pm`, `vn-pipeline` y `vn-cli` dependen de él (Ley 1: la
   definición de proyecto no vive arriba, en `vn-pm`).
-- **Un solo manifiesto, `varn.toml`.** Se borra el alias `vn.toml` y las secciones `[package]`
+- **Un solo manifiesto, `vn.toml`.** Se borra el alias `vn.toml` y las secciones `[package]`
   y `[project]`; quedan los campos planos (`name`, `version`, `main`, `exports`, `dependencies`, `dev_dependencies`,
   `peer_dependencies`, `workspaces`) más las secciones nuevas. Es un cambio incompatible: la
   ganancia es que un campo tiene una sola ubicación. Los manifiestos del repo (`std/`,
@@ -277,7 +277,7 @@ nota de validación de `AGENTS.md`.
 
 - `vn lint`, `vn doc`, `vn upgrade`. Necesitan su propio motor (reglas, extracción de
   documentación, distribución de releases). Se añaden como un módulo de comando más, con su
-  sección en `varn.toml`.
+  sección en `vn.toml`.
 - Cambiar la resolución de dependencias entre miembros de un workspace.
 - REPL con estado entre líneas. Hoy cada línea es un programa aparte y `let x = 1` seguido de
   `x` falla. Arreglarlo exige un entorno incremental en el checker; es otro diseño.
@@ -304,7 +304,7 @@ condicione el diseño (Ley 18: se rehace el test).
 
 - Features `lsp`, `dap`, `pm` fuera: un toolchain es un binario con todo.
 - Permisos por defecto sin cambio (todo concedido).
-- `varn.toml` con campos planos y sin sección `package`.
+- `vn.toml` con campos planos y sin sección `package`.
 - Crate nuevo `vn-project` como hoja.
 - `Target::Exe` completa el trailer `VEXE`; el lector sin productor no se deja como está.
 - `vn task` entra en esta tanda; `lint`, `doc` y `upgrade` no.
@@ -317,7 +317,7 @@ condicione el diseño (Ley 18: se rehace el test).
 
 ## Decisión: el arranque se ancla en el cwd
 
-`.env` y el `std` de `varn.toml` se resuelven antes de analizar la línea de comandos
+`.env` y el `std` de `vn.toml` se resuelven antes de analizar la línea de comandos
 (la std se registra y el entorno se aplica antes de que exista ningún `Session`), así
 que parten del cwd. `Session::open` parte, en cambio, del archivo de entrada. Un
 `vn run ../otro/main.vn` valida el manifiesto de `otro` y toma `.env` y `std` del

@@ -121,7 +121,7 @@ pub fn run_pipeline(source: String, uri: String, session: &Session) -> DocumentA
         diagnostics.insert(
             0,
             LspDiag {
-                message: "no standard library found for this workspace (checked varn.toml \
+                message: "no standard library found for this workspace (checked vn.toml \
                     'std', VN_STD, this checkout's std/ tree, and the stdlib compiled \
                     into this binary) — rebuild or reinstall the vn toolchain"
                     .to_string(),

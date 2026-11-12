@@ -42,7 +42,7 @@ Entradas que el diseño implica y que ninguna tarea cubriría sin pedirlo. Cada 
 
 1. `vn task a` donde la tarea `a` invoca `task a`: debe dar un error de recursión, no un desbordamiento de pila (Tarea 12).
 2. Varios workers de `vn test` escribiendo la misma entrada de caché a la vez: ninguna lectura debe ver un archivo a medias (Tarea 8).
-3. `varn.toml` con una clave desconocida: error que nombra la clave y el archivo (Tarea 3).
+3. `vn.toml` con una clave desconocida: error que nombra la clave y el archivo (Tarea 3).
 4. `vn eval "let ="` (error de sintaxis sin archivo): el diagnóstico se muestra con el nombre virtual y exit code 3 (Tarea 2).
 5. Ejecutable `--target exe` con trailer `VEXE` pero grafo corrupto: error explícito con exit code distinto de 0, no arranque silencioso del `vn` normal (Tarea 11).
 
@@ -126,10 +126,10 @@ Entradas que el diseño implica y que ninguna tarea cubriría sin pedirlo. Cada 
   `ProjectError` incluye la clave desconocida y el archivo.
 - Consume: nada (hoja; `serde`, `serde_json`, std).
 
-- [ ] **Paso 1:** Inventario. `tgrep -n -F -- "varn.toml" .` y `tgrep -n -- "find_project_root|project_root_cached|ProjectManifest"` sobre `crates/`. El repo no contiene manifiestos; el manifiesto se parsea hoy en `vn-pm::ProjectManifest`, `vn-modules::package` y `std_root::project_std_override`, y esos tres lectores se reemplazan por `Manifest`. `vn init` deja de escribir `[package]`.
+- [ ] **Paso 1:** Inventario. `tgrep -n -F -- "vn.toml" .` y `tgrep -n -- "find_project_root|project_root_cached|ProjectManifest"` sobre `crates/`. El repo no contiene manifiestos; el manifiesto se parsea hoy en `vn-pm::ProjectManifest`, `vn-modules::package` y `std_root::project_std_override`, y esos tres lectores se reemplazan por `Manifest`. `vn init` deja de escribir `[package]`.
 - [ ] **Paso 2:** Crear el crate. La regla de descubrimiento es la actual de `find_project_root` (mismos marcadores), parametrizada por `Anchor`; `Anchor::File` parte del directorio del archivo y `Anchor::Cwd` del cwd. El `.env` se lee del `root` con la lógica de `env_file.rs`. La sección `package` desaparece; los campos planos son los únicos.
 - [ ] **Paso 3:** Reemplazar los seis sitios de búsqueda de raíz por `Project`. `vn-modules`, `vn-pm`, `vn-pipeline`, `vn-resolver` y `vn-cli` dependen de `vn-project`. `ProjectManifest` de `vn-pm` se borra y `vn-pm` usa `Manifest`.
-- [ ] **Paso 4: check `manifest-unknown-key`**: en un directorio temporal, `varn.toml` con la línea `nmae = "x"` y un `.vn`; `vn run` debe fallar y mostrar `nmae` y la ruta del `varn.toml`.
+- [ ] **Paso 4: check `manifest-unknown-key`**: en un directorio temporal, `vn.toml` con la línea `nmae = "x"` y un `.vn`; `vn run` debe fallar y mostrar `nmae` y la ruta del `vn.toml`.
 - [ ] **Paso 5:** G1. Commit: `project: one manifest shape and one root discovery in a leaf crate`.
 
 ---
@@ -365,7 +365,7 @@ Cinco commits.
 - Un `execute` de comando devuelve `Result<(), Failure>`; la pila de tareas en curso viaja en un parámetro y una tarea ya presente en la pila da `Failure::Usage("task cycle: a → b → a")`.
 
 - [ ] **Paso 1:** Implementar. Una tarea desconocida lista las existentes. Los argumentos extra de `vn task <n> …` se añaden a la última línea.
-- [ ] **Paso 2: checks** `task-runs-in-order`, `task-stops-on-failure` y `task-cycle-detected` (la tarea `a` con la línea `task a`) en `cli-smoke.ps1`, con un `varn.toml` temporal.
+- [ ] **Paso 2: checks** `task-runs-in-order`, `task-stops-on-failure` y `task-cycle-detected` (la tarea `a` con la línea `task a`) en `cli-smoke.ps1`, con un `vn.toml` temporal.
 - [ ] **Paso 3:** G1. Commit: `cli: vn task runs manifest tasks in-process`.
 
 ---
@@ -442,7 +442,7 @@ plan. Lo que cambió respecto a él, con la razón (el ledger de ejecución no s
   arranque que `run`.
 - **El proyecto lo fija el argumento del comando, no el cwd.** `dispatch::project_for` descubre el
   `Project` (archivo, directorio o cwd según el comando) antes de `bootstrap::init`, que carga los `.env`
-  y fija el `std` de `varn.toml` desde ese proyecto. `Project::owning` (salta `.vn/packages`) es el
+  y fija el `std` de `vn.toml` desde ese proyecto. `Project::owning` (salta `.vn/packages`) es el
   alcance de `vn pkg`; `vn-modules` y `vn-pm` ya no tienen buscadores de manifiesto propios y un
   manifiesto inválido en un ancestro es un error con su causa. El LSP reabre su `Session` sobre la
   raíz del workspace en `initialize` y `vn-inspect` recibe la `Session` del comando.

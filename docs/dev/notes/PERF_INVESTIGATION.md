@@ -673,7 +673,7 @@ obj_alloc ~21x (was 189x) · str_build still ~400x (needs extensible strings).
 **Cache warning that cost hours:** `.vnc` artifacts bake in resolved
 `GlobalIdx` slots that depend on the whole import graph, but the cache key is
 per-file source hash only, and the cache lives in the *source file's own
-directory* (`tests/.vn`) plus `~/.varn/cache`. Running a module from two
+directory* (`tests/.vn`) plus `~/.vn/cache`. Running a module from two
 different entry points poisons later runs with wrong global indices
 ("value is not callable: null" with no miscompilation present). Purge all
 cache locations between compiler builds; longer term, key artifacts by

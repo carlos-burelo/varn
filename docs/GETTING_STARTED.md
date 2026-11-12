@@ -69,7 +69,7 @@ cd mi-proyecto
 vn run main.vn
 ```
 
-`vn init` crea `main.vn` y `varn.toml`. La caché es global (`~/.vn/cache`, o
+`vn init` crea `main.vn` y `vn.toml`. La caché es global (`~/.vn/cache`, o
 `VN_HOME`/`VN_CACHE_DIR`); `vn run` no escribe en el proyecto.
 
 ## 5. Tests

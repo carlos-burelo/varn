@@ -12,7 +12,7 @@ pub fn execute(project: &Project, args: RemoveArgs) -> Result<(), CliError> {
 
     if !manifest.dependencies.contains_key(&args.alias) {
         return Err(CliError::fatal(format!(
-            "dependency '{}' not found in varn.toml",
+            "dependency '{}' not found in vn.toml",
             args.alias
         )));
     }

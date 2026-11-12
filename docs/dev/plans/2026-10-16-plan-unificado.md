@@ -174,7 +174,7 @@ un nombre no declarado no daba error y llegaba al verificador TIR como
 chequeaban, pero se emitían (`94f63b09`). Corpus `tests/errors` 206/0.
 Toolchain (2026-10-24, diseño y plan en `2026-10-24-toolchain-pipeline*.md`):
 `Failure` tipado y exit codes en el borde (`df849f7a`); `vn-project` con un
-solo `varn.toml` y una sola búsqueda de raíz (`bb302345`); `Session` dueña del
+solo `vn.toml` y una sola búsqueda de raíz (`bb302345`); `Session` dueña del
 `Project` y del resolver (`ad2234b7`); `Source` (`283499b7`); `lower_module`
 único (`682ce5ea`); `Session::compile` con `Compilation` por etapas, sin
 `DebugSink` ni `RunOpts` (`767f7430`); `Policy` y `PermissionArgs`
