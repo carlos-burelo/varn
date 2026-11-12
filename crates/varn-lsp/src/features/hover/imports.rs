@@ -36,10 +36,7 @@ fn resolve_import_module_path(specifier: &str, doc_uri: &str) -> String {
         joined
     };
 
-    let mut resolved = std::fs::canonicalize(&with_ext).unwrap_or(with_ext);
-    if resolved.extension().and_then(|ext| ext.to_str()) == Some("Varn") {
-        resolved.set_extension("");
-    }
+    let resolved = std::fs::canonicalize(&with_ext).unwrap_or(with_ext);
 
     normalize_display_path(&resolved.to_string_lossy())
 }
