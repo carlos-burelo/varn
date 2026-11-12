@@ -161,7 +161,7 @@ Nada de la Fase R empieza hasta cerrar M1–M5.
 
 ### M7. Mapa del repo al día
 
-- `.claude/skills/varn-repo-map/SKILL.md` cita `crates/varn-regalloc` y
+- `.claude/skills/vn-repo-map/SKILL.md` cita `crates/varn-regalloc` y
   `crates/varn-runtime`, que no existen, y omite `vn-emit`, `vn-sem`,
   `vn-binder`, `vn-tir`, `vn-resolver`.
 - Corregir la lista contra `ls crates/`. Actualizar también la línea "No tocar"
@@ -421,8 +421,8 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
   3. Cruzar con `docs/dev/audits/DYNAMIC_INVENTORY.md` y sus CSV solo como
      lista de sitios; el estado se toma del código (Ley 12).
 - (a) Los 216 `Eq` y 1471 `GetProperty` genéricos del corpus bajan por causa
-  conocida. (b) Skill `varn-static-coverage` antes y después, y
-  `varn-dynamic-audit` sobre `tests/`. (c) Los fallbacks.
+  conocida. (b) Skill `vn-static-coverage` antes y después, y
+  `vn-dynamic-audit` sobre `tests/`. (c) Los fallbacks.
 - **Riesgo:** rompe código del corpus que hoy compila (Ley 15 y 18: se corrige
   el corpus). Coordinar con §2.5 del plan unificado.
 
@@ -430,7 +430,7 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
 
 - **Evidencia:** 11 `Eq` genéricos en `bench_generator.vn`; generator pierde
   contra Bun en `compare.ps1`, dato no verificado por checksum.
-- **Primer paso:** skill `varn-type-loss-audit` sobre un `Eq` de `pingpong`.
+- **Primer paso:** skill `vn-type-loss-audit` sobre un `Eq` de `pingpong`.
 - (a), (b) Añadir `generator` a `xtask compare` y medir. (c) Según la causa.
 
 ### L3. Ley 11: tests de Rust y comentarios
