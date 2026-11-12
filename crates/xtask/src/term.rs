@@ -42,11 +42,11 @@ impl Term {
 
     pub(super) fn rt_color(&self, rt: &str, s: &str) -> String {
         match rt {
-            "varn" => self.color("1;36", s),
+            "vn" => self.color("1;36", s),
             "bun" => self.color("1;33", s),
             "node" => self.color("1;32", s),
             "python" => self.color("1;34", s),
-            "varn-base" => self.color("1;35", s),
+            "vn-base" => self.color("1;35", s),
             _ => self.white(s),
         }
     }

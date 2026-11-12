@@ -84,7 +84,7 @@ fn print_compact(term: &Term, results: &[RowResult]) {
     println!("  {}", term.gray(&"─".repeat(hdr.len() - 2)));
 
     for r in results {
-        let varn_w = r.work_stats.get("varn").map(|w| w.median);
+        let varn_w = r.work_stats.get("vn").map(|w| w.median);
         let bun_w = r.work_stats.get("bun").map(|w| w.median);
         let node_w = r.work_stats.get("node").map(|w| w.median);
 
@@ -104,7 +104,7 @@ fn print_compact(term: &Term, results: &[RowResult]) {
                 let v_share = ((vw / total) * 18.0).round() as usize;
                 let v_share = v_share.clamp(1, 17);
                 let b_share = 18 - v_share;
-                let v_blocks = term.rt_color("varn", &"█".repeat(v_share));
+                let v_blocks = term.rt_color("vn", &"█".repeat(v_share));
                 let b_blocks = term.rt_color("bun", &"░".repeat(b_share));
                 format!("[{v_blocks}{b_blocks}]")
             } else {

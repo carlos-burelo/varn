@@ -8,7 +8,7 @@ pub(super) fn discover_runtimes(opts: &Opts, target_vn: &Path) -> Vec<RuntimeInf
     let mut runtimes = Vec::new();
 
     runtimes.push(RuntimeInfo {
-        name: "varn".to_string(),
+        name: "vn".to_string(),
         bin: target_vn.to_path_buf(),
         args_prefix: vec!["run".to_string()],
         empty_ext: ".vn",
@@ -17,7 +17,7 @@ pub(super) fn discover_runtimes(opts: &Opts, target_vn: &Path) -> Vec<RuntimeInf
 
     if let Some(ref base_path) = opts.baseline {
         runtimes.push(RuntimeInfo {
-            name: "varn-base".to_string(),
+            name: "vn-base".to_string(),
             bin: base_path.clone(),
             args_prefix: vec!["run".to_string()],
             empty_ext: ".vn",

@@ -65,7 +65,7 @@ pub(super) fn calibrate_runtimes(
             }
             .max(1);
             let bar_str = term.bar(&rt.name, bar_len);
-            let extra = if rt.name == "varn" {
+            let extra = if rt.name == "vn" {
                 if let Some(bun_st) = startup_stats.get("bun") {
                     let factor = bun_st.median / st.median.max(0.1);
                     format!(
@@ -114,13 +114,13 @@ pub(super) fn measure_benchmarks(
         let mut bench_files: HashMap<String, PathBuf> = HashMap::new();
         for rt in runtimes {
             let rel = match rt.name.as_str() {
-                "varn" | "varn-base" => Some(bench.vn),
+                "vn" | "vn-base" => Some(bench.vn),
                 "python" => bench.py,
                 _ => Some(bench.ts),
             };
             if let Some(r) = rel {
                 let full = match rt.name.as_str() {
-                    "varn" | "varn-base" => bench_dir.join("vn").join(r),
+                    "vn" | "vn-base" => bench_dir.join("vn").join(r),
                     "python" => bench_dir.join(r),
                     _ => bench_dir.join("ts").join(r),
                 };
@@ -202,8 +202,8 @@ pub(super) fn measure_benchmarks(
         let mut best_rival_work: Option<f64> = None;
 
         for rt in &present_rts {
-            if rt.name != "varn"
-                && rt.name != "varn-base"
+            if rt.name != "vn"
+                && rt.name != "vn-base"
                 && let Some(w) = work_stats.get(&rt.name)
                 && (best_rival_work.is_none() || w.median < best_rival_work.unwrap())
             {
@@ -212,14 +212,14 @@ pub(super) fn measure_benchmarks(
             }
         }
 
-        let varn_work = work_stats.get("varn").map(|w| w.median);
+        let varn_work = work_stats.get("vn").map(|w| w.median);
         let work_ratio = match (varn_work, best_rival_work) {
             (Some(vw), Some(rw)) if vw >= 0.05 && rw >= 0.05 => Some(round2(rw / vw)),
             _ => None,
         };
 
         let resolved = if let (Some(rw_name), Some(_rw)) = (&best_rival, best_rival_work) {
-            match (work_stats.get("varn"), work_stats.get(rw_name)) {
+            match (work_stats.get("vn"), work_stats.get(rw_name)) {
                 (Some(varn_w), Some(rival_w)) => {
                     let non_overlapping = (varn_w.max < rival_w.min) || (rival_w.max < varn_w.min);
                     let significant_diff =
