@@ -210,12 +210,12 @@ impl super::Scanner<'_> {
             let mut content_start = self.pos;
             if !self.is_eof() && self.peek(0) == b'\r' && self.peek(1) == b'\n' {
                 self.cur_line += 1;
-                self.cur_col = 1;
+                self.cur_col = 0;
                 self.pos += 2;
                 content_start = self.pos;
             } else if !self.is_eof() && self.peek(0) == b'\n' {
                 self.cur_line += 1;
-                self.cur_col = 1;
+                self.cur_col = 0;
                 self.pos += 1;
                 content_start = self.pos;
             }
@@ -226,11 +226,11 @@ impl super::Scanner<'_> {
                 }
                 if self.peek(0) == b'\n' {
                     self.cur_line += 1;
-                    self.cur_col = 1;
+                    self.cur_col = 0;
                     self.pos += 1;
                 } else if self.peek(0) == b'\r' && self.peek(1) == b'\n' {
                     self.cur_line += 1;
-                    self.cur_col = 1;
+                    self.cur_col = 0;
                     self.pos += 2;
                 } else {
                     self.advance_byte();
