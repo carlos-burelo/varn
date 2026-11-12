@@ -59,7 +59,7 @@ function run(): void {
     let end = now()
 
     print("Count:", activeAdults.length)
-    print("Total Score:", totalScore)
+    print("Total Score:", totalScore as int)
     print("Elapsed time (ms):", end - start)
 }
 
