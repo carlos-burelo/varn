@@ -123,5 +123,5 @@ function Gallery(): Widget {
     return Scroll(overlays(), galleryScroll.get(() => signal(0.0)));
 }
 
-run("varn all components", build: (fr: UiFrame, focus: Focus): Widget => Gallery(), w: 640, h: 800);
+run("Varn all components", build: (fr: UiFrame, focus: Focus): Widget => Gallery(), w: 640, h: 800);
 print("all components demo done");

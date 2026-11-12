@@ -17,7 +17,7 @@ const GREEN = 4278255360;
 const WHITE = 4294967295;
 const GRAY = 4287137928;
 
-using win = UiWindow.open("varn ui demo", W, H, args().indexOf("--headless") != null);
+using win = UiWindow.open("Varn ui demo", W, H, args().indexOf("--headless") != null);
 print(`real window: ${win.real() ? "yes" : "no (headless: --headless flag)"}`);
 
 const fr = new UiFrame(W, H);
@@ -57,7 +57,7 @@ while (!fr.closed) {
 
     const elapsed = (now() - t0) as float;
     const fps = frames > 10 ? (frames as float) * 1000.0 / elapsed : 0.0;
-    win.text(24.0, 60.0, "varn native ui — click the box, move the mouse, Esc closes", 22.0, WHITE);
+    win.text(24.0, 60.0, "Varn native ui — click the box, move the mouse, Esc closes", 22.0, WHITE);
     win.text(24.0, 100.0, `frame ${frames}  fps ${fps}`, 22.0, WHITE);
     const lines = wrapText("marquee: immediate-mode draw list, one submit per present", 18.0, 240.0);
     for (let i = 0; i < lines.length; i = i + 1) {

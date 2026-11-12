@@ -34,7 +34,7 @@ pub(super) fn print_header(term: &Term, opts: &Opts, cpu: &str, rt_names: &[Stri
     println!();
     let box_width = 80_usize;
     println!("  {}", term.gray(&format!("┌{}┐", "─".repeat(box_width))));
-    let title_plain = "⚡ VARN BENCHMARK SUITE — Comparative Performance Matrix";
+    let title_plain = "⚡ Varn Benchmark Suite — Comparative Performance Matrix";
     let pad_title = (box_width - 4).saturating_sub(title_plain.chars().count());
     println!(
         "  {}  {}{}{}",

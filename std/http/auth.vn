@@ -30,11 +30,11 @@ export namespace Auth {
         return { user: decoded.slice(0, colon), pass: decoded.slice(colon + 1) };
     }
 
-    export function basicChallenge(realm: str = "varn"): str {
+    export function basicChallenge(realm: str = "Varn"): str {
         return "Basic realm=\"" + realm + "\"";
     }
 
-    export function bearerChallenge(realm: str = "varn"): str {
+    export function bearerChallenge(realm: str = "Varn"): str {
         return "Bearer realm=\"" + realm + "\"";
     }
 }

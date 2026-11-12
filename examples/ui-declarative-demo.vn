@@ -51,12 +51,12 @@ function TodoList(): Widget {
 @component()
 function Dashboard(): Widget {
     return Column([
-        Row([Headline("Dashboard"), Caption("varn ui")], mainAxis: MainAxis.spaceBetween),
+        Row([Headline("Dashboard"), Caption("Varn ui")], mainAxis: MainAxis.spaceBetween),
         Counter(start: 10),
         Progress(0.4),
         TodoList()
     ], pad: 24.0, gap: 16.0);
 }
 
-run("varn declarative ui", build: (fr: UiFrame, focus: Focus): Widget => Dashboard(), w: 560, h: 640);
+run("Varn declarative ui", build: (fr: UiFrame, focus: Focus): Widget => Dashboard(), w: 560, h: 640);
 print("declarative demo done");
