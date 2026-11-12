@@ -1,5 +1,5 @@
 use std::sync::atomic::{AtomicU64, Ordering};
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::NativeError;
 use vn_types::{NativeCtx, VmValue};
 
@@ -101,7 +101,7 @@ fn deep_equal(ctx: &dyn NativeCtx, a: VmValue, b: VmValue) -> bool {
     false
 }
 
-varn_contract! {
+vn_contract! {
     module: "runtime:testing",
     contract: "src/modules/runtime/testing/testing_runtime.vn",
     impl TestingRuntime {

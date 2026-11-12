@@ -84,11 +84,11 @@ fn print_compact(term: &Term, results: &[RowResult]) {
     println!("  {}", term.gray(&"─".repeat(hdr.len() - 2)));
 
     for r in results {
-        let varn_w = r.work_stats.get("vn").map(|w| w.median);
+        let vn_w = r.work_stats.get("vn").map(|w| w.median);
         let bun_w = r.work_stats.get("bun").map(|w| w.median);
         let node_w = r.work_stats.get("node").map(|w| w.median);
 
-        let v_str = varn_w
+        let v_str = vn_w
             .map(|w| format!("{:>7.1} ms", w))
             .unwrap_or_else(|| format!("{:>10}", "--"));
         let b_str = bun_w
@@ -98,7 +98,7 @@ fn print_compact(term: &Term, results: &[RowResult]) {
             .map(|w| format!("{:>7.1} ms", w))
             .unwrap_or_else(|| format!("{:>10}", "--"));
 
-        let rel_bar = if let (Some(vw), Some(bw)) = (varn_w, bun_w) {
+        let rel_bar = if let (Some(vw), Some(bw)) = (vn_w, bun_w) {
             let total = vw + bw;
             if total > 0.0 {
                 let v_share = ((vw / total) * 18.0).round() as usize;

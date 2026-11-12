@@ -1,6 +1,6 @@
 use bigdecimal::{BigDecimal, RoundingMode};
 use num_traits::{Signed, ToPrimitive, Zero};
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::{NativeCtx, NativeError, VmValue};
 
 pub struct Dec;
@@ -36,7 +36,7 @@ fn pow_decimal(d: &BigDecimal, exp: i64) -> Result<BigDecimal, NativeError> {
     })
 }
 
-varn_contract! {
+vn_contract! {
     module: "globals",
     class: "decimal",
     contract: "src/modules/core/types/decimal/decimal.vn",

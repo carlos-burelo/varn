@@ -1,5 +1,5 @@
 use vn_core::StdErrorClass;
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::NativeError;
 use vn_types::{NativeCtx, VmValue};
 
@@ -92,7 +92,7 @@ fn set_int(ctx: &mut dyn NativeCtx, obj: VmValue, key: &str, val: i64) {
     ctx.set_field(obj, key, nv);
 }
 
-varn_contract! {
+vn_contract! {
     module: "runtime:time",
     contract: "src/modules/runtime/time/time_runtime.vn",
     impl TimeRuntime {

@@ -1,6 +1,6 @@
 use rusqlite::Connection;
 use std::time::Duration;
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::value::SendValue;
 use vn_types::{NativeCtx, NativeError, VmValue, VnArray};
 
@@ -43,7 +43,7 @@ fn allow_path(ctx: &mut dyn NativeCtx, path: &str) -> Result<(), NativeError> {
     Ok(())
 }
 
-varn_contract! {
+vn_contract! {
     module: "runtime:sqlite",
     contract: "src/modules/runtime/sqlite/sqlite_runtime.vn",
     impl SqliteRuntime {

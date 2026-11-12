@@ -1,12 +1,12 @@
 use vn_core::StdErrorClass;
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::NativeError;
 use vn_types::marshal::VnArray;
 use vn_types::{NativeCtx, VmValue};
 
 pub struct BufferRuntime;
 
-varn_contract! {
+vn_contract! {
     module: "runtime:buffer",
     contract: "src/modules/runtime/buffer/buffer_runtime.vn",
     impl BufferRuntime {

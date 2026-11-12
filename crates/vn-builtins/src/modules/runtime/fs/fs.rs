@@ -1,5 +1,5 @@
 use std::fs;
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::value::SendValue;
 use vn_core::{ErrorField, StdErrorClass};
 use vn_types::{NativeCtx, NativeError, VmValue};
@@ -59,25 +59,25 @@ fn text_array(items: Vec<String>) -> SendValue {
 
 pub struct FsRuntime;
 
-vn_macros::varn_record! {
+vn_macros::vn_record! {
     contract: "src/modules/runtime/fs/fs_runtime.vn",
     interface: "RawStats",
     struct RawStats;
 }
 
-vn_macros::varn_enum! {
+vn_macros::vn_enum! {
     module: MODULE_ID,
     contract: "src/modules/runtime/fs/fs_runtime.vn",
     pub enum FileMode;
 }
 
-vn_macros::varn_enum! {
+vn_macros::vn_enum! {
     module: MODULE_ID,
     contract: "src/modules/runtime/fs/fs_runtime.vn",
     pub enum SeekOrigin;
 }
 
-varn_contract! {
+vn_contract! {
     module: "runtime:fs",
     contract: "src/modules/runtime/fs/fs_runtime.vn",
     impl FsRuntime {

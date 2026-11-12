@@ -1,10 +1,10 @@
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::NativeError;
 use vn_types::NativeCtx;
 
 pub struct MathRuntime;
 
-varn_contract! {
+vn_contract! {
     module: "runtime:math",
     contract: "src/modules/runtime/math/math_runtime.vn",
     impl MathRuntime {

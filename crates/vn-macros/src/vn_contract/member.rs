@@ -49,9 +49,9 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
     } else {
         format_ident!("r#{}", rust_sym)
     };
-    let wrap_ident = format_ident!("__varn_wrap_{}_{}", sanitize(&prefix), sanitize(rust_sym));
+    let wrap_ident = format_ident!("__vn_wrap_{}_{}", sanitize(&prefix), sanitize(rust_sym));
     let fast_wrap_ident = format_ident!(
-        "__varn_fast_wrap_{}_{}",
+        "__vn_fast_wrap_{}_{}",
         sanitize(&prefix),
         sanitize(rust_sym)
     );

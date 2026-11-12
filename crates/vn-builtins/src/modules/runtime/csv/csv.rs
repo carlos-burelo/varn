@@ -1,11 +1,11 @@
 use vn_core::StdErrorClass;
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::NativeError;
 use vn_types::{NativeCtx, VmValue};
 
 pub struct CsvRuntime;
 
-varn_contract! {
+vn_contract! {
     module: "runtime:csv",
     contract: "src/modules/runtime/csv/csv_runtime.vn",
     impl CsvRuntime {

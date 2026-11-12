@@ -2,7 +2,7 @@
 use std::sync::OnceLock;
 use std::time::Instant;
 use vn_core::StdErrorClass;
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::NativeError;
 use vn_types::{NativeCtx, VmValue};
 
@@ -18,7 +18,7 @@ fn clock_origin() -> Instant {
         .unwrap_or_else(Instant::now)
 }
 
-varn_contract! {
+vn_contract! {
     module: "runtime:sys",
     contract: "src/modules/runtime/sys/sys_runtime.vn",
     impl SysRuntime {

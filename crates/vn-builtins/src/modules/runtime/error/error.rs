@@ -1,5 +1,5 @@
 use vn_core::{RuntimeErrorKind, StdErrorClass};
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::{NativeCtx, NativeError, VmValue, VnArray};
 
 pub struct StdErrorRuntime;
@@ -8,7 +8,7 @@ fn range_error(message: String) -> NativeError {
     NativeError::rethrow(RuntimeErrorKind::RangeError, message, None)
 }
 
-varn_contract! {
+vn_contract! {
     module: "runtime:error",
     contract: "src/modules/runtime/error/error_runtime.vn",
     impl StdErrorRuntime {

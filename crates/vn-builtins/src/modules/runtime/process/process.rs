@@ -4,7 +4,7 @@ use std::process::{Child, Command};
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::time::Duration;
 use vn_core::StdErrorClass;
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::NativeError;
 use vn_types::value::SendValue;
 use vn_types::{NativeCtx, VmValue, VnArray};
@@ -81,13 +81,13 @@ fn wait_child(pid: i64) -> Result<i64, String> {
 
 pub struct ProcessRuntime;
 
-vn_macros::varn_record! {
+vn_macros::vn_record! {
     contract: "src/modules/runtime/process/process_runtime.vn",
     interface: "ProcessOutput",
     struct ProcessOutput;
 }
 
-vn_macros::varn_record! {
+vn_macros::vn_record! {
     contract: "src/modules/runtime/process/process_runtime.vn",
     interface: "ProcessStatus",
     struct ProcessStatus;
@@ -105,7 +105,7 @@ fn output_record(ctx: &mut dyn NativeCtx, result: ExecResult) -> VmValue {
     .alloc(ctx)
 }
 
-varn_contract! {
+vn_contract! {
     module: "runtime:process",
     contract: "src/modules/runtime/process/process_runtime.vn",
     impl ProcessRuntime {

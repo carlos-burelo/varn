@@ -3,7 +3,7 @@ use std::path::PathBuf;
 const DIR_NAME: &str = "std-src";
 
 pub fn root() -> PathBuf {
-    vn_core::paths::varn_home_dir()
+    vn_core::paths::vn_home_dir()
         .join(DIR_NAME)
         .join(format!("{:08x}", vn_modules::artifact::BUILD_FINGERPRINT))
 }

@@ -1,5 +1,5 @@
 use num_traits::ToPrimitive;
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::{NativeCtx, NativeError, VmValue};
 
 pub struct BigInt;
@@ -8,7 +8,7 @@ fn get_bigint(ctx: &dyn NativeCtx, this: VmValue) -> Option<num_bigint::BigInt> 
     ctx.as_bigint(this)
 }
 
-varn_contract! {
+vn_contract! {
     module: "globals",
     class: "bigint",
     contract: "src/modules/core/types/bigint/bigint.vn",

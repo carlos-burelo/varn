@@ -26,7 +26,7 @@ impl Parse for EnumInput {
                 other => {
                     return Err(syn::Error::new(
                         key.span(),
-                        format!("unknown varn_enum! key `{other}`"),
+                        format!("unknown vn_enum! key `{other}`"),
                     ))
                 }
             }
@@ -36,7 +36,7 @@ impl Parse for EnumInput {
         input.parse::<Token![enum]>()?;
         let name: Ident = input.parse()?;
         input.parse::<Token![;]>()?;
-        let missing = |k: &str| syn::Error::new(name.span(), format!("varn_enum! needs `{k}:`"));
+        let missing = |k: &str| syn::Error::new(name.span(), format!("vn_enum! needs `{k}:`"));
         Ok(EnumInput {
             module: module.ok_or_else(|| missing("module"))?,
             contract: contract.ok_or_else(|| missing("contract"))?,
@@ -75,7 +75,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
     let vis = &input.vis;
     let name = &input.name;
     let module = &input.module;
-    let builder = format_ident!("__varn_enum_build_{}", enum_name.to_lowercase());
+    let builder = format_ident!("__vn_enum_build_{}", enum_name.to_lowercase());
     let entry = format_ident!("__VARN_ENUM_{}", enum_name.to_uppercase());
     let entries = format_ident!("{}_ENTRIES", enum_name.to_uppercase());
     let abs_lit = LitStr::new(&abs_path_str, proc_macro2::Span::call_site());

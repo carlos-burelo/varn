@@ -9,7 +9,7 @@ use vn_core::kinds::TypeKind;
 use vn_core::{AtomInterner, LangPrimitive};
 
 use crate::contract_members::{Kind, Member, ParamInfo};
-use crate::varn_contract::Mapped;
+use crate::vn_contract::Mapped;
 
 pub(crate) enum LookupFailure {
     Unparsable(String),

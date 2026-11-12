@@ -144,11 +144,11 @@ pub fn forge_tags_api_url(host: &str, user: &str, repo: &str) -> String {
     }
 }
 
-pub fn is_varn_file(path: &str) -> bool {
+pub fn is_vn_file(path: &str) -> bool {
     path.ends_with(".vn")
 }
 
-pub fn ensure_varn_extension(path: &mut std::path::PathBuf) {
+pub fn ensure_vn_extension(path: &mut std::path::PathBuf) {
     if path.extension().is_none() {
         path.set_extension(super::VARN_FILE_EXTENSION);
     }

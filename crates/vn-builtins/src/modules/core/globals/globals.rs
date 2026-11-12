@@ -1,10 +1,10 @@
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::NativeError;
 use vn_types::{NativeCtx, VmValue};
 
 pub struct Globals;
 
-varn_contract! {
+vn_contract! {
     module: "globals",
     contract: "src/modules/core/globals/globals.vn",
     impl Globals {

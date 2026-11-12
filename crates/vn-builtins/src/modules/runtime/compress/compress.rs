@@ -5,7 +5,7 @@ use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::Path;
 use vn_core::StdErrorClass;
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::NativeError;
 use vn_types::{NativeCtx, VmValue};
 
@@ -50,7 +50,7 @@ fn zip_dir_recursive(
     Ok(())
 }
 
-varn_contract! {
+vn_contract! {
     module: "runtime:compress",
     contract: "src/modules/runtime/compress/compress_runtime.vn",
     impl CompressRuntime {

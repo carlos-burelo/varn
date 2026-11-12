@@ -1,17 +1,17 @@
 use vn_core::StdErrorClass;
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::NativeError;
 use vn_types::{NativeCtx, VmValue};
 
 pub struct TextRuntime;
 
-vn_macros::varn_record! {
+vn_macros::vn_record! {
     contract: "src/modules/runtime/text/text_runtime.vn",
     interface: "ShapedRun",
     struct ShapedRun;
 }
 
-varn_contract! {
+vn_contract! {
     module: "runtime:text",
     contract: "src/modules/runtime/text/text_runtime.vn",
     impl TextRuntime {

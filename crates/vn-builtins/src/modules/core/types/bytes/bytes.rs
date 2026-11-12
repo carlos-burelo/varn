@@ -1,4 +1,4 @@
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::{NativeCtx, NativeError, VmValue, VnArray};
 
 pub struct Bytes;
@@ -16,7 +16,7 @@ fn byte_index(ctx: &mut dyn NativeCtx, this: VmValue, index: i64) -> Result<usiz
         .ok_or_else(|| NativeError::range_error(format!("index {index} is out of range for length {len}")))
 }
 
-varn_contract! {
+vn_contract! {
     module: "globals",
     class: "Bytes",
     contract: "src/modules/core/types/bytes/bytes.vn",

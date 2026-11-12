@@ -1,11 +1,11 @@
 # LBI: nativos con contrato `.vn`
 
-Código manda. Fuentes: `crates/vn-macros/src/varn_contract/`, `crates/vn-macros/src/contract_parse.rs`, `crates/vn-builtins/build.rs`, `crates/vn-builtins/src/modules/mod.rs`, `crates/vn-builtins/src/dispatch/mod.rs`, `crates/vn-core/src/op_id.rs`, `crates/vn-core/src/abi.rs`.
+Código manda. Fuentes: `crates/vn-macros/src/vn_contract/`, `crates/vn-macros/src/contract_parse.rs`, `crates/vn-builtins/build.rs`, `crates/vn-builtins/src/modules/mod.rs`, `crates/vn-builtins/src/dispatch/mod.rs`, `crates/vn-core/src/op_id.rs`, `crates/vn-core/src/abi.rs`.
 
 ## Piezas reales
 
 1. **Contrato = un `.vn` por módulo**, junto a su `.rs` en `vn-builtins/src/modules/{core,runtime}/<mod>/`. Un directorio con más de un `.vn` aborta el build.
-2. **`varn_contract!`** (`vn-macros/src/varn_contract/mod.rs`): lee el `.vn` en tiempo de macro y lo parsea con el parser real (`contract_parse.rs`); no hay tabla intermedia. Contratos inline se rechazan. Por cada `declare function` (y miembros de clase) genera wrappers y un `NativeOpEntry`; exporta `NATIVE_ENTRIES: &[&NativeOpEntry]`. Un `include_bytes!` del `.vn` lo hace dependencia de compilación.
+2. **`vn_contract!`** (`vn-macros/src/vn_contract/mod.rs`): lee el `.vn` en tiempo de macro y lo parsea con el parser real (`contract_parse.rs`); no hay tabla intermedia. Contratos inline se rechazan. Por cada `declare function` (y miembros de clase) genera wrappers y un `NativeOpEntry`; exporta `NATIVE_ENTRIES: &[&NativeOpEntry]`. Un `include_bytes!` del `.vn` lo hace dependencia de compilación.
 3. **`build.rs` de `vn-builtins`**: recorre `src/modules/{core,runtime}`, parsea cada contrato con `vn-parser` y genera `MODULE_REGISTRY` (`registry.generated.rs`): id `core:<mod>`/`runtime:<mod>`, fuente embebida, exports y si el contrato trae código además de declaraciones.
 4. **Registro estático único**: `native_modules!` (`modules/mod.rs`) enumera los módulos y concatena sus `NATIVE_ENTRIES` en `NATIVE_MODULES`. Sin secciones del linker ni marcadores.
 5. **`vn-macros`** también define `#[jit_slow]` y `jit_helper_table!` (helpers JIT; no registran módulos).

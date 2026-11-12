@@ -43,5 +43,5 @@ Escrito en Varn sobre `runtime:task`: `spawn`, `sleep`, `parallel`, `cancel`,
 
 ## AOT (`vn-rt`)
 
-Runtime mínimo para `vn build --native`: `main` → `_varn_main`, `varn_rt_print`,
-`varn_rt_str_concat`, `varn_rt_panic`. Sin scheduler, canales ni GC.
+Runtime mínimo para `vn build --native`: `main` → `_vn_main`, `vn_rt_print`,
+`vn_rt_str_concat`, `vn_rt_panic`. Sin scheduler, canales ni GC.

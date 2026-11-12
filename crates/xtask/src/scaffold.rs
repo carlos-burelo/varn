@@ -36,13 +36,13 @@ fn valid_class(name: &str) -> bool {
 fn module_rs(mod_name: &str, classes: &[String]) -> String {
     let struct_name = format!("{}Runtime", pascal(mod_name));
     let mut out = format!(
-        "use vn_macros::varn_contract;\nuse vn_types::NativeCtx;\n\npub struct {struct_name};\n"
+        "use vn_macros::vn_contract;\nuse vn_types::NativeCtx;\n\npub struct {struct_name};\n"
     );
     for class in classes {
         out.push_str(&format!("pub struct {class}Impl;\n"));
     }
     out.push_str(&format!(
-        "\nvarn_contract! {{\n    module: \"runtime:{mod_name}\",\n    contract: \"src/modules/runtime/{mod_name}/{mod_name}_runtime.vn\",\n    impl {struct_name} {{\n        fn ping(_ctx: &mut dyn NativeCtx) -> Result<String, String> {{\n            Ok(\"pong\".to_string())\n        }}\n    }}\n"
+        "\nvn_contract! {{\n    module: \"runtime:{mod_name}\",\n    contract: \"src/modules/runtime/{mod_name}/{mod_name}_runtime.vn\",\n    impl {struct_name} {{\n        fn ping(_ctx: &mut dyn NativeCtx) -> Result<String, String> {{\n            Ok(\"pong\".to_string())\n        }}\n    }}\n"
     ));
     for class in classes {
         out.push_str(&format!(

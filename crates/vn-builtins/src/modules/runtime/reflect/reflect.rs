@@ -1,5 +1,5 @@
 use std::sync::atomic::{AtomicU64, Ordering};
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::NativeError;
 use vn_types::{NativeCtx, VmValue};
 
@@ -7,7 +7,7 @@ pub struct ReflectRuntime;
 
 static META_KEY_COUNTER: AtomicU64 = AtomicU64::new(1);
 
-varn_contract! {
+vn_contract! {
     module: "runtime:reflect",
     contract: "src/modules/runtime/reflect/reflect_runtime.vn",
     impl ReflectRuntime {

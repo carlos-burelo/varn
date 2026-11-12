@@ -1,4 +1,4 @@
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::value::SetRef;
 use vn_types::{NativeCtx, NativeError, VmValue, VnArray};
 
@@ -8,7 +8,7 @@ fn get_set(ctx: &dyn NativeCtx, this: VmValue) -> Option<SetRef> {
     ctx.as_set(this)
 }
 
-varn_contract! {
+vn_contract! {
     module: "globals",
     class: "Set",
     contract: "src/modules/core/types/set/set.vn",

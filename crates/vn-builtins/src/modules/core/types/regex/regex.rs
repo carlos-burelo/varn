@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock, PoisonError, RwLock};
 use vn_core::StdErrorClass;
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::NativeError;
 use vn_types::{NativeCtx, VmValue};
 
@@ -48,7 +48,7 @@ fn handle_of(slot: usize, generation: u32) -> i64 {
 
 pub struct RegexClass;
 
-vn_macros::varn_record! {
+vn_macros::vn_record! {
     contract: "src/modules/core/types/regex/regex.vn",
     interface: "RegexMatch",
     struct RegexMatch;
@@ -204,7 +204,7 @@ pub(crate) fn regex_argument(
     Some(of_instance(ctx, value))
 }
 
-varn_contract! {
+vn_contract! {
     module: "globals",
     class: "Regex",
     contract: "src/modules/core/types/regex/regex.vn",

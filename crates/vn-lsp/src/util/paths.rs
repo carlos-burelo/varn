@@ -6,6 +6,6 @@ pub fn is_stdlib_uri(uri: &str) -> bool {
     crate::workspace::std_sources::is_mirrored_uri(uri)
 }
 
-pub fn is_varn_file(path: &str) -> bool {
-    vn_modules::resolver::is_varn_file(path)
+pub fn is_vn_file(path: &str) -> bool {
+    vn_modules::resolver::is_vn_file(path)
 }

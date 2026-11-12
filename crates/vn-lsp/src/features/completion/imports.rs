@@ -13,7 +13,7 @@ pub fn build_import_completions(prefix: &str, doc_uri: &str) -> Vec<CompletionIt
     }
 
     if !prefix.starts_with(STD_PREFIX) {
-        items.extend(relative_varn_completions(prefix, doc_uri));
+        items.extend(relative_vn_completions(prefix, doc_uri));
     }
 
     items
@@ -38,7 +38,7 @@ fn stdlib_module_completions(prefix: &str) -> Vec<CompletionItem> {
     items
 }
 
-fn relative_varn_completions(prefix: &str, doc_uri: &str) -> Vec<CompletionItem> {
+fn relative_vn_completions(prefix: &str, doc_uri: &str) -> Vec<CompletionItem> {
     use std::path::Path;
 
     let doc_path = uri_to_path(doc_uri);

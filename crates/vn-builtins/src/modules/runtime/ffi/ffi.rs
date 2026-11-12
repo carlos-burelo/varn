@@ -1,5 +1,5 @@
 use vn_core::StdErrorClass;
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::NativeError;
 use vn_types::{NativeCtx, VmValue, VnArray};
 
@@ -25,7 +25,7 @@ fn permit(ctx: &mut dyn NativeCtx) -> Result<(), NativeError> {
     }
 }
 
-varn_contract! {
+vn_contract! {
     module: "runtime:ffi",
     contract: "src/modules/runtime/ffi/ffi_runtime.vn",
     impl FfiRuntime {

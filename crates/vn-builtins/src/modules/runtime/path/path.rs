@@ -1,4 +1,4 @@
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::NativeError;
 use vn_types::{NativeCtx, VnArray};
 
@@ -260,7 +260,7 @@ fn str_array(ctx: &mut dyn NativeCtx, arr: VnArray) -> Result<Vec<String>, Strin
     Ok(out)
 }
 
-varn_contract! {
+vn_contract! {
     module: "runtime:path",
     contract: "src/modules/runtime/path/path_runtime.vn",
     impl PathRuntime {

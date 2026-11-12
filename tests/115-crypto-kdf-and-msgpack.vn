@@ -27,11 +27,11 @@ function testCryptoPrimitives(): void {
         expect(timingSafeEqual("constant_time_secret", "wrong_secret")).toBeFalsy();;
 
     // 4. hashPassword and verifyPassword
-    let hash = hashPassword("super_secure_varn_2026", 1000);
+    let hash = hashPassword("super_secure_vn_2026", 1000);
         expect(hash.startsWith("$pbkdf2-sha256$i=1000$")).toBeTruthy();;
-        expect(verifyPassword("super_secure_varn_2026", hash)).toBeTruthy();;
+        expect(verifyPassword("super_secure_vn_2026", hash)).toBeTruthy();;
         expect(verifyPassword("wrong_attempt", hash)).toBeFalsy();;
-        expect(verifyPassword("super_secure_varn_2026_suffix", hash)).toBeFalsy();;
+        expect(verifyPassword("super_secure_vn_2026_suffix", hash)).toBeFalsy();;
 
 }
 

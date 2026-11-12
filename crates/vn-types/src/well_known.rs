@@ -2,7 +2,7 @@ use std::sync::Arc;
 use vn_core::well_known as core;
 
 lazy_static::lazy_static! {
-    pub static ref ERR_IS_varn_ERROR: Arc<str> = Arc::from(core::ERR_IS_varn_ERROR);
+    pub static ref ERR_IS_vn_ERROR: Arc<str> = Arc::from(core::ERR_IS_vn_ERROR);
     pub static ref ERR_MESSAGE: Arc<str> = Arc::from(core::ERR_MESSAGE);
     pub static ref ERR_STACK: Arc<str> = Arc::from(core::ERR_STACK);
     pub static ref ERR_NAME: Arc<str> = Arc::from(core::ERR_NAME);

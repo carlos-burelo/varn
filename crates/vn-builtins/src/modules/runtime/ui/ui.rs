@@ -2,7 +2,7 @@ use parking_lot::Mutex;
 use std::collections::VecDeque;
 use std::sync::OnceLock;
 use vn_core::StdErrorClass;
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::NativeError;
 use vn_types::{NativeCtx, VmValue};
 
@@ -12,19 +12,19 @@ use ui_draw::DrawCmd;
 
 pub struct UiRuntime;
 
-vn_macros::varn_enum! {
+vn_macros::vn_enum! {
     module: MODULE_ID,
     contract: "src/modules/runtime/ui/ui_runtime.vn",
     pub enum UiEventKind;
 }
 
-vn_macros::varn_enum! {
+vn_macros::vn_enum! {
     module: MODULE_ID,
     contract: "src/modules/runtime/ui/ui_runtime.vn",
     pub enum UiInjectKind;
 }
 
-vn_macros::varn_enum! {
+vn_macros::vn_enum! {
     module: MODULE_ID,
     contract: "src/modules/runtime/ui/ui_runtime.vn",
     pub enum UiControlKind;
@@ -79,26 +79,26 @@ fn ui_event(ctx: &mut dyn NativeCtx, e: &vn_ui::RealEvent) -> Result<VmValue, St
     Ok(UiEvent { kind, key, pressed, x, y, button, w, h }.alloc(ctx))
 }
 
-vn_macros::varn_record! {
+vn_macros::vn_record! {
     contract: "src/modules/runtime/ui/ui_runtime.vn",
     interface: "TypedText",
     struct TypedText;
 }
 
-vn_macros::varn_record! {
+vn_macros::vn_record! {
     contract: "src/modules/runtime/ui/ui_runtime.vn",
     interface: "DrawnItem",
     struct DrawnItem;
 }
 
-vn_macros::varn_record! {
+vn_macros::vn_record! {
     contract: "src/modules/runtime/ui/ui_runtime.vn",
     interface: "UiEvent",
     struct UiEvent;
 }
 
 
-varn_contract! {
+vn_contract! {
     module: "runtime:ui",
     contract: "src/modules/runtime/ui/ui_runtime.vn",
     impl UiRuntime {

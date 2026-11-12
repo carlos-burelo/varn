@@ -191,7 +191,7 @@ impl std::fmt::Display for ArtifactError {
 }
 
 pub fn get_cache_dir() -> PathBuf {
-    vn_core::paths::varn_cache_dir()
+    vn_core::paths::vn_cache_dir()
 }
 
 pub fn get_bytecode_cache_dir() -> PathBuf {

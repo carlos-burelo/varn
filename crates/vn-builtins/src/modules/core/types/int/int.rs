@@ -1,4 +1,4 @@
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::{NativeCtx, NativeError};
 
 pub struct Int;
@@ -6,7 +6,7 @@ pub struct Int;
 const INT_MAX: i64 = vn_core::INT_MAX;
 const INT_MIN: i64 = vn_core::INT_MIN;
 
-varn_contract! {
+vn_contract! {
     module: "globals",
     class: "int",
     contract: "src/modules/core/types/int/int.vn",

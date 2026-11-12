@@ -1,9 +1,9 @@
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::{NativeCtx, NativeFnResult, VmValue};
 
 pub struct Bool;
 
-varn_contract! {
+vn_contract! {
     module: "globals",
     class: "bool",
     contract: "src/modules/core/types/bool/bool.vn",

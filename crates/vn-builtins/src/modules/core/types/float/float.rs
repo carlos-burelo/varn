@@ -1,9 +1,9 @@
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::{NativeCtx, NativeError, NativeFnResult, VmValue};
 
 pub struct Float;
 
-varn_contract! {
+vn_contract! {
     module: "globals",
     class: "float",
     contract: "src/modules/core/types/float/float.vn",

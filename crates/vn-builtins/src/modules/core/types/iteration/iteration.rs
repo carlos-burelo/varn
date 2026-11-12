@@ -1,4 +1,4 @@
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::{NativeCtx, NativeError, VmValue};
 
 pub struct GeneratorImpl;
@@ -8,7 +8,7 @@ fn resume(ctx: &mut dyn NativeCtx, this: VmValue) -> Result<VmValue, NativeError
     ctx.resume_generator(this, VmValue::null())
 }
 
-varn_contract! {
+vn_contract! {
     module: "globals",
     contract: "src/modules/core/types/iteration/iteration.vn",
     class: "Generator",

@@ -15,7 +15,7 @@ pub fn compile_to_object(
     proto: &vn_types::FunctionProto,
     isa: &OwnedTargetIsa,
 ) -> Result<AotOutput, String> {
-    let obj_builder = ObjectBuilder::new(isa.clone(), "varn_aot_module", default_libcall_names())
+    let obj_builder = ObjectBuilder::new(isa.clone(), "vn_aot_module", default_libcall_names())
         .map_err(|e| format!("aot: ObjectBuilder: {e}"))?;
     let mut module = ObjectModule::new(obj_builder);
 
@@ -28,8 +28,8 @@ pub fn compile_to_object(
         sig
     };
     let main_id = module
-        .declare_function("_varn_main", Linkage::Export, &main_sig)
-        .map_err(|e| format!("aot: declare _varn_main: {e}"))?;
+        .declare_function("_vn_main", Linkage::Export, &main_sig)
+        .map_err(|e| format!("aot: declare _vn_main: {e}"))?;
 
     let mut ctx = module.make_context();
     ctx.func.signature = main_sig;
@@ -52,7 +52,7 @@ pub fn compile_to_object(
 
     module
         .define_function(main_id, &mut ctx)
-        .map_err(|e| format!("aot: define _varn_main: {e}"))?;
+        .map_err(|e| format!("aot: define _vn_main: {e}"))?;
 
     let product = module.finish();
     let bytes = product.emit().map_err(|e| format!("aot: emit: {e}"))?;
@@ -82,10 +82,10 @@ fn declare_rt_helpers(module: &mut ObjectModule) -> Result<RtHelpers, String> {
             .map_err(|e| format!("aot: declare helper {name}: {e}"))
     };
     Ok(RtHelpers {
-        print_str: import("varn_rt_print", 2, 0)?,
-        print_int: import("varn_rt_print_int", 1, 0)?,
-        print_bool: import("varn_rt_print_bool", 1, 0)?,
-        print_null: import("varn_rt_print_null", 0, 0)?,
-        str_concat: import("varn_rt_str_concat", 5, 0)?,
+        print_str: import("vn_rt_print", 2, 0)?,
+        print_int: import("vn_rt_print_int", 1, 0)?,
+        print_bool: import("vn_rt_print_bool", 1, 0)?,
+        print_null: import("vn_rt_print_null", 0, 0)?,
+        str_concat: import("vn_rt_str_concat", 5, 0)?,
     })
 }

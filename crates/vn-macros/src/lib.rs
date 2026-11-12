@@ -4,15 +4,15 @@ mod contract_parse;
 mod contract_records;
 mod jit_helper_table;
 mod jit_slow;
-mod varn_contract;
-mod varn_enum;
-mod varn_record;
+mod vn_contract;
+mod vn_enum;
+mod vn_record;
 
 use proc_macro::TokenStream;
 
 #[proc_macro]
-pub fn varn_contract(input: TokenStream) -> TokenStream {
-    varn_contract::expand(input)
+pub fn vn_contract(input: TokenStream) -> TokenStream {
+    vn_contract::expand(input)
 }
 
 #[proc_macro_attribute]
@@ -26,11 +26,11 @@ pub fn jit_helper_table(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro]
-pub fn varn_record(input: TokenStream) -> TokenStream {
-    varn_record::expand(input)
+pub fn vn_record(input: TokenStream) -> TokenStream {
+    vn_record::expand(input)
 }
 
 #[proc_macro]
-pub fn varn_enum(input: TokenStream) -> TokenStream {
-    varn_enum::expand(input)
+pub fn vn_enum(input: TokenStream) -> TokenStream {
+    vn_enum::expand(input)
 }

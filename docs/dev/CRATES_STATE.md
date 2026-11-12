@@ -160,7 +160,7 @@ Sin conteos de líneas: viven en el código (`find crates -name "*.rs" | xargs w
 | `vn-resolver` | Resolución de módulos e imports |
 | `vn-tir` | Representación intermedia tipada canónica |
 | `vn-types` | Modelo de datos de runtime y bytecode |
-| `vn-macros` | Proc-macros: `varn_contract!`, `#[jit_slow]`, `jit_helper_table!` |
+| `vn-macros` | Proc-macros: `vn_contract!`, `#[jit_slow]`, `jit_helper_table!` |
 | `vn-compiler` | Compilador (TIR→SSA→bytecode + `regalloc` interno) |
 | `vn-jit` | JIT (Cranelift, sobre `vn-jit-abi`) |
 | `vn-jit-abi` | ABI del JIT |

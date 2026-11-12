@@ -3,7 +3,7 @@ use hmac::{Hmac, Mac};
 use rand::RngCore;
 use sha2::{Digest, Sha256, Sha512};
 use vn_core::StdErrorClass;
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::NativeError;
 use vn_types::{NativeCtx, VmValue};
 
@@ -21,7 +21,7 @@ fn random_size(what: &str, size: i64) -> Result<usize, NativeError> {
 
 pub struct CryptoRuntime;
 
-varn_contract! {
+vn_contract! {
     module: "runtime:crypto",
     contract: "src/modules/runtime/crypto/crypto_runtime.vn",
     impl CryptoRuntime {

@@ -1,4 +1,4 @@
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::value::MapRef;
 use vn_types::{NativeCtx, NativeError, VmValue, VnArray};
 
@@ -8,7 +8,7 @@ fn get_map(ctx: &dyn NativeCtx, this: VmValue) -> Option<MapRef> {
     ctx.as_map(this)
 }
 
-varn_contract! {
+vn_contract! {
     module: "globals",
     class: "Map",
     contract: "src/modules/core/types/map/map.vn",

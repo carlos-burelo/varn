@@ -5,7 +5,7 @@ pub mod http_parser;
 use driver::driver;
 use urlencoding::{decode, encode};
 use vn_core::{ErrorField, StdErrorClass};
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::NativeError;
 use vn_types::{HostOpen, NativeCtx, VmValue};
 
@@ -22,7 +22,7 @@ fn payload(ctx: &mut dyn NativeCtx, data: VmValue) -> Result<Vec<u8>, String> {
     }
 }
 
-varn_contract! {
+vn_contract! {
     module: "runtime:net",
     contract: "src/modules/runtime/net/net_runtime.vn",
     impl NetRuntime {

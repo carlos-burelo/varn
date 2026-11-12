@@ -31,7 +31,7 @@ impl Parse for ContractInput {
                     other => {
                         return Err(syn::Error::new(
                             key.span(),
-                            format!("unknown varn_contract! key `{other}`"),
+                            format!("unknown vn_contract! key `{other}`"),
                         ))
                     }
                 };

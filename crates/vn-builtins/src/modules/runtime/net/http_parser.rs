@@ -1,12 +1,12 @@
 use vn_types::{NativeCtx, VmValue};
 
-vn_macros::varn_enum! {
+vn_macros::vn_enum! {
     module: super::MODULE_ID,
     contract: "src/modules/runtime/net/net_runtime.vn",
     pub enum HttpMethod;
 }
 
-vn_macros::varn_record! {
+vn_macros::vn_record! {
     contract: "src/modules/runtime/net/net_runtime.vn",
     interface: "HttpRequestHead",
     struct HttpRequestHead;

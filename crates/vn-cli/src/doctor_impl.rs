@@ -13,11 +13,11 @@ pub fn run_doctor() -> CliResult<()> {
     println!(
         "  {}: {}",
         vn_core::env::EnvVar::Home.name(),
-        vn_core::paths::varn_home_dir().display()
+        vn_core::paths::vn_home_dir().display()
     );
     println!(
         "  cache dir: {}",
-        vn_core::paths::varn_cache_dir().display()
+        vn_core::paths::vn_cache_dir().display()
     );
     match &vn_core::env::process().std {
         Some(raw) => println!("  VARN_STD: {raw}"),

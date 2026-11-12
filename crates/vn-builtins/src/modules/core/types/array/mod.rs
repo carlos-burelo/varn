@@ -2,7 +2,7 @@
 
 mod ordering;
 
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::{NativeCtx, NativeError, VmValue, VnArray};
 
 pub struct Array;
@@ -40,7 +40,7 @@ fn flatten_one_level(ctx: &mut dyn NativeCtx, arr: VmValue, out: &mut Vec<VmValu
     }
 }
 
-varn_contract! {
+vn_contract! {
     module: "globals",
     class: "Array",
     contract: "src/modules/core/types/array/array.vn",

@@ -1,5 +1,5 @@
 use vn_core::StdErrorClass;
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::NativeError;
 use vn_types::marshal::VnArray;
 use vn_types::{NativeCtx, VmValue};
@@ -48,7 +48,7 @@ fn elementwise(op: vn_gpu::Op, a: i64, b: i64) -> Result<i64, String> {
     vn_gpu::pool().lock().lazy(op, vec![a, b], la, da)
 }
 
-varn_contract! {
+vn_contract! {
     module: "runtime:gpu",
     contract: "src/modules/runtime/gpu/gpu_runtime.vn",
     impl GpuRuntime {

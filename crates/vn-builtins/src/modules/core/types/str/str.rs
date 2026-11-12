@@ -1,4 +1,4 @@
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::str_util::{
     char_len, char_range_to_bytes, find_bytes,
 };
@@ -15,7 +15,7 @@ fn normalize_idx(idx: i64, len: i64) -> usize {
     }
 }
 
-varn_contract! {
+vn_contract! {
     module: "globals",
     class: "str",
     contract: "src/modules/core/types/str/str.vn",

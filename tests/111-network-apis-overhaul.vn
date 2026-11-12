@@ -99,9 +99,9 @@ await describe("111 network apis overhaul", async () => {
                 expect(clientSock.isOpen).toBeTruthy();
                 expect(clientSock.remoteHost).toBe("127.0.0.1");
                 expect(clientSock.remotePort).toBe(testPort);
-                await clientSock.writeAll("varn_test\n");
+                await clientSock.writeAll("vn_test\n");
                 let echoMsg = await clientSock.readText();
-                expect(echoMsg.trim()).toBe("ECHO:varn_test");
+                expect(echoMsg.trim()).toBe("ECHO:vn_test");
                 clientSock.close();
                 ok = true;
             } catch (e) {

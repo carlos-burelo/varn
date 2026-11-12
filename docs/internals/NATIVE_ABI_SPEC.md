@@ -25,7 +25,7 @@ Windows). Se intenta `Native` y se cae a `Framed` con `NEEDS_ACTIVATION`
 (NULL/BOOL/INT/FLOAT/HEAP/SSO/SYMBOL), SSO hasta 8 B. Los frames separan
 registros por clase: GPR `i64`, FPR `f64`, Refs `HeapRef`, Dyn `VmValue`
 (`docs/internals/VM_ARCHITECTURE.md` §1-2). Las nativas Rust tienen tipo `NativeFn = fn(&mut dyn NativeCtx, &[VmValue]) -> NativeFnResult`
-(`vn-types/src/native.rs`); se generan desde el contrato `.vn` con `varn_contract!`
+(`vn-types/src/native.rs`); se generan desde el contrato `.vn` con `vn_contract!`
 (ver `LBI_ARCHITECTURE.md`).
 
 ## 4. Errores y plataforma

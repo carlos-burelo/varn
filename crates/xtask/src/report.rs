@@ -79,7 +79,7 @@ pub(super) fn print_scoreboard(
     if opts.json {
         return;
     }
-    let mut varn_wins = 0;
+    let mut vn_wins = 0;
     let mut rival_wins = 0;
     let mut tied = 0;
     let mut mismatches = 0;
@@ -91,7 +91,7 @@ pub(super) fn print_scoreboard(
             tied += 1;
         } else if let Some(ratio) = r.work_ratio {
             if ratio >= 1.05 {
-                varn_wins += 1;
+                vn_wins += 1;
             } else if ratio <= 0.95 {
                 rival_wins += 1;
             } else {
@@ -113,13 +113,13 @@ pub(super) fn print_scoreboard(
     println!("  {}", term.gray(&format!("┌{}┐", "─".repeat(box_width))));
     let title_line = format!(
         "📊 SCOREBOARD:   🏆 {} Wins   •   🤝 {} Tied   •   🔻 {} Rivals",
-        varn_wins, tied, rival_wins
+        vn_wins, tied, rival_wins
     );
     let title_colored = format!(
         "{}   {} {}   •   {} {}   •   {} {}",
         term.bold_white("📊 SCOREBOARD:"),
         "🏆",
-        term.bold_green(&format!("{varn_wins} Wins")),
+        term.bold_green(&format!("{vn_wins} Wins")),
         "🤝",
         term.cyan(&format!("{tied} Tied")),
         "🔻",

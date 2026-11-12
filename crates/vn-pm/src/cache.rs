@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use crate::origin::DepOrigin;
 
 pub fn global_cache_root() -> PathBuf {
-    vn_core::paths::varn_cache_dir()
+    vn_core::paths::vn_cache_dir()
 }
 
 pub fn cached_package_path(origin: &DepOrigin, version: &str) -> PathBuf {

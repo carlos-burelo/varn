@@ -1,9 +1,9 @@
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::{NativeCtx, VmValue};
 
 pub struct Char;
 
-varn_contract! {
+vn_contract! {
     module: "globals",
     class: "char",
     contract: "src/modules/core/types/char/char.vn",

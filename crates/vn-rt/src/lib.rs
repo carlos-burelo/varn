@@ -2,13 +2,13 @@ use std::io::Write;
 
 unsafe extern "C" {
 
-    fn _varn_main() -> i64;
+    fn _vn_main() -> i64;
 }
 
 #[cfg(not(test))]
 #[unsafe(no_mangle)]
 pub extern "C" fn main(_argc: i32, _argv: *const *const u8) -> i32 {
-    let code = unsafe { _varn_main() };
+    let code = unsafe { _vn_main() };
     code as i32
 }
 
@@ -20,7 +20,7 @@ fn print_line(text: &[u8]) {
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn varn_rt_print(ptr: *const u8, len: usize) {
+pub unsafe extern "C" fn vn_rt_print(ptr: *const u8, len: usize) {
     if ptr.is_null() || len == 0 {
         print_line(b"");
     } else {
@@ -29,17 +29,17 @@ pub unsafe extern "C" fn varn_rt_print(ptr: *const u8, len: usize) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn varn_rt_print_int(value: i64) {
+pub extern "C" fn vn_rt_print_int(value: i64) {
     print_line(value.to_string().as_bytes());
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn varn_rt_print_bool(value: i64) {
+pub extern "C" fn vn_rt_print_bool(value: i64) {
     print_line(if value != 0 { b"true" } else { b"false" });
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn varn_rt_print_null() {
+pub extern "C" fn vn_rt_print_null() {
     print_line(b"null");
 }
 
@@ -50,7 +50,7 @@ pub struct StrResult {
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn varn_rt_str_concat(
+pub unsafe extern "C" fn vn_rt_str_concat(
     a_ptr: *const u8,
     a_len: usize,
     b_ptr: *const u8,
@@ -70,7 +70,7 @@ pub unsafe extern "C" fn varn_rt_str_concat(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn varn_rt_panic(ptr: *const u8, len: usize) -> ! {
+pub unsafe extern "C" fn vn_rt_panic(ptr: *const u8, len: usize) -> ! {
     if !ptr.is_null() && len > 0 {
         let slice = unsafe { std::slice::from_raw_parts(ptr, len) };
         let msg = String::from_utf8_lossy(slice);

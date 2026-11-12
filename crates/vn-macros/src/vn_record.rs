@@ -5,7 +5,7 @@ use syn::parse::{Parse, ParseStream};
 use syn::{Ident, LitStr, Token, Visibility};
 
 use crate::contract_records::{record_fields, RecordSource};
-use crate::varn_contract::Mapped;
+use crate::vn_contract::Mapped;
 
 struct RecordInput {
     contract: LitStr,
@@ -30,7 +30,7 @@ impl Parse for RecordInput {
                 other => {
                     return Err(syn::Error::new(
                         key.span(),
-                        format!("unknown varn_record! key `{other}`"),
+                        format!("unknown vn_record! key `{other}`"),
                     ))
                 }
             }
@@ -41,9 +41,9 @@ impl Parse for RecordInput {
         let name: Ident = input.parse()?;
         input.parse::<Token![;]>()?;
         let contract = contract
-            .ok_or_else(|| syn::Error::new(name.span(), "varn_record! needs `contract:`"))?;
+            .ok_or_else(|| syn::Error::new(name.span(), "vn_record! needs `contract:`"))?;
         let (source, declared) = declared.ok_or_else(|| {
-            syn::Error::new(name.span(), "varn_record! needs `interface:` or `class:`")
+            syn::Error::new(name.span(), "vn_record! needs `interface:` or `class:`")
         })?;
         Ok(RecordInput {
             contract,

@@ -81,6 +81,6 @@ nativas), `text`, `time`, `types` (`array`, `bigint`, `bool`, `bytes`, `char`,
 
 ## Macros
 
-`vn-macros` es el único crate proc-macro: `varn_contract!` (`src/varn_contract/`,
+`vn-macros` es el único crate proc-macro: `vn_contract!` (`src/vn_contract/`,
 `contract_parse.rs` parsea el `.vn` con el parser real), `#[jit_slow]` y
 `jit_helper_table!`. Lo consumen `vn-builtins` (contratos) y `vn-vm` (helpers JIT).

@@ -88,7 +88,7 @@ fn expand_section(
         .class
         .clone()
         .unwrap_or_else(|| input.module.clone());
-    let trait_ident = format_ident!("__VarnContract_{}", sanitize(&prefix));
+    let trait_ident = format_ident!("__VnContract_{}", sanitize(&prefix));
 
     let self_ty = &section.self_ty;
     let user_fns = &section.fns;
@@ -119,7 +119,7 @@ fn expand_section(
     } = generated;
 
     let registration = if let Some(class) = &section.class {
-        let builder_ident = format_ident!("__varn_build_{}", sanitize(class));
+        let builder_ident = format_ident!("__vn_build_{}", sanitize(class));
         let entry_ident = format_ident!("__VARN_OP_{}", sanitize(class).to_uppercase());
         generated_entry_idents.push(entry_ident.clone());
         let superclass_setup = if let Some(parent) = &contract.extends {

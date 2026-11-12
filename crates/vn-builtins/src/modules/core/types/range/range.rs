@@ -1,4 +1,4 @@
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::value::{RangeData, RangeElem};
 use vn_types::{NativeCtx, NativeError, VmValue};
 
@@ -37,7 +37,7 @@ fn raw_of(ctx: &dyn NativeCtx, r: &RangeData, val: VmValue) -> Option<i64> {
     }
 }
 
-varn_contract! {
+vn_contract! {
     module: "globals",
     class: "Range",
     contract: "src/modules/core/types/range/range.vn",

@@ -1,12 +1,12 @@
 use vn_core::StdErrorClass;
 use std::io::Write as IoWrite;
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::NativeError;
 use vn_types::{NativeCtx, VmValue};
 
 pub struct IoRuntime;
 
-varn_contract! {
+vn_contract! {
     module: "runtime:io",
     contract: "src/modules/runtime/io/io_runtime.vn",
     impl IoRuntime {

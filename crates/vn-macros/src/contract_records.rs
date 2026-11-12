@@ -2,7 +2,7 @@ use vn_core::ast::{ClassDecl, ClassMember, Decl, InterfaceDecl, InterfaceMember,
 use vn_core::AtomInterner;
 
 use crate::contract_parse::{classify, unwrap_export};
-use crate::varn_contract::Mapped;
+use crate::vn_contract::Mapped;
 
 pub(crate) enum RecordSource {
     Interface,

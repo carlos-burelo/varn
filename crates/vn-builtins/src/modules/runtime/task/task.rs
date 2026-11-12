@@ -1,5 +1,5 @@
 use vn_core::StdErrorClass;
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::value::{endpoint_id, ChannelEndpoint, SendValue};
 use vn_types::{HostOpen, NativeCtx, NativeError, VmValue};
 
@@ -25,13 +25,13 @@ fn reject_closed(ctx: &mut dyn NativeCtx) -> VmValue {
     ctx.task_rejected(error)
 }
 
-vn_macros::varn_record! {
+vn_macros::vn_record! {
     contract: "src/modules/runtime/task/task_runtime.vn",
     class: "IsolateHandle",
     struct IsolateHandleRecord;
 }
 
-vn_macros::varn_record! {
+vn_macros::vn_record! {
     contract: "src/modules/runtime/task/task_runtime.vn",
     class: "Channel",
     struct ChannelRecord;
@@ -47,7 +47,7 @@ fn same_module(a: &str, b: &str) -> bool {
     module_key(a) == module_key(b)
 }
 
-varn_contract! {
+vn_contract! {
     module: "runtime:task",
     contract: "src/modules/runtime/task/task_runtime.vn",
     impl TaskRuntime {

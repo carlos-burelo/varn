@@ -1,5 +1,5 @@
 use vn_core::RuntimeErrorKind;
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::{NativeCtx, VmValue};
 
 fn init_error(
@@ -37,7 +37,7 @@ pub struct DivisionByZeroClass;
 
 pub struct MatchErrorClass;
 
-varn_contract! {
+vn_contract! {
     module: "globals",
     contract: "src/modules/core/errors/errors.vn",
     class: "Error",

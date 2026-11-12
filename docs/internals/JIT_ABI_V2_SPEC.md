@@ -79,7 +79,7 @@ Bails reales de try en `setup.rs`: handler compartido por dos valores
 Solo prototipado, no backend general. Emite: `LoadInt`/`Zero`/`One`,
 `LoadConst` (str/int/bool), `LoadTrue/False/Null`, `Move`, `Add/Sub/Mul/Mod`
 (`iadd/isub/imul/srem`), `AddImm` (`iadd_imm`), `StrConcat` (helper
-`varn_rt_str_concat`), `Call` solo con `argc == 2` redirigido a `varn_rt_print`,
+`vn_rt_str_concat`), `Call` solo con `argc == 2` redirigido a `vn_rt_print`,
 `Return` termina el cuerpo. Todo lo demás se ignora (`=> {}`) o es
 `unreachable!` en el brazo exhaustivo.
 

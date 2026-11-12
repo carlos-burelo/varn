@@ -2,7 +2,7 @@ use base64::Engine;
 use rand::RngCore;
 use sha1::Digest;
 use vn_core::StdErrorClass;
-use vn_macros::varn_contract;
+use vn_macros::vn_contract;
 use vn_types::NativeError;
 use vn_types::{NativeCtx, VmValue};
 
@@ -46,19 +46,19 @@ fn header_value(head: &str, name: &str) -> Option<String> {
     None
 }
 
-vn_macros::varn_enum! {
+vn_macros::vn_enum! {
     module: MODULE_ID,
     contract: "src/modules/runtime/ws/ws_runtime.vn",
     pub enum WsOpcode;
 }
 
-vn_macros::varn_record! {
+vn_macros::vn_record! {
     contract: "src/modules/runtime/ws/ws_runtime.vn",
     interface: "WsFrame",
     struct WsFrame;
 }
 
-varn_contract! {
+vn_contract! {
     module: "runtime:ws",
     contract: "src/modules/runtime/ws/ws_runtime.vn",
     impl WsRuntime {

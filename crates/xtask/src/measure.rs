@@ -212,18 +212,18 @@ pub(super) fn measure_benchmarks(
             }
         }
 
-        let varn_work = work_stats.get("vn").map(|w| w.median);
-        let work_ratio = match (varn_work, best_rival_work) {
+        let vn_work = work_stats.get("vn").map(|w| w.median);
+        let work_ratio = match (vn_work, best_rival_work) {
             (Some(vw), Some(rw)) if vw >= 0.05 && rw >= 0.05 => Some(round2(rw / vw)),
             _ => None,
         };
 
         let resolved = if let (Some(rw_name), Some(_rw)) = (&best_rival, best_rival_work) {
             match (work_stats.get("vn"), work_stats.get(rw_name)) {
-                (Some(varn_w), Some(rival_w)) => {
-                    let non_overlapping = (varn_w.max < rival_w.min) || (rival_w.max < varn_w.min);
+                (Some(vn_w), Some(rival_w)) => {
+                    let non_overlapping = (vn_w.max < rival_w.min) || (rival_w.max < vn_w.min);
                     let significant_diff =
-                        (varn_w.median - rival_w.median).abs() / rival_w.median.max(0.1) > 0.05;
+                        (vn_w.median - rival_w.median).abs() / rival_w.median.max(0.1) > 0.05;
                     non_overlapping || significant_diff
                 }
                 _ => false,
