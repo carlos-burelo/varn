@@ -15,6 +15,6 @@ pub fn execute(args: CompletionsArgs) -> Result<(), CliError> {
         Shell::PowerShell => ClapShell::PowerShell,
         Shell::Elvish => ClapShell::Elvish,
     };
-    clap_complete::generate(shell, &mut cmd, "Varn", &mut io::stdout());
+    clap_complete::generate(shell, &mut cmd, "vn", &mut io::stdout());
     Ok(())
 }
