@@ -138,3 +138,11 @@ fn debug_plain_goldens_jit() {
         }
     }
 }
+
+#[test]
+fn tokens_after_a_multiline_raw_string_keep_their_columns() {
+    let dir = fixtures_dir();
+    let fixture = dir.join("raw_string.vn");
+    assert!(fixture.exists(), "missing fixture {}", fixture.display());
+    check_or_update("raw_string", &fixture, "tokens");
+}

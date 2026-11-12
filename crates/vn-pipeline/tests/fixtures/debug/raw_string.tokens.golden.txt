@@ -1,0 +1,17 @@
+
+  [35mtokens[0m [2m─────────────────────────────────────────── <fixtures>/raw_string.vn[0m
+  [2mIdx   │ Loc        │ Kind                 │ Lexeme[0m
+  ──────────────────────────────────────────────────────────────────────
+  [2m0    [0m │ 2:0        │ [35mLet                 [0m │ [33m"let"[0m
+  [2m1    [0m │ 2:4        │ [35mIdentifier          [0m │ [33m"text"[0m
+  [2m2    [0m │ 2:9        │ [35mEq                  [0m │ [33m"="[0m
+  [2m3    [0m │ 2:11       │ [35mRawStr              [0m │ [33m"first\nsecond\nthird"[0m
+  [2m4    [0m │ 4:9        │ [35mPlus                [0m │ [33m"+"[0m
+  [2m5    [0m │ 4:11       │ [35mStr                 [0m │ [33m"x"[0m
+  [2m6    [0m │ 4:14       │ [35mSemicolon           [0m │ [33m";"[0m
+  [2m7    [0m │ 5:0        │ [35mIdentifier          [0m │ [33m"print"[0m
+  [2m8    [0m │ 5:5        │ [35mLParen              [0m │ [33m"("[0m
+  [2m9    [0m │ 5:6        │ [35mIdentifier          [0m │ [33m"text"[0m
+  [2m10   [0m │ 5:10       │ [35mRParen              [0m │ [33m")"[0m
+  [2m11   [0m │ 6:0        │ [35mEOF                 [0m │ [33m""[0m
+  [2m── end: tokens ──[0m
