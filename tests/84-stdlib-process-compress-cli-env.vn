@@ -58,15 +58,15 @@ await describe("84 stdlib process compress cli env", async () => {
         expect(parsed.positionals.length).toBe(2);
         expect(parsed.positionals[0]).toBe("serve");
         expect(parsed.positionals[1]).toBe("api/v1");
-        Env.set("VARN_TEST_PORT", "8080");
-        expect(Env.get("VARN_TEST_PORT")).toBe("8080");
-        expect(Env.getInt("VARN_TEST_PORT", 3000)).toBe(8080);
-        expect(Env.getInt("VARN_NON_EXISTING_KEY", 5000)).toBe(5000);
-        Env.set("VARN_DEBUG_FLAG", "true");
+        Env.set("VN_TEST_PORT", "8080");
+        expect(Env.get("VN_TEST_PORT")).toBe("8080");
+        expect(Env.getInt("VN_TEST_PORT", 3000)).toBe(8080);
+        expect(Env.getInt("VN_NON_EXISTING_KEY", 5000)).toBe(5000);
+        Env.set("VN_DEBUG_FLAG", "true");
     });
 
     await it("group 1 part 3", async () => {
-        expect(Env.getBool("VARN_DEBUG_FLAG", false)).toBe(true);
+        expect(Env.getBool("VN_DEBUG_FLAG", false)).toBe(true);
         expect(envMap["APP_NAME"]).toBe("VarnServer");
         expect(envMap["PORT"]).toBe("4000");
         expect(envMap["DEBUG"]).toBe("true");

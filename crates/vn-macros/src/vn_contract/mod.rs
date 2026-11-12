@@ -120,7 +120,7 @@ fn expand_section(
 
     let registration = if let Some(class) = &section.class {
         let builder_ident = format_ident!("__vn_build_{}", sanitize(class));
-        let entry_ident = format_ident!("__VARN_OP_{}", sanitize(class).to_uppercase());
+        let entry_ident = format_ident!("__VN_OP_{}", sanitize(class).to_uppercase());
         generated_entry_idents.push(entry_ident.clone());
         let superclass_setup = if let Some(parent) = &contract.extends {
             quote! {

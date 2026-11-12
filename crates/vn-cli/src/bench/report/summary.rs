@@ -30,7 +30,7 @@ impl BuildId {
                 "release"
             },
             backend,
-            commit: option_env!("VARN_GIT_SHA"),
+            commit: option_env!("VN_GIT_SHA"),
         }
     }
 

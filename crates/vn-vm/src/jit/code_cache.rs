@@ -98,7 +98,7 @@ fn verify(
     let cached = postcard::to_allocvec(cached).ok();
     if fresh != cached {
         eprintln!(
-            "VARN_JIT_CACHE verify: cached code differs from a fresh compile of {}",
+            "VN_JIT_CACHE verify: cached code differs from a fresh compile of {}",
             proto.name.as_deref().unwrap_or("<module>")
         );
         std::process::exit(70);

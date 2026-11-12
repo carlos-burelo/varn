@@ -1,5 +1,5 @@
 > Estado verificado 2026-10-13: VIGENTE como registro — cada entrada murió por medición; reabrir solo con dato nuevo (regla del propio doc).
-> Validación: `.\scripts\verify.ps1 -Fast`; sin JIT `VARN_NO_JIT=1 vn run tests/main.vn`. Cifras = sesión indicada, no cita.
+> Validación: `.\scripts\verify.ps1 -Fast`; sin JIT `VN_NO_JIT=1 vn run tests/main.vn`. Cifras = sesión indicada, no cita.
 >
 > Histórico. No spec vigente. Código manda. Revalidar antes de usar.
 
@@ -96,7 +96,7 @@ un vector disperso a cambio de nada demostrable.
 
 Síntoma: `vn bench tests/benchmarks/bench_http_routing.vn` aborta en el warmup
 con `OpGetFixedField: slot 3 out of range`; `vn run` va bien. Es **del JIT**
-(`VARN_NO_JIT=1` funciona) y **preexistente**. Depende del volumen: 90 000
+(`VN_NO_JIT=1` funciona) y **preexistente**. Depende del volumen: 90 000
 peticiones pasa, 95 000 falla.
 
 Causa inmediata conocida: una **referencia colgante al nursery** — `evacuate`
@@ -289,7 +289,7 @@ es resoluble aquí**.
 Los dos binarios compartían directorio de caché y se leían el bytecode
 mutuamente. Reportó `matrix` como **+69 % de regresión** cuando el A/B aislado
 daba **−8 % de mejora**. Corregido: la clave de caché incluye ahora la identidad
-del productor, y el harness da a cada runtime su propio `VARN_CACHE_DIR`.
+del productor, y el harness da a cada runtime su propio `VN_CACHE_DIR`.
 
 ### Los comentarios del repo como evidencia — NO
 

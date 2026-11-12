@@ -33,7 +33,7 @@ Consecuencias observadas en el código, no supuestas:
 - `ModuleResolver::new()` se construye en ocho sitios. Nadie es dueño de la sesión.
 - Los permisos (`--allow-*`) solo existen en `run`. `eval`, `repl`, `test` y `check` fijan
   `allow_all` cada uno por su cuenta.
-- `main.rs` mezcla arranque, volcado de operaciones nativas (`VARN_DEBUG_OPS`), detección de
+- `main.rs` mezcla arranque, volcado de operaciones nativas (`VN_DEBUG_OPS`), detección de
   ejecutable standalone y una lista de subcomandos (`implicit_run`) que repite la del enum de
   clap.
 - `build --native` busca el linker con rutas del Windows SDK escritas en el código y acepta dos

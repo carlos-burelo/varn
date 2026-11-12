@@ -10,7 +10,7 @@ las produce la auditoría, no se copian).
 
 > Validación: `.\scripts\verify.ps1 -Fast` (matriz 4 cuadrantes,
 > release); iteración `.\scripts\verify.ps1 -Quick`; sin JIT
-> `VARN_NO_JIT=1 vn run tests/main.vn`.
+> `VN_NO_JIT=1 vn run tests/main.vn`.
 
 ## 0. Reglas
 
@@ -123,7 +123,7 @@ dev-checkout corre de imagen en caché, el árbol solo la construye
 `--version`.
 Caché JIT persistente (2026-10-16): lowering con relocaciones para todo
 valor del proceso (`5577e184`, lowering puro sin linker) y caché de
-imágenes en `<cache>/jit/` con modo `VARN_JIT_CACHE=verify` como
+imágenes en `<cache>/jit/` con modo `VN_JIT_CACHE=verify` como
 cuadrante 5 de `verify.ps1` (`5489ec54`). http_routing 262→227 ms
 (bun 219).
 Globales top-level a registros del módulo (regresión de la migración

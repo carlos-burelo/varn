@@ -67,15 +67,15 @@ vn doctor
 vn run tests/main.vn
 ```
 
-Matriz puerta = 4 cuadrantes (`ci.yml`): std `dev-checkout`/`@embedded` × JIT/`VARN_NO_JIT=1`. Falla 1 = falla todo. En local, `scripts/verify.ps1 -Fast` añade el cuadrante 5 (`VARN_JIT_CACHE=verify`).
+Matriz puerta = 4 cuadrantes (`ci.yml`): std `dev-checkout`/`@embedded` × JIT/`VN_NO_JIT=1`. Falla 1 = falla todo. En local, `scripts/verify.ps1 -Fast` añade el cuadrante 5 (`VN_JIT_CACHE=verify`).
 
 ## Env runtime
 
 | Variable | Efecto (código) |
 |---|---|
-| `VARN_STD=@embedded\|<path>` | Origen stdlib. Orden: clave `std` del manifiesto del proyecto → `VARN_STD` → `std/` en un ancestro del binario → imagen embebida |
-| `VARN_NO_JIT=1` | Fuerza intérprete |
-| `VARN_GC_TRACE=1` | Línea por colección menor |
+| `VN_STD=@embedded\|<path>` | Origen stdlib. Orden: clave `std` del manifiesto del proyecto → `VN_STD` → `std/` en un ancestro del binario → imagen embebida |
+| `VN_NO_JIT=1` | Fuerza intérprete |
+| `VN_GC_TRACE=1` | Línea por colección menor |
 | `RUST_BACKTRACE=1\|full` | Stack trace pánico Rust |
 
 Lista completa de variables: [`CLI_REFERENCE.md`](CLI_REFERENCE.md#variables-de-entorno).

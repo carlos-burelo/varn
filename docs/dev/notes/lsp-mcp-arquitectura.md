@@ -1,5 +1,5 @@
 > Histórico. No spec vigente. Código manda. Revalidar antes de usar.
-> Validación: `.\scripts\verify.ps1 -Fast` (matriz 4 cuadrantes, release); iteración `.\scripts\verify.ps1 -Quick`; sin JIT `VARN_NO_JIT=1 vn run tests/main.vn`. Cifras aquí = sesión indicada, no cita: re-medir antes de usar.
+> Validación: `.\scripts\verify.ps1 -Fast` (matriz 4 cuadrantes, release); iteración `.\scripts\verify.ps1 -Quick`; sin JIT `VN_NO_JIT=1 vn run tests/main.vn`. Cifras aquí = sesión indicada, no cita: re-medir antes de usar.
 
 # LSP + MCP: arquitectura y desbloqueo del binario en Windows
 
@@ -19,7 +19,7 @@ que seguir vivo y mantiene bloqueado su propio exe.
 `crates/vn-shadow` es un lanzador sin dependencias. Su código no cambia, así
 que cargo nunca tiene que volver a enlazarlo y su bloqueo no estorba.
 
-1. Resuelve el objetivo: `VARN_SHADOW_TARGET` o el `vn` del mismo directorio.
+1. Resuelve el objetivo: `VN_SHADOW_TARGET` o el `vn` del mismo directorio.
 2. Copia el objetivo a `<dir>/.vn-shadow/<len>-<mtime>/vn.exe` (staging + rename,
    así dos arranques concurrentes no chocan) y borra las ranuras que ya nadie
    usa. La copia queda bajo el mismo directorio porque `std_root` busca `std/`

@@ -9,7 +9,7 @@ import { describe, it, expect } from "std:test";
 // slot, any call with FOUR OR MORE real parameters staged too few values and
 // `prepare_call` then read the callee's frame one slot low — silently, with
 // no error. `f4(1,2,3,4)` returned 123 instead of 1234 and `f6(...)` returned
-// 230123 instead of 123456. `VARN_NO_JIT=1` was correct throughout, so only a
+// 230123 instead of 123456. `VN_NO_JIT=1` was correct throughout, so only a
 // compiled caller exposed it.
 //
 // Arguments now travel through the caller's flushed register window, which

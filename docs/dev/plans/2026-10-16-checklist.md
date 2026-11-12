@@ -20,7 +20,7 @@
   - [x] JIT emite alloc bump + header + `HeapObj` + `ObjData` inline; borra solo el uso del helper en vía fast (helper queda como fallback slow; `jit_build_*_with_shape` NO se borran aún: records + fallback los usan)
   - [x] Claves del fix: `ObjData` va tras `HeapObj` completo (`data_off`), forma es CONTROL (`as_ptr-16`), `ObjRef` gordo necesita `len` (`payload_len_off`); todo con tripwires en `heap/jit.rs`
   - [x] Medida quick: push3 ~12%, repr_rows objlit3 51→42 (~18%); checksums iguales
-  - [x] Suite 3522/3522 JIT y NOJIT + 14 sondas crash + `VARN_ALLOC_SLOW` intacto
+  - [x] Suite 3522/3522 JIT y NOJIT + 14 sondas crash + `VN_ALLOC_SLOW` intacto
   - Deuda v1: records por helper; `payload_len_off`/`data_off`/`JIT_HELPERS_VERSION=5` quedan como ABI
 - [ ] Fase E — tipos objeto exactos como instancias (compuerta: D)
   - [ ] Graduar `DynReason::Shape` a `BackendTy` con layout

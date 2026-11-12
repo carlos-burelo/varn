@@ -65,11 +65,11 @@ pub fn print_phases() {
     terminal::log("  types:N  types:all  expr:N   rango de líneas");
     terminal::tagged(
         "env gc",
-        "VARN_GC_TRACE=1   una línea por colección menor, según ocurre (cualquier comando)",
+        "VN_GC_TRACE=1   una línea por colección menor, según ocurre (cualquier comando)",
     );
     terminal::tagged(
         "env gc",
-        "VARN_GC_STRESS=N  colecciones cada N objetos jóvenes (N pequeño, p. ej. 64): caza raíces perdidas",
+        "VN_GC_STRESS=N  colecciones cada N objetos jóvenes (N pequeño, p. ej. 64): caza raíces perdidas",
     );
     Section::new("debug phases").close();
 }

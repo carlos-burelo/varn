@@ -1,5 +1,5 @@
 > Estado verificado 2026-10-13: VIGENTE como snapshot 2026-10-09 (método Ley 12, structs citadas verificables en `crates/vn-sem`, `vn-modules`, `vn-resolver`).
-> Validación: `.\scripts\verify.ps1 -Fast`; sin JIT `VARN_NO_JIT=1 vn run tests/main.vn`. Cifras = sesión indicada, no cita.
+> Validación: `.\scripts\verify.ps1 -Fast`; sin JIT `VN_NO_JIT=1 vn run tests/main.vn`. Cifras = sesión indicada, no cita.
 >
 > Histórico. No spec vigente. Código manda. Revalidar antes de usar.
 
@@ -43,7 +43,7 @@ Módulos / resolver disco:
 
 - `crates/vn-modules/src/loader.rs:94` `trait ModuleLoader { resolve:95, source:104 }`. `ProviderLoader:107`, `ModuleRegistry:169`, `FilesystemLoader:232`, `MemoryLoader:259`. `default_registry Filesystem+Provider:163-167`. `Registry.source` prueba backends en orden `:216-229`. `FilesystemLoader.source read_to_string:235-255`. `ProviderLoader.source:118-160` solo `Core/Std/Runtime`.
 - `crates/vn-modules/src/resolver.rs:18` `ModuleResolver resolve:23` por `Stdlib/Core/Runtime/Relative/Package`.
-- `crates/vn-modules/src/artifact.rs:99` `ArtifactKind { ModuleGraph:100, CheckerInterface:102 }`, `write/read_module_artifact:263,280`, `source_fingerprint:236`, `module_key:243`. `ENVELOPE_VERSION=1:95`, `ArtifactClass Cache=1/Distributable=2:128-132`, `write_artifact:306`, `read_artifact:319`, `write_artifact_file WRITE_SEQ+tmp+rename:370`, `prune_superseded GENERATIONS=3:47-89`, `FP OnceLock exe path+len+mtime:15`, `cache_key BUILD^producer:43`, `producer_fingerprint fnv:14-41`, `payload_checksum fnv32:192`, `find_project_root:201`, `global_vn_dir VARN_HOME/HOME:211`, `get_cache_dir VARN_CACHE_DIR else ~/.varn/cache:221`, `get_bytecode_cache_dir:228`, `get_types_cache_dir:232`.
+- `crates/vn-modules/src/artifact.rs:99` `ArtifactKind { ModuleGraph:100, CheckerInterface:102 }`, `write/read_module_artifact:263,280`, `source_fingerprint:236`, `module_key:243`. `ENVELOPE_VERSION=1:95`, `ArtifactClass Cache=1/Distributable=2:128-132`, `write_artifact:306`, `read_artifact:319`, `write_artifact_file WRITE_SEQ+tmp+rename:370`, `prune_superseded GENERATIONS=3:47-89`, `FP OnceLock exe path+len+mtime:15`, `cache_key BUILD^producer:43`, `producer_fingerprint fnv:14-41`, `payload_checksum fnv32:192`, `find_project_root:201`, `global_vn_dir VN_HOME/HOME:211`, `get_cache_dir VN_CACHE_DIR else ~/.varn/cache:221`, `get_bytecode_cache_dir:228`, `get_types_cache_dir:232`.
 - `crates/vn-modules/src/spec.rs:12` `ModuleSpec`, `provider.rs:7 StdlibProvider + PROVIDER OnceLock:30-32`, `registry.rs:16 core_module_ids, :31 std_module_ids, :35 is_known_stdlib_module`, `layer.rs:2 Layer + check_import:28`, `package.rs:49 resolve_pkg_specifier + resolve_pkg_detailed:65-103 + find_package_root .vn/packages:178-195 + enforce constraint:83 + resolve_export_target exists:117-176 + canonicalize:292-302`.
 - `crates/vn-resolver/src/resolver_disk.rs:5` `DiskResolver { loader:ModuleRegistry:6, graph:Mutex<ModuleGraph>:7, in_flight:FxHashSet:9, core_exports/members:11-12 }`. `with_registry:26`, `types_cache_dir:51-54`.
 - `crates/vn-resolver/src/graph.rs:9` `ModuleGraph { binds/exports/programs/arenas/resolved_paths/reverse_deps:10-18 FxHashMap }`. `project_root_or_init current_dir+find_project_root:76-80`. `invalidate reverse_deps:83-106`.
@@ -94,7 +94,7 @@ Capabilities / host / ABI:
 - `crates/vn-types/src/native.rs:5` `NativeFn=fn(&mut dyn NativeCtx,&[VmValue])->NativeFnResult`, `:83 NativeOpEntry { module_id,namespace,symbol,func_ptr,raw_func_ptr,signature,capability_mask,entry_kind } #[repr(C,align16)]`, `:104 Sync/Send`, `:130 func() transmute`.
 - `crates/vn-cli/src/commands/run.rs:39` `build_capabilities: sandbox:41, allow_all||!has_any_allow=>allow_all:50, mask CAP_FS_READ:61 etc, env_vars:108 pero net_ports:None:107 nunca seteado`.
 - `crates/vn-cli/src/commands/check.rs:14,debug.rs:37,eval.rs:14,repl.rs:67,tester.rs:123` usan `Default=all`. `crates/vn-dap/src/driver.rs:52` `boot_machine(...,allow_all())`.
-- `crates/vn-builtins/src/dispatch/mod.rs:128` `capability:None` hardcodeado `build_table`, `196 dispatch_runtime_op` check muerto, `180 describe_op capability:None`, `:10 unsafe extern C __VARN_OPS_START/END`, `:29 START_MARKER`, `:33 END_MARKER`, `:36 iter_native_ops from_raw_parts`, `:62 FALLBACK_ENTRIES OnceLock<Mutex>`, `:72 ALL_OPS OnceLock`, `:110 ENTRY_BY_OP_ID`, `:120 TABLE`, `:140 MODULE_OPS`. `entry.rs:9 capability:Option<&'static str>` existe pero sin uso.
+- `crates/vn-builtins/src/dispatch/mod.rs:128` `capability:None` hardcodeado `build_table`, `196 dispatch_runtime_op` check muerto, `180 describe_op capability:None`, `:10 unsafe extern C __VN_OPS_START/END`, `:29 START_MARKER`, `:33 END_MARKER`, `:36 iter_native_ops from_raw_parts`, `:62 FALLBACK_ENTRIES OnceLock<Mutex>`, `:72 ALL_OPS OnceLock`, `:110 ENTRY_BY_OP_ID`, `:120 TABLE`, `:140 MODULE_OPS`. `entry.rs:9 capability:Option<&'static str>` existe pero sin uso.
 - `crates/vn-builtins/src/modules/runtime/ffi/ffi.rs:21` `!has_capability("sys.ffi") x12 (21,39,54,72,165,186,204,224,245,263,282,304)`, `13 ERR_PERMISSION_DENIED`.
 - `crates/vn-builtins/src/modules/runtime/fs/fs.rs:46` `check_fs_read/write (121,129,163,170,193,200,207,221,233,245,252,259,266,273,287)`.
 - `crates/vn-builtins/src/modules/runtime/net/net.rs:34` `check_net_listen`, `49 check_net_connect`, `142`.
@@ -171,7 +171,7 @@ HashMap no determinista:
 
 Disco/IO en fases bajas:
 
-- `modules/loader.rs:240 FilesystemLoader.source read_to_string`, `:144 ProviderLoader source_path read_to_string`, `:240-249 Io/NotFound`, `package.rs:252 read_to_string manifest`, `:296 canonicalize`, `:372 canonical_or_original canonicalize`, `:378-380 resolve_specifier_path join+exists`, `artifact.rs:271 create_dir_all`, `:287 read`, `:375 write`, `:376 rename`, `:65 read_dir`, `:85 remove_file`, `:25-34 current_exe+metadata+modified`, `:202-209 find_project_root exists`, `:211-226 global_vn_dir env VARN_HOME/HOME + VARN_CACHE_DIR:222`.
+- `modules/loader.rs:240 FilesystemLoader.source read_to_string`, `:144 ProviderLoader source_path read_to_string`, `:240-249 Io/NotFound`, `package.rs:252 read_to_string manifest`, `:296 canonicalize`, `:372 canonical_or_original canonicalize`, `:378-380 resolve_specifier_path join+exists`, `artifact.rs:271 create_dir_all`, `:287 read`, `:375 write`, `:376 rename`, `:65 read_dir`, `:85 remove_file`, `:25-34 current_exe+metadata+modified`, `:202-209 find_project_root exists`, `:211-226 global_vn_dir env VN_HOME/HOME + VN_CACHE_DIR:222`.
 - `resolver/graph.rs:76-80 project_root_or_init current_dir + find_project_root`, `cache_io.rs:44 read_module_artifact`, `:105 write_module_artifact`, `resolver_trait.rs:31 load_source`, `:52 parse_and_cache`, `resolver_disk.rs:51-54 types_cache_dir`.
 - Binder fase baja toca IO vía trait + paths: `imports.rs:22 parent(source_file) + resolve_specifier:28 / resolve_package:26 + module_exports:38`, `record_reexport_dep:213-217 parent+resolve`, `paths.rs:24-26 resolve_specifier`, `core/loader.rs:25 stdlib_exports, :41 stdlib_bind` en `build_*` llamado desde `checker/stages.rs:17,28` y `resolver_trait core_*`. Checker `prepare stages.rs:16-33` dispara IO transitiva antes de chequear.
 
@@ -246,7 +246,7 @@ Fix breaking (ganancia: corrección UB, costo runtime cero con `RefCell` en buil
 - `ctx.modules/globals`: acceso vía métodos `borrow/borrow_mut` con guard, no `&*get()` crudo.
 - `NATIVE_GLOBALS order` documentar como ABI congelada o generar desde `contract`.
 
-Verificación: `cargo clippy -D missing-safety-doc -D mut_from_ref`, tests `circular TDZ`, `task fork` bajo `VARN_NO_JIT=1` + JIT, miri si aplica a `linker/globals`.
+Verificación: `cargo clippy -D missing-safety-doc -D mut_from_ref`, tests `circular TDZ`, `task fork` bajo `VN_NO_JIT=1` + JIT, miri si aplica a `linker/globals`.
 
 ### H4. Hasher aleatorio + orden hash determinan bytecode
 
@@ -268,7 +268,7 @@ Fix breaking (ganancia: determinismo byte-idéntico, caché hit; verificación: 
 - `Tir TyTable` → aceptar índice local por módulo (bien) pero documentar `dedup` no cruza módulos; no usar `FxHashMap` iter para emitir.
 - `Checker` caches `FxHashMap` solo si no afectan orden emisión; auditar `infer_cache/compat_cache` no iterados para codegen (hoy no, pero prohibir `iter`).
 
-Verificación: `VARN_CACHE_DIR=<tmp> vn build` dos veces → `sha256 .vncache` idéntico; `topo` test con 3 módulos independientes orden alfabético.
+Verificación: `VN_CACHE_DIR=<tmp> vn build` dos veces → `sha256 .vncache` idéntico; `topo` test con 3 módulos independientes orden alfabético.
 
 ### H5. Clases foráneas degradan a `Dynamic` en backend
 
@@ -300,7 +300,7 @@ Fix breaking (ganancia: elimina clase bugs orden-dependientes + panics caché; s
 - `Atom.resolve` → no panic en Laws nuevas: usar `try_resolve` + error `E_STALE_ATOM` con `source_file + atom dbg`. Mantener `resolve` solo en tests.
 - `PortableModule` debe validar `names` contiene todo `Atom` alcanzable (hoy `encode Roots BTreeSet` bien, pero `decode` debe error si falta, no `intern` vacío).
 
-Verificación: test `module_cache_atom_roundtrip` + `shared_interner_origin_module` con caché limpio `VARN_CACHE_DIR=<tmp>`, fuzz `adopt_dependencies` orden inverso mismo resultado.
+Verificación: test `module_cache_atom_roundtrip` + `shared_interner_origin_module` con caché limpio `VN_CACHE_DIR=<tmp>`, fuzz `adopt_dependencies` orden inverso mismo resultado.
 
 ---
 
@@ -334,7 +334,7 @@ Fix: `source_hashes` + `interface_hash = fnv(postcard(PortableModule))` por mód
 
 Evidencia: `native.rs:83,130`, `native_abi.rs:6-101`, `jit-abi/lib.rs:115-243 sin VERSION`, `proto/definition.rs:50-113 skip`, `native_entry.rs:78-95 sig+epoch`, `contract/fast.rs:55,72 DummyCtx`, `mapping.rs:189 u8 7 slots`, `dispatch/mod.rs:36 from_raw_parts + OnceLock<Mutex>`, `rt/lib.rs:3,46 Box::leak,65 exit(1)`, `globals:SILENT AtomicBool`, `timer WHEEL OnceLock<Mutex>`, `channel REGISTRY OnceLock`, `sqlite DB_POOL Mutex<Vec>`, `profile TASK_STATS static`, `clif_link thread_local CURRENT_CTX/EPOCH/COMPILED + NEXT_EPOCH AtomicU64`, `pumps thread_local PUMPS/HOSTS`.
 
-Fix breaking: `JitHelpers::VERSION: u32` + `assert_version` en `table_build.rs:7-33` (ya `offset_of+probe`, añadir número). `NativeOpEntry.capability_mask` real. `fast_wrap` sin `DummyCtx` fallback → error si decode falla. `signature_token` `u8` → `u16` o error explícito `>7 args no fast`. `__VARN_OPS_START/END from_raw_parts` documentar safety + test `iter_native_ops` cuenta. `Box::leak str_concat` → devolver `StrResult` con owner o interner, no leak. `SILENT AtomicBool` → pasar en `NativeCtx`, no global.
+Fix breaking: `JitHelpers::VERSION: u32` + `assert_version` en `table_build.rs:7-33` (ya `offset_of+probe`, añadir número). `NativeOpEntry.capability_mask` real. `fast_wrap` sin `DummyCtx` fallback → error si decode falla. `signature_token` `u8` → `u16` o error explícito `>7 args no fast`. `__VN_OPS_START/END from_raw_parts` documentar safety + test `iter_native_ops` cuenta. `Box::leak str_concat` → devolver `StrResult` con owner o interner, no leak. `SILENT AtomicBool` → pasar en `NativeCtx`, no global.
 
 ---
 
@@ -362,11 +362,11 @@ Fix: ver H7. `Binder` no importa `ImportResolver` de `vn-sem` que implementa `Di
 
 ## 4. Plan corrección detallado (orden + commits atómicos Ley9)
 
-Cada paso = un commit revertible, mensaje sin "y". Validación iteración `cargo build --profile quick --bin vn` + `.\scripts\verify.ps1 -Quick` (dev-checkout/JIT). Matriz completa `-Fast` (release, 4 cuadrantes std dev-checkout/@embedded × JIT/VARN_NO_JIT=1) solo antes de commit. Si contradicción código vs plan, código manda + registrar bug diseño (AGENTS.md §0).
+Cada paso = un commit revertible, mensaje sin "y". Validación iteración `cargo build --profile quick --bin vn` + `.\scripts\verify.ps1 -Quick` (dev-checkout/JIT). Matriz completa `-Fast` (release, 4 cuadrantes std dev-checkout/@embedded × JIT/VN_NO_JIT=1) solo antes de commit. Si contradicción código vs plan, código manda + registrar bug diseño (AGENTS.md §0).
 
 ### Fase A — determinismo + seguridad (P0, sin cambio semántico salvo fail-closed)
 
-A1. `artifact hasher determinista` — tocar `modules/src/artifact.rs:236-248` → `fnv1a64`/`xxh3_64`, `cache_io.rs:18-31` igual. Borrar `DefaultHasher`. Tests: `module_key` estable entre procesos (dos `vn` distintos mismo output). Ganancia: caché hit. Verificación: `VARN_CACHE_DIR=<tmp1>/<tmp2>` mismo `module_key`.
+A1. `artifact hasher determinista` — tocar `modules/src/artifact.rs:236-248` → `fnv1a64`/`xxh3_64`, `cache_io.rs:18-31` igual. Borrar `DefaultHasher`. Tests: `module_key` estable entre procesos (dos `vn` distintos mismo output). Ganancia: caché hit. Verificación: `VN_CACHE_DIR=<tmp1>/<tmp2>` mismo `module_key`.
 
 A2. `topo + graph_hash determinista` — `module_precompile.rs:104-118 BTreeMap/sort`, `compile.rs:119-121 BTreeMap fold`, `encode.rs:35-53 sort keys`, `core/loader.rs:44 sort`, `exports.rs:168,206 sort`, `package.rs:124 sort`. Tests: 3 módulos independientes orden alfabético estable, `graph_hash` igual dos corridas.
 
@@ -410,7 +410,7 @@ D1. `SymTy Known/Unknown`, D2. `compat Atom directo`, D3. `Atom.resolve` → `tr
 
 ### Puerta validación (AGENTS.md §5)
 
-`.\scripts\verify.ps1 -Fast` 4 cuadrantes + `VARN_CACHE_DIR=<temp>` limpio para aislar frontera módulo (Ley2). `cargo check` detecta rotura std bundle (`vn-cli/build.rs`). Criterio: `PASSED:N FAILED:0 ALL TESTS PASSED` x4.
+`.\scripts\verify.ps1 -Fast` 4 cuadrantes + `VN_CACHE_DIR=<temp>` limpio para aislar frontera módulo (Ley2). `cargo check` detecta rotura std bundle (`vn-cli/build.rs`). Criterio: `PASSED:N FAILED:0 ALL TESTS PASSED` x4.
 
 ---
 
@@ -449,7 +449,7 @@ Suite 4 cuadrantes con perfil `quick`: `PASSED: 2287 FAILED: 0 ALL TESTS PASSED`
 - H11 parcial: `jit-abi/lib.rs: JIT_HELPERS_VERSION=1`, re-export en `jit/lib.rs`, assert en `vm/jit/table_build.rs`. `contract/fast.rs` sin cambio: fast path solo escalares no-falibles, `DummyCtx` ahora sandbox sin efecto en decode.
 - Hallazgo nuevo B4 (verificador TIR): `tir/verify/coherence/ops.rs: check_binary` eximía solo comparaciones y `Dynamic`; `Instanceof`/`In` heterogéneos fallaban (`e instanceof Error` con ambos lados `Class` distintos) enmascarado antes por `Dynamic`. Ahora exentos con check `e.ty==Bool`. Sin esto H5 es imposible.
 - R2: `rehome::canonicalize_lang_named`: `Named` lang-name + origen == `core_module()` → `Builtin`/`Primitive`. Cableado en `rehome_ty`, `rehome_ty_with_origin` e `imports.rs` (tras `with_origin`). Los tipos nativos ya no viajan como `Named` foráneo.
-- R3: `BindResult::classify_decl` (`DeclKind`: prioridad `SumType > Enum > Class > Interface > Namespace`, `debug_assert` unicidad para builds dev). Ambos colectores la usan: clases exige `Class`, enums exige `Enum|SumType`. Hallazgo raíz medido: `bind_enum` (`binder/decl_values/type_decls.rs:46,268,272`) registra cada enum en TRES mapas (`sum_type_variants` + `classes` + `enums`); el colector viejo leía mapas espejo y la primera versión de `classify` tenía bug last-wins (devolvía `Class` para `Result`, rompiendo `try`; verificado con `VARN_DEBUG_FOREIGN` temporal, ya retirado). Con first-wins, `Result`/`Option` van solo a enum y `try`/`match` vuelven precisos.
+- R3: `BindResult::classify_decl` (`DeclKind`: prioridad `SumType > Enum > Class > Interface > Namespace`, `debug_assert` unicidad para builds dev). Ambos colectores la usan: clases exige `Class`, enums exige `Enum|SumType`. Hallazgo raíz medido: `bind_enum` (`binder/decl_values/type_decls.rs:46,268,272`) registra cada enum en TRES mapas (`sum_type_variants` + `classes` + `enums`); el colector viejo leía mapas espejo y la primera versión de `classify` tenía bug last-wins (devolvía `Class` para `Result`, rompiendo `try`; verificado con `VN_DEBUG_FOREIGN` temporal, ya retirado). Con first-wins, `Result`/`Option` van solo a enum y `try`/`match` vuelven precisos.
 - R4: `modules::is_prelude_module` (misma lista que usa `emit/prelude.rs`). `pipeline/layer_link.rs: verify_synthetic_imports` en linkado (entry + deps): arista TIR no declarada en AST debe ser prelude. `binder/imports.rs: check_reexport_layer` (`export...from` sin check antes; negativo verificado → `VN2010`). Runtime mantiene `Runtime→solo-Std` como backstop.
 - H8: `decl_primary_name → decl_export_names` (N declarators; antes pérdida silenciosa desde el 2º). `ExportMap.collisions` + first-wins + `E_EXPORT_COLLISION` en linkado (entry, deps, stdlib). Hallazgo raíz medido: `export *` sin alias NO emitía `TirExport` (`emit/imports_exports.rs` sin rama `All`, suite sin cobertura) → slots siempre null (preexistente, expuesto al probar H8a). Fix: `pipeline: emit_and_compile` dividido en `emit_tir` + `inject_star_reexports` + `compile_tir` (+ `tir_import_sources`; wrapper borrado; `vn-tir` dep directa de pipeline), que materializa star vía `reexport_from` con el mecanismo existente.
 - H11-silence: `SILENT` estático borrado en `globals.rs` y `testing.rs`; `NativeCtx::print_silent()` (default `false`, override en `ExecCtx`) + campo `ExecCtx.print_silent` (heredado en `fork_for_task`); `RunOpts.print_silent` → `execute_with_caps` → `machine.ctx`; `VmFactory.print_silent` + `build_silent`/`run_once_silent`; tester quiet por-VM (elimina leak en early-return y carreras entre workers); contadores `PASSED/FAILED` se quedan globales a propósito (agregación cross-worker de `vn test`); `vn test` con `allow_all` explícito (dev tool; el default sandbox rompía tests de red).
@@ -521,7 +521,7 @@ Mecanismo probado con evidencia (no especulación):
 - `compiler/from_tir/build/class_def.rs:13-23` cada módulo ejecuta `MakeClass { name, super_class }` propio (`exec/class.rs:8-11` `op_class` crea SIEMPRE fresco vía `new_rc`, sin consultar ningún registro).
 - Dos mecanismos de creación conviven (Ley8): nativas por registro (`contract/mod.rs:116-122` `get_class`/`register_class` en `heap.intrinsic_classes`, singletons por nombre) vs fuente siempre-fresco. No unificar a ciegas por `(module,name)`: la frescura por evaluación es LOAD-BEARING para REPL/eval (redefinir `class Foo` por snippet debe crear objeto nuevo; internar por `(module,name)` acumularía métodos entre snippets).
 - `compiler/from_tir/ty.rs:33-36` el `ClassId` local muere en la frontera TIR→SSA (`HirType::Class` por nombre); el slot fixo (`GetFixedField`) se congela contra el `ClassInfo` local.
-- F0 medido (instrumento `VARN_DEBUG_CLASS` temporal, ya retirado): `Error#4, TypeError#5...` vía `new_native_rc` UNA vez; `ValidationError#24` vía `new_rc` UNA vez; cero `INSTANCEOF_MISS`; t4 `true`. Creación única por VM (linker/evaluación única funciona); heaps no cruzan threads (`SendValue`); `freeze` rechaza módulos con clases (`module_freeze.rs:70-71` → recargan normal) y `thaw` preserva el `Rc` (`thaw_export: Class`, misma identidad). Identidad runtime SANA bajo evaluación única; el t4-falso histórico fue artefacto de compile-time (ids `ClassId` duplicados entre tablas por módulo), ya fijado con `TypeTest` local-only + dinámico.
+- F0 medido (instrumento `VN_DEBUG_CLASS` temporal, ya retirado): `Error#4, TypeError#5...` vía `new_native_rc` UNA vez; `ValidationError#24` vía `new_rc` UNA vez; cero `INSTANCEOF_MISS`; t4 `true`. Creación única por VM (linker/evaluación única funciona); heaps no cruzan threads (`SendValue`); `freeze` rechaza módulos con clases (`module_freeze.rs:70-71` → recargan normal) y `thaw` preserva el `Rc` (`thaw_export: Class`, misma identidad). Identidad runtime SANA bajo evaluación única; el t4-falso histórico fue artefacto de compile-time (ids `ClassId` duplicados entre tablas por módulo), ya fijado con `TypeTest` local-only + dinámico.
 - Restricción que queda: sin registro global, la unicidad depende de "un módulo se evalúa una vez" (linker) + frescura por evaluación (REPL). R1 completo = mover esa garantía de runtime-accidental a linkado-explícito (F1-F5).
 
 Fases (cada una verde + commit):
@@ -532,5 +532,5 @@ Fases (cada una verde + commit):
 - F4: VM: `ExecCtx` con registro compartido (`Rc`); `TypeTest`/`GetFixedField`/vtable consultan registro; `MakeClass` unifica shapes por id global (un solo layout por clase = Ley6); borrar copias foráneas (`ForeignClass`, `parent_class_id`, `foreign_parent_info`) y fallback dinámico en `expr_binary` (Ley8).
 - F5: `ModuleSlot`: emitir `LoadModuleSlot/StoreModuleSlot` verificados contra `ExportMap` + `interface_hash` en caché; borrar `LoadModule+GetProperty Dynamic` para estáticos y `loader.load` fallback sin hash.
 
-Verificación F4/F5: t4 `true` con `TypeTest` estático, suite 4 cuadrantes, bench campo/método cross-module == local, caché limpio `VARN_CACHE_DIR=<tmp>`.
+Verificación F4/F5: t4 `true` con `TypeTest` estático, suite 4 cuadrantes, bench campo/método cross-module == local, caché limpio `VN_CACHE_DIR=<tmp>`.
 

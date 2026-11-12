@@ -6,7 +6,7 @@ pub use vars::{EnvVar, Scope};
 
 use std::sync::OnceLock;
 
-const VARN_PREFIX: &str = "VARN_";
+const VN_PREFIX: &str = "VN_";
 
 #[allow(clippy::disallowed_methods)]
 fn process_lookup(name: &str) -> Option<String> {
@@ -46,7 +46,7 @@ pub fn process() -> &'static Settings {
 pub fn unknown_vars() -> Vec<String> {
     let mut unknown: Vec<String> = std::env::vars()
         .map(|(name, _)| name)
-        .filter(|name| name.starts_with(VARN_PREFIX) && EnvVar::from_name(name).is_none())
+        .filter(|name| name.starts_with(VN_PREFIX) && EnvVar::from_name(name).is_none())
         .collect();
     unknown.sort();
     unknown

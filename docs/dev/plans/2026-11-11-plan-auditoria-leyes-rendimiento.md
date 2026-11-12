@@ -18,7 +18,7 @@ antes de actuar.
   `delta%` mayor que `ci95%`. `same` significa que no se probó nada y el item se aparca.
 - Un mejor conteo de opcodes no es una ganancia de tiempo.
 - Orden obligatorio: Fase M (medición) antes que cualquier item de Fase R.
-- Puerta por item: suite en JIT y `VARN_NO_JIT=1`, `scripts\verify.ps1 -Fast`
+- Puerta por item: suite en JIT y `VN_NO_JIT=1`, `scripts\verify.ps1 -Fast`
   antes de push (Ley 19); matriz completa al tocar JIT, caché JIT o cargador de std.
 - Las causas marcadas **hipótesis** no están probadas: el primer paso del item es probarlas.
 
@@ -29,7 +29,7 @@ antes de actuar.
 | Comprobación | Resultado |
 |---|---|
 | `vn run tests\main.vn` (JIT) | `PASSED: 5542`, `FAILED: 0` |
-| `VARN_NO_JIT=1` | `PASSED: 5542`, `FAILED: 0`, salida idéntica a la de JIT |
+| `VN_NO_JIT=1` | `PASSED: 5542`, `FAILED: 0`, salida idéntica a la de JIT |
 | Tres volcados `debug -p bytecode tests\main.vn` | mismo SHA-256 (11 865 811 caracteres) |
 
 ### 1.2 Contra rivales (`xtask compare`, 7 corridas, 2 de calentamiento)
@@ -69,8 +69,8 @@ Estos números contradicen la línea "No tocar: fib/dto/json_pure/gc_alloc
 
 | Medición | Valor |
 |---|---|
-| `http_routing` con `VARN_GC_TRACE=1` | 4 menores y 1 mayor; cada menor entra con 530 000–670 000 celdas y 42–55 MB, tarda 9.4–15.4 ms; `external` ≈ 16.8 MB en cada una |
-| fib: JIT / `VARN_NO_JIT=1` (proceso completo) | ≈ 100 ms / 3177 ms |
+| `http_routing` con `VN_GC_TRACE=1` | 4 menores y 1 mayor; cada menor entra con 530 000–670 000 celdas y 42–55 MB, tarda 9.4–15.4 ms; `external` ≈ 16.8 MB en cada una |
+| fib: JIT / `VN_NO_JIT=1` (proceso completo) | ≈ 100 ms / 3177 ms |
 | matrix: JIT / sin JIT | 32 ms / 229 ms |
 | json_pure: caché on / caché off / sin JIT | 415 / 385 / 402 ms (el JIT no influye) |
 | Suite: primera corrida tras recompilar / siguientes | 112 s / 40 s |
@@ -187,7 +187,7 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
   (`external` ≈ 16.8 MB en cada línea de la traza), no el de celdas.
 - **Cambio:** contabilizar el vivero en bytes reales (celdas más externo)
   contra un único presupuesto, y disparar la menor al cruzarlo. Barrer el
-  presupuesto entre 1, 2, 4, 8 y 16 MiB con `VARN_GC_TRACE=1` y elegir por
+  presupuesto entre 1, 2, 4, 8 y 16 MiB con `VN_GC_TRACE=1` y elegir por
   tiempo total de `http_routing`, `gc_alloc`, `new_retained`, `json_pure`.
 - (a) Menos fallos de caché por asignación y pausas menores más cortas;
   objetivo: `in gc` de `http_routing` de 21.9 % a menos de 12 %. (b) `vn bench
@@ -227,7 +227,7 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
 - **Evidencia:** `mi_malloc_aligned` 6.0 % en `http_routing` y 6.5 % en
   `json_api_payloads`; `alloc_array_repr` 2.5–3.7 %; `external` ≈ 16.8 MB por ciclo menor.
 - **Hipótesis:** cada arreglo y mapa joven reserva su respaldo fuera del heap.
-- **Primer paso:** `VARN_ALLOC_PROFILE` sobre `http_routing` para contar
+- **Primer paso:** `VN_ALLOC_PROFILE` sobre `http_routing` para contar
   reservas externas por sitio y tamaño.
 - **Cambio (si se confirma):** respaldo en línea para colecciones pequeñas,
   dentro de la celda o del vivero; `malloc` solo sobre un umbral.
@@ -283,7 +283,7 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
 
 ### R7. Una sola guarda por llamada sin frame
 
-- **Evidencia:** el IR de `fib` (`VARN_CLIF_PRINT_IR=1`) emite por cada llamada:
+- **Evidencia:** el IR de `fib` (`VN_CLIF_PRINT_IR=1`) emite por cada llamada:
   `guard_headroom` (puntero de pila contra `jit_stack_floor`), `enter_frameless`
   (dos cargas, suma, comparación contra 10000, escritura) y `leave_frameless`
   (carga, resta, escritura). Código en
@@ -365,7 +365,7 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
   6. **Hipótesis:** un segundo `match op` en los módulos `ops_*.rs` (existen,
      falta confirmar que el bucle principal delega en ellos por opcode).
   7. `record_hotspot_global` en cada carga de global.
-- **Cambios, uno por commit, cada uno medido con `VARN_NO_JIT=1` en fib y matrix:**
+- **Cambios, uno por commit, cada uno medido con `VN_NO_JIT=1` en fib y matrix:**
   1. Verificar el bytecode una vez al cargar el chunk (opcodes válidos, saltos
      dentro de rango, último opcode terminador) y quitar 1, 3 y 4 del bucle.
   2. Depuración: bucle distinto cuando hay sesión de depuración activa, elegido
@@ -373,7 +373,7 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
   3. `compiler_fence`: averiguar con `git show 54129d29` qué error tapaba,
      corregir esa causa y retirarlo (Ley 14).
   4. Perfilado de globales: mismo tratamiento que la depuración.
-- (a) Objetivo: fib sin JIT por debajo de 1500 ms. (b) `VARN_NO_JIT=1 vn bench`.
+- (a) Objetivo: fib sin JIT por debajo de 1500 ms. (b) `VN_NO_JIT=1 vn bench`.
   (c) Las comprobaciones por opcode y el `compiler_fence`.
 - **Límite:** Ley 10 no admite `unsafe` por ganancia de compilación; aquí es
   runtime y el verificador de carga es lo que justifica el acceso sin límites.
@@ -386,7 +386,7 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
 - **Cambio:** fusión de copias en el emisor SSA
   (`crates/vn-compiler/src/ssa/emit/`) para el patrón dominante.
 - (a) Solo cuenta si baja el tiempo sin JIT; el conteo no es resultado.
-  (b) `VARN_NO_JIT=1` en fib, matrix, collection_pipeline. (c) Nada.
+  (b) `VN_NO_JIT=1` en fib, matrix, collection_pipeline. (c) Nada.
 
 ### R14. Costo de la caché JIT fría
 
@@ -395,9 +395,9 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
   `OSR_BACKEDGES = 1000` (`crates/vn-vm/src/settings.rs:19-21`).
 - **Hipótesis:** los 72 s son compilación con Cranelift de funciones con bucle
   que corren una sola vez.
-- **Primer paso:** `VARN_JIT_CACHE=off vn run tests\main.vn` cronometrado, y
+- **Primer paso:** `VN_JIT_CACHE=off vn run tests\main.vn` cronometrado, y
   `vn bench tests\main.vn --profile` para leer `in jit compile`.
-- **Cambio (si se confirma):** barrer `VARN_JIT_TIER` en 1, 2, 4, 8 con la
+- **Cambio (si se confirma):** barrer `VN_JIT_TIER` en 1, 2, 4, 8 con la
   suite y las 25 cargas, y fijar el menor valor que no empeore ninguna carga
   más que su ci95. OSR ya cubre el bucle largo en la primera llamada.
 - (a) Suite en frío por debajo de 60 s sin regresión en caliente. (b) Las dos
@@ -583,6 +583,6 @@ R7–R9 llamadas; R10–R11 strings; R12–R14 intérprete y arranque.
   Bun y Node.
 - `task_soak`, `task_spawn`, `gpu_matmul`, `csv_etl`, `now`, `math`,
   `multiple`, `generator`: sin equivalente verificado en `xtask compare` o sin perfilar.
-- Cuadrante `VARN_STD=@embedded`: no se corrió en esta auditoría.
+- Cuadrante `VN_STD=@embedded`: no se corrió en esta auditoría.
 - Los perfiles se tomaron con el muestreador añadiendo 14–17 % de sobrecarga;
   el de `str_ops` reportó −49.9 %, señal de ruido (ver M5).

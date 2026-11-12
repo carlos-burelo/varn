@@ -37,14 +37,14 @@ artefacto; `write_image` la produce (`vn std-bundle`).
 Resolución de la raíz (`std_root.rs::resolve`, una vez por proceso):
 
 1. clave `std` del manifiesto del proyecto (`ProjectOverride`);
-2. `VARN_STD` = ruta a un árbol fuente, o `@embedded` (`Env`);
+2. `VN_STD` = ruta a un árbol fuente, o `@embedded` (`Env`);
 3. un `std/` en un ancestro del ejecutable (`DevCheckout`);
 4. imagen embebida (`Embedded`).
 
 Qué imagen se usa (`vn-cli/src/std_source.rs::select`):
 
-- **Árbol fuente** (override, `VARN_STD=<ruta>` o dev-checkout): `vn` construye la imagen en `<cache>/std/std.<huella>.vnb` lanzando `vn std-bundle` como proceso hijo. La huella cubre el binario y ruta/tamaño/mtime de cada módulo, así que cambiar `std/` o recompilar `vn` la regenera. Un error de tipos en `std/` aparece en la primera corrida, no en `cargo check`.
-- **Embebida**: con la feature `embed-std`, `dist/std.vnb` va dentro del binario; si no, se lee de `VARN_STD_BUNDLE`.
+- **Árbol fuente** (override, `VN_STD=<ruta>` o dev-checkout): `vn` construye la imagen en `<cache>/std/std.<huella>.vnb` lanzando `vn std-bundle` como proceso hijo. La huella cubre el binario y ruta/tamaño/mtime de cada módulo, así que cambiar `std/` o recompilar `vn` la regenera. Un error de tipos en `std/` aparece en la primera corrida, no en `cargo check`.
+- **Embebida**: con la feature `embed-std`, `dist/std.vnb` va dentro del binario; si no, se lee de `VN_STD_BUNDLE`.
 
 El checker lee las interfaces de std/core directamente de la imagen; no recompila la std.
 
@@ -60,8 +60,8 @@ inversas (`invalidate` por `reverse_deps`, `evict_heavy`, `clear`).
 `graph_stats`, `find_bind_for_type`, `stdlib_specs`, `find_stdlib_bind`.
 
 Los artefactos en disco (grafo compilado, interfaces) usan el sobre de
-`artifact.rs` y viven en la caché global (`~/.vn/cache`, `VARN_HOME`,
-`VARN_CACHE_DIR`). Ningún `.vnb` está versionado en el repo (`dist/` se ignora).
+`artifact.rs` y viven en la caché global (`~/.vn/cache`, `VN_HOME`,
+`VN_CACHE_DIR`). Ningún `.vnb` está versionado en el repo (`dist/` se ignora).
 
 ## Módulos nativos
 

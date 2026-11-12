@@ -73,7 +73,7 @@ Estas cifras no describen el conjunto del compilador.
 ## Agujeros reproducidos en VM y JIT
 
 Los ejemplos siguientes aceptan valores que incumplen el tipo. Se ejecutaron
-con `target/release/vn run <archivo>` y nuevamente con `VARN_NO_JIT=1`, usando
+con `target/release/vn run <archivo>` y nuevamente con `VN_NO_JIT=1`, usando
 un caché aislado bajo `target/tmp/`. Ambas modalidades coincidieron.
 
 ### Unión sin miembros en el contrato backend

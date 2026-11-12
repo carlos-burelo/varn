@@ -76,7 +76,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
     let name = &input.name;
     let module = &input.module;
     let builder = format_ident!("__vn_enum_build_{}", enum_name.to_lowercase());
-    let entry = format_ident!("__VARN_ENUM_{}", enum_name.to_uppercase());
+    let entry = format_ident!("__VN_ENUM_{}", enum_name.to_uppercase());
     let entries = format_ident!("{}_ENTRIES", enum_name.to_uppercase());
     let abs_lit = LitStr::new(&abs_path_str, proc_macro2::Span::call_site());
 

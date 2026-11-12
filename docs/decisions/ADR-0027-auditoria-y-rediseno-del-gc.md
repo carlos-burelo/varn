@@ -10,7 +10,7 @@ Por la Ley 12, ninguna afirmación de este documento se apoya en otro `.md`. Cad
 
 Se leyó el GC completo: `heap/{gc,minor,major,young,children,structs,core,jit,strings,intern,obj}.rs`, `heap/cells/{mod,blocks,typed,native}.rs`, `vn-types/src/cell.rs`, `vm_value/{array,vm_array,vm_array_access}.rs`, `exec/ctx_gc.rs`, `closure.rs`, `dispatch/modules.rs`, el contrato con el JIT (`vn-jit/src/clif/alloc/safepoints.rs`, `from_ssa/alloc_instance.rs`) y `scripts/verify.ps1`.
 
-Se midió con programas deterministas (apéndice A), con los contadores de `vn bench -v` y con `VARN_GC_TRACE`. Las pausas por fase del GC mayor se midieron con instrumentación temporal que no se commiteó.
+Se midió con programas deterministas (apéndice A), con los contadores de `vn bench -v` y con `VN_GC_TRACE`. Las pausas por fase del GC mayor se midieron con instrumentación temporal que no se commiteó.
 
 Una lección de método que invalidó una primera tanda: el análisis de escape del JIT elimina `const t = new Node(i); sink += t.id`. Los primeros experimentos de churn no asignaban nada. Todos los temporales de este documento escapan a un anillo (`ring[i & 1023] = new Node(i)`).
 
@@ -55,7 +55,7 @@ Cada celda tiene una cabecera de 8 bytes (`state`, `kind`, `class`, `_aux`) y un
 - **Arrays tipados** (`I64`, `F64`) que el GC no recorre, y el prefijo limpio de `Boxed` (`vm_array.rs:92-100`, `vm_array_access.rs:20,101,125`), con `tests/155`.
 - **Barrera generacional con conjunto recordado** y `match` exhaustivo al recorrer hijos (`children.rs`, Ley 7).
 - **Internadores que nacen `Old`** (`strings.rs:45-62`, `intern.rs`), así que una menor nunca deja entradas colgando.
-- **La suite pasa con el GC bajo estrés**: `VARN_GC_STRESS=2048` y `VARN_GC_STRESS=256` → `PASSED: 5542, FAILED: 0` (ver H7).
+- **La suite pasa con el GC bajo estrés**: `VN_GC_STRESS=2048` y `VN_GC_STRESS=256` → `PASSED: 5542, FAILED: 0` (ver H7).
 
 ## 3. Hallazgos
 
@@ -156,7 +156,7 @@ Queda abierto: con supervivencia del 100 % la primera menor promueve exactamente
 
 - `write_barrier` se llama a mano desde unos 40 sitios (VM, helpers del JIT, `builtins`). Cada mutador nuevo debe acordarse de ella y de bajar `clean_prefix`. Una barrera olvidada es un objeto joven liberado mientras alguien lo referencia.
 - No existe un verificador de invariantes del heap.
-- `VARN_GC_STRESS` existe (`settings.rs:24-28`) pero **ningún script ni CI lo usa**: `verify.ps1` define cinco cuadrantes y ninguno lo activa; un `grep` de `GC_STRESS` solo encuentra su definición y su ayuda.
+- `VN_GC_STRESS` existe (`settings.rs:24-28`) pero **ningún script ni CI lo usa**: `verify.ps1` define cinco cuadrantes y ninguno lo activa; un `grep` de `GC_STRESS` solo encuentra su definición y su ayuda.
 - Positivo medido: la suite completa pasa con el GC bajo estrés, con N=2048 (5542/0, 66 s) y con N=256 (5542/0, 62 s). El estrés está activo de verdad: el mismo programa pasa de 5 a 15 629 colecciones menores. Las barreras y las raíces actuales aguantan esa presión; lo que falta es que alguien lo compruebe en cada cambio.
 
 ### H8 — Acoplamiento con el JIT
@@ -254,13 +254,13 @@ No se implementa hasta que se fije un objetivo de pausa (decisión D1). Con 15 n
 
 ### 6.6 Seguridad
 
-- **Verificador** (`VARN_GC_VERIFY=1`, y siempre en el cuadrante de estrés): tras cada menor y mayor recorre el heap y comprueba que (i) ninguna referencia apunta a una celda libre, (ii) todo viejo con hijo joven está recordado o en el registro, (iii) no quedan marcas, (iv) las listas libres solo contienen celdas libres y los contadores cuadran.
-- **Nuevo cuadrante de `verify.ps1`** con `VARN_GC_STRESS` y verificador, y el mismo en CI.
+- **Verificador** (`VN_GC_VERIFY=1`, y siempre en el cuadrante de estrés): tras cada menor y mayor recorre el heap y comprueba que (i) ninguna referencia apunta a una celda libre, (ii) todo viejo con hijo joven está recordado o en el registro, (iii) no quedan marcas, (iv) las listas libres solo contienen celdas libres y los contadores cuadran.
+- **Nuevo cuadrante de `verify.ps1`** con `VN_GC_STRESS` y verificador, y el mismo en CI.
 - **Barrera por tipos.** Los mutadores de contenedores devuelven un `WriteEffect` `#[must_use]` que el llamador entrega al heap. Olvidar la barrera es un error de compilación (Leyes 7 y 14).
 
 ### 6.7 Observabilidad
 
-`VARN_GC_TRACE` solo traza menores (`gc_trace` se llama en `minor.rs`); los mayores hubo que instrumentarlos a mano para esta auditoría. Se traza cada colección con fases, bytes y edades, y `bench -v` suma histograma de pausas y bytes por generación.
+`VN_GC_TRACE` solo traza menores (`gc_trace` se llama en `minor.rs`); los mayores hubo que instrumentarlos a mano para esta auditoría. Se traza cada colección con fases, bytes y edades, y `bench -v` suma histograma de pausas y bytes por generación.
 
 ## 7. Plan por etapas
 
@@ -384,7 +384,7 @@ Orden recomendado: **S0 → S1 → S3 → S2 → S4 → S8 → S7 → S9**, con 
 
 | Etapa | Estado | Medida |
 |---|---|---|
-| S0 | Entra (`c693a661`) | Suite verde con `VARN_GC_STRESS=256` y verificador; sonda de `born` activa |
+| S0 | Entra (`c693a661`) | Suite verde con `VN_GC_STRESS=256` y verificador; sonda de `born` activa |
 | S1 | Entra (`d687480a`) | Ritmo en bytes y ledger externo; sin umbral fijo en celdas |
 | S2 | Entra (`2fa6b617`) | E4: 7,5 ms → 2,2 ms; E7: 3,8 ms → 2,1 ms |
 | S3 | Entra (`b70254d0`) | E5: promovidos 4,0 M → 42; mayores 4 → 1; GC 134 ms → 57 ms |
@@ -413,7 +413,7 @@ Orden recomendado: **S0 → S1 → S3 → S2 → S4 → S8 → S7 → S9**, con 
 
 ## Apéndice A — Experimentos
 
-Binario: `target\release\vn.exe` (commit `7dc95881`). Contadores con `vn bench FILE --runs 1 --warmup 0 --allow-all -v`; trazas con `VARN_GC_TRACE=1 vn run FILE --allow-all`; memoria muestreando `WorkingSet64` cada 100 ms. Todos usan:
+Binario: `target\release\vn.exe` (commit `7dc95881`). Contadores con `vn bench FILE --runs 1 --warmup 0 --allow-all -v`; trazas con `VN_GC_TRACE=1 vn run FILE --allow-all`; memoria muestreando `WorkingSet64` cada 100 ms. Todos usan:
 
 ```
 class Node {
@@ -435,7 +435,7 @@ for (let i = 0; i < 1024; i = i + 1) { ring.push(new Node(0)) }
 | E5 | ventana de 500 k nodos, 6 M de reemplazos | promovidos / mayores / GC | 4,0 M / 4 / 134 ms |
 | E6 | 3 M instancias contra 3 M literales | pico, pausa mayor | 394 contra 616 MiB; 60–74 contra 79–165 ms |
 | E7 | `Map` viejo de 0 / 500 k / 1 M entradas | pausa menor (últimas 3) | 1,6–1,9 / 2,8–3,9 / 3,6–4,0 ms |
-| Estrés | `VARN_GC_STRESS=2048` y `=256`, `vn run tests/main.vn` | resultado | `PASSED: 5542, FAILED: 0` en ambos (66 s y 62 s); con `=256` el programa E4 hace 15 629 menores en vez de 5 |
+| Estrés | `VN_GC_STRESS=2048` y `=256`, `vn run tests/main.vn` | resultado | `PASSED: 5542, FAILED: 0` en ambos (66 s y 62 s); con `=256` el programa E4 hace 15 629 menores en vez de 5 |
 
 Pausas del mayor por fase (instrumentación temporal, descartada): `http_routing` marcado 4,6 ms + barrido 3,8 ms con 330 k supervivientes; `csv_pipeline` 1,8 + 3,1 ms con 250 k.
 

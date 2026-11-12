@@ -150,6 +150,6 @@ pub fn is_vn_file(path: &str) -> bool {
 
 pub fn ensure_vn_extension(path: &mut std::path::PathBuf) {
     if path.extension().is_none() {
-        path.set_extension(super::VARN_FILE_EXTENSION);
+        path.set_extension(super::VN_FILE_EXTENSION);
     }
 }

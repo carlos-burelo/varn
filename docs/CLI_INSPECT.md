@@ -71,7 +71,7 @@ Vistas del IDE (mismo análisis que el LSP): `lsp:hovers`, `lsp:semantic`, `lsp:
 `lsp:completions`, `lsp:symbols`, `lsp:colorize`, `lsp:hints`, `lsp:all`, y
 `lsp:interact@Ln:Col;...` para consultas puntuales (ver `--list-phases`).
 
-Variable `VARN_GC_TRACE=1`: una línea por colección menor en cualquier comando.
+Variable `VN_GC_TRACE=1`: una línea por colección menor en cualquier comando.
 
 ## JIT (`clif`)
 

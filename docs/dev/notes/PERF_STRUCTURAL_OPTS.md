@@ -1,5 +1,5 @@
 > Histórico. No spec vigente. Código manda. Revalidar antes de usar.
-> Validación: `.\scripts\verify.ps1 -Fast` (matriz 4 cuadrantes, release); iteración `.\scripts\verify.ps1 -Quick`; sin JIT `VARN_NO_JIT=1 vn run tests/main.vn`. Cifras aquí = sesión indicada, no cita: re-medir antes de usar.
+> Validación: `.\scripts\verify.ps1 -Fast` (matriz 4 cuadrantes, release); iteración `.\scripts\verify.ps1 -Quick`; sin JIT `VN_NO_JIT=1 vn run tests/main.vn`. Cifras aquí = sesión indicada, no cita: re-medir antes de usar.
 
 # Optimizaciones estructurales de rendimiento — especificación
 
@@ -147,7 +147,7 @@ array invariante. Real-code: iteración de arrays es ubicua.
 - Bench pareado array_sum antes/después (canary entre corridas).
 - Test específico: array que promueve a old-gen a mitad de loop (forzar GC)
   — debe seguir correcto (o tomar fallback).
-- `VARN_NO_JIT=1` idéntico bit-a-bit.
+- `VN_NO_JIT=1` idéntico bit-a-bit.
 
 ### Implementación (2026-07-03)
 
@@ -242,7 +242,7 @@ descarte del re-resolve en el safepoint). Test dirigido de GC forzado
 antes de cada una de 5000 llamadas a una función con loop elegible —
 5000/5000 resultados correctos, confirma que el safepoint forzado del
 preheader deja el puntero cacheado consistente incluso cuando el heap
-tenía presión de nursery justo antes de entrar al loop. `VARN_NO_JIT=1`
+tenía presión de nursery justo antes de entrar al loop. `VN_NO_JIT=1`
 tiene una falla preexistente no relacionada en
 `42-stdlib-comprehensive-test.vn` (confirmada idéntica en baseline sin
 estos cambios) — el resto del intérprete coincide con el comportamiento
@@ -375,7 +375,7 @@ en el cuerpo del loop es **untagged i64** en un callee-saved. Necesita:
   callee-saved no se escanean (no son roots — son ints), pero si se
   spillean a stack deben re-boxearse o el GC los malinterpretará.
 - **Tier-identidad:** el resultado observable debe ser idéntico al
-  intérprete (semántica wrap i48). Test bit-a-bit `VARN_NO_JIT=1`.
+  intérprete (semántica wrap i48). Test bit-a-bit `VN_NO_JIT=1`.
 
 ### Riesgos
 

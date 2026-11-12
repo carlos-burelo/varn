@@ -20,15 +20,15 @@ pub fn run_doctor() -> CliResult<()> {
         vn_core::paths::vn_cache_dir().display()
     );
     match &vn_core::env::process().std {
-        Some(raw) => println!("  VARN_STD: {raw}"),
-        None => println!("  VARN_STD: <not set>"),
+        Some(raw) => println!("  VN_STD: {raw}"),
+        None => println!("  VN_STD: <not set>"),
     }
 
     match vn_modules::provider::get().and_then(|p| p.std_provenance()) {
         Some((desc, prov)) => {
             let origin = match prov {
                 vn_modules::std_root::StdProvenance::ProjectOverride => "varn.toml override",
-                vn_modules::std_root::StdProvenance::Env => "VARN_STD",
+                vn_modules::std_root::StdProvenance::Env => "VN_STD",
                 vn_modules::std_root::StdProvenance::DevCheckout => {
                     "dev checkout (std/ next to binary)"
                 }
@@ -48,7 +48,7 @@ pub fn run_doctor() -> CliResult<()> {
         println!("    {:<24} {:<10} {}", var.name(), shown, var.doc());
     }
     for name in vn_core::env::unknown_vars() {
-        println!("    {name}: unknown VARN_ variable (typo?)");
+        println!("    {name}: unknown VN_ variable (typo?)");
     }
 
     match vn_builtins::std_load_error() {

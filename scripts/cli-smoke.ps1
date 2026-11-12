@@ -21,7 +21,7 @@ if (-not (Test-Path $vn)) { $vn = Join-Path $RootDir "target\$Profile\vn" }
 $work = Join-Path $RootDir "target\tmp\smoke"
 if (Test-Path $work) { Remove-Item $work -Recurse -Force }
 New-Item -ItemType Directory -Force $work | Out-Null
-$env:VARN_CACHE_DIR = Join-Path $work "cache"
+$env:VN_CACHE_DIR = Join-Path $work "cache"
 
 $failed = @()
 

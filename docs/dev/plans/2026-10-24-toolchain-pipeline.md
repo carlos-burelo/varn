@@ -276,7 +276,7 @@ Es la tarea más grande. Tiene cuatro commits.
 
 - [ ] **Paso 1:** Mover `compile_source_cached` dentro de `Session::compile`; `Compilation.cache_hit` se rellena. `run`, `test`, `build` y `dap` pasan a usar la caché sin cambios por su lado. La escritura es atómica: a un archivo temporal en el mismo directorio y `rename`, para que ninguna lectura vea un archivo a medias.
 - [ ] **Paso 2: check `cache-hit-on-second-run`**: `vn run -v` sobre un `.vn` en un directorio temporal dos veces; la segunda salida contiene `compile cache hit`.
-- [ ] **Paso 3:** G1. Además, `bytecode-hash.ps1 -Compare` con caché fría (`VARN_CACHE_DIR=<temp>`) y caliente: ambas `IDENTICAL`. Commit: `pipeline: the compile cache lives in Session::compile for every command`.
+- [ ] **Paso 3:** G1. Además, `bytecode-hash.ps1 -Compare` con caché fría (`VN_CACHE_DIR=<temp>`) y caliente: ambas `IDENTICAL`. Commit: `pipeline: the compile cache lives in Session::compile for every command`.
 
 ---
 
@@ -344,7 +344,7 @@ Cinco commits.
 **Interfaces:**
 - Produce: `discover::vn_files(root: &Path, filter: &FileFilter) -> Result<Vec<PathBuf>, Failure>` (un recorrido para `fmt` y `test`, ordenado, que respeta `include`/`exclude` del manifiesto y salta `.`-dirs, `target`, `node_modules`); `#[derive(ValueEnum)] enum Target { Bytecode, Exe, Native }`; `vn_jit::aot::link::link_executable(obj: &Path, out: &Path) -> Result<(), LinkError>`; `standalone::try_run() -> Option<ExitCode>`.
 
-- [ ] **Paso 1 (commit):** `main.rs` queda en hilo + `bootstrap::init()` + dispatch. El volcado `VARN_DEBUG_OPS` pasa a `vn debug -p natives`. `implicit_run` consulta `Cli::command().get_subcommands()`. Commit: `cli: main is only thread, bootstrap and dispatch; subcommand list comes from clap`.
+- [ ] **Paso 1 (commit):** `main.rs` queda en hilo + `bootstrap::init()` + dispatch. El volcado `VN_DEBUG_OPS` pasa a `vn debug -p natives`. `implicit_run` consulta `Cli::command().get_subcommands()`. Commit: `cli: main is only thread, bootstrap and dispatch; subcommand list comes from clap`.
 - [ ] **Paso 2 (commit):** Features `lsp`, `dap`, `pm` fuera; se borran los `cfg` y los stubs de `dispatch`. Quedan `clif`, `embed-std`, `dhat-heap`. Commit: `cli: lsp, dap and pm are always built in`.
 - [ ] **Paso 3 (commit):** `discover::vn_files` reemplaza `discover_vn_files` y `discover_test_files`; `fmt` usa el módulo `terminal` en vez de escapes ANSI. Commit: `cli: one file discovery for fmt and test honoring the manifest filters`.
 - [ ] **Paso 4 (commit):** `Target` como `ValueEnum`; se borra `--native`. El linker se muda a `vn_jit::aot::link`, descubre las librerías por entorno (`LIB`, `vswhere`) en vez de versiones fijas del SDK, y en plataformas sin linker soportado devuelve un `LinkError` que lo dice. Commit: `build: Target enum, linker discovery lives with the AOT backend`.

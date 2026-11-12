@@ -96,7 +96,7 @@ una lectura en frío como canario antes de confiar en números absolutos.
 ## Intérprete vs JIT
 
 ```
-VARN_NO_JIT=1 vn bench tests/benchmarks/vn/bench_fib.vn -v
+VN_NO_JIT=1 vn bench tests/benchmarks/vn/bench_fib.vn -v
 ```
 
 Apaga el JIT por completo (0 funciones compiladas, 0 B de código máquina). Sirve

@@ -152,17 +152,17 @@ if ! run_quadrant "1/4: [dev-checkout] + [JIT Habilitado]" "" "run tests/main.vn
 fi
 
 # Q2: dev-checkout + No-JIT
-if ! run_quadrant "2/4: [dev-checkout] + [Intérprete Pure (VARN_NO_JIT=1)]" "VARN_NO_JIT=1" "run tests/main.vn"; then
+if ! run_quadrant "2/4: [dev-checkout] + [Intérprete Pure (VN_NO_JIT=1)]" "VN_NO_JIT=1" "run tests/main.vn"; then
     FAILED_STEPS+=("Cuadrante 2 (dev-checkout + No-JIT)")
 fi
 
 # Q3: @embedded + JIT
-if ! run_quadrant "3/4: [@embedded std] + [JIT Habilitado]" "VARN_STD=@embedded VARN_STD_BUNDLE=$STD_BUNDLE" "run tests/main.vn"; then
+if ! run_quadrant "3/4: [@embedded std] + [JIT Habilitado]" "VN_STD=@embedded VN_STD_BUNDLE=$STD_BUNDLE" "run tests/main.vn"; then
     FAILED_STEPS+=("Cuadrante 3 (@embedded + JIT)")
 fi
 
 # Q4: @embedded + No-JIT
-if ! run_quadrant "4/4: [@embedded std] + [Intérprete Pure (VARN_NO_JIT=1)]" "VARN_STD=@embedded VARN_STD_BUNDLE=$STD_BUNDLE VARN_NO_JIT=1" "run tests/main.vn"; then
+if ! run_quadrant "4/4: [@embedded std] + [Intérprete Pure (VN_NO_JIT=1)]" "VN_STD=@embedded VN_STD_BUNDLE=$STD_BUNDLE VN_NO_JIT=1" "run tests/main.vn"; then
     FAILED_STEPS+=("Cuadrante 4 (@embedded + No-JIT)")
 fi
 

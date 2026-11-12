@@ -45,7 +45,7 @@ Fuentes: `Cargo.toml` workspace + 26 manifiestos, conteo `*.rs`, `Cargo.lock`, t
 
 - `crates/vn-vm/Cargo.toml:21`: `vn-jit` no opcional.
 - `crates/vn-jit/Cargo.toml:11-15`: `cranelift-codegen/frontend/native/module/object 0.136.2`.
-- `VARN_NO_JIT=1` es flag runtime: sigue pagando compilación Cranelift.
+- `VN_NO_JIT=1` es flag runtime: sigue pagando compilación Cranelift.
 - Cadena: `crates/vn-cli/Cargo.toml:43,48` → `vn-debug` + `vn-jit`; `crates/vn-debug/Cargo.toml:10-14` → `checker+compiler+jit+iced-x86`. `vn-debug` solo lo usa `cli`, pero `cli` paga `iced-x86` + Cranelift siempre.
 - Acción: `jit = optional` en `vm`, feature `jit` en `vm/cli/debug`. Medir `cargo build -p vn-cli --no-default-features` antes/después con perfil `quick` (Ley 13).
 
@@ -98,10 +98,10 @@ Cada paso: un commit (Ley 9), declara ganancia + verificación + qué borra (Ley
 ## 10. Fase 1 aplicada — `build.rs` fuera del camino crítico
 
 - Borrado `build-deps pipeline/modules/builtins` de `vn-cli`. `build.rs` trivial solo `rerun-if-changed=build.rs`.
-- `main.rs` ya no exige `OUT_DIR/std.vnb` en compilación. Nueva `register_embedded_stdlib_if_available()`: feature `embed-std` incluye `dist/std.vnb`; sin feature solo registra si `VARN_STD_BUNDLE=/path` existe. Dev usa `SourceTree` sin bundle.
+- `main.rs` ya no exige `OUT_DIR/std.vnb` en compilación. Nueva `register_embedded_stdlib_if_available()`: feature `embed-std` incluye `dist/std.vnb`; sin feature solo registra si `VN_STD_BUNDLE=/path` existe. Dev usa `SourceTree` sin bundle.
 - Nuevo comando explícito `vn std-bundle --std-dir std --out dist/std.vnb` (`commands/std_bundle.rs`, `cli.rs:StdBundleArgs`). Reemplaza compilación implícita por invocación manual/CI.
 - Verificado: `cargo check -p vn-cli` y `--no-default-features` verdes. `cargo build --profile quick --bin vn` en curso para probar `Dir` + `std-bundle`.
-- Validado 2026-10-08: `quick --bin vn` en 1m43s (sin compilar std en build). `doctor` resuelve `source tree std v0.3.0` ok. `vn std-bundle` escribe `dist/std.vnb` 2.730.418 bytes. `VARN_STD=@embedded` sin bundle falla accionable; con `VARN_STD_BUNDLE=dist/std.vnb` resuelve `embedded v0.3.0` ok. Feature `embed-std` compila. `vn check tests/main.vn` corre.
+- Validado 2026-10-08: `quick --bin vn` en 1m43s (sin compilar std en build). `doctor` resuelve `source tree std v0.3.0` ok. `vn std-bundle` escribe `dist/std.vnb` 2.730.418 bytes. `VN_STD=@embedded` sin bundle falla accionable; con `VN_STD_BUNDLE=dist/std.vnb` resuelve `embedded v0.3.0` ok. Feature `embed-std` compila. `vn check tests/main.vn` corre.
 
 ## 12. Fase 3 aplicada — `varn-contract` sin frontend (`contracts.json`)
 
@@ -109,9 +109,9 @@ Cada paso: un commit (Ley 9), declara ganancia + verificación + qué borra (Ley
 - Nuevo `vn gen-contract-tables` (`cli/commands/contract_tables.rs`): parsea 34 `.vn` con parser real, clasifica con código movido (no copiado) de `mapping.rs`/`contract_members.rs`, escribe `crates/vn-builtins/contracts.json` (114KB, versionado) con `{version, files: {path: xxh3}, contracts: {path: {classes, functions}}}`. Tipos como códigos (`int/float/bool/char/str/array/dynamic/void/opt(x)`). `--check` para CI.
 - Macro lee JSON (`contract/tables.rs`, vía `CARGO_MANIFEST_DIR` del consumidor) en vez de parsear. Mismos mensajes de error para clase/funciones ausentes. `include_bytes!` del `.vn` intacto. Contratos inline (cero usos): error accionable.
 - `builtins/build.rs`: gate duro — verifica xxh3 de cada `.vn` contra JSON y `panic!` accionable si stale. Imposible deriva silenciosa.
-- `verify.ps1/verify.sh`: `gen-contract-tables --check` siempre; `std-bundle` + `VARN_STD_BUNDLE` en cuadrantes `@embedded`.
+- `verify.ps1/verify.sh`: `gen-contract-tables --check` siempre; `std-bundle` + `VN_STD_BUNDLE` en cuadrantes `@embedded`.
 - Verificado: `check -p varn-contract/builtins/workspace` verdes. Gate negativo probado (newline en `int.vn` → `contract tables stale`). Tras `touch vn-core`, `check -p varn-contract` en 0.15s sin recompilar: desacople probado.
-- Validado runtime 2026-10-08 con glue JSON: `check tests/main.vn` ok; `run` dev-checkout+JIT 2290/0; `@embedded`+JIT 2290/0; `VARN_NO_JIT=1` 2290/0; `std-bundle` regenera 2.730.418 bytes idéntico.
+- Validado runtime 2026-10-08 con glue JSON: `check tests/main.vn` ok; `run` dev-checkout+JIT 2290/0; `@embedded`+JIT 2290/0; `VN_NO_JIT=1` 2290/0; `std-bundle` regenera 2.730.418 bytes idéntico.
 
 ## 13. Fase 4 aplicada — grafo mínimo por defecto + fusión micro-crates
 
@@ -145,7 +145,7 @@ Cada paso: un commit (Ley 9), declara ganancia + verificación + qué borra (Ley
 - `rustc-hash` opcional tras `clif` en `jit`. `binder/resolver` opcionales tras `dev-tools`/`lsp` en `cli`.
 - `target/` extra: de entorno, no del workspace. No se toca.
 - `check --workspace --all-targets` cero errores y cero `unused`; `cargo fmt` limpio.
-- Validado runtime 2026-10-08 tras split: `quick --bin vn` 1m25s; `run` dev-checkout 2290/0, `@embedded` 2290/0 (bundle regenerado, bytes idénticos), `VARN_NO_JIT=1` 2290/0.
+- Validado runtime 2026-10-08 tras split: `quick --bin vn` 1m25s; `run` dev-checkout 2290/0, `@embedded` 2290/0 (bundle regenerado, bytes idénticos), `VN_NO_JIT=1` 2290/0.
 
 ## 11. Fase 2 aplicada — Cranelift opcional (`clif`)
 

@@ -7,7 +7,7 @@ No duplicarlos aquí.
 
 ## Lo verificado en tests
 
-- Dos backends: intérprete bytecode y JIT. `VARN_NO_JIT=1` fuerza intérprete
+- Dos backends: intérprete bytecode y JIT. `VN_NO_JIT=1` fuerza intérprete
   (matriz de validación en `CONTRIBUTING.md`).
 - Heap compartido en hilo principal; cada `spawnIsolate` crea heap separado,
   comunicación solo por canales
@@ -22,7 +22,7 @@ No duplicarlos aquí.
   (`tests/120-int-division.vn`).
 - La stdlib se carga siempre desde una imagen `std.vnb`: en un checkout se
   construye desde `std/` en la caché; en un binario de release va embebida
-  (`VARN_STD=@embedded`). Ver `../MODULES_SYSTEM.md`.
+  (`VN_STD=@embedded`). Ver `../MODULES_SYSTEM.md`.
 
 ## Closures
 

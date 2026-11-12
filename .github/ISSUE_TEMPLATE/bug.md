@@ -13,4 +13,4 @@ labels: bug
 
 **Esperado / obtenido:**
 
-**¿Ocurre con `VARN_NO_JIT=1`?**
+**¿Ocurre con `VN_NO_JIT=1`?**

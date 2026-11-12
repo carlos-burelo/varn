@@ -51,8 +51,8 @@ en homes), así que el `longjmp` deja `frames` coherente.
   rechaza protos de más de 8192 words salvo leaf-safe (sin alloc, sync, no
   generador) (`clif/lower.rs`).
 - Umbrales (`vn-vm/src/jit/tiering.rs`): `JIT_TIER_THRESHOLD = 1` (con
-  backedge usa `VARN_JIT_TIER`), `JIT_TIER_THRESHOLD_STRAIGHT = 128` (sin
-  backedge), `JIT_OSR_BACKEDGES = 1000` (`VARN_JIT_OSR`).
+  backedge usa `VN_JIT_TIER`), `JIT_TIER_THRESHOLD_STRAIGHT = 128` (sin
+  backedge), `JIT_OSR_BACKEDGES = 1000` (`VN_JIT_OSR`).
 
 ## 4. Try nativo (sin longjmp/personality en vn-jit)
 

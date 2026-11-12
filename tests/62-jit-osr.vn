@@ -9,7 +9,7 @@ import { describe, it, expect } from "std:test";
 //
 // Each function below is entered ONCE and loops well past the OSR back-edge
 // threshold, so every one of them tiers up in flight. Run under
-// `VARN_JIT_TIER=999999` to prove it was OSR and not ordinary tiering.
+// `VN_JIT_TIER=999999` to prove it was OSR and not ordinary tiering.
 
 function osrIntCounter(n: int): int {
   let s: int = 0

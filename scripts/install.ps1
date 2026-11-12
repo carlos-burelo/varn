@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 
 if (-not $Dest) {
-    $varnHome = if ($env:VARN_HOME) { $env:VARN_HOME } else { Join-Path $HOME ".vn" }
+    $varnHome = if ($env:VN_HOME) { $env:VN_HOME } else { Join-Path $HOME ".vn" }
     $Dest = Join-Path $varnHome "bin"
 }
 New-Item -ItemType Directory -Force $Dest | Out-Null

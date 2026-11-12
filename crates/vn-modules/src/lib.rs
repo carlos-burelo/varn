@@ -12,7 +12,7 @@ pub mod std_image;
 pub mod std_root;
 pub mod uri;
 
-pub use ids::{DEFAULT_PACKAGE_VERSION, PKG_PREFIX, RELATIVE_EXPORT_PREFIX, VARN_FILE_EXTENSION};
+pub use ids::{DEFAULT_PACKAGE_VERSION, PKG_PREFIX, RELATIVE_EXPORT_PREFIX, VN_FILE_EXTENSION};
 pub use package::{
     canonical_or_original, is_pkg_specifier, normalize_path_string, resolve_pkg_specifier,
     resolve_pkg_specifier_detailed, PackageResolution,

@@ -85,28 +85,28 @@ para el `std` de `varn.toml`. `vn task` entra en la raíz del proyecto después 
 
 | Variable | Efecto |
 |---|---|
-| `VARN_STD` | Raíz de la std (directorio fuente) o `@embedded` |
-| `VARN_STD_BUNDLE` | Imagen `.vnb` a usar cuando la std es `@embedded` y el binario no la lleva dentro |
-| `VARN_CACHE_DIR` | Directorio de caché (aislar corridas: un directorio temporal) |
-| `VARN_HOME` | Directorio base de Varn |
-| `VARN_NO_JIT=1` | Solo intérprete |
-| `VARN_NO_CLIF` | Desactiva el backend Cranelift |
-| `VARN_JIT_TIER` / `VARN_JIT_TIER_STRAIGHT` / `VARN_JIT_OSR` | Umbrales de tiering (con bucle / sin bucle / back-edges para OSR) |
-| `VARN_JIT_CACHE` | `off`, `verify` (recompila y compara con la caché) o activo por defecto |
-| `VARN_CLIF_OPT` | `opt_level` de Cranelift (por defecto `speed`) |
-| `VARN_CLIF_VERIFY` | Activa el verificador de Cranelift |
-| `VARN_CLIF_TRACE`, `VARN_CLIF_PRINT_IR` | Traza de lowering / IR de Cranelift |
-| `VARN_GC_TRACE=1` | Una línea por colección menor |
-| `VARN_ALLOC_PROFILE`, `VARN_ALLOC_SLOW` | Perfil de asignaciones / fuerza el camino lento de asignación en JIT |
-| `VARN_UI_REAL=1` | Backend de ventanas real para `std:ui` (por defecto headless) |
-| `VARN_LSP_DEBUG` | Registro de depuración del LSP |
+| `VN_STD` | Raíz de la std (directorio fuente) o `@embedded` |
+| `VN_STD_BUNDLE` | Imagen `.vnb` a usar cuando la std es `@embedded` y el binario no la lleva dentro |
+| `VN_CACHE_DIR` | Directorio de caché (aislar corridas: un directorio temporal) |
+| `VN_HOME` | Directorio base de Varn |
+| `VN_NO_JIT=1` | Solo intérprete |
+| `VN_NO_CLIF` | Desactiva el backend Cranelift |
+| `VN_JIT_TIER` / `VN_JIT_TIER_STRAIGHT` / `VN_JIT_OSR` | Umbrales de tiering (con bucle / sin bucle / back-edges para OSR) |
+| `VN_JIT_CACHE` | `off`, `verify` (recompila y compara con la caché) o activo por defecto |
+| `VN_CLIF_OPT` | `opt_level` de Cranelift (por defecto `speed`) |
+| `VN_CLIF_VERIFY` | Activa el verificador de Cranelift |
+| `VN_CLIF_TRACE`, `VN_CLIF_PRINT_IR` | Traza de lowering / IR de Cranelift |
+| `VN_GC_TRACE=1` | Una línea por colección menor |
+| `VN_ALLOC_PROFILE`, `VN_ALLOC_SLOW` | Perfil de asignaciones / fuerza el camino lento de asignación en JIT |
+| `VN_UI_REAL=1` | Backend de ventanas real para `std:ui` (por defecto headless) |
+| `VN_LSP_DEBUG` | Registro de depuración del LSP |
 
 ## Verificación del repo
 
 `scripts/verify.ps1`:
 
 - `-Quick`: perfil `quick`, sin lint ni bench, solo cuadrante 1 (dev-checkout + JIT).
-- `-Fast`: release, sin benchmark; cuadrantes 1–4 + cuadrante 5 (`VARN_JIT_CACHE=verify`).
+- `-Fast`: release, sin benchmark; cuadrantes 1–4 + cuadrante 5 (`VN_JIT_CACHE=verify`).
 - `-SkipLint`: omite `cargo fmt --check` y `clippy`.
 - `-CleanCache`: `vn cache clean` antes de cada cuadrante.
 

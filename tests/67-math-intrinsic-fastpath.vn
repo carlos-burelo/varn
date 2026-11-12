@@ -12,7 +12,7 @@ import { abs, sqrt, floor, ceil } from "std:math";
 //
 // Every case runs inside a hot loop: the fast path only exists in compiled
 // code, so a test that never tiers up would pass while measuring nothing.
-// Run under both tiers (`VARN_NO_JIT=1`) to compare interpreter and JIT.
+// Run under both tiers (`VN_NO_JIT=1`) to compare interpreter and JIT.
 
 function near(a: float, b: float): bool {
     return a - b < 0.0000001 && b - a < 0.0000001;

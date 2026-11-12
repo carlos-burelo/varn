@@ -67,7 +67,7 @@ nativas), `text`, `time`, `types` (`array`, `bigint`, `bool`, `bytes`, `char`,
 ## UI (`vn-ui` + `runtime:ui` + `std:ui`)
 
 - `vn-ui`: ventanas `winit` + render `wgpu` (`window.rs`, `render.rs`), eventos (`events.rs`), compositor de quads instanciados con atlas de glifos (`comp.rs`, `quad.rs`, `pipes.rs`, `present.rs`).
-- `runtime:ui`: ventanas como handles `int` con cola de eventos y lista de comandos de dibujo (`Clear/Rect/Text`). Headless por defecto; `VARN_UI_REAL=1` abre ventanas reales. Toda la capa está tras la capability `ui` (`--allow-ui`).
+- `runtime:ui`: ventanas como handles `int` con cola de eventos y lista de comandos de dibujo (`Clear/Rect/Text`). Headless por defecto; `VN_UI_REAL=1` abre ventanas reales. Toda la capa está tras la capability `ui` (`--allow-ui`).
 - `std:ui`, dos niveles:
   - **Inmediato**: `UiWindow`/`UiEvent` (`window`), `UiFrame` (`frame`: flancos de ratón/teclas), `Focus`, `TextEdit` (`edit`), `layout` (`pad/row/col`, `textX/textY`, `ellipsize`), `keys`, y widgets `Label/Box/Column/Row/Button/Field/Spacer/Divider/Checkbox/List` con `render` y `run` (`widgets`).
   - **Declarativo** (objetivo de [`UI-SPEC.md`](UI-SPEC.md)): señales `signal/computed/effect/batch/untracked` (`signal`), `component`/`memo` (`component`), nodos `VNode` y catálogo `column/row/stack/padding/sizedBox/spacer/text/button/input/image/progressIndicator/container/animated/when/each` (`catalog`), estilos y temas (`style`).

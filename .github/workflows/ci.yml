@@ -103,26 +103,26 @@ jobs:
 
       - name: Quadrant 2 (dev-checkout + No-JIT)
         env:
-          VARN_NO_JIT: "1"
+          VN_NO_JIT: "1"
         run: ${{ matrix.bin_path }} run ./tests/main.vn
 
       - name: Quadrant 3 (@embedded + JIT)
         env:
-          VARN_STD: "@embedded"
-          VARN_STD_BUNDLE: "dist/std.vnb"
+          VN_STD: "@embedded"
+          VN_STD_BUNDLE: "dist/std.vnb"
         run: ${{ matrix.bin_path }} run ./tests/main.vn
 
       - name: Quadrant 4 (@embedded + No-JIT)
         env:
-          VARN_STD: "@embedded"
-          VARN_STD_BUNDLE: "dist/std.vnb"
-          VARN_NO_JIT: "1"
+          VN_STD: "@embedded"
+          VN_STD_BUNDLE: "dist/std.vnb"
+          VN_NO_JIT: "1"
         run: ${{ matrix.bin_path }} run ./tests/main.vn
 
       - name: Quadrant 5 (GC stress 256 + verifier)
         env:
-          VARN_GC_STRESS: "256"
-          VARN_GC_VERIFY: "1"
+          VN_GC_STRESS: "256"
+          VN_GC_VERIFY: "1"
         run: ${{ matrix.bin_path }} run ./tests/main.vn
 
 

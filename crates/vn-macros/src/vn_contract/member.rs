@@ -202,7 +202,7 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
     let capability = m.capability.clone().unwrap_or_default();
     if m.kind == Kind::Function {
         let fn_entry_ident = format_ident!(
-            "__VARN_OP_{}_{}",
+            "__VN_OP_{}_{}",
             sanitize(&prefix).to_uppercase(),
             sanitize(sym).to_uppercase()
         );
@@ -243,7 +243,7 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
         };
         if let Some(mkind) = mkind {
             let mentry_ident = format_ident!(
-                "__VARN_OPM_{}_{}",
+                "__VN_OPM_{}_{}",
                 sanitize(&prefix).to_uppercase(),
                 sanitize(sym).to_uppercase()
             );

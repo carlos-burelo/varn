@@ -84,7 +84,7 @@ Método: medir antes de romper (Ley 12/14). Binario `quick`, esta máquina. Re-m
 
 - `vn-ui` nuevo (hoja `winit`+`wgpu`+`pollster`): `EventLoop` no es `Send` → loop por pump en `thread_local`, cero hilos (portable incl. macOS-main-thread a futuro); afinidad de hilo con error explícito; superficie efímera por `present` (cero lifetimes compartidos; persistente en F2b); `AutoVsync` = pacing natural.
 - Decisiones contra fácil: teclas por `to_text` (sin matchear `NamedKey` ajeno de 150 variantes), `WindowEvent` exhaustivo a mano (~28 brazos), `any_thread` solo Windows + `catch_unwind` en todo (real que falla = headless, nunca crash; `panic=abort` obliga).
-- Backend real tras `VARN_UI_REAL=1` (default headless: CI determinista); `real()` lo reporta. `poll` drena OS primero; `size` refresca; `present` dibuja clear + cuenta log.
+- Backend real tras `VN_UI_REAL=1` (default headless: CI determinista); `real()` lo reporta. `poll` drena OS primero; `size` refresca; `present` dibuja clear + cuenta log.
 - Puerta: ventana real abre/presenta/cierra (`real()=true`, `present()=2`), `215` verde en ambos modos (paridad API), suite 3246/0, clippy cero.
 
 ## Décima oleada (M23): compositing real F2b

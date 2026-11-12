@@ -70,7 +70,7 @@ vn run main.vn
 ```
 
 `vn init` crea `main.vn` y `varn.toml`. La caché es global (`~/.vn/cache`, o
-`VARN_HOME`/`VARN_CACHE_DIR`); `vn run` no escribe en el proyecto.
+`VN_HOME`/`VN_CACHE_DIR`); `vn run` no escribe en el proyecto.
 
 ## 5. Tests
 

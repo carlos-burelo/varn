@@ -10,7 +10,7 @@
     4. Compilación del binario de producción (cargo build --release --bin vn)
     5. Suite tests/main.vn: el camino de producción (@embedded + JIT) con -Fast,
        la matriz completa de 5 cuadrantes sin banderas, y el cuadrante de estrés
-       del GC (VARN_GC_STRESS=256 + verificador de invariantes)
+       del GC (VN_GC_STRESS=256 + verificador de invariantes)
     6. Benchmark de estabilidad (opcional con -Fast)
 
 .PARAMETER Fast
@@ -186,7 +186,7 @@ function Run-Quadrant($name, $envVars, $argsList) {
 # 5. Suite de integracion
 if ($Fast -and -not $Quick) {
     Write-StepHeader "5/6: Camino de produccion (tests/main.vn con @embedded + JIT)"
-    $q3 = Run-Quadrant "[@embedded std] + [JIT Habilitado]" @{ "VARN_STD" = "@embedded"; "VARN_STD_BUNDLE" = $stdBundle } @("run", "tests/main.vn")
+    $q3 = Run-Quadrant "[@embedded std] + [JIT Habilitado]" @{ "VN_STD" = "@embedded"; "VN_STD_BUNDLE" = $stdBundle } @("run", "tests/main.vn")
     if (-not $q3) { $failedSteps += "Camino de produccion (@embedded + JIT)" }
     Write-WarningMsg "Cuadrantes 1, 2, 4 y 5 los corre el CI; correr sin banderas al tocar JIT, su cache o el cargador de std."
 } else {
@@ -201,27 +201,27 @@ if ($Quick) {
 } else {
 
 # Q2: dev-checkout + No-JIT (Interprete Pure)
-$q2 = Run-Quadrant "2/4: [dev-checkout] + [Interprete Pure (VARN_NO_JIT=1)]" @{ "VARN_NO_JIT" = "1" } @("run", "tests/main.vn")
+$q2 = Run-Quadrant "2/4: [dev-checkout] + [Interprete Pure (VN_NO_JIT=1)]" @{ "VN_NO_JIT" = "1" } @("run", "tests/main.vn")
 if (-not $q2) { $failedSteps += "Cuadrante 2 (dev-checkout + No-JIT)" }
 
 # Q3: @embedded + JIT
-$q3 = Run-Quadrant "3/4: [@embedded std] + [JIT Habilitado]" @{ "VARN_STD" = "@embedded"; "VARN_STD_BUNDLE" = $stdBundle } @("run", "tests/main.vn")
+$q3 = Run-Quadrant "3/4: [@embedded std] + [JIT Habilitado]" @{ "VN_STD" = "@embedded"; "VN_STD_BUNDLE" = $stdBundle } @("run", "tests/main.vn")
 if (-not $q3) { $failedSteps += "Cuadrante 3 (@embedded + JIT)" }
 
 # Q4: @embedded + No-JIT (Interprete Pure)
-$q4 = Run-Quadrant "4/4: [@embedded std] + [Interprete Pure (VARN_NO_JIT=1)]" @{ "VARN_STD" = "@embedded"; "VARN_STD_BUNDLE" = $stdBundle; "VARN_NO_JIT" = "1" } @("run", "tests/main.vn")
+$q4 = Run-Quadrant "4/4: [@embedded std] + [Interprete Pure (VN_NO_JIT=1)]" @{ "VN_STD" = "@embedded"; "VN_STD_BUNDLE" = $stdBundle; "VN_NO_JIT" = "1" } @("run", "tests/main.vn")
 if (-not $q4) { $failedSteps += "Cuadrante 4 (@embedded + No-JIT)" }
 
 # Q5: cache JIT tibia (de Q1/Q3) recompilada y comparada byte a byte
-$q5 = Run-Quadrant "5: [cache JIT] + [VARN_JIT_CACHE=verify]" @{ "VARN_JIT_CACHE" = "verify" } @("run", "tests/main.vn")
+$q5 = Run-Quadrant "5: [cache JIT] + [VN_JIT_CACHE=verify]" @{ "VN_JIT_CACHE" = "verify" } @("run", "tests/main.vn")
 if (-not $q5) { $failedSteps += "Cuadrante 5 (cache JIT verify)" }
 }
 }
 
 # 5c. Estres del GC con verificador: la red de seguridad de todo cambio en el heap
 if (-not $Quick) {
-    Write-StepHeader "5c: Estres del GC (VARN_GC_STRESS=256 + VARN_GC_VERIFY=1)"
-    $qs = Run-Quadrant "[estres GC 256] + [verificador de invariantes]" @{ "VARN_GC_STRESS" = "256"; "VARN_GC_VERIFY" = "1" } @("run", "tests/main.vn")
+    Write-StepHeader "5c: Estres del GC (VN_GC_STRESS=256 + VN_GC_VERIFY=1)"
+    $qs = Run-Quadrant "[estres GC 256] + [verificador de invariantes]" @{ "VN_GC_STRESS" = "256"; "VN_GC_VERIFY" = "1" } @("run", "tests/main.vn")
     if (-not $qs) { $failedSteps += "Estres del GC (256 + verificador)" }
 }
 

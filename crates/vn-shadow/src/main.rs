@@ -6,7 +6,7 @@ mod shadow;
 use std::ffi::OsString;
 use std::path::PathBuf;
 
-const TARGET_ENV: &str = "VARN_SHADOW_TARGET";
+const TARGET_ENV: &str = "VN_SHADOW_TARGET";
 
 fn main() {
     let target = match resolve_target() {

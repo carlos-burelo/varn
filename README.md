@@ -102,7 +102,7 @@ Lee [`AGENTS.md`](AGENTS.md) (contrato de arquitectura) y
 ```
 
 Los cuadrantes cruzan la procedencia de la std (`dev-checkout` / `@embedded`) con
-JIT / intérprete (`VARN_NO_JIT=1`), más la verificación de la caché JIT.
+JIT / intérprete (`VN_NO_JIT=1`), más la verificación de la caché JIT.
 
 ## Licencia
 

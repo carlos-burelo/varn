@@ -8,7 +8,7 @@
       2. cargo build --profile quick --bin vn
       3. cargo test --profile quick -p vn-cli --test error_corpus
       4. los 4 cuadrantes de tests/main.vn (dev-checkout/@embedded x JIT/No-JIT)
-      5. el estres del GC con verificador de invariantes (VARN_GC_STRESS=256, VARN_GC_VERIFY=1)
+      5. el estres del GC con verificador de invariantes (VN_GC_STRESS=256, VN_GC_VERIFY=1)
     Lo que solo se rompe en Linux (cfg, rutas, FFI SysV, sockets, lints) no aparece en
     verify.ps1. Correr este script antes de hacer push cuando el cambio toque codigo
     dependiente de plataforma.
@@ -36,10 +36,10 @@ cargo test --profile quick -p vn-cli --test error_corpus
 BIN=/target/quick/vn
 $BIN std-bundle --std-dir std --out /tmp/std.vnb
 echo "== Quadrant 1 (dev-checkout + JIT)";    timeout 900 $BIN run ./tests/main.vn
-echo "== Quadrant 2 (dev-checkout + No-JIT)"; VARN_NO_JIT=1 timeout 900 $BIN run ./tests/main.vn
-echo "== Quadrant 3 (@embedded + JIT)";       VARN_STD=@embedded VARN_STD_BUNDLE=/tmp/std.vnb timeout 900 $BIN run ./tests/main.vn
-echo "== Quadrant 4 (@embedded + No-JIT)";    VARN_STD=@embedded VARN_STD_BUNDLE=/tmp/std.vnb VARN_NO_JIT=1 timeout 900 $BIN run ./tests/main.vn
-echo "== Quadrant 5 (GC stress 256 + verifier)"; VARN_GC_STRESS=256 VARN_GC_VERIFY=1 timeout 1800 $BIN run ./tests/main.vn
+echo "== Quadrant 2 (dev-checkout + No-JIT)"; VN_NO_JIT=1 timeout 900 $BIN run ./tests/main.vn
+echo "== Quadrant 3 (@embedded + JIT)";       VN_STD=@embedded VN_STD_BUNDLE=/tmp/std.vnb timeout 900 $BIN run ./tests/main.vn
+echo "== Quadrant 4 (@embedded + No-JIT)";    VN_STD=@embedded VN_STD_BUNDLE=/tmp/std.vnb VN_NO_JIT=1 timeout 900 $BIN run ./tests/main.vn
+echo "== Quadrant 5 (GC stress 256 + verifier)"; VN_GC_STRESS=256 VN_GC_VERIFY=1 timeout 1800 $BIN run ./tests/main.vn
 echo CI_LINUX_OK
 '@ -replace "`r`n", "`n"
 
@@ -54,6 +54,6 @@ docker run --rm `
     -v varn-ci-target:/target `
     -v varn-ci-cargo:/usr/local/cargo/registry `
     -e CARGO_TARGET_DIR=/target `
-    -e VARN_STD=/work/std `
+    -e VN_STD=/work/std `
     -w /work "rust:$toolchain" bash /work/target/tmp/ci-linux.sh
 exit $LASTEXITCODE

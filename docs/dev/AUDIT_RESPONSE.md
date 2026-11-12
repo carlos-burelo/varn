@@ -1,5 +1,5 @@
 > Estado verificado 2026-10-13: PARCIAL — snapshot 2026-09-20 + actualización post-auditoría; balas JIT/SSA resueltas siguen vigentes (SSA portable, `tests/main.vn` verde); rutas `EXPECTED_AUDIT.md` y `2026-09-20-PLAN-PENDIENTE.md` inexistentes [corregido 2026-10-13].
-> Validación: `.\scripts\verify.ps1 -Fast`; sin JIT `VARN_NO_JIT=1 vn run tests/main.vn`. Cifras = sesión indicada, no cita.
+> Validación: `.\scripts\verify.ps1 -Fast`; sin JIT `VN_NO_JIT=1 vn run tests/main.vn`. Cifras = sesión indicada, no cita.
 >
 > Histórico. No spec vigente. Código manda. Revalidar antes de usar.
 
@@ -13,8 +13,8 @@ Cada conclusión importante cita `Archivo | Símbolo | Comportamiento | Conclusi
 > `docs/plans/2026-09-20-PLAN-PENDIENTE.md`** [corregido 2026-10-13: plan inexistente; plan vivo actual `docs/plans/2026-10-09-plan-unificado.md`] (absorbió los planes de JIT
 > anteriores). Cambios posteriores que invalidan varias balas del resumen:
 > - **JIT activo y con par de valor único (C1).** `Ref`+`Dyn` bajan como par
->   tag+payload; el gate `VARN_JIT_ALLOW_REF` se eliminó. `tests/main.vn`
->   1233/0 en JIT y `VARN_NO_JIT=1`.
+>   tag+payload; el gate `VN_JIT_ALLOW_REF` se eliminó. `tests/main.vn`
+>   1233/0 en JIT y `VN_NO_JIT=1`.
 > - **Bala 9 (JIT baja de bytecode): RESUELTA.** El JIT baja **todo** de SSA
 >   portable (`vn_types::ssa` + `clif/from_ssa/`); el lowering desde bytecode
 >   (`clif/body/*`, lattice, safepoint maps) está borrado y el único fallback
@@ -458,6 +458,6 @@ este documento).**
 **Evidencia.**
 - Suite e2e: 1223/1223 (`tests/109-narrow-array-literals.vn` nuevo, importado a `main.vn`; "NARROW ARRAY LITERALS PASSED").
 - `cargo build --workspace`: limpio. Cada `match` exhaustivo roto por el nuevo campo `narrow_elem` (`ssa/dump.rs`, `ssa/emit/regs.rs`, `ssa/uses.rs` x2) y por las 7 variantes de `ArrayRepr` se resolvió explícitamente — sin `_ =>` nuevo escondiendo un caso sin decidir. Un sitio no enumerado por el plan (`vn-lsp/src/features/compiler_inspect.rs`) apareció durante el build y se corrigió igual.
-- Stress test dedicado (no permanente): `Array<i8>` de 5 elementos declarado antes de 200 000 asignaciones de basura (fuerza colecciones menores repetidas), íntegro tras 8 `minor gc` (`VARN_GC_TRACE=1`); valores en los extremos del rango (`-128`, `127`) sobreviven exactos.
+- Stress test dedicado (no permanente): `Array<i8>` de 5 elementos declarado antes de 200 000 asignaciones de basura (fuerza colecciones menores repetidas), íntegro tras 8 `minor gc` (`VN_GC_TRACE=1`); valores en los extremos del rango (`-128`, `127`) sobreviven exactos.
 - `clif/arrays.rs`: doc de módulo actualizado — confirma que el módulo (hoy muerto, `FRAME_LAYOUT_V2_JIT_BAIL = true`) sigue siendo correcto para las 7 variantes nuevas sin cambio de código: el bloque `slow` ya despacha por los accesores totales de `VmArray`, no por un `match` de 3 vías fijo.
 

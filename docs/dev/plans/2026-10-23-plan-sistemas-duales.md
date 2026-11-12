@@ -195,7 +195,7 @@ Orden: capa más baja primero (Ley 14). Validación por item:
 - Hallazgo: `vn-resolver` + `vn-modules` + `vn-pipeline/resolver.rs`
   (`Session`) + `stdlib_loader/layer_link/portable`.
 - Ganancia: una identidad, una resolución, una carga, una caché (Ley 8).
-- Verificación: 4 cuadrantes con `VARN_CACHE_DIR` limpio.
+- Verificación: 4 cuadrantes con `VN_CACHE_DIR` limpio.
 - Se borra: `Session`, `resolver_embed/disk` duplicados, caminos paralelos.
 
 ## Fase C — runtime
@@ -257,7 +257,7 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   `Declared`/`Unrecorded` sobre instancias de clase, no solo interfaces.
 - Verificación: microbenchmark de lectura por interfaz (200M: hoy 6.6 s; objetivo cercano a
   los 0.25 s de la lectura por clase), caso polimórfico con dos clases, y la matriz completa
-  con `VARN_JIT_CACHE=verify` (el layout de `CacheEntry` entra en el código JIT cacheado).
+  con `VN_JIT_CACHE=verify` (el layout de `CacheEntry` entra en el código JIT cacheado).
 - Riesgos: el layout de `CacheEntry` es `#[repr(C)]` y el JIT lo lee por offsets fijos
   (`id` 0, `slot` 4, `is_class` 6); ampliar la entrada cambia `poly_ic_slot_size` y debe
   salir de una constante compartida. Campos de clase mutados por `SetProperty` mientras hay
@@ -287,7 +287,7 @@ Orden: capa más baja primero (Ley 14). Validación por item:
   `CARGO_PROFILE_RELEASE_DEBUG=line-tables-only cargo build --release --bin vn --target-dir <tmp>`,
   `samply record --save-only --unstable-presymbolicate -r 4000 <tmp>/release/vn.exe run X.vn` y
   `python scripts/prof_report.py profile.json.gz <tmp>/release/vn.exe 30` (resuelve contra el PDB
-  con DbgHelp, porque samply no lo hace con el PDB de Rust). Con `VARN_STD=<repo>/std` si el
+  con DbgHelp, porque samply no lo hace con el PDB de Rust). Con `VN_STD=<repo>/std` si el
   binario no está dentro de `target/`.
 - Hallazgos corregidos: `alloc_str_view_of` copiaba el string padre entero por parte en `split`
   (12a6ece4, e6d78477); `Json.parse` descartaba su caché de formas en cada llamada y solo tenía
@@ -458,7 +458,7 @@ variantes y obliga a revisar la comparación estructural.
 - **Verificación:** el repro de arriba debe quedar a menos de 1,5× el método de clase;
   `tests/16-enums.vn`, `tests/136-enum-identity.vn`, `tests/175-enum-instanceof.vn` y
   `tests/189-enum-variant-slots.vn` sin cambios; matriz completa de 4 cuadrantes más
-  `VARN_JIT_CACHE=verify`; comparación de tiers (`vn run --compare-tiers`).
+  `VN_JIT_CACHE=verify`; comparación de tiers (`vn run --compare-tiers`).
 - **Se borraría (previsiblemente):** la rama de enum en `get_class`
   (`crates/vn-vm/src/exec/props/intrinsic.rs`) que resuelve la clase por
   `enum_class_id`, y el pre-chequeo `enum_variant_template` de `call_method` para nombres

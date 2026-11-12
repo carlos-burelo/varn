@@ -74,7 +74,7 @@ cerrar lo pendiente en `docs/dev/plans/2026-10-16-plan-unificado.md`.
   ejecutable standalone (`vn-cli/src/main.rs`).
 - **Primer paso.** Sección de imágenes JIT dentro del `VEXE`, servida
   por el mismo `CodeStore`; el perfil decide qué funciones entran.
-- **Puerta.** `VARN_JIT_CACHE=verify` sobre el ejecutable; tiempo de
+- **Puerta.** `VN_JIT_CACHE=verify` sobre el ejecutable; tiempo de
   primera corrida medido contra la segunda.
 
 ### 3. Capacidades inferidas estáticamente, aplicadas por dependencia

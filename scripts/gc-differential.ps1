@@ -30,7 +30,7 @@ function Invoke-Mode($arguments, $variables) {
 
 function Test-Case($name, $arguments, $canonical) {
     $plain = Invoke-Mode $arguments @{}
-    $stressVars = @{ VARN_GC_STRESS = "$Stress"; VARN_GC_VERIFY = '1' }
+    $stressVars = @{ VN_GC_STRESS = "$Stress"; VN_GC_VERIFY = '1' }
     $stress = Invoke-Mode $arguments $stressVars
     $left = if ($canonical) { $plain.Lines | Where-Object { $_ -match '^(=== Suite:|PASSED:|FAILED:|ALL TESTS PASSED)' -or $_ -match '^\s*[✖x]' -or $_ -match '^error:' } } else { $plain.Lines }
     $right = if ($canonical) { $stress.Lines | Where-Object { $_ -match '^(=== Suite:|PASSED:|FAILED:|ALL TESTS PASSED)' -or $_ -match '^\s*[✖x]' -or $_ -match '^error:' } } else { $stress.Lines }
