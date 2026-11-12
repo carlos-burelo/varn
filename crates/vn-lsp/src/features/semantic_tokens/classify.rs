@@ -137,7 +137,15 @@ fn member_tt(state: &DocumentState, ty: &Type) -> u32 {
 }
 
 fn tt_from_symbol(state: &DocumentState, kind: SymbolKind, ty: &Type, prev_is_dot: bool) -> u32 {
-    let is_fn = matches!(state.db.ty_kind(ty), TypeKind::Fn(_));
+    symbol_tt(state, kind, Some(ty), prev_is_dot)
+}
+
+pub fn declared_tt(state: &DocumentState, symbol: &vn_sem::symbol::Symbol) -> u32 {
+    symbol_tt(state, symbol.kind, symbol.ty.as_ref(), false)
+}
+
+fn symbol_tt(state: &DocumentState, kind: SymbolKind, ty: Option<&Type>, prev_is_dot: bool) -> u32 {
+    let is_fn = ty.is_some_and(|ty| matches!(state.db.ty_kind(ty), TypeKind::Fn(_)));
     match kind {
         SymbolKind::Function | SymbolKind::Method => TT_FUNCTION,
         SymbolKind::Class | SymbolKind::Extension => TT_CLASS,
@@ -154,7 +162,7 @@ fn tt_from_symbol(state: &DocumentState, kind: SymbolKind, ty: &Type, prev_is_do
             }
         }
         SymbolKind::Property => {
-            if prev_is_dot && is_enum_type(state, ty) {
+            if prev_is_dot && ty.is_some_and(|ty| is_enum_type(state, ty)) {
                 TT_ENUM_MEMBER
             } else if is_fn {
                 TT_FUNCTION

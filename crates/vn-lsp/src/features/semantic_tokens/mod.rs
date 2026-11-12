@@ -1,4 +1,5 @@
 mod classify;
+mod modifiers;
 
 use once_cell::sync::Lazy;
 use tower_lsp_f::lsp_types::{SemanticTokenModifiers, SemanticTokenTypes, SemanticTokensLegend};
@@ -29,6 +30,7 @@ pub static LEGEND: Lazy<SemanticTokensLegend> = Lazy::new(|| SemanticTokensLegen
         SemanticTokenModifiers::Async.into(),
         SemanticTokenModifiers::Static.into(),
         SemanticTokenModifiers::Abstract.into(),
+        SemanticTokenModifiers::Deprecated.into(),
     ],
 });
 
@@ -51,12 +53,14 @@ pub const MOD_READONLY: u32 = 1 << 1;
 pub const MOD_ASYNC: u32 = 1 << 2;
 pub const MOD_STATIC: u32 = 1 << 3;
 pub const MOD_ABSTRACT: u32 = 1 << 4;
+pub const MOD_DEPRECATED: u32 = 1 << 5;
 
 pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
     let tokens = &state.tokens;
     let mut result = Vec::with_capacity(tokens.len() * 5);
     let mut prev_line: u32 = 0;
     let mut prev_col: u32 = 0;
+    let declarations = modifiers::DeclarationIndex::build(state);
 
     for (i, tok) in tokens.iter().enumerate() {
         let colorable = tok.kind == TokenKind::Identifier
@@ -99,7 +103,7 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
                 .map(|t| t.kind != TokenKind::Identifier)
                 .unwrap_or(true);
 
-        let Some(token_type) = classify::resolve_token(
+        let resolved = classify::resolve_token(
             state,
             tok,
             prev_is_dot,
@@ -107,8 +111,13 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
             next_is_lparen,
             next_is_colon,
             getset_as_ident,
-        ) else {
-            continue;
+        );
+        let token_type = match resolved {
+            Some(token_type) => token_type,
+            None => match declarations.symbol_at(tok.offset) {
+                Some(id) => classify::declared_tt(state, state.db.bind.arena.get(id)),
+                None => continue,
+            },
         };
 
         let (emit_col, emit_len) = match tok.kind {
@@ -280,20 +289,7 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
             continue;
         }
 
-        let modifier = if tok.kind == TokenKind::This
-            || state
-                .db
-                .expr_types
-                .get(&tok.offset)
-                .and_then(|info| info.symbol_id)
-                .filter(|s| *s < state.db.bind.arena.len())
-                .map(|s| state.db.bind.arena.get(s).kind)
-                == Some(SymbolKind::Const)
-        {
-            MOD_READONLY
-        } else {
-            0
-        };
+        let modifier = modifiers::modifiers_of(state, &declarations, i, tok);
 
         let delta_line = tok.line - prev_line;
         let delta_start = if delta_line == 0 {
