@@ -50,8 +50,9 @@ impl ExecCtx {
         window[1..=args.len()].copy_from_slice(args);
 
         let was_native = self.heap.cells.suspend_native();
+        let closure_ptr = Rc::as_ptr(&closure) as *const c_void;
         self.frames
-            .push(CallFrame::new_owned(Rc::clone(&closure), CallFrame::NO_ACTIVATION));
+            .push(CallFrame::new_owned(closure, CallFrame::NO_ACTIVATION));
         let exits_len = self.jit_exits_saved.len();
         let frameless_depth = self.jit_frameless_depth;
         self.jit_exits_saved.push(self.jit_exit);
@@ -65,7 +66,7 @@ impl ExecCtx {
         unsafe {
             thunk(
                 self as *mut ExecCtx as *mut c_void,
-                Rc::as_ptr(&closure) as *const c_void,
+                closure_ptr,
                 window.as_ptr(),
                 &mut out,
             );

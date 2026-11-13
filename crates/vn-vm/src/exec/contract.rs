@@ -136,24 +136,52 @@ pub(crate) fn method_callee(ctx: &ExecCtx, recv: VmValue, name: &str) -> VmValue
     NativeCtx::get_field(ctx, recv, name).unwrap_or_else(VmValue::null)
 }
 
+const INLINE_WITNESSES: usize = 4;
+
+struct Witnesses {
+    inline: [VmValue; INLINE_WITNESSES],
+    len: usize,
+    spilled: Vec<VmValue>,
+}
+
+impl Witnesses {
+    fn as_slice(&self) -> &[VmValue] {
+        if self.spilled.is_empty() {
+            &self.inline[..self.len]
+        } else {
+            &self.spilled
+        }
+    }
+}
+
 fn resolve_witnesses(
     ctx: &ExecCtx,
     closure: &VmClosure,
     witnesses: &[ContractWitness],
-) -> Vec<VmValue> {
+) -> Witnesses {
     let globals = ctx.globals_ref();
-    witnesses
-        .iter()
-        .map(|witness| {
-            match witness {
-                ContractWitness::Slot(slot) => {
-                    globals.get_by_index(closure.module_base as usize + *slot as usize)
-                }
-                ContractWitness::Name(name) => globals.get_by_name(name),
+    let resolve = |witness: &ContractWitness| {
+        match witness {
+            ContractWitness::Slot(slot) => {
+                globals.get_by_index(closure.module_base as usize + *slot as usize)
             }
-            .unwrap_or_else(VmValue::null)
-        })
-        .collect()
+            ContractWitness::Name(name) => globals.get_by_name(name),
+        }
+        .unwrap_or_else(VmValue::null)
+    };
+    let mut resolved = Witnesses {
+        inline: [VmValue::null(); INLINE_WITNESSES],
+        len: witnesses.len().min(INLINE_WITNESSES),
+        spilled: Vec::new(),
+    };
+    if witnesses.len() > INLINE_WITNESSES {
+        resolved.spilled = witnesses.iter().map(resolve).collect();
+    } else {
+        for (slot, witness) in witnesses.iter().enumerate() {
+            resolved.inline[slot] = resolve(witness);
+        }
+    }
+    resolved
 }
 
 fn check_args(
@@ -220,7 +248,7 @@ pub(crate) fn verify_call(
         args,
         fixed,
         rest.as_deref(),
-        &witnesses,
+        witnesses.as_slice(),
     )?;
     Ok(())
 }
