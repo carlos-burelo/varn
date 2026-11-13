@@ -70,6 +70,7 @@ pub struct Forward {
     pub module: std::sync::Arc<str>,
     pub symbol: std::sync::Arc<str>,
     pub args: u8,
+    pub decodes: bool,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

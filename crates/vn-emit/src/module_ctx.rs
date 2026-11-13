@@ -21,7 +21,7 @@ pub(super) struct MCtx<'a> {
     pub(super) core_static_ops: &'a FxHashMap<(Arc<str>, Arc<str>), u64>,
     pub(super) math_intrinsics: &'a FxHashMap<Atom, u8>,
     pub(super) native_fns: &'a FxHashMap<Atom, u64>,
-    pub(super) native_forwards: &'a FxHashMap<Arc<str>, (u64, u8)>,
+    pub(super) native_forwards: &'a FxHashMap<Arc<str>, (u64, u8, Option<u64>)>,
     pub(super) interner: &'a AtomInterner,
     pub(super) checker_table: &'a vn_sem::types::CheckerTyTable,
     pub(super) annotation_types: &'a FxHashMap<AstId, vn_sem::types::Type>,

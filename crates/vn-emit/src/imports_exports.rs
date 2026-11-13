@@ -213,14 +213,18 @@ pub(super) fn native_function_imports(
 
 pub(super) fn native_forwards(
     bind: &vn_sem::bind::BindResult,
-) -> FxHashMap<Arc<str>, (u64, u8)> {
+) -> FxHashMap<Arc<str>, (u64, u8, Option<u64>)> {
     let mut out = FxHashMap::default();
     let Some(provider) = vn_modules::provider::get() else {
         return out;
     };
     for (local, forward) in &bind.imported_forwards {
         if let Some(id) = provider.native_op_id(&forward.module, "", &forward.symbol) {
-            out.insert(local.clone(), (id, forward.args));
+            let typed = forward
+                .decodes
+                .then(|| vn_core::runtime_ops::typed_variant(&forward.module, &forward.symbol))
+                .flatten();
+            out.insert(local.clone(), (id, forward.args, typed));
         }
     }
     out

@@ -34,7 +34,7 @@ pub(crate) struct ModuleCtx<'a> {
     pub math_intrinsics: &'a FxHashMap<Atom, u8>,
 
     pub native_fns: &'a FxHashMap<Atom, u64>,
-    pub native_forwards: &'a FxHashMap<Arc<str>, (u64, u8)>,
+    pub native_forwards: &'a FxHashMap<Arc<str>, (u64, u8, Option<u64>)>,
 
     pub interner: &'a AtomInterner,
 

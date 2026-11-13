@@ -87,6 +87,7 @@ pub(super) fn try_pinned_vars(func: &vn_tir::TirFunction) -> FxHashSet<VarId> {
                 | Resolution::DirectFn(_)
                 | Resolution::Intrinsic(_)
                 | Resolution::NativeOp(_)
+                | Resolution::NativeDecode { .. }
                 | Resolution::EnumVariant { .. }
                 | Resolution::ByName { .. } => {}
             }

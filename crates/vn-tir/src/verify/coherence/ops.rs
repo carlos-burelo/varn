@@ -144,6 +144,7 @@ pub(super) fn check_field(
         | Resolution::DirectFn(_)
         | Resolution::Intrinsic(_)
         | Resolution::NativeOp(_)
+        | Resolution::NativeDecode { .. }
         | Resolution::EnumVariant { .. }
         | Resolution::ByName { .. } => {}
     }

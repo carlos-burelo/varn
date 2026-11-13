@@ -253,6 +253,7 @@ pub(super) fn check_res(
         | Resolution::ModuleSlot { .. }
         | Resolution::Intrinsic(_)
         | Resolution::NativeOp(_)
+        | Resolution::NativeDecode { .. }
         | Resolution::NativeGlobal(_)
         | Resolution::Upvalue(_)
         | Resolution::None => {}

@@ -41,6 +41,7 @@ impl<'m> Builder<'m> {
                 | Resolution::DirectFn(_)
                 | Resolution::Intrinsic(_)
                 | Resolution::NativeOp(_)
+                | Resolution::NativeDecode { .. }
                 | Resolution::EnumVariant { .. } => {
                     return Err(OptError::Unsupported("from_tir: assign target var"))
                 }
@@ -80,6 +81,7 @@ impl<'m> Builder<'m> {
                     | Resolution::DirectFn(_)
                     | Resolution::Intrinsic(_)
                     | Resolution::NativeOp(_)
+                    | Resolution::NativeDecode { .. }
                     | Resolution::EnumVariant { .. }
                     | Resolution::ByName { .. } => InstKind::SetProperty {
                         object: obj,
@@ -221,6 +223,7 @@ impl<'m> Builder<'m> {
             | Resolution::VtableSlot(_)
             | Resolution::Intrinsic(_)
             | Resolution::NativeOp(_)
+            | Resolution::NativeDecode { .. }
             | Resolution::EnumVariant { .. } => {
                 Err(OptError::Unsupported("from_tir: var resolution"))
             }

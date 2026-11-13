@@ -39,7 +39,7 @@ impl<'m> Builder<'m> {
             vn_tir::CheckKind::Conform => vn_core::runtime_ops::CONFORM,
             vn_tir::CheckKind::Decode => vn_core::runtime_ops::DECODE,
         };
-        self.lower_conform_op(v, node_ty, ty, op)
+        self.lower_conform_op(v, node_ty, ty, vn_core::runtime_ops::op_id(op))
     }
 
     pub(super) fn lower_conform_op(
@@ -47,7 +47,7 @@ impl<'m> Builder<'m> {
         v: Value,
         node_ty: BackendTy,
         ty: BackendTy,
-        op: &str,
+        op_id: u64,
     ) -> Result<Value> {
         let mut describer = Describer::new(self.tir);
         let desc = describer.describe(node_ty)?;
@@ -63,7 +63,7 @@ impl<'m> Builder<'m> {
             InstKind::CallNativeOp {
                 object: v,
                 args,
-                op_id: vn_core::runtime_ops::op_id(op),
+                op_id,
             },
             BackendTy::Dynamic(DynReason::Boxed),
         );

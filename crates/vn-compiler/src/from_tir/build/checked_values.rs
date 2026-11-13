@@ -129,27 +129,17 @@ impl Builder<'_> {
         Ok(())
     }
 
-    fn std_json_parse_text<'t>(&self, operand: &'t TirExpr) -> Option<&'t TirExpr> {
-        let vn_tir::TirExprKind::Call { callee, args } = &operand.kind else {
+    fn native_decode_text<'t>(&self, operand: &'t TirExpr) -> Option<(&'t TirExpr, u64)> {
+        let vn_tir::Resolution::NativeDecode { typed, .. } = operand.res else {
             return None;
         };
-        let vn_tir::Resolution::GlobalSlot(slot) = &callee.res else {
+        let vn_tir::TirExprKind::Call { args, .. } = &operand.kind else {
             return None;
         };
         let [vn_tir::TirArg::Expr(text)] = args.as_slice() else {
             return None;
         };
-        if text.ty != BackendTy::Str {
-            return None;
-        }
-        let (import, spec) = self.tir.imported_binding(*slot)?;
-        let is_std_parse = import.source.as_ref() == vn_core::well_known::STD_ENCODING_MODULE
-            && matches!(
-                &spec.kind,
-                vn_tir::TirImportKind::Named(original)
-                    if original.as_ref() == vn_core::well_known::JSON_PARSE_IMPORT
-            );
-        is_std_parse.then_some(text)
+        (text.ty == BackendTy::Str).then_some((text, typed))
     }
 
     pub(super) fn lower_checked(
@@ -161,10 +151,10 @@ impl Builder<'_> {
     ) -> Result<Value> {
         if kind == vn_tir::CheckKind::Decode
             && super::conform::is_structural(node_ty)
-            && let Some(text) = self.std_json_parse_text(operand)
+            && let Some((text, typed)) = self.native_decode_text(operand)
         {
             let text = self.lower_expr(text)?;
-            return self.lower_conform_op(text, node_ty, ty, vn_core::runtime_ops::PARSE_TYPED);
+            return self.lower_conform_op(text, node_ty, ty, typed);
         }
         let v = self.lower_expr(operand)?;
         if kind == vn_tir::CheckKind::Decode

@@ -35,7 +35,17 @@ impl Binder<'_> {
         else {
             return None;
         };
-        while let ExprKind::As { expression, .. } = &self.ast_arena.expr(value).kind {
+        let mut decodes = false;
+        while let ExprKind::As {
+            expression,
+            type_ann,
+        } = &self.ast_arena.expr(value).kind
+        {
+            decodes |= matches!(
+                &type_ann.kind,
+                vn_core::ast::AstTypeKind::Named(name, None)
+                    if f.type_params.iter().any(|param| param.name == *name)
+            );
             value = *expression;
         }
         let ExprKind::Call {
@@ -74,6 +84,7 @@ impl Binder<'_> {
             module: Arc::from(module),
             symbol: Arc::from(symbol),
             args: u8::try_from(args.len()).ok()?,
+            decodes,
         }))
     }
 }

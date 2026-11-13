@@ -163,10 +163,13 @@ impl<'a> FnEmitter<'a> {
                         .m
                         .native_forwards
                         .get(self.m.interner.resolve(*name))
-                        .is_some_and(|(_, args)| targs.len() <= *args as usize)
+                        .is_some_and(|(_, args, _)| targs.len() <= *args as usize)
                     && self.forward_keeps_checks(&targs, callee_sig) =>
                 {
-                    Resolution::NativeOp(self.m.native_forwards[self.m.interner.resolve(*name)].0)
+                    match self.m.native_forwards[self.m.interner.resolve(*name)] {
+                        (plain, _, Some(typed)) => Resolution::NativeDecode { plain, typed },
+                        (plain, _, None) => Resolution::NativeOp(plain),
+                    }
                 }
                 _ => match c.res {
                     Resolution::NativeGlobal(idx) => Resolution::NativeGlobal(idx),
@@ -182,6 +185,7 @@ impl<'a> FnEmitter<'a> {
                     | Resolution::DirectFn(_)
                     | Resolution::Intrinsic(_)
                     | Resolution::NativeOp(_)
+                    | Resolution::NativeDecode { .. }
                     | Resolution::EnumVariant { .. }
                     | Resolution::ByName { .. } => Resolution::None,
                 },

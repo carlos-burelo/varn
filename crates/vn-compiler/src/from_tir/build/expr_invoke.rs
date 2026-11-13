@@ -24,16 +24,14 @@ impl<'m> Builder<'m> {
                 ty,
             ));
         }
-        if let Resolution::NativeOp(op_id) = res
-            && !args.is_empty()
-        {
+        if let Some(op_id) = res.native_op().filter(|_| !args.is_empty()) {
             let mut argv = self.lower_args(args)?;
             let object = argv.remove(0);
             return Ok(self.emit(
                 InstKind::CallNativeOp {
                     object,
                     args: argv,
-                    op_id: *op_id,
+                    op_id,
                 },
                 ty,
             ));
@@ -80,6 +78,7 @@ impl<'m> Builder<'m> {
             | Resolution::VtableSlot(_)
             | Resolution::Intrinsic(_)
             | Resolution::NativeOp(_)
+            | Resolution::NativeDecode { .. }
             | Resolution::EnumVariant { .. }
             | Resolution::ByName { .. } => self.lower_expr(callee)?,
         };
@@ -175,7 +174,10 @@ impl<'m> Builder<'m> {
             );
             return self.lower_call(bound, args, ty);
         }
-        if !matches!(res, Resolution::NativeOp(_))
+        if !matches!(
+            res,
+            Resolution::NativeOp(_) | Resolution::NativeDecode { .. }
+        )
             && let Some(v) = self.try_inline_method_call(recv, r, name, args, ty)?
         {
             return Ok(v);
@@ -229,6 +231,7 @@ impl<'m> Builder<'m> {
             | Resolution::DirectFn(_)
             | Resolution::Intrinsic(_)
             | Resolution::NativeOp(_)
+            | Resolution::NativeDecode { .. }
             | Resolution::ByName { .. } => {
                 return Err(OptError::Unsupported("from_tir: MakeVariant without res"))
             }

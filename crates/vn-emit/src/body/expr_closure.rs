@@ -141,6 +141,7 @@ impl<'a> FnEmitter<'a> {
                 | Resolution::DirectFn(_)
                 | Resolution::Intrinsic(_)
                 | Resolution::NativeOp(_)
+                | Resolution::NativeDecode { .. }
                 | Resolution::EnumVariant { .. }
                 | Resolution::ByName { .. } => vn_tir::TirUpvalue::ParentUpvalue(0),
             })

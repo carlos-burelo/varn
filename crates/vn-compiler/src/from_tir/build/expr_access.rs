@@ -46,6 +46,7 @@ impl<'m> Builder<'m> {
             | Resolution::DirectFn(_)
             | Resolution::Intrinsic(_)
             | Resolution::NativeOp(_)
+            | Resolution::NativeDecode { .. }
             | Resolution::EnumVariant { .. }
             | Resolution::ByName { .. } => InstKind::GetProperty {
                 object: obj,

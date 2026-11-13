@@ -25,6 +25,8 @@ pub enum Resolution {
 
     NativeOp(u64),
 
+    NativeDecode { plain: u64, typed: u64 },
+
     EnumVariant { enum_id: EnumId, tag: u16 },
 
     ByName { name: Arc<str>, why: DynReason },
@@ -37,6 +39,27 @@ impl Resolution {
 
     pub fn is_dynamic_dispatch(&self) -> bool {
         matches!(self, Resolution::ByName { .. })
+    }
+
+    pub fn native_op(&self) -> Option<u64> {
+        match self {
+            Resolution::NativeOp(id) => Some(*id),
+            Resolution::NativeDecode { plain, .. } => Some(*plain),
+            Resolution::None
+            | Resolution::Local(_)
+            | Resolution::Param(_)
+            | Resolution::Upvalue(_)
+            | Resolution::GlobalSlot(_)
+            | Resolution::NativeGlobal(_)
+            | Resolution::ModuleSlot { .. }
+            | Resolution::FieldSlot(_)
+            | Resolution::StaticField(_)
+            | Resolution::VtableSlot(_)
+            | Resolution::DirectFn(_)
+            | Resolution::Intrinsic(_)
+            | Resolution::EnumVariant { .. }
+            | Resolution::ByName { .. } => None,
+        }
     }
 
     pub fn dyn_reason(&self) -> Option<DynReason> {
@@ -55,6 +78,7 @@ impl Resolution {
             | Resolution::DirectFn(_)
             | Resolution::Intrinsic(_)
             | Resolution::NativeOp(_)
+            | Resolution::NativeDecode { .. }
             | Resolution::EnumVariant { .. } => None,
         }
     }

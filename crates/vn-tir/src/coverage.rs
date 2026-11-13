@@ -179,6 +179,7 @@ impl Coverage {
             | Resolution::DirectFn(_)
             | Resolution::Intrinsic(_)
             | Resolution::NativeOp(_)
+            | Resolution::NativeDecode { .. }
             | Resolution::EnumVariant { .. } => self.static_dispatch += 1,
         }
 

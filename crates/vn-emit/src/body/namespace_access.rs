@@ -117,14 +117,18 @@ impl FnEmitter<'_> {
             .m
             .native_forwards
             .get(&key)
-            .filter(|(_, args)| {
+            .filter(|(_, args, _)| {
                 all_positional
                     && !targs.is_empty()
                     && targs.len() <= *args as usize
                     && self.forward_keeps_checks(&targs, callee_sig)
             });
         let res = match (known, forwarded) {
-            (_, Some((op_id, _))) => Resolution::NativeOp(*op_id),
+            (_, Some((plain, _, Some(typed)))) => Resolution::NativeDecode {
+                plain: *plain,
+                typed: *typed,
+            },
+            (_, Some((plain, _, None))) => Resolution::NativeOp(*plain),
             (Some((fn_id, arity)), None) if all_positional && arity as usize == targs.len() => {
                 Resolution::DirectFn(vn_tir::FnId(fn_id))
             }

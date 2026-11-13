@@ -32,3 +32,12 @@ pub fn op_id(name: &str) -> u64 {
         .map(|i| i as u64)
         .unwrap_or_else(|| panic!("unknown VM runtime op `{name}`"))
 }
+
+const TYPED_NATIVES: [(&str, &str, &str); 1] = [("runtime:json", "parse", PARSE_TYPED)];
+
+pub fn typed_variant(module: &str, symbol: &str) -> Option<u64> {
+    TYPED_NATIVES
+        .iter()
+        .find(|(m, s, _)| *m == module && *s == symbol)
+        .map(|(_, _, op)| op_id(op))
+}
