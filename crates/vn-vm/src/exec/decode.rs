@@ -77,7 +77,24 @@ fn walk_needed(desc: &TypeDesc) -> bool {
     match desc {
         TypeDesc::Array(_) | TypeDesc::Tuple(_) => true,
         TypeDesc::Nullable(inner) => walk_needed(inner),
-        _ => inner_changes(desc),
+        TypeDesc::Float
+        | TypeDesc::Map(..)
+        | TypeDesc::Object(_)
+        | TypeDesc::Enclosing { .. }
+        | TypeDesc::Any
+        | TypeDesc::Literal(_)
+        | TypeDesc::Int
+        | TypeDesc::Bool
+        | TypeDesc::Char
+        | TypeDesc::Str
+        | TypeDesc::Bytes
+        | TypeDesc::Decimal
+        | TypeDesc::BigInt
+        | TypeDesc::Callable
+        | TypeDesc::Class { .. }
+        | TypeDesc::Enum { .. }
+        | TypeDesc::Set(_)
+        | TypeDesc::Args { .. } => inner_changes(desc),
     }
 }
 
@@ -194,7 +211,8 @@ fn walk(
             }
         }
         TypeDesc::Array(inner) => {
-            let keeps_kind = v.is_heap() && matches!(heap.get(v.as_heap()), Some(HeapObj::Array(_)));
+            let keeps_kind =
+                v.is_heap() && matches!(heap.get(v.as_heap()), Some(HeapObj::Array(_)));
             if keeps_kind && !inner_changes(inner) {
                 return v;
             }
@@ -331,9 +349,10 @@ fn walk(
                 let shape = std::rc::Rc::clone(obj.borrow().shape());
                 if shape.class.is_none() && shape.ordered_names().len() == sources.len() {
                     PLANS.with(|plans| {
-                        plans
-                            .borrow_mut()
-                            .insert(plan_key, std::rc::Rc::new(ProjectionPlan { shape, sources }));
+                        plans.borrow_mut().insert(
+                            plan_key,
+                            std::rc::Rc::new(ProjectionPlan { shape, sources }),
+                        );
                     });
                 }
             }

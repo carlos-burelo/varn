@@ -474,7 +474,9 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
             && let Some(shape) = self.ctx.get_object_shape(obj)
             && shape.property_names.len() == owned_keys.len()
         {
-            self.ctx.json_shapes.push(CacheEntry::new(owned_keys, shape));
+            self.ctx
+                .json_shapes
+                .push(CacheEntry::new(owned_keys, shape));
             let index = self.ctx.json_shapes.len() - 1;
             self.remember_shape(depth, index);
         }

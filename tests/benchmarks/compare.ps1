@@ -37,6 +37,7 @@ function Measure-Median($exePath, $argvList) {
         $psi.RedirectStandardError = $true
         $clock = [Diagnostics.Stopwatch]::StartNew()
         $p = [Diagnostics.Process]::Start($psi)
+        try { $p.PriorityClass = [Diagnostics.ProcessPriorityClass]::High } catch {}
         $null = $p.StandardOutput.ReadToEndAsync()
         $null = $p.StandardError.ReadToEndAsync()
         $p.WaitForExit()

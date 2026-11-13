@@ -238,9 +238,8 @@ fn coalesce_window_args(ssa: &SsaFunc, reg: &mut [u8], call_base: u8) {
     }
     for block in &ssa.blocks {
         for (at, inst) in block.insts.iter().enumerate() {
-            let args = match &inst.kind {
-                InstKind::Call { args, .. } | InstKind::SelfCall { args } => args,
-                _ => continue,
+            let (InstKind::Call { args, .. } | InstKind::SelfCall { args }) = &inst.kind else {
+                continue;
             };
             for (i, arg) in args.iter().enumerate() {
                 if uses[arg.0 as usize] != 1 {

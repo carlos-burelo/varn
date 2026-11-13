@@ -79,47 +79,14 @@ impl<'m> Builder<'m> {
         ty: BackendTy,
     ) -> Result<Option<Value>> {
         use vn_core::abi::NATIVE_GLOBALS;
-        use vn_tir::{TirArg, TirArrayEl, TirExprKind};
         let is_map = NATIVE_GLOBALS
             .get(native as usize)
             .is_some_and(|g| g.name == vn_core::BuiltinType::Map.name());
         if !is_map || !matches!(ty, BackendTy::Map(..)) {
             return Ok(None);
         }
-        let entries: Vec<(&TirExpr, &TirExpr)> = match args {
-            [] => Vec::new(),
-            [TirArg::Expr(only)] => {
-                let mut source = only;
-                while let TirExprKind::Cast { operand } = &source.kind {
-                    source = operand;
-                }
-                match &source.kind {
-                    TirExprKind::NullLit => Vec::new(),
-                    TirExprKind::ArrayLit(elements) => {
-                        let mut pairs = Vec::with_capacity(elements.len());
-                        for element in elements {
-                            let TirArrayEl::Expr(entry) = element else {
-                                return Ok(None);
-                            };
-                            match &entry.kind {
-                                TirExprKind::TupleLit(pair) if pair.len() == 2 => {
-                                    pairs.push((&pair[0], &pair[1]));
-                                }
-                                TirExprKind::ArrayLit(pair) => match pair.as_slice() {
-                                    [TirArrayEl::Expr(key), TirArrayEl::Expr(value)] => {
-                                        pairs.push((key, value));
-                                    }
-                                    _ => return Ok(None),
-                                },
-                                _ => return Ok(None),
-                            }
-                        }
-                        pairs
-                    }
-                    _ => return Ok(None),
-                }
-            }
-            _ => return Ok(None),
+        let Some(entries) = map_entries(args) else {
+            return Ok(None);
         };
         let by_value = |key: &TirExpr| {
             matches!(
@@ -148,10 +115,7 @@ impl<'m> Builder<'m> {
         ty: BackendTy,
     ) -> Result<Value> {
         let r = self.lower_expr(recv)?;
-        if args
-            .iter()
-            .any(|a| matches!(a, vn_tir::TirArg::Spread(_)))
-        {
+        if args.iter().any(|a| matches!(a, vn_tir::TirArg::Spread(_))) {
             let bound = self.emit(
                 InstKind::GetProperty {
                     object: r,
@@ -243,4 +207,43 @@ impl<'m> Builder<'m> {
             self.lower_call(variant, args, ty)
         }
     }
+}
+
+fn map_entries(args: &[vn_tir::TirArg]) -> Option<Vec<(&TirExpr, &TirExpr)>> {
+    use vn_tir::{TirArg, TirArrayEl, TirExprKind};
+    if args.is_empty() {
+        return Some(Vec::new());
+    }
+    let [TirArg::Expr(only)] = args else {
+        return None;
+    };
+    let mut source = only;
+    while let TirExprKind::Cast { operand } = &source.kind {
+        source = operand;
+    }
+    if matches!(source.kind, TirExprKind::NullLit) {
+        return Some(Vec::new());
+    }
+    let TirExprKind::ArrayLit(elements) = &source.kind else {
+        return None;
+    };
+    elements
+        .iter()
+        .map(|element| {
+            let TirArrayEl::Expr(entry) = element else {
+                return None;
+            };
+            if let TirExprKind::TupleLit(pair) = &entry.kind
+                && let [key, value] = pair.as_slice()
+            {
+                return Some((key, value));
+            }
+            if let TirExprKind::ArrayLit(pair) = &entry.kind
+                && let [TirArrayEl::Expr(key), TirArrayEl::Expr(value)] = pair.as_slice()
+            {
+                return Some((key, value));
+            }
+            None
+        })
+        .collect()
 }

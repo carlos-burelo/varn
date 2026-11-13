@@ -3,8 +3,7 @@ use super::super::native_abi::NativeShape;
 use super::super::piece::compile_piece;
 use super::{
     block, call, exceptions, hoist, induction, osr, pinned, ranges, self_entry, setup, stack_exit,
-    versions,
-    Ctx, Lowered,
+    versions, Ctx, Lowered,
 };
 use crate::JitHelpers;
 use cranelift_codegen::ir::{
