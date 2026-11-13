@@ -4068,6 +4068,7 @@ name = "vn-tir"
 version = "0.1.0"
 dependencies = [
  "rustc-hash 1.1.0",
+ "serde",
  "vn-core",
 ]
 

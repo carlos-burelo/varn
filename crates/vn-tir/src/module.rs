@@ -2,7 +2,7 @@ use crate::node::{TirExpr, TirStmt};
 use crate::ty::{BackendTy, ClassId, EnumId, FnId, SigId, TyTable};
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TirFunction {
     pub name: Arc<str>,
     pub sig: SigId,

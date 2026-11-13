@@ -4,6 +4,7 @@ pub use ty::{
     BackendTy, ClassId, DynReason, EnumId, FnId, LiteralStrId, LocalId, ModuleId, ShapeField,
     ShapeId, SigId, TyId, TyListId, TyTable,
 };
+pub use ty::PortableTable;
 
 mod resolution;
 pub use resolution::Resolution;

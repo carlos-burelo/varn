@@ -1,7 +1,7 @@
 use crate::ty::{DynReason, EnumId, FnId, LocalId, ModuleId};
 use std::sync::Arc;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Resolution {
     None,
 

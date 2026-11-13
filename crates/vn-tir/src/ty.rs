@@ -1,15 +1,15 @@
 use vn_core::TypeLiteral;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct TyId(pub u32);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct LiteralStrId(pub u32);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct TyListId(pub u32);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ShapeId(pub u32);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,25 +20,25 @@ pub struct ShapeField {
     pub readonly: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ClassId(pub u32);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct EnumId(pub u32);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct SigId(pub u32);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FnId(pub u32);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct ModuleId(pub u32);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct LocalId(pub u32);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum DynReason {
     HostBoundary,
 
@@ -77,7 +77,7 @@ pub enum DynReason {
     Runtime,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum BackendTy {
     Literal(TypeLiteral<LiteralStrId>),
     Int,
@@ -327,5 +327,109 @@ impl TyTable {
 
     pub fn contains_shape(&self, id: ShapeId) -> bool {
         (id.0 as usize) < self.shapes.len()
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct PortableTable {
+    literal_strings: Vec<String>,
+    entries: Vec<BackendTy>,
+    lists: Vec<Vec<BackendTy>>,
+}
+
+impl TyTable {
+    pub fn to_portable(&self) -> PortableTable {
+        PortableTable {
+            literal_strings: self.literal_strings.iter().map(|s| s.to_string()).collect(),
+            entries: self.entries.clone(),
+            lists: self.lists.clone(),
+        }
+    }
+
+    pub fn from_portable(portable: PortableTable) -> TyTable {
+        let mut table = TyTable {
+            literal_strings: portable
+                .literal_strings
+                .into_iter()
+                .map(|s| std::sync::Arc::from(s.as_str()))
+                .collect(),
+            entries: portable.entries,
+            lists: portable.lists,
+            ..TyTable::default()
+        };
+        for (index, entry) in table.entries.iter().enumerate() {
+            table.dedup.entry(*entry).or_insert(index as u32);
+        }
+        table
+    }
+
+    pub fn import_ty(&mut self, from: &TyTable, ty: BackendTy) -> Option<BackendTy> {
+        match ty {
+            BackendTy::Literal(TypeLiteral::Str(id)) => {
+                let text = from.literal_str(id)?.to_owned();
+                Some(BackendTy::Literal(TypeLiteral::Str(
+                    self.intern_literal_str(&text),
+                )))
+            }
+            BackendTy::Literal(_)
+            | BackendTy::Int
+            | BackendTy::Float
+            | BackendTy::Bool
+            | BackendTy::Char
+            | BackendTy::Str
+            | BackendTy::Bytes
+            | BackendTy::Decimal
+            | BackendTy::BigInt
+            | BackendTy::Void
+            | BackendTy::Never => Some(ty),
+            BackendTy::Array(inner) => Some(BackendTy::Array(self.import_id(from, inner)?)),
+            BackendTy::Set(inner) => Some(BackendTy::Set(self.import_id(from, inner)?)),
+            BackendTy::Nullable(inner) => Some(BackendTy::Nullable(self.import_id(from, inner)?)),
+            BackendTy::Map(key, value) => Some(BackendTy::Map(
+                self.import_id(from, key)?,
+                self.import_id(from, value)?,
+            )),
+            BackendTy::Tuple(list) => {
+                if !from.contains_list(list) {
+                    return None;
+                }
+                let items: Option<Vec<BackendTy>> = from
+                    .get_list(list)
+                    .to_vec()
+                    .into_iter()
+                    .map(|item| self.import_ty(from, item))
+                    .collect();
+                Some(BackendTy::Tuple(self.intern_list(&items?)))
+            }
+            BackendTy::Dynamic(reason) => match reason {
+                DynReason::HostBoundary
+                | DynReason::Union
+                | DynReason::IndexSignature
+                | DynReason::Declared
+                | DynReason::Callable
+                | DynReason::CoreMember
+                | DynReason::Spread
+                | DynReason::Unrecorded
+                | DynReason::Generic
+                | DynReason::Boxed
+                | DynReason::Runtime => Some(ty),
+                DynReason::Awaitable(_)
+                | DynReason::Yields(_)
+                | DynReason::Range(_)
+                | DynReason::TaskHandle(_)
+                | DynReason::ClassObject(_)
+                | DynReason::Interface(_)
+                | DynReason::Shape(_) => None,
+            },
+            BackendTy::Class(_) | BackendTy::Enum(_) | BackendTy::Fn(_) => None,
+        }
+    }
+
+    fn import_id(&mut self, from: &TyTable, id: TyId) -> Option<TyId> {
+        if !from.contains(id) {
+            return None;
+        }
+        let imported = self.import_ty(from, from.get(id))?;
+        Some(self.intern(imported))
     }
 }

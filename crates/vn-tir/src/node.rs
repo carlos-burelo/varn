@@ -2,7 +2,7 @@ use crate::resolution::Resolution;
 use crate::ty::{BackendTy, ClassId, FnId};
 use std::sync::Arc;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub struct Span {
     pub start: u32,
     pub end: u32,
@@ -12,7 +12,7 @@ impl Span {
     pub const EMPTY: Span = Span { start: 0, end: 0 };
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TirExpr {
     pub kind: TirExprKind,
     pub ty: BackendTy,
@@ -20,13 +20,13 @@ pub struct TirExpr {
     pub span: Span,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum CheckKind {
     Conform,
     Decode,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum TirBinOp {
     Add,
     Sub,
@@ -52,7 +52,7 @@ pub enum TirBinOp {
     In,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum TirUnOp {
     Neg,
     Not,
@@ -67,7 +67,7 @@ pub enum TirUnOp {
     ToStr,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum TirArg {
     Expr(TirExpr),
     Spread(TirExpr),
@@ -85,20 +85,20 @@ impl TirArg {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum TirArrayEl {
     Expr(TirExpr),
     Spread(TirExpr),
     Hole,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum TirObjectEntry {
     Field { name: Arc<str>, value: TirExpr },
     Spread(TirExpr),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum TirExprKind {
     IntLit(i64),
     FloatLit(f64),
@@ -245,7 +245,7 @@ pub enum TirExprKind {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum TirStmt {
     Expr(TirExpr),
 
@@ -277,7 +277,7 @@ pub enum TirStmt {
     BuildClass(u32),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum TirUpvalue {
     ParentLocal(u32),
     ParentParam(u32),

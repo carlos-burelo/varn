@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 vn-core = { path = "../vn-core" }
 rustc-hash = { workspace = true }
+serde = { workspace = true }
 
 [lints]
 workspace = true
