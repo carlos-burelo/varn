@@ -65,7 +65,11 @@ pub(crate) fn expand(source: &str, path: &str, resolver: &ModuleResolver) -> Opt
         let start = imp.range.start.offset as usize;
         let end = imp.range.end.offset as usize;
         let original = source.get(start..end)?;
-        let mut text = import_text(imp, &kept, &interner);
+        let mut text = if kept.is_empty() && exports.inert {
+            String::new()
+        } else {
+            import_text(imp, &kept, &interner)
+        };
         text.push_str(&"\n".repeat(original.matches('\n').count()));
         rewrites.push(Rewrite { start, end, text });
         for found in inlined {

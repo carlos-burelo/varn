@@ -108,6 +108,7 @@ impl ModuleResolver {
             visiting,
             &mut exports,
         );
+        exports.inert = super::exports::is_inert(&program.body, ast_arena);
         super::exports::assign_slots(&mut exports);
         exports
     }

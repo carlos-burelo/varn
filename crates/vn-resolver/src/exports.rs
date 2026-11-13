@@ -85,6 +85,34 @@ fn origin_text(bind: &BindResult, out: &ExportMap, atom: Option<Atom>, fallback:
     .unwrap_or_else(|| fallback.to_owned())
 }
 
+pub(super) fn is_inert(stmts: &[StmtId], arena: &AstArena) -> bool {
+    stmts.iter().all(|&stmt| {
+        let StmtKind::Decl(decl) = &arena.stmt(stmt).kind else {
+            return false;
+        };
+        match decl.as_ref() {
+            Decl::Function(_) | Decl::Interface(_) | Decl::TypeAlias(_) => true,
+            Decl::Export(ExportDecl::Decl { declaration, .. }) => matches!(
+                declaration.as_ref(),
+                Decl::Function(_) | Decl::Interface(_) | Decl::TypeAlias(_)
+            ),
+            Decl::Export(ExportDecl::Named { source: None, .. }) => true,
+            Decl::Export(
+                ExportDecl::Named { source: Some(_), .. }
+                | ExportDecl::All { .. }
+                | ExportDecl::Default { .. },
+            )
+            | Decl::Variable(_)
+            | Decl::Class(_)
+            | Decl::Enum(_)
+            | Decl::Namespace(_)
+            | Decl::Import(_)
+            | Decl::Extension(_)
+            | Decl::SumType(_) => false,
+        }
+    })
+}
+
 pub(super) fn assign_slots(exports: &mut ExportMap) {
     let mut keys: Vec<String> = exports.keys().cloned().collect();
     keys.sort();
