@@ -1,4 +1,5 @@
 use crate::ModuleResolver;
+use rustc_hash::FxHashSet;
 use std::path::Path;
 use std::sync::Arc;
 use vn_core::ast::{Decl, ImportDecl, ImportSpecifier, StmtKind};
@@ -22,6 +23,7 @@ pub(crate) fn expand(source: &str, path: &str, resolver: &ModuleResolver) -> Opt
     let base_dir = Path::new(path).parent().unwrap_or(Path::new("."));
     let mut rewrites: Vec<Rewrite> = Vec::new();
     let mut appended = String::new();
+    let mut emitted: FxHashSet<String> = FxHashSet::default();
 
     for &stmt in &program.body {
         let StmtKind::Decl(decl) = &arena.stmt(stmt).kind else {
@@ -67,9 +69,7 @@ pub(crate) fn expand(source: &str, path: &str, resolver: &ModuleResolver) -> Opt
         text.push_str(&"\n".repeat(original.matches('\n').count()));
         rewrites.push(Rewrite { start, end, text });
         for found in inlined {
-            appended.push('\n');
-            appended.push_str(&renamed(&found)?);
-            appended.push('\n');
+            render(&found.src, &found.local, &mut emitted, &mut appended);
         }
     }
     if rewrites.is_empty() {
@@ -101,20 +101,30 @@ fn exports_of(
     }
 }
 
-fn renamed(found: &Inlined) -> Option<String> {
-    let text = found.src.text.as_ref();
-    let at = found.src.name_offset as usize;
-    let from = text.get(at..)?;
-    let name_len = from
-        .char_indices()
-        .find(|(_, c)| !(c.is_alphanumeric() || *c == '_' || *c == '$'))
-        .map_or(from.len(), |(i, _)| i);
-    Some(format!(
-        "{}{}{}",
-        &text[..at],
-        found.local,
-        &text[at + name_len..]
-    ))
+fn render(src: &InlineSrc, name: &str, emitted: &mut FxHashSet<String>, out: &mut String) {
+    let mut edits: Vec<(usize, usize, String)> =
+        vec![(src.name_offset as usize, src.name.len(), name.to_owned())];
+    for dep in &src.deps {
+        let mangled = format!(
+            "{}${:06x}",
+            dep.src.name,
+            vn_core::fingerprint::fingerprint(dep.src.module.as_bytes()) & 0xff_ffff
+        );
+        for &offset in &dep.offsets {
+            edits.push((offset as usize, dep.src.name.len(), mangled.clone()));
+        }
+        if emitted.insert(mangled.clone()) {
+            render(&dep.src, &mangled, emitted, out);
+        }
+    }
+    edits.sort_by_key(|edit| std::cmp::Reverse(edit.0));
+    let mut text = src.text.to_string();
+    for (at, len, replacement) in edits {
+        text.replace_range(at..at + len, &replacement);
+    }
+    out.push('\n');
+    out.push_str(&text);
+    out.push('\n');
 }
 
 fn import_text(imp: &ImportDecl, kept: &[&ImportSpecifier], interner: &AtomInterner) -> String {

@@ -106,6 +106,13 @@ pub(super) fn collect_exports(
     visiting: &mut Vec<String>,
     out: &mut ExportMap,
 ) {
+    let mut analyzer = vn_checker::checker::inline_candidate::InlineAnalyzer::new(
+        stmts,
+        ast_arena,
+        &bind.interner,
+        source,
+        abs_path,
+    );
     for &stmt_id in stmts {
         let StmtKind::Decl(decl) = &ast_arena.stmt(stmt_id).kind else {
             continue;
@@ -122,18 +129,7 @@ pub(super) fn collect_exports(
                         let mut s = sym.clone();
                         s.origin_module = Some(intern_origin(out, abs_path));
                         if let Decl::Function(f) = declaration.as_ref() {
-                            s.inline_src = vn_checker::checker::inline_candidate::inline_source(
-                                f,
-                                ast_arena,
-                                &bind.interner,
-                                source,
-                            )
-                            .map(|found| {
-                                Arc::new(vn_sem::symbol::InlineSrc {
-                                    text: Arc::from(found.text),
-                                    name_offset: found.name_offset as u32,
-                                })
-                            });
+                            s.inline_src = analyzer.analyze(f.id);
                         }
                         out.insert(name_str.to_string(), s);
                     }
