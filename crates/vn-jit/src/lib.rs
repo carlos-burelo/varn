@@ -163,6 +163,7 @@ pub struct Compiled {
     pub entry: JitFn,
     pub native: usize,
     pub native_sig: u64,
+    pub host: usize,
     pub code: Rc<dyn Any>,
 }
 
@@ -280,6 +281,7 @@ pub fn install(
             entry: jit_fn,
             native,
             native_sig,
+            host: if native != 0 { art.host_entry() } else { 0 },
             code: Rc::new(art) as Rc<dyn Any>,
         })
     }

@@ -62,6 +62,68 @@ pub(crate) fn wrapper_signature(cc: CallConv) -> Signature {
     sig
 }
 
+pub(super) fn build_host_thunk(
+    proto: &FunctionProto,
+    isa: &OwnedTargetIsa,
+) -> Result<CompiledPiece, String> {
+    let cc = isa.default_call_conv();
+    let mut sig = Signature::new(cc);
+    for _ in 0..4 {
+        sig.params.push(AbiParam::new(types::I64));
+    }
+    let mut func = Function::with_name_signature(UserFuncName::user(0, 3), sig);
+    let shape = NativeShape::of_proto(proto);
+    let raw_sig = func.import_signature(shape.signature());
+    let raw_name = func.declare_imported_user_function(UserExternalName::new(0, 0));
+    let raw_ref = func.import_function(ExtFuncData {
+        name: ExternalName::user(raw_name),
+        signature: raw_sig,
+        colocated: true,
+        patchable: false,
+    });
+
+    let mut fb_ctx = FunctionBuilderContext::new();
+    let mut b = FunctionBuilder::new(&mut func, &mut fb_ctx);
+    let block = b.create_block();
+    b.append_block_params_for_function_params(block);
+    b.switch_to_block(block);
+    b.seal_block(block);
+    let (exec_ctx, closure, window, out) = {
+        let p = b.block_params(block);
+        (p[0], p[1], p[2], p[3])
+    };
+
+    let m = MemFlagsData::trusted();
+    let mut args = vec![exec_ctx, closure];
+    for (slot, class) in shape.params.iter().enumerate() {
+        let at = (slot * 16) as i32;
+        let tag = b.ins().load(types::I64, m, window, at);
+        let payload = b.ins().load(types::I64, m, window, at + 8);
+        let boxed = b.ins().iconcat(tag, payload);
+        push_native_arg(
+            &mut b,
+            &mut args,
+            NativeClass::of(*class),
+            kind_of(proto, slot),
+            boxed,
+        );
+    }
+    let call = b.ins().call(raw_ref, &args);
+    let res = b.inst_results(call).to_vec();
+    let boxed = native_result_boxed(
+        &mut b,
+        NativeClass::of(shape.ret),
+        proto.return_kind,
+        &res,
+    );
+    let (tag, payload) = b.ins().isplit(boxed);
+    b.ins().store(m, tag, out, 0);
+    b.ins().store(m, payload, out, 8);
+    b.ins().return_(&[]);
+    b.finalize(isa.frontend_config());
+    compile_piece(func, isa)
+}
+
 pub(super) fn build_wrapper(
     proto: &FunctionProto,
     helpers: &JitHelpers,

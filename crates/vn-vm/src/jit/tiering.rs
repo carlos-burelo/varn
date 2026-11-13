@@ -25,9 +25,7 @@ impl VmClosure {
 
     pub(crate) fn hot_jit_fn(&self, settings: &ExecSettings) -> Option<vn_jit::JitFn> {
         if let Some(f) = self.jit_fn() {
-            vn_jit::JIT_STATS
-                .jit_cached
-                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            vn_jit::JitStats::bump(&vn_jit::JIT_STATS.jit_cached);
             return Some(f);
         }
         if self.proto.jit_failed.get() {
@@ -72,6 +70,7 @@ impl VmClosure {
 
                 self.proto.jit_native_sig.set(compiled.native_sig);
                 self.proto.jit_native.set(compiled.native);
+                self.proto.jit_host.set(compiled.host);
                 crate::clif_link::register_compiled(&self.proto, previous);
             }
             Err(_) => {
@@ -79,6 +78,7 @@ impl VmClosure {
                 self.proto.jit_entry.set(0);
                 self.proto.jit_native.set(0);
                 self.proto.jit_native_sig.set(0);
+                self.proto.jit_host.set(0);
                 self.proto.jit_epoch.set(0);
                 if let Some((old_epoch, code)) = previous {
                     crate::clif_link::retire_code(old_epoch, code);

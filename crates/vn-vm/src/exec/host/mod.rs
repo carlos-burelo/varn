@@ -1,5 +1,6 @@
 mod alloc;
 mod buffers;
+mod direct_call;
 mod isolate_spawn;
 pub(crate) mod isolates;
 mod metadata;

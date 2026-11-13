@@ -223,6 +223,7 @@ pub(crate) fn emit_function_meta(
         jit_entry: Cell::new(0),
         jit_native: Cell::new(0),
         jit_native_sig: Cell::new(0),
+        jit_host: Cell::new(0),
         jit_code: RefCell::new(None),
         jit_failed: Cell::new(false),
         jit_epoch: Cell::new(0),

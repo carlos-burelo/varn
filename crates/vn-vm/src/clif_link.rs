@@ -74,6 +74,7 @@ pub(crate) fn invalidate_epoch(epoch: u64) {
         proto.jit_entry.set(0);
         proto.jit_native.set(0);
         proto.jit_native_sig.set(0);
+        proto.jit_host.set(0);
         proto.jit_code.replace(None);
         proto.jit_epoch.set(0);
         proto.jit_entry_count.set(0);

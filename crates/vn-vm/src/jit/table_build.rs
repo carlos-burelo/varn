@@ -43,7 +43,7 @@ macro_rules! fill_tail {
 pub fn build_jit_helpers(settings: &crate::settings::ExecSettings) -> vn_jit::JitHelpers {
     assert_eq!(
         vn_jit::JIT_HELPERS_VERSION,
-        15,
+        16,
         "JitHelpers ABI version mismatch: review offset_of layout after vn-jit-abi change"
     );
     static HELPERS: std::sync::OnceLock<vn_jit::JitHelpers> = std::sync::OnceLock::new();

@@ -1,7 +1,7 @@
 use cranelift_codegen::isa::OwnedTargetIsa;
 use vn_types::{FunctionProto, VmValue};
 
-use super::abi::{build_wrapper, Activation};
+use super::abi::{build_host_thunk, build_wrapper, Activation};
 use super::alloc;
 use super::debug::ClifDebugSink;
 use super::emit::patch_rel32;
@@ -12,19 +12,28 @@ pub struct ClifArtifact {
     pub buffer: JitBuffer,
     pub entry: *const u8,
     pub raw: *const u8,
+    pub host: *const u8,
 
     pub activation: Activation,
 
     pub frameless: bool,
 }
 
+fn native_callable(proto: &FunctionProto, activation: Activation) -> bool {
+    activation == Activation::Native
+        && !proto.has_rest
+        && !proto.is_async
+        && !proto.is_generator
+        && super::native_abi::NativeShape::of_proto(proto).id().is_some()
+}
+
 impl ClifArtifact {
+    pub fn host_entry(&self) -> usize {
+        self.host as usize
+    }
+
     pub fn native_entry(&self, proto: &FunctionProto) -> (usize, u64) {
-        if self.activation != Activation::Native
-            || proto.has_rest
-            || proto.is_async
-            || proto.is_generator
-        {
+        if !native_callable(proto, self.activation) {
             return (0, 0);
         }
         let Some(id) = super::native_abi::NativeShape::of_proto(proto).id() else {
@@ -181,10 +190,13 @@ pub fn try_compile(
                 );
             }
             let wrapper = build_wrapper(proto, helpers, isa, activation, osr_req.is_some())?;
-            let image = CodeImage::assemble(lowered, wrapper, activation);
+            let host = native_callable(proto, activation)
+                .then(|| build_host_thunk(proto, isa))
+                .transpose()?;
+            let image = CodeImage::assemble(lowered, wrapper, host, activation);
             super::debug::capture_code(
                 &mut debug,
-                &image.code,
+                &image.code[..image.host_off.map_or(image.code.len(), |off| off as usize)],
                 image.raw_len(),
                 image.wrapper_off as usize,
                 &image.locations,
@@ -208,6 +220,7 @@ pub fn try_compile(
 pub struct CodeImage {
     code: Vec<u8>,
     wrapper_off: u32,
+    host_off: Option<u32>,
     call_relocs: Vec<(u32, u32)>,
     abs_relocs: Vec<(u32, super::reloc::AbsSym)>,
     natives: Vec<u64>,
@@ -223,6 +236,7 @@ impl CodeImage {
     fn assemble(
         lowered: super::from_ssa::Lowered,
         wrapper: super::piece::CompiledPiece,
+        host: Option<super::piece::CompiledPiece>,
         activation: Activation,
     ) -> Self {
         let entry = lowered.piece;
@@ -232,12 +246,19 @@ impl CodeImage {
             .as_ref()
             .map_or(entry.code.len(), |body| body_off + body.code.len());
         let wrapper_off = (raw_end + 15) & !15;
-        let mut code = vec![0u8; wrapper_off + wrapper.code.len()];
+        let host_off = (wrapper_off + wrapper.code.len() + 15) & !15;
+        let total = host
+            .as_ref()
+            .map_or(wrapper_off + wrapper.code.len(), |h| host_off + h.code.len());
+        let mut code = vec![0u8; total];
         code[..entry.code.len()].copy_from_slice(&entry.code);
         if let Some(body) = &lowered.self_body {
             code[body_off..body_off + body.code.len()].copy_from_slice(&body.code);
         }
-        code[wrapper_off..].copy_from_slice(&wrapper.code);
+        code[wrapper_off..wrapper_off + wrapper.code.len()].copy_from_slice(&wrapper.code);
+        if let Some(h) = &host {
+            code[host_off..host_off + h.code.len()].copy_from_slice(&h.code);
+        }
         let shift_wrapper = |off: usize| (wrapper_off + off) as u32;
         let shift_body = |off: usize| (body_off + off) as u32;
         let entry_target = if lowered.self_body.is_some() {
@@ -297,9 +318,23 @@ impl CodeImage {
                 .into_iter()
                 .map(|s| (shift_wrapper(s.return_offset as usize), s.slots)),
         );
+        if let Some(h) = &host {
+            call_relocs.extend(h.call_reloc_offsets.iter().map(|&r| ((host_off + r) as u32, 0)));
+            abs_relocs.extend(
+                h.abs_relocs
+                    .iter()
+                    .map(|&(off, sym)| ((host_off + off as usize) as u32, sym)),
+            );
+            safepoints.extend(
+                h.safepoints
+                    .iter()
+                    .map(|s| ((host_off + s.return_offset as usize) as u32, s.slots.clone())),
+            );
+        }
         CodeImage {
             code,
             wrapper_off: wrapper_off as u32,
+            host_off: host.as_ref().map(|_| host_off as u32),
             call_relocs,
             abs_relocs,
             natives: lowered.natives,
@@ -374,10 +409,15 @@ impl CodeImage {
             owner,
         );
         let entry = unsafe { buf.as_ptr().add(self.wrapper_off as usize) };
+        let host = match self.host_off {
+            Some(off) => unsafe { buf.as_ptr().add(off as usize) },
+            None => std::ptr::null(),
+        };
         Ok(ClifArtifact {
             buffer: buf,
             entry,
             raw: raw_ptr,
+            host,
             activation: self.activation,
             frameless: self.frameless,
         })
