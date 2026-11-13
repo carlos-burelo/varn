@@ -54,6 +54,23 @@ impl FnEmitter<'_> {
         })
     }
 
+    pub(super) fn forward_keeps_checks(
+        &self,
+        targs: &[TirArg],
+        callee_sig: Option<vn_tir::SigId>,
+    ) -> bool {
+        let params = callee_sig
+            .and_then(|sig| self.signatures.get(sig.0 as usize))
+            .map(|sig| sig.params.as_slice());
+        targs.iter().enumerate().all(|(slot, arg)| {
+            let untyped = matches!(arg.value().ty, BackendTy::Dynamic(_));
+            let accepts_any = params
+                .and_then(|params| params.get(slot))
+                .is_some_and(|param| matches!(param, BackendTy::Dynamic(_)));
+            !untyped || accepts_any
+        })
+    }
+
     pub(super) fn lower_namespace_call(
         &mut self,
         call_id: AstId,
@@ -96,11 +113,22 @@ impl FnEmitter<'_> {
                 }));
             }
         }
-        let res = match known {
-            Some((fn_id, arity)) if all_positional && arity as usize == targs.len() => {
+        let forwarded = self
+            .m
+            .native_forwards
+            .get(&key)
+            .filter(|(_, args)| {
+                all_positional
+                    && !targs.is_empty()
+                    && targs.len() <= *args as usize
+                    && self.forward_keeps_checks(&targs, callee_sig)
+            });
+        let res = match (known, forwarded) {
+            (_, Some((op_id, _))) => Resolution::NativeOp(*op_id),
+            (Some((fn_id, arity)), None) if all_positional && arity as usize == targs.len() => {
                 Resolution::DirectFn(vn_tir::FnId(fn_id))
             }
-            Some(_) | None => Resolution::None,
+            (Some(_) | None, None) => Resolution::None,
         };
         Some(TirExpr {
             kind: TirExprKind::Call {

@@ -210,3 +210,18 @@ pub(super) fn native_function_imports(
     }
     out
 }
+
+pub(super) fn native_forwards(
+    bind: &vn_sem::bind::BindResult,
+) -> FxHashMap<Arc<str>, (u64, u8)> {
+    let mut out = FxHashMap::default();
+    let Some(provider) = vn_modules::provider::get() else {
+        return out;
+    };
+    for (local, forward) in &bind.imported_forwards {
+        if let Some(id) = provider.native_op_id(&forward.module, "", &forward.symbol) {
+            out.insert(local.clone(), (id, forward.args));
+        }
+    }
+    out
+}

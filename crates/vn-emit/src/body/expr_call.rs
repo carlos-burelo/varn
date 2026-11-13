@@ -157,6 +157,17 @@ impl<'a> FnEmitter<'a> {
                 _ if all_positional && self.m.native_fns.contains_key(name) => {
                     Resolution::NativeOp(self.m.native_fns[name])
                 }
+                _ if all_positional
+                    && !targs.is_empty()
+                    && self
+                        .m
+                        .native_forwards
+                        .get(self.m.interner.resolve(*name))
+                        .is_some_and(|(_, args)| targs.len() <= *args as usize)
+                    && self.forward_keeps_checks(&targs, callee_sig) =>
+                {
+                    Resolution::NativeOp(self.m.native_forwards[self.m.interner.resolve(*name)].0)
+                }
                 _ => match c.res {
                     Resolution::NativeGlobal(idx) => Resolution::NativeGlobal(idx),
                     Resolution::None

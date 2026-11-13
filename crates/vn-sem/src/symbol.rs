@@ -65,6 +65,13 @@ impl SymbolKind {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Forward {
+    pub module: std::sync::Arc<str>,
+    pub symbol: std::sync::Arc<str>,
+    pub args: u8,
+}
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Symbol {
     pub kind: SymbolKind,
@@ -111,6 +118,9 @@ pub struct Symbol {
 
     #[serde(default)]
     pub is_test: bool,
+
+    #[serde(default)]
+    pub forward: Option<std::sync::Arc<Forward>>,
 }
 
 impl Symbol {
@@ -144,6 +154,7 @@ impl Symbol {
             capabilities: Vec::new(),
             throws: Vec::new(),
             is_test: false,
+            forward: None,
         }
     }
 

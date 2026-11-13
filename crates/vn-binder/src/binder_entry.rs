@@ -86,6 +86,7 @@ impl<'r> Binder<'r> {
             pending_decorator_roles: Vec::new(),
             user_decorators: rustc_hash::FxHashSet::default(),
             namespace_imports: Vec::new(),
+            imported_forwards: Default::default(),
             namespace_path: Vec::new(),
             declared_type_names: FxHashMap::default(),
             generic_type_uses: Vec::new(),
@@ -143,6 +144,7 @@ impl<'r> Binder<'r> {
             pending_enrich: b.pending_enrich,
             user_decorators: b.user_decorators,
             namespace_imports: b.namespace_imports,
+            imported_forwards: b.imported_forwards,
             declared_type_names: b.declared_type_names,
             generic_type_uses: b.generic_type_uses,
         }

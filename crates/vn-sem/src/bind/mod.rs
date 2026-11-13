@@ -159,6 +159,8 @@ pub struct BindResult {
     #[serde(skip, default)]
     pub namespace_imports: Vec<NamespaceImport>,
     #[serde(skip, default)]
+    pub imported_forwards: FxHashMap<Arc<str>, Arc<crate::symbol::Forward>>,
+    #[serde(skip, default)]
     pub declared_type_names: FxHashMap<vn_core::ast::AstId, Arc<str>>,
     #[serde(skip, default)]
     pub generic_type_uses: Vec<GenericTypeUse>,

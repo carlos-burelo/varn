@@ -131,6 +131,7 @@ impl<'r> super::super::Binder<'r> {
             .iter()
             .map(|t| t.default.as_ref().map(|given| self.resolve_type(given)))
             .collect();
+        sym.forward = self.forwarder_of(f);
         let sym_id = self.define(f.id, sym);
         crate::decorator_attrs::record_decorators(self, sym_id, &f.decorators);
 

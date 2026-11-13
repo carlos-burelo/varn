@@ -76,6 +76,7 @@ pub fn emit_module(
     let core_static_ops = module_globals::core_static_ops(bind);
     let math_intrinsics = math_intrinsic_imports(program, ast_arena, interner);
     let native_fns = native_function_imports(program, ast_arena, interner);
+    let native_forwards = imports_exports::native_forwards(bind);
 
     let free_functions::FreeFunctions {
         list: free_fns,
@@ -111,6 +112,7 @@ pub fn emit_module(
         core_static_ops: &core_static_ops,
         math_intrinsics: &math_intrinsics,
         native_fns: &native_fns,
+        native_forwards: &native_forwards,
         interner,
         checker_table: &bind.ty_table,
         annotation_types: &bind.annotation_types,

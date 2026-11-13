@@ -23,6 +23,9 @@ pub(super) fn export_declared(
         sym.ty = Some(member.ty);
         sym.origin_module = Some(table.intern_name(abs_path));
         sym.original_name = Some(table.intern_name(&key));
+        sym.forward = member
+            .symbol_id
+            .and_then(|id| bind.arena.get(id).forward.clone());
         out.insert(key, sym);
     }
 }

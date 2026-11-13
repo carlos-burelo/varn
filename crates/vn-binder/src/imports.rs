@@ -173,6 +173,17 @@ impl<'r> super::Binder<'r> {
             if let Some(exports) = exports_ref {
                 let hang: Arc<str> = Arc::from(self.interner.resolve(local));
                 let found = imported_namespaces(exports, &hang, &imported);
+                for ns in &found {
+                    for member in &ns.members {
+                        let exported_key = format!("{}::{}", ns.exported, member);
+                        if let Some(forward) =
+                            exports.get(&exported_key).and_then(|s| s.forward.clone())
+                        {
+                            self.imported_forwards
+                                .insert(Arc::from(format!("{}::{}", ns.binding, member)), forward);
+                        }
+                    }
+                }
                 self.namespace_imports.extend(found);
             }
 
@@ -205,6 +216,12 @@ impl<'r> super::Binder<'r> {
                             if let Some(mp) = &module_path {
                                 s.intrinsic_wire =
                                     vn_core::intrinsic_ops::intrinsic_lookup(mp, &imported);
+                            }
+                            if let Some(forward) = &s.forward {
+                                self.imported_forwards.insert(
+                                    Arc::from(self.interner.resolve(local)),
+                                    forward.clone(),
+                                );
                             }
                             s
                         }
