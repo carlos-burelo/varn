@@ -331,7 +331,14 @@ vn_contract! {
         fn sort(ctx: &mut dyn NativeCtx, this: VnArray, compareFn: Option<VmValue>) -> Result<VmValue, NativeError> {
             let mut items = this.to_vec(ctx);
             match compareFn.filter(|v| !v.is_null()) {
-                Some(cb) => ordering::merge_sort(&mut items, &mut |a, b| ordering::sign(ctx, cb, &[a, b]))?,
+                Some(cb) => {
+                    if items.len() > 1 {
+                        for &item in &items {
+                            ctx.verify_callback(cb, &[item, item])?;
+                        }
+                    }
+                    ordering::merge_sort(&mut items, &mut |a, b| ordering::sign(ctx, cb, &[a, b]))?
+                }
                 None => ordering::merge_sort(&mut items, &mut |a, b| ordering::natural_cmp(ctx, a, b))?,
             }
             for (i, v) in items.iter().enumerate() {

@@ -25,7 +25,7 @@ pub(super) fn sign(
     compare: VmValue,
     args: &[VmValue],
 ) -> Result<Ordering, NativeError> {
-    let result = ctx.call_vm(compare, args)?;
+    let result = ctx.call_vm_verified(compare, args)?;
     if !result.is_int() {
         return Err(NativeError::type_error("sort: a comparator must return int"));
     }

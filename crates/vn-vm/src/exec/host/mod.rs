@@ -210,6 +210,22 @@ impl NativeCtx for ExecCtx {
         self.host_call_vm(callee, args)
     }
 
+    fn call_vm_verified(
+        &mut self,
+        callee: VmValue,
+        args: &[VmValue],
+    ) -> Result<VmValue, vn_types::NativeError> {
+        self.host_call_vm_verified(callee, args)
+    }
+
+    fn verify_callback(
+        &mut self,
+        callee: VmValue,
+        args: &[VmValue],
+    ) -> Result<(), vn_types::NativeError> {
+        crate::exec::contract::verify_call(self, callee, args)
+    }
+
     fn method(&mut self, recv: VmValue, name: &str) -> Option<VmValue> {
         self.bound_method(recv, name)
     }

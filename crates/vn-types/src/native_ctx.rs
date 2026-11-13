@@ -155,6 +155,22 @@ pub trait NativeCtx: crate::Buffers {
     fn call_vm(&mut self, callee: VmValue, args: &[VmValue])
         -> Result<VmValue, crate::NativeError>;
 
+    fn call_vm_verified(
+        &mut self,
+        callee: VmValue,
+        args: &[VmValue],
+    ) -> Result<VmValue, crate::NativeError> {
+        self.call_vm(callee, args)
+    }
+
+    fn verify_callback(
+        &mut self,
+        _callee: VmValue,
+        _args: &[VmValue],
+    ) -> Result<(), crate::NativeError> {
+        Ok(())
+    }
+
     fn method(&mut self, _recv: VmValue, _name: &str) -> Option<VmValue> {
         None
     }
