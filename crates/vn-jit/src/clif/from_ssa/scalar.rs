@@ -120,8 +120,7 @@ pub(super) fn emit_inst(
                     b, ctx, values, args,
                 )?)));
             }
-            super::stack_exit::guard_headroom(b, ctx);
-            super::stack_exit::enter_frameless(b, ctx);
+            let entry_depth = super::stack_exit::enter_self_call(b, ctx);
             let no_closure = b.ins().iconst(types::I64, 0);
             let null_tag = b
                 .ins()
@@ -133,7 +132,7 @@ pub(super) fn emit_inst(
             }
             let call = b.ins().call(ctx.self_ref, &a);
             let result = b.inst_results(call)[0];
-            super::stack_exit::leave_frameless(b, ctx);
+            super::stack_exit::leave_self_call(b, ctx, entry_depth);
             result
         }
         SsaOp::MethodCall {

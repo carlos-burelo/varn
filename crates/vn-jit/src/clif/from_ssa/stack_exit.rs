@@ -49,14 +49,20 @@ pub(super) fn leave_frameless(b: &mut FunctionBuilder, ctx: &Ctx<'_>) {
 }
 
 fn guard_limit(b: &mut FunctionBuilder, ctx: &Ctx<'_>, exhausted: Value, helper: usize) {
-    let helpers = ctx.helpers;
-    let m = MemFlagsData::trusted();
     let raise = b.create_block();
     let cont = b.create_block();
     b.set_cold_block(raise);
     b.ins().brif(exhausted, raise, &[], cont, &[]);
 
     b.switch_to_block(raise);
+    raise_overflow(b, ctx, helper);
+
+    b.switch_to_block(cont);
+}
+
+fn raise_overflow(b: &mut FunctionBuilder, ctx: &Ctx<'_>, helper: usize) {
+    let helpers = ctx.helpers;
+    let m = MemFlagsData::trusted();
     super::exceptions::note_site(b, ctx);
     let zero = b.ins().iconst(types::I64, 0);
     let err_off = helpers.jit_error_flag_offset as i32;
@@ -80,8 +86,64 @@ fn guard_limit(b: &mut FunctionBuilder, ctx: &Ctx<'_>, exhausted: Value, helper:
         }
         (None, None) => super::exceptions::emit_placeholder_return(b, ctx),
     }
+}
+
+pub(super) fn enter_self_call(b: &mut FunctionBuilder, ctx: &Ctx<'_>) -> Value {
+    let helpers = ctx.helpers;
+    let lay = &helpers.call_layout;
+    let m = MemFlagsData::trusted();
+    let sp = b.ins().get_stack_pointer(types::I64);
+    let floor = b.ins().load(
+        types::I64,
+        m,
+        ctx.exec_ctx,
+        helpers.jit_stack_floor_offset as i32,
+    );
+    let frames = b
+        .ins()
+        .load(types::I64, m, ctx.exec_ctx, lay.frames_len_off as i32);
+    let frameless = b
+        .ins()
+        .load(types::I64, m, ctx.exec_ctx, lay.frameless_depth_off as i32);
+    let depth = b.ins().iadd(frames, frameless);
+    let stack_low = b.ins().icmp(IntCC::UnsignedLessThan, sp, floor);
+    let too_deep = b.ins().icmp_imm_u(
+        IntCC::UnsignedGreaterThanOrEqual,
+        depth,
+        lay.max_call_depth as i64,
+    );
+    let exhausted = b.ins().bor(stack_low, too_deep);
+
+    let raise = b.create_block();
+    let raise_stack = b.create_block();
+    let raise_depth = b.create_block();
+    let cont = b.create_block();
+    b.set_cold_block(raise);
+    b.set_cold_block(raise_stack);
+    b.set_cold_block(raise_depth);
+    b.ins().brif(exhausted, raise, &[], cont, &[]);
+
+    b.switch_to_block(raise);
+    b.ins().brif(stack_low, raise_stack, &[], raise_depth, &[]);
+    b.switch_to_block(raise_stack);
+    raise_overflow(b, ctx, helpers.stack_overflow);
+    b.switch_to_block(raise_depth);
+    raise_overflow(b, ctx, helpers.call_depth_overflow);
 
     b.switch_to_block(cont);
+    let next = b.ins().iadd_imm_u(frameless, 1);
+    b.ins()
+        .store(m, next, ctx.exec_ctx, lay.frameless_depth_off as i32);
+    frameless
+}
+
+pub(super) fn leave_self_call(b: &mut FunctionBuilder, ctx: &Ctx<'_>, entry_depth: Value) {
+    b.ins().store(
+        MemFlagsData::trusted(),
+        entry_depth,
+        ctx.exec_ctx,
+        ctx.helpers.call_layout.frameless_depth_off as i32,
+    );
 }
 
 pub(crate) fn publish(b: &mut FunctionBuilder, helpers: &JitHelpers, exec_ctx: Value) {
