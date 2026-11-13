@@ -39,6 +39,16 @@ impl<'m> Builder<'m> {
             vn_tir::CheckKind::Conform => vn_core::runtime_ops::CONFORM,
             vn_tir::CheckKind::Decode => vn_core::runtime_ops::DECODE,
         };
+        self.lower_conform_op(v, node_ty, ty, op)
+    }
+
+    pub(super) fn lower_conform_op(
+        &mut self,
+        v: Value,
+        node_ty: BackendTy,
+        ty: BackendTy,
+        op: &str,
+    ) -> Result<Value> {
         let mut describer = Describer::new(self.tir);
         let desc = describer.describe(node_ty)?;
         let text = self.emit(InstKind::ConstStr(Arc::from(desc.encode())), BackendTy::Str);

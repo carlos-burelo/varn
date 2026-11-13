@@ -37,6 +37,10 @@ const RUNTIME_OPS: [(&str, NativeFn); vn_core::runtime_ops::ALL.len()] = [
     ),
     (vn_core::runtime_ops::STR_INDEX, str_index_native),
     (vn_core::runtime_ops::INHERITED, inherited_native),
+    (
+        vn_core::runtime_ops::PARSE_TYPED,
+        crate::exec::conform::parse_typed_native,
+    ),
 ];
 
 fn inherited_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
@@ -260,6 +264,15 @@ impl Boundary for ExecCtx {
 
     fn decode(&mut self, value: VmValue, desc: &str, witnesses: &[VmValue]) -> NativeFnResult {
         crate::exec::conform::decode(&mut self.heap, self.jit_stack_floor, value, desc, witnesses)
+    }
+
+    fn parse_typed(
+        &mut self,
+        text: VmValue,
+        desc: &str,
+        witnesses: &[VmValue],
+    ) -> NativeFnResult {
+        crate::exec::conform::parse_typed(self, text, desc, witnesses)
     }
 
     fn verify_call(&mut self, callee: VmValue, args: &[VmValue]) -> Result<(), NativeError> {

@@ -39,6 +39,32 @@ pub(crate) fn decode_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Native
     }
 }
 
+pub(crate) fn parse_typed_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
+    let (value, text) = descriptor_args(ctx, args)?;
+    match ctx.boundary_mut() {
+        Some(boundary) => boundary.parse_typed(value, &text, &args[2..]),
+        None => Err(mismatch("parse: this context has no heap".to_string())),
+    }
+}
+
+pub(crate) fn parse_typed(
+    ctx: &mut crate::exec::ctx::ExecCtx,
+    text: VmValue,
+    desc: &str,
+    witnesses: &[VmValue],
+) -> NativeFnResult {
+    let source = NativeCtx::str_owned(ctx, text)
+        .ok_or_else(|| mismatch("parse: expected a string".to_string()))?;
+    let descriptor = parse_descriptor(desc)?;
+    if let Some(value) = ctx.json_parse_typed(&source, &descriptor) {
+        return Ok(value);
+    }
+    let parsed = ctx
+        .json_parse(&source)
+        .map_err(|e| NativeError::std(vn_core::StdErrorClass::Parse, e))?;
+    decode(&mut ctx.heap, ctx.jit_stack_floor, parsed, desc, witnesses)
+}
+
 thread_local! {
     static DESCRIPTORS: RefCell<rustc_hash::FxHashMap<String, std::rc::Rc<TypeDesc>>> =
         RefCell::new(rustc_hash::FxHashMap::default());

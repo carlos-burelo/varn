@@ -129,6 +129,37 @@ impl Builder<'_> {
         Ok(())
     }
 
+    fn std_json_parse_text<'t>(&self, operand: &'t TirExpr) -> Option<&'t TirExpr> {
+        let vn_tir::TirExprKind::Call { callee, args } = &operand.kind else {
+            return None;
+        };
+        let vn_tir::Resolution::GlobalSlot(slot) = &callee.res else {
+            return None;
+        };
+        let [vn_tir::TirArg::Expr(text)] = args.as_slice() else {
+            return None;
+        };
+        if text.ty != BackendTy::Str {
+            return None;
+        }
+        let name = self.tir.global_names.get(*slot as usize)?;
+        let is_std_parse = self
+            .tir
+            .imports
+            .iter()
+            .filter(|import| import.source.as_ref() == vn_core::well_known::STD_ENCODING_MODULE)
+            .flat_map(|import| import.specs.iter())
+            .any(|spec| {
+                spec.local == *name
+                    && matches!(
+                        &spec.kind,
+                        vn_tir::TirImportKind::Named(original)
+                            if original.as_ref() == vn_core::well_known::JSON_PARSE_IMPORT
+                    )
+            });
+        is_std_parse.then_some(text)
+    }
+
     pub(super) fn lower_checked(
         &mut self,
         operand: &TirExpr,
@@ -136,6 +167,13 @@ impl Builder<'_> {
         ty: BackendTy,
         kind: vn_tir::CheckKind,
     ) -> Result<Value> {
+        if kind == vn_tir::CheckKind::Decode
+            && super::conform::is_structural(node_ty)
+            && let Some(text) = self.std_json_parse_text(operand)
+        {
+            let text = self.lower_expr(text)?;
+            return self.lower_conform_op(text, node_ty, ty, vn_core::runtime_ops::PARSE_TYPED);
+        }
         let v = self.lower_expr(operand)?;
         if kind == vn_tir::CheckKind::Decode
             && matches!(

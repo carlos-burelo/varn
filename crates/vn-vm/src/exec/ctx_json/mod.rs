@@ -35,6 +35,7 @@ mod fast;
 mod number;
 mod serde_parse;
 mod stringify;
+mod typed;
 
 pub(crate) struct CacheEntry {
     pub(super) keys: std::rc::Rc<Vec<String>>,

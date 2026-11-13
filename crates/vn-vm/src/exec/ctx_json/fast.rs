@@ -24,12 +24,34 @@ pub(super) struct FastJsonParser<'a, 'ctx> {
     bytes: &'a [u8],
     pos: usize,
     depth: usize,
-    ctx: &'ctx mut ExecCtx,
+    pub(super) ctx: &'ctx mut ExecCtx,
 }
 
 impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
+    pub(super) fn new(ctx: &'ctx mut ExecCtx, text: &'a str) -> Self {
+        FastJsonParser {
+            text,
+            bytes: text.as_bytes(),
+            pos: 0,
+            depth: 0,
+            ctx,
+        }
+    }
+
+    pub(super) fn at_end(&self) -> bool {
+        self.pos == self.bytes.len()
+    }
+
+    pub(super) fn advance(&mut self, by: usize) {
+        self.pos += by;
+    }
+
+    pub(super) fn peek_raw(&self) -> Option<u8> {
+        self.bytes.get(self.pos).copied()
+    }
+
     #[inline(always)]
-    fn skip_whitespace(&mut self) {
+    pub(super) fn skip_whitespace(&mut self) {
         while self.pos < self.bytes.len() {
             let b = self.bytes[self.pos];
             if b == b' ' || b == b'\t' || b == b'\n' || b == b'\r' {
@@ -41,12 +63,12 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
     }
 
     #[inline(always)]
-    fn peek(&mut self) -> Option<u8> {
+    pub(super) fn peek(&mut self) -> Option<u8> {
         self.skip_whitespace();
         self.bytes.get(self.pos).copied()
     }
 
-    fn parse_value(&mut self) -> Option<VmValue> {
+    pub(super) fn parse_value(&mut self) -> Option<VmValue> {
         match self.peek()? {
             b'{' => self.parse_object(),
             b'[' => self.parse_array(),
@@ -60,7 +82,7 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
     }
 
     #[inline(always)]
-    fn parse_true(&mut self) -> Option<VmValue> {
+    pub(super) fn parse_true(&mut self) -> Option<VmValue> {
         if self.bytes.get(self.pos..self.pos + 4) == Some(b"true") {
             self.pos += 4;
             Some(VmValue::bool_true())
@@ -70,7 +92,7 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
     }
 
     #[inline(always)]
-    fn parse_false(&mut self) -> Option<VmValue> {
+    pub(super) fn parse_false(&mut self) -> Option<VmValue> {
         if self.bytes.get(self.pos..self.pos + 5) == Some(b"false") {
             self.pos += 5;
             Some(VmValue::bool_false())
@@ -80,7 +102,7 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
     }
 
     #[inline(always)]
-    fn parse_null(&mut self) -> Option<VmValue> {
+    pub(super) fn parse_null(&mut self) -> Option<VmValue> {
         if self.bytes.get(self.pos..self.pos + 4) == Some(b"null") {
             self.pos += 4;
             Some(VmValue::null())
@@ -89,7 +111,7 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
         }
     }
 
-    fn read_string_text(&mut self) -> Option<std::borrow::Cow<'a, str>> {
+    pub(super) fn read_string_text(&mut self) -> Option<std::borrow::Cow<'a, str>> {
         let bytes: &'a [u8] = self.bytes;
         let text: &'a str = self.text;
         let start = self.pos + 1;
@@ -172,7 +194,7 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
     }
 
     #[inline]
-    fn parse_string(&mut self) -> Option<VmValue> {
+    pub(super) fn parse_string(&mut self) -> Option<VmValue> {
         let text = self.read_string_text()?;
         if let Some(sso) = VmValue::try_from_sso(&text) {
             return Some(sso);
@@ -181,7 +203,7 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
     }
 
     #[inline]
-    fn parse_number(&mut self) -> Option<VmValue> {
+    pub(super) fn parse_number(&mut self) -> Option<VmValue> {
         let start = self.pos;
         let mut i = start;
         let negative = self.bytes.get(i) == Some(&b'-');
