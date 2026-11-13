@@ -9,10 +9,11 @@ Código manda. Fuentes: `crates/vn-macros/src/vn_contract/`, `crates/vn-macros/s
 3. **`build.rs` de `vn-builtins`**: recorre `src/modules/{core,runtime}`, parsea cada contrato con `vn-parser` y genera `MODULE_REGISTRY` (`registry.generated.rs`): id `core:<mod>`/`runtime:<mod>`, fuente embebida, exports y si el contrato trae código además de declaraciones.
 4. **Registro estático único**: `native_modules!` (`modules/mod.rs`) enumera los módulos y concatena sus `NATIVE_ENTRIES` en `NATIVE_MODULES`. Sin secciones del linker ni marcadores.
 5. **`vn-macros`** también define `#[jit_slow]` y `jit_helper_table!` (helpers JIT; no registran módulos).
+6. **Decoradores de contrato** (`ContractDecorator`, `vn-core/src/ast/decorator_kind.rs`): `@throws(Clase…)`, `@permission("dominio")` y `@decodes("<op>")`. `@decodes` declara la variante tipada de un nativo (`runtime:json`: `parse$` → `parse-typed`); el binder la guarda en el símbolo (`Symbol.decode_op`) y el forwarder de la función que la envuelve la propaga a `vn-emit`.
 
 ## Módulos nativos (`modules/mod.rs`)
 
-`buffer compress crypto csv errors ffi fs globals gpu io json math net path process reflect regex sqlite sys task testing text time ui ws` + `types` (`array bigint bool bytes char decimal float int iteration map range set string`). `testing` no aporta entradas nativas.
+`buffer compress crypto csv errors ffi fs globals gpu io json math net path process reflect sqlite stderror sys task testing text time ui ws` + `types` (`array bigint bool bytes char decimal float int iteration map range regex set string`). `testing` no aporta entradas nativas.
 
 Entrada: `build_module(id, ctx)` → `dispatch::build_module`: crea el objeto módulo y cuelga cada entrada en su ruta de namespace.
 

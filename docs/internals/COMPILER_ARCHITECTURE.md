@@ -27,9 +27,45 @@ portable para el JIT. Todo vive en `crates/vn-compiler/src/`.
 Tipo interno del lowering: `HirType` (`hir/mod.rs`: `Int/Float/Bool/Str/Ref/Dynamic/
 Array/Map/Set/Tuple/Class/Nullable`), distinto de `BackendTy`.
 
-Único inlining: `try_inline_direct_call` (`from_tir/build/call.rs`). Solo inserta
-funciones cuyo cuerpo es un único `return`; rechaza recursión, async/generador,
-rest, `this`, locales, aridad distinta, spread y retorno de closure.
+## Inlining
+
+Tres mecanismos dentro de un módulo, todos en `from_tir/build/`:
+
+- `try_inline_direct_call` (`call.rs`): funciones cuyo cuerpo es un único `return`;
+  rechaza recursión, async/generador, rest, `this`, locales, aridad distinta, spread y
+  retorno de closure.
+- `try_inline_body_call` (`inline_body.rs`): cuerpos generales de funciones libres,
+  hasta 96 nodos (`@inline` fuerza). Rechaza closures, `try`, `await`/`yield`, `super`,
+  upvalues y parámetros con valor por defecto.
+- `try_inline_method_call` (`inline_method.rs`): métodos cuyo receptor tiene clase
+  estática conocida (`devirtualized_method`); profundidad máxima 4.
+
+El predicado de elegibilidad es único y vive en `vn-tir` (`inlinable::body_inlinable`):
+el compilador y la extracción de plantillas entre módulos lo comparten.
+
+## Enlace entre módulos (`vn-tir`)
+
+Antes de `compile_module`, `lower_module` (`vn-pipeline/src/lower.rs`) ejecuta
+`vn_tir::link::link` sobre el TIR del importador:
+
+1. `vn_tir::package::extract` produce, por módulo ya bajado, `ModuleTemplates`: un
+   `InlinePackage` por función exportada elegible (la función y las hermanas que llama
+   directamente, con sus tipos re-internados en una `TyTable` portable), las
+   constantes exportadas con valor literal y la bandera `inert`.
+2. `link` instala cada paquete usado en el módulo importador (funciones con global
+   `__inl<huella>::nombre`, tipos y firmas remapeados con `TyTable::import_ty`),
+   reescribe la llamada a `DirectFn` y deja la decisión de inlinar al compilador.
+3. Una lectura de constante importada se reemplaza por su literal.
+4. Si el módulo es inerte (su nivel superior solo asigna literales; sin clases, imports
+   relativos ni reexports) y todos sus especificadores quedaron enlazados y sin
+   referencias, el import se elimina y el módulo no se carga.
+
+Un paquete solo contiene tipos sin ids locales (escalares, `str`, `Bytes`, decimal,
+bigint, arrays, mapas, sets, tuplas y nulables de ellos), resoluciones `Local`, `Param`,
+`Intrinsic`, `NativeOp` (con al menos un argumento), `NativeDecode` y llamadas directas a
+hermanas. Clases, enums, tipos función, genéricos, `this`, closures y estado de módulo no
+constante quedan fuera. Los módulos de `std` publican sus plantillas en `std.vnb`
+(`MODULES_SYSTEM.md`).
 
 ## Pases SSA (`passes/mod.rs::optimize`)
 

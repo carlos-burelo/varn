@@ -158,7 +158,7 @@ Sin conteos de líneas: viven en el código (`find crates -name "*.rs" | xargs w
 | `vn-sem` | Representación semántica |
 | `vn-binder` | Nombres y alcances |
 | `vn-resolver` | Resolución de módulos e imports |
-| `vn-tir` | Representación intermedia tipada canónica |
+| `vn-tir` | Representación intermedia tipada canónica; paquetes inlinables (`package`), pasada de enlace (`link`) y predicado de inlinabilidad (`inlinable`) |
 | `vn-types` | Modelo de datos de runtime y bytecode |
 | `vn-macros` | Proc-macros: `vn_contract!`, `#[jit_slow]`, `jit_helper_table!` |
 | `vn-compiler` | Compilador (TIR→SSA→bytecode + `regalloc` interno) |
@@ -167,7 +167,7 @@ Sin conteos de líneas: viven en el código (`find crates -name "*.rs" | xargs w
 | `vn-vm` | Ejecución |
 | `vn-builtins` | Stdlib nativa |
 | `vn-modules` | Resolución de módulos y bundle |
-| `vn-pipeline` | Orquestación de fases y caché |
+| `vn-pipeline` | Orquestación de fases (dependencias antes que el importador), caché y biblioteca de plantillas |
 | `vn-cli` | CLI (`vn`) |
 | `vn-lsp` | Servidor LSP |
 | `vn-dap` | Adaptador DAP |

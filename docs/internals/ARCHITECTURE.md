@@ -6,20 +6,29 @@ contradice al código, manda el código. Contrato de diseño: [`AGENTS.md`](../.
 ## Pipeline
 
 ```
-texto ─lex─▶ tokens ─parse─▶ AST ─check─▶ CheckResult ─emit─▶ TIR ─compile─▶ SSA ─▶ bytecode ─▶ VM ⇄ JIT
+texto ─lex─▶ tokens ─parse─▶ AST ─check─▶ CheckResult ─emit─▶ TIR ─link─▶ TIR ─compile─▶ SSA ─▶ bytecode ─▶ VM ⇄ JIT
 ```
 
-Orquesta `vn-pipeline` (`run` en `src/lib.rs`): lee la fuente, compila (con caché
-de grafo de módulos si no hay flags de depuración) y ejecuta.
+Orquesta `vn-pipeline` (`Session::compile` → `Compilation::advance`, `compilation.rs`):
+lee la fuente, compila (con caché de grafo de módulos si no hay flags de depuración) y
+ejecuta.
 
 | Fase | Dónde | Entrada → salida |
 |---|---|---|
 | lex | `vn_lexer::scan` (`vn-pipeline/src/lex.rs`) | texto → `(tokens, lexeme_buf, errores)` |
 | parse | `vn_parser::parse` (`parse.rs`) | tokens → `Program` + `AstArena` + `AtomInterner` |
 | check | `vn_checker::Checker` (`check.rs`) | AST + resolvedor de imports → `vn_sem::output::CheckResult` |
-| emit | `vn_emit::emit_module` (`compile.rs::emit_tir`) | AST + `CheckResult` → `vn_tir::TirModule` |
-| compile | `vn_compiler::from_tir::compile_module` (`compile.rs::compile_tir`) | TIR → `FunctionProto` (SSA optimizado → bytecode de registros) |
+| emit | `vn_emit::emit_module` (`lower.rs::emit_tir`) | AST + `CheckResult` → `vn_tir::TirModule` |
+| link | `vn_tir::link::link` (`lower.rs::lower_module`) | TIR del importador + paquetes inlinables de sus dependencias → TIR con llamadas directas |
+| compile | `vn_compiler::from_tir::compile_module` (`lower.rs::compile_tir`) | TIR → `FunctionProto` (SSA optimizado → bytecode de registros) |
 | execute | `execute.rs`: `boot_machine` → `enter_main` | `FunctionProto` → ejecución en `vn_vm::Vm` |
+
+Orden de compilación (`compile.rs::build_executable`): se descubre el grafo de imports
+(`module_precompile::discover`; un ciclo es error), se bajan las dependencias antes que
+el módulo de entrada (`lower_dependencies`, orden topológico inverso) y cada módulo bajado
+publica sus plantillas en una `TemplateLibrary` que consume el paso `link` de sus
+importadores. Ver [`COMPILER_ARCHITECTURE.md`](COMPILER_ARCHITECTURE.md) y
+[`ADR-0028`](../decisions/ADR-0028-inlining-entre-modulos.md).
 
 No hay fase JIT en el pipeline: el tiering vive dentro de la VM
 (`vn-vm/src/jit/tiering.rs`) y llama a `vn-jit` cuando una función se calienta.
@@ -30,7 +39,7 @@ El TIR lo emite después `vn-emit` a partir de esos artefactos.
 
 ## Crates
 
-29 miembros del workspace (`Cargo.toml`): 28 crates + `xtask`. Grafo de dependencias
+31 miembros del workspace (`Cargo.toml`): 30 crates + `xtask`. Grafo de dependencias
 real en [`CRATES_STATE.md`](../dev/CRATES_STATE.md).
 
 | Capa | Crates |
@@ -46,7 +55,7 @@ No existen `varn-runtime` ni `varn-regalloc`: el regalloc es
 
 ## Bytecode
 
-`OpCode` (`vn-core/src/opcode.rs`, `repr(u8)`): 148 variantes. Las palabras de
+`OpCode` (`vn-core/src/opcode.rs`, `repr(u8)`): 152 variantes. Las palabras de
 código son `u16` (`OpCode::from_u16`). Excepciones: `Try`, `PopTry`, `Throw`; la VM
 las resuelve con `ExceptionRange` del chunk.
 
@@ -57,7 +66,7 @@ las resuelve con `ExceptionRange` del chunk.
 - **Async**: `await` monta la tarea aguardada como frame de quien aguarda; solo una celda pendiente suspende.
 - **Generadores**: frame congelado que se reanuda sobre la pila de quien llama.
 - **JIT**: Cranelift, activaciones `Native`/`Framed`, try/catch puro sin `longjmp` en `vn-jit`. Ver [`JIT_ABI_V2_SPEC.md`](JIT_ABI_V2_SPEC.md).
-- **Std**: siempre desde una imagen `std.vnb` (embebida o construida en caché). Ver [`MODULES_SYSTEM.md`](MODULES_SYSTEM.md).
+- **Std**: siempre desde una imagen `std.vnb` (embebida o construida en caché), con interfaz, bytecode y plantillas de inlining por módulo. Ver [`MODULES_SYSTEM.md`](MODULES_SYSTEM.md).
 
 ## Más detalle
 

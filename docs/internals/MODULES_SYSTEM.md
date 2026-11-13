@@ -31,7 +31,7 @@ pub trait ModuleLoader: Send + Sync {
 
 `std` y los módulos `core:` se consumen siempre desde una imagen `std.vnb`
 (`std_image.rs`): cabecera + tabla de módulos (`id`, `path`, `pure`, `interface`,
-`bytecode`, `source`) indexada sin copiar. `StdImage::parse` valida el sobre del
+`bytecode`, `templates`, `source`; 13 palabras por entrada) indexada sin copiar. `StdImage::parse` valida el sobre del
 artefacto; `write_image` la produce (`vn std-bundle`).
 
 Resolución de la raíz (`std_root.rs::resolve`, una vez por proceso):
@@ -47,6 +47,12 @@ Qué imagen se usa (`vn-cli/src/std_source.rs::select`):
 - **Embebida**: con la feature `embed-std`, `dist/std.vnb` va dentro del binario; si no, se lee de `VN_STD_BUNDLE`.
 
 El checker lee las interfaces de std/core directamente de la imagen; no recompila la std.
+
+`templates` es un `ModuleTemplates` serializado con postcard (`vn_tir::package`): lo
+produce `compile_stdlib_image` al bajar cada módulo y lo decodifica bajo demanda la
+`TemplateLibrary` del pipeline (`lower.rs`) cuando un módulo de usuario importa de
+`std:`/`core:`. Las plantillas de un módulo de std no se enlazan entre sí al construir la
+imagen. Una imagen de otra versión del formato se reconstruye.
 
 ## Grafo y caché de interfaces
 
