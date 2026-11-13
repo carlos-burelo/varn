@@ -36,6 +36,27 @@ mod number;
 mod serde_parse;
 mod stringify;
 
-pub(super) type CacheEntry = (std::rc::Rc<Vec<String>>, std::rc::Rc<vn_types::Shape>);
+pub(crate) struct CacheEntry {
+    pub(super) keys: std::rc::Rc<Vec<String>>,
+    pub(super) shape: std::rc::Rc<vn_types::Shape>,
+    pub(super) tokens: Vec<Option<Box<[u8]>>>,
+}
+
+impl CacheEntry {
+    pub(super) fn new(keys: Vec<String>, shape: std::rc::Rc<vn_types::Shape>) -> Self {
+        let tokens = keys
+            .iter()
+            .map(|key| {
+                let plain = key.bytes().all(|b| b >= 0x20 && b != b'"' && b != b'\\');
+                plain.then(|| format!("\"{key}\":").into_bytes().into_boxed_slice())
+            })
+            .collect();
+        CacheEntry {
+            keys: std::rc::Rc::new(keys),
+            shape,
+            tokens,
+        }
+    }
+}
 
 pub(super) const JSON_SHAPE_CAP: usize = 64;
