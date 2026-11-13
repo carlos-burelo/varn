@@ -63,6 +63,13 @@ pub(crate) fn instanceof(obj: VmValue, class_nv: VmValue, heap: &Heap) -> bool {
         | None => return false,
     };
 
+    if obj.is_heap()
+        && heap
+            .instance(obj.as_heap())
+            .is_some_and(|inst| inst.class_id == cls.id)
+    {
+        return true;
+    }
     match cls.name.as_str() {
         n if n == vn_core::RuntimeKind::Str.name() => {
             return obj.is_sso()

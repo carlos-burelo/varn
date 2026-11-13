@@ -102,6 +102,13 @@ impl JitStatsSnapshot {
     }
 }
 
+impl JitStats {
+    #[inline(always)]
+    pub fn bump(counter: &AtomicU64) {
+        counter.store(counter.load(Ordering::Relaxed) + 1, Ordering::Relaxed);
+    }
+}
+
 pub struct JitStats {
     pub compile_success: AtomicU64,
     pub compile_fail: AtomicU64,

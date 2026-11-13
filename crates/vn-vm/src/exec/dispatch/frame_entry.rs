@@ -84,9 +84,7 @@ pub(super) unsafe fn enter(
             Some(result) => Entry::Done(result),
         };
     } else if is_first_entry {
-        vn_jit::JIT_STATS
-            .interp_runs
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        vn_jit::JitStats::bump(&vn_jit::JIT_STATS.interp_runs);
     }
     Entry::Interpret
 }

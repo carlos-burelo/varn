@@ -82,14 +82,10 @@ pub(super) unsafe fn run_compiled_frame(
     is_osr: bool,
 ) -> JitFrameOutcome {
     if is_first_entry {
-        vn_jit::JIT_STATS
-            .jit_runs
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        vn_jit::JitStats::bump(&vn_jit::JIT_STATS.jit_runs);
     }
     if is_osr {
-        vn_jit::JIT_STATS
-            .osr_entries
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        vn_jit::JitStats::bump(&vn_jit::JIT_STATS.osr_entries);
         let owner = frame_idx + 1;
         unsafe { (*ctx).try_handlers.retain(|h| h.frame_depth != owner) };
     }
