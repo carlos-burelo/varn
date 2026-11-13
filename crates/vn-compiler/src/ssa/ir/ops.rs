@@ -53,6 +53,7 @@ pub enum InstKind {
     Call {
         callee: Value,
         args: Vec<Value>,
+        shape: Option<u32>,
     },
 
     AllocInstance {

@@ -100,6 +100,7 @@ impl<'m> Builder<'m> {
                 InstKind::Call {
                     callee: fv,
                     args: vec![],
+    shape: None,
                 },
                 BackendTy::Dynamic(DynReason::Boxed),
             );

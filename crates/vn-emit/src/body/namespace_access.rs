@@ -54,6 +54,15 @@ impl FnEmitter<'_> {
         })
     }
 
+    pub(super) fn typed_callee(&self, mut callee: TirExpr, sig: Option<vn_tir::SigId>) -> TirExpr {
+        if let Some(sig) = sig
+            && matches!(callee.ty, BackendTy::Dynamic(vn_tir::DynReason::Callable))
+        {
+            callee.ty = BackendTy::Fn(sig);
+        }
+        callee
+    }
+
     pub(super) fn forward_keeps_checks(
         &self,
         targs: &[TirArg],
@@ -134,6 +143,7 @@ impl FnEmitter<'_> {
             }
             (Some(_) | None, None) => Resolution::None,
         };
+        let c = self.typed_callee(c, callee_sig);
         Some(TirExpr {
             kind: TirExprKind::Call {
                 callee: Box::new(c),

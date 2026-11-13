@@ -190,6 +190,7 @@ impl<'a> FnEmitter<'a> {
                     | Resolution::ByName { .. } => Resolution::None,
                 },
             };
+            let c = self.typed_callee(c, callee_sig);
             return TirExpr {
                 kind: TirExprKind::Call {
                     callee: Box::new(c),

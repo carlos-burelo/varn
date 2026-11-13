@@ -1,7 +1,7 @@
 use super::context::{Builder, InlineFrame, Result};
 use crate::ssa::ir::{InstKind, Value};
 use crate::OptError;
-use vn_tir::BackendTy;
+use vn_tir::{BackendTy, DynReason};
 use vn_tir::TirStmt;
 
 fn creates_closure(e: &vn_tir::TirExpr) -> bool {
@@ -17,6 +17,16 @@ impl<'m> Builder<'m> {
         callee: Value,
         args: &[vn_tir::TirArg],
         ty: BackendTy,
+    ) -> Result<Value> {
+        self.lower_call_typed(callee, args, ty, None)
+    }
+
+    pub(super) fn lower_call_typed(
+        &mut self,
+        callee: Value,
+        args: &[vn_tir::TirArg],
+        ty: BackendTy,
+        callee_ty: Option<BackendTy>,
     ) -> Result<Value> {
         let mut vals: Vec<(Value, bool)> = Vec::with_capacity(args.len());
         let mut any_spread = false;
@@ -35,15 +45,58 @@ impl<'m> Builder<'m> {
         if any_spread {
             Ok(self.emit(InstKind::CallSpread { callee, args: vals }, ty))
         } else {
-            let plain = vals.into_iter().map(|(v, _)| v).collect();
+            let mut plain: Vec<Value> = vals.into_iter().map(|(v, _)| v).collect();
+            let shape = callee_ty.and_then(|callee_ty| self.declared_call_shape(callee_ty, &mut plain));
             Ok(self.emit(
                 InstKind::Call {
                     callee,
                     args: plain,
+                    shape,
                 },
                 ty,
             ))
         }
+    }
+
+    fn declared_call_shape(&mut self, callee_ty: BackendTy, args: &mut Vec<Value>) -> Option<u32> {
+        let BackendTy::Fn(sig) = callee_ty else {
+            return None;
+        };
+        let signature = self.tir.signature(sig)?;
+        if signature.has_rest || args.len() > signature.params.len() {
+            return None;
+        }
+        let params: Vec<_> = signature
+            .params
+            .iter()
+            .map(|param| crate::ssa::emit::slot_kind_of(*param))
+            .collect();
+        let ret = crate::ssa::emit::slot_kind_of(signature.return_ty);
+        let padding = &params[args.len()..];
+        if padding.iter().any(|kind| {
+            matches!(
+                kind,
+                vn_types::register_meta::SlotKind::Int
+                    | vn_types::register_meta::SlotKind::Float
+                    | vn_types::register_meta::SlotKind::Bool
+            )
+        }) {
+            return None;
+        }
+        for _ in 0..padding.len() {
+            let null = self.emit(InstKind::ConstNull, BackendTy::Dynamic(DynReason::Boxed));
+            args.push(null);
+        }
+        let shape = vn_types::ssa::CallShape { params, ret };
+        let index = self
+            .call_shapes
+            .iter()
+            .position(|known| *known == shape)
+            .unwrap_or_else(|| {
+                self.call_shapes.push(shape);
+                self.call_shapes.len() - 1
+            });
+        u32::try_from(index).ok()
     }
 
     pub(super) fn try_lower_self_call(

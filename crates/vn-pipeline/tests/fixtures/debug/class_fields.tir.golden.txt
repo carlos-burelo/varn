@@ -1252,8 +1252,10 @@ TirModule {
                     kind: Call {
                         callee: TirExpr {
                             kind: Var,
-                            ty: Dynamic(
-                                Callable,
+                            ty: Fn(
+                                SigId(
+                                    7,
+                                ),
                             ),
                             res: NativeGlobal(
                                 0,

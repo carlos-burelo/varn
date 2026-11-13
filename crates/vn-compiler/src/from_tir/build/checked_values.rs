@@ -121,6 +121,7 @@ impl Builder<'_> {
             InstKind::Call {
                 callee: ctor,
                 args: vec![message],
+    shape: None,
             },
             BackendTy::Dynamic(DynReason::Runtime),
         );

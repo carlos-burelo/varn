@@ -31,6 +31,7 @@ impl<'m> Builder<'m> {
             InstKind::Call {
                 callee: deco_v,
                 args: vec![mv, ctx],
+    shape: None,
             },
             BackendTy::Dynamic(DynReason::Runtime),
         );
@@ -72,6 +73,7 @@ impl<'m> Builder<'m> {
                 InstKind::Call {
                     callee: deco_v,
                     args: vec![class_v],
+    shape: None,
                 },
                 BackendTy::Dynamic(DynReason::Runtime),
             );
@@ -138,6 +140,7 @@ impl<'m> Builder<'m> {
                     InstKind::Call {
                         callee: deco_v,
                         args: vec![class_v, ctx],
+    shape: None,
                     },
                     BackendTy::Dynamic(DynReason::Runtime),
                 );

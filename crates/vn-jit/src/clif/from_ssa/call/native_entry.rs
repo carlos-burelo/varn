@@ -33,7 +33,8 @@ pub(crate) fn emit(
         .map(|d| ctx.ssa.value_ty(d))
         .unwrap_or(SlotKind::Dynamic);
     let arg_kinds: Vec<SlotKind> = call.args.iter().map(|v| ctx.ssa.value_ty(*v)).collect();
-    let shape = NativeShape::new(&arg_kinds, dest_kind);
+    let shape = declared_shape(ctx, &arg_kinds, dest_kind)
+        .unwrap_or_else(|| NativeShape::new(&arg_kinds, dest_kind));
     let Some(id) = shape.id() else {
         return Ok(Out::Boxed(slow(b)?));
     };
@@ -147,7 +148,14 @@ pub(crate) fn emit(
     crate::clif::from_ssa::exceptions::check_error_branch(b, ctx)?;
     let direct = match crate::clif::native_abi::NativeClass::of(shape.ret) {
         NativeClass::Word | NativeClass::Float => res[0],
-        NativeClass::Boxed => b.ins().iconcat(res[0], res[1]),
+        NativeClass::Boxed => {
+            let boxed = b.ins().iconcat(res[0], res[1]);
+            if NativeClass::of(dest_kind) == NativeClass::Boxed {
+                boxed
+            } else {
+                heap::unbox_checked(b, ctx, dest_kind, boxed)?
+            }
+        }
     };
     drop_home_addrs(ctx);
     b.ins().jump(merge, &[direct.into()]);
@@ -160,6 +168,26 @@ pub(crate) fn emit(
 
     b.switch_to_block(merge);
     Ok(Out::Native(b.block_params(merge)[0]))
+}
+
+fn declared_shape(
+    ctx: &Ctx<'_>,
+    arg_kinds: &[SlotKind],
+    dest_kind: SlotKind,
+) -> Option<NativeShape> {
+    let declared = ctx.ssa.call_shape_at(ctx.site_ip.get())?;
+    if declared.params.len() != arg_kinds.len() {
+        return None;
+    }
+    let same_class = |a: SlotKind, b: SlotKind| NativeClass::of(a) == NativeClass::of(b);
+    let args_fit = declared
+        .params
+        .iter()
+        .zip(arg_kinds)
+        .all(|(param, arg)| NativeClass::of(*param) == NativeClass::Boxed || same_class(*param, *arg));
+    let ret_fits = same_class(declared.ret, dest_kind) || NativeClass::of(declared.ret) == NativeClass::Boxed;
+    (args_fit && ret_fits)
+        .then(|| NativeShape::new(&declared.params, declared.ret))
 }
 
 fn push_frame(

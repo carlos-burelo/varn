@@ -71,6 +71,16 @@ pub struct SsaProto {
     pub captured: Vec<u32>,
 
     pub secondary_entries: Vec<SsaSecondaryEntry>,
+
+    pub call_shapes: Vec<CallShape>,
+
+    pub call_sites: Vec<(u32, u32)>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CallShape {
+    pub params: Vec<crate::register_meta::SlotKind>,
+    pub ret: crate::register_meta::SlotKind,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -103,6 +113,11 @@ pub struct OsrRequest {
 
 impl SsaProto {
     #[inline]
+    pub fn call_shape_at(&self, ip: u32) -> Option<&CallShape> {
+        let at = self.call_sites.binary_search_by_key(&ip, |(site, _)| *site).ok()?;
+        self.call_shapes.get(self.call_sites[at].1 as usize)
+    }
+
     pub fn block(&self, id: u32) -> &SsaBlock {
         &self.blocks[id as usize]
     }

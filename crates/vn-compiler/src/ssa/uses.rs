@@ -159,7 +159,7 @@ macro_rules! inst_uses {
             SelfCall { args } | SuperCall { args } | SuperMethodCall { args, .. } => {
                 $iter!(args).for_each(|v| $use!($f, v))
             }
-            Call { callee, args } => {
+            Call { callee, args, .. } => {
                 $use!($f, callee);
                 $iter!(args).for_each(|v| $use!($f, v));
             }

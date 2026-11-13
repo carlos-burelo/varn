@@ -53,7 +53,7 @@ pub(super) fn emit_value(
         }
         InstKind::LoadUpvalue(uv) => access::emit_load_upvalue(chunk, d, *uv, line),
 
-        InstKind::Call { callee, args } => {
+        InstKind::Call { callee, args, .. } => {
             calls::emit_call(chunk, d, *callee, args, reg, call_base, line);
         }
         InstKind::AllocInstance { class, .. } => {

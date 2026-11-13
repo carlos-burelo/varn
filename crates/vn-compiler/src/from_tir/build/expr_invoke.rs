@@ -82,7 +82,7 @@ impl<'m> Builder<'m> {
             | Resolution::EnumVariant { .. }
             | Resolution::ByName { .. } => self.lower_expr(callee)?,
         };
-        self.lower_call(cv, args, ty)
+        self.lower_call_typed(cv, args, ty, Some(callee.ty))
     }
 
     fn try_lower_map_construction(

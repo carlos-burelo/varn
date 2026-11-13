@@ -38,6 +38,7 @@ pub(crate) struct Builder<'m> {
     pub(super) inline_serial: u32,
     pub(super) inline_scopes: Vec<vn_types::chunk::InlineScope>,
     pub(super) inline_scope_stack: Vec<u32>,
+    pub(super) call_shapes: Vec<vn_types::ssa::CallShape>,
 }
 
 pub(super) struct InlineFrame {
@@ -82,6 +83,7 @@ impl<'m> Builder<'m> {
             inline_serial: 0,
             inline_scopes: Vec::new(),
             inline_scope_stack: Vec::new(),
+            call_shapes: Vec::new(),
         };
         let entry = b.new_block();
         b.sealed[entry.0 as usize] = true;

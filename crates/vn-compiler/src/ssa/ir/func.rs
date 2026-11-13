@@ -18,6 +18,8 @@ pub struct SsaFunc {
     pub is_generator: bool,
 
     pub inline_scopes: Vec<vn_types::chunk::InlineScope>,
+
+    pub call_shapes: Vec<vn_types::ssa::CallShape>,
 }
 
 impl SsaFunc {

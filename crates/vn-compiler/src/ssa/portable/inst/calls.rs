@@ -4,7 +4,7 @@ use vn_types::ssa::{SsaOp, SsaUpvalue};
 
 pub(super) fn try_project(kind: &InstKind, site: &Site, captured: &mut Captured) -> Option<SsaOp> {
     match kind {
-        InstKind::Call { callee, args } => Some(SsaOp::Call {
+        InstKind::Call { callee, args, .. } => Some(SsaOp::Call {
             callee: callee.0,
             args: args.iter().map(|v| v.0).collect(),
         }),

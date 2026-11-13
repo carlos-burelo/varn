@@ -71,6 +71,7 @@ pub(crate) fn project(
         nparams: emitted.nparams,
     };
     let mut blocks = Vec::with_capacity(ssa.blocks.len());
+    let mut call_sites: Vec<(u32, u32)> = Vec::new();
     for (b, block) in ssa.blocks.iter().enumerate() {
         let mut insts = Vec::with_capacity(block.insts.len());
         for (i, inst) in block.insts.iter().enumerate() {
@@ -279,8 +280,15 @@ pub(crate) fn project(
                     | InstKind::BuildObjectSpread { .. } => Vec::new(),
                 },
             };
+            let site_ip = site.next_ip;
             let projected = project_inst(inst, &value_tys, site, &mut captured)
                 .ok_or_else(|| why_not::why_not(&inst.kind, &value_tys))?;
+            if let InstKind::Call {
+                shape: Some(shape), ..
+            } = &inst.kind
+            {
+                call_sites.push((site_ip, *shape));
+            }
             insts.push(projected);
         }
         blocks.push(SsaBlock {
@@ -298,6 +306,7 @@ pub(crate) fn project(
         })
         .collect();
 
+    call_sites.sort_unstable();
     Ok(SsaProto {
         name: name.as_ref().into(),
         nparams: ssa
@@ -313,6 +322,8 @@ pub(crate) fn project(
         has_this,
         captured: captured.regs(),
         secondary_entries: entries::secondary_entries(ssa, &emitted),
+        call_shapes: ssa.call_shapes.clone(),
+        call_sites,
     })
 }
 

@@ -580,8 +580,10 @@ TirModule {
                             kind: Call {
                                 callee: TirExpr {
                                     kind: Var,
-                                    ty: Dynamic(
-                                        Callable,
+                                    ty: Fn(
+                                        SigId(
+                                            7,
+                                        ),
                                     ),
                                     res: GlobalSlot(
                                         1,
@@ -637,8 +639,10 @@ TirModule {
                             kind: Call {
                                 callee: TirExpr {
                                     kind: Var,
-                                    ty: Dynamic(
-                                        Callable,
+                                    ty: Fn(
+                                        SigId(
+                                            8,
+                                        ),
                                     ),
                                     res: Local(
                                         LocalId(
@@ -795,8 +799,10 @@ TirModule {
                             kind: Call {
                                 callee: TirExpr {
                                     kind: Var,
-                                    ty: Dynamic(
-                                        Callable,
+                                    ty: Fn(
+                                        SigId(
+                                            9,
+                                        ),
                                     ),
                                     res: GlobalSlot(
                                         2,
@@ -838,8 +844,10 @@ TirModule {
                             kind: Call {
                                 callee: TirExpr {
                                     kind: Var,
-                                    ty: Dynamic(
-                                        Callable,
+                                    ty: Fn(
+                                        SigId(
+                                            10,
+                                        ),
                                     ),
                                     res: Local(
                                         LocalId(
@@ -968,8 +976,10 @@ TirModule {
                             kind: Call {
                                 callee: TirExpr {
                                     kind: Var,
-                                    ty: Dynamic(
-                                        Callable,
+                                    ty: Fn(
+                                        SigId(
+                                            11,
+                                        ),
                                     ),
                                     res: Local(
                                         LocalId(
@@ -1095,8 +1105,10 @@ TirModule {
                     kind: Call {
                         callee: TirExpr {
                             kind: Var,
-                            ty: Dynamic(
-                                Callable,
+                            ty: Fn(
+                                SigId(
+                                    12,
+                                ),
                             ),
                             res: NativeGlobal(
                                 0,

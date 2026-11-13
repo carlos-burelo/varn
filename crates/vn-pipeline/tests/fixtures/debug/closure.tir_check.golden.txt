@@ -2,7 +2,7 @@
   tir check ──────────────────────────────────────── <fixtures>/closure.vn
 nodes 53   static 19   by name 0   static 100%
   declared           dynamic     1   by name     0
-  function type      dynamic    12   by name     0
+  function type      dynamic     6   by name     0
   class object       dynamic     3   by name     0
   info from_tir(ssa): OK (5 ssa fn(s))
   info from_tir(proto): OK
