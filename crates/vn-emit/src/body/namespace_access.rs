@@ -63,6 +63,29 @@ impl FnEmitter<'_> {
         callee
     }
 
+    pub(super) fn native_resolution(
+        &self,
+        key: &str,
+        targs: &[TirArg],
+        callee_sig: Option<vn_tir::SigId>,
+    ) -> Option<Resolution> {
+        let target = self.m.native_targets.get(key)?;
+        if let Some(max_args) = target.max_args
+            && (targs.is_empty()
+                || targs.len() > max_args as usize
+                || !self.forward_keeps_checks(targs, callee_sig))
+        {
+            return None;
+        }
+        Some(match target.typed {
+            Some(typed) => Resolution::NativeDecode {
+                plain: target.op,
+                typed,
+            },
+            None => Resolution::NativeOp(target.op),
+        })
+    }
+
     pub(super) fn forward_keeps_checks(
         &self,
         targs: &[TirArg],
@@ -122,22 +145,13 @@ impl FnEmitter<'_> {
                 }));
             }
         }
-        let forwarded = self
-            .m
-            .native_forwards
-            .get(&key)
-            .filter(|(_, args, _)| {
-                all_positional
-                    && !targs.is_empty()
-                    && targs.len() <= *args as usize
-                    && self.forward_keeps_checks(&targs, callee_sig)
-            });
-        let res = match (known, forwarded) {
-            (_, Some((plain, _, Some(typed)))) => Resolution::NativeDecode {
-                plain: *plain,
-                typed: *typed,
-            },
-            (_, Some((plain, _, None))) => Resolution::NativeOp(*plain),
+        let native = if all_positional {
+            self.native_resolution(&key, &targs, callee_sig)
+        } else {
+            None
+        };
+        let res = match (known, native) {
+            (_, Some(resolved)) => resolved,
             (Some((fn_id, arity)), None) if all_positional && arity as usize == targs.len() => {
                 Resolution::DirectFn(vn_tir::FnId(fn_id))
             }

@@ -23,7 +23,7 @@ pub use ty::{lower_type, NameResolver, NoNames};
 
 use extensions::emit_extensions;
 use imports_exports::{
-    collect_exports, collect_imports, math_intrinsic_imports, native_function_imports,
+    collect_exports, collect_imports, math_intrinsic_imports, native_targets,
 };
 use module_ctx::MCtx;
 use rustc_hash::FxHashMap;
@@ -75,8 +75,7 @@ pub fn emit_module(
     let core_ops = module_globals::core_method_ops(bind);
     let core_static_ops = module_globals::core_static_ops(bind);
     let math_intrinsics = math_intrinsic_imports(program, ast_arena, interner);
-    let native_fns = native_function_imports(program, ast_arena, interner);
-    let native_forwards = imports_exports::native_forwards(bind);
+    let native_targets = native_targets(program, ast_arena, interner, bind);
 
     let free_functions::FreeFunctions {
         list: free_fns,
@@ -111,8 +110,7 @@ pub fn emit_module(
         core_ops: &core_ops,
         core_static_ops: &core_static_ops,
         math_intrinsics: &math_intrinsics,
-        native_fns: &native_fns,
-        native_forwards: &native_forwards,
+        native_targets: &native_targets,
         interner,
         checker_table: &bind.ty_table,
         annotation_types: &bind.annotation_types,

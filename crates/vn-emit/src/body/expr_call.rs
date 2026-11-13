@@ -154,22 +154,14 @@ impl<'a> FnEmitter<'a> {
                 _ if all_positional && self.m.math_intrinsics.contains_key(name) => {
                     Resolution::Intrinsic(self.m.math_intrinsics[name] as u16)
                 }
-                _ if all_positional && self.m.native_fns.contains_key(name) => {
-                    Resolution::NativeOp(self.m.native_fns[name])
-                }
                 _ if all_positional
-                    && !targs.is_empty()
-                    && self
-                        .m
-                        .native_forwards
-                        .get(self.m.interner.resolve(*name))
-                        .is_some_and(|(_, args, _)| targs.len() <= *args as usize)
-                    && self.forward_keeps_checks(&targs, callee_sig) =>
+                    && let Some(resolved) = self.native_resolution(
+                        self.m.interner.resolve(*name),
+                        &targs,
+                        callee_sig,
+                    ) =>
                 {
-                    match self.m.native_forwards[self.m.interner.resolve(*name)] {
-                        (plain, _, Some(typed)) => Resolution::NativeDecode { plain, typed },
-                        (plain, _, None) => Resolution::NativeOp(plain),
-                    }
+                    resolved
                 }
                 _ => match c.res {
                     Resolution::NativeGlobal(idx) => Resolution::NativeGlobal(idx),

@@ -178,11 +178,19 @@ pub(super) fn math_intrinsic_imports(
     out
 }
 
-pub(super) fn native_function_imports(
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct NativeTarget {
+    pub(crate) op: u64,
+    pub(crate) max_args: Option<u8>,
+    pub(crate) typed: Option<u64>,
+}
+
+pub(super) fn native_targets(
     program: &Program,
     ast_arena: &AstArena,
     interner: &AtomInterner,
-) -> FxHashMap<Atom, u64> {
+    bind: &vn_sem::bind::BindResult,
+) -> FxHashMap<Arc<str>, NativeTarget> {
     use vn_core::ast::ImportSpecifier;
     let mut out = FxHashMap::default();
     let Some(provider) = vn_modules::provider::get() else {
@@ -203,28 +211,33 @@ pub(super) fn native_function_imports(
             else {
                 continue;
             };
-            if let Some(id) = provider.native_op_id(source, "", interner.resolve(*imported)) {
-                out.insert(*local, id);
+            if let Some(op) = provider.native_op_id(source, "", interner.resolve(*imported)) {
+                out.insert(
+                    Arc::from(interner.resolve(*local)),
+                    NativeTarget {
+                        op,
+                        max_args: None,
+                        typed: None,
+                    },
+                );
             }
         }
     }
-    out
-}
-
-pub(super) fn native_forwards(
-    bind: &vn_sem::bind::BindResult,
-) -> FxHashMap<Arc<str>, (u64, u8, Option<u64>)> {
-    let mut out = FxHashMap::default();
-    let Some(provider) = vn_modules::provider::get() else {
-        return out;
-    };
     for (local, forward) in &bind.imported_forwards {
-        if let Some(id) = provider.native_op_id(&forward.module, "", &forward.symbol) {
-            let typed = forward
-                .decodes
-                .then(|| vn_core::runtime_ops::typed_variant(&forward.module, &forward.symbol))
-                .flatten();
-            out.insert(local.clone(), (id, forward.args, typed));
+        if let Some(op) = provider.native_op_id(&forward.module, "", &forward.symbol) {
+            out.insert(
+                local.clone(),
+                NativeTarget {
+                    op,
+                    max_args: Some(forward.args),
+                    typed: forward
+                        .decodes
+                        .then(|| {
+                            vn_core::runtime_ops::typed_variant(&forward.module, &forward.symbol)
+                        })
+                        .flatten(),
+                },
+            );
         }
     }
     out
