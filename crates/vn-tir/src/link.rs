@@ -114,6 +114,7 @@ fn remap(to: &mut TyTable, from: &TyTable, ty: &mut BackendTy) -> bool {
 
 pub fn link(module: &mut TirModule, source: &dyn TemplateSource) {
     let mut linked: FxHashMap<u32, (Arc<str>, Arc<InlinePackage>)> = FxHashMap::default();
+    let mut constants: FxHashMap<u32, TirExpr> = FxHashMap::default();
     let mut inert_imports: Vec<usize> = Vec::new();
     for (index, import) in module.imports.iter().enumerate() {
         if import.is_type_only {
@@ -124,14 +125,17 @@ pub fn link(module: &mut TirModule, source: &dyn TemplateSource) {
         };
         let mut all = !import.specs.is_empty();
         for spec in &import.specs {
-            let package = match &spec.kind {
-                TirImportKind::Named(name) => templates.package(name),
-                TirImportKind::Default | TirImportKind::Namespace => None,
+            let (package, constant) = match &spec.kind {
+                TirImportKind::Named(name) => (templates.package(name), templates.constant(name)),
+                TirImportKind::Default | TirImportKind::Namespace => (None, None),
             };
             let slot = module.global_names.iter().position(|n| *n == spec.local);
-            match (package, slot) {
-                (Some(package), Some(slot)) => {
+            match (package, constant, slot) {
+                (Some(package), _, Some(slot)) => {
                     linked.insert(slot as u32, (import.source.clone(), package.clone()));
+                }
+                (None, Some(literal), Some(slot)) => {
+                    constants.insert(slot as u32, literal.clone());
                 }
                 _ => all = false,
             }
@@ -140,7 +144,7 @@ pub fn link(module: &mut TirModule, source: &dyn TemplateSource) {
             inert_imports.push(index);
         }
     }
-    if linked.is_empty() {
+    if linked.is_empty() && constants.is_empty() {
         return;
     }
 
@@ -155,6 +159,14 @@ pub fn link(module: &mut TirModule, source: &dyn TemplateSource) {
     {
         let mut rewrite = |expr: &mut TirExpr| {
             let span = expr.span;
+            if let (TirExprKind::Var, Resolution::GlobalSlot(slot)) = (&expr.kind, &expr.res)
+                && let Some(literal) = constants.get(slot)
+                && literal.ty.representation() == expr.ty.representation()
+            {
+                expr.kind = literal.kind.clone();
+                expr.res = Resolution::None;
+                return;
+            }
             let TirExprKind::Call { callee, .. } = &mut expr.kind else {
                 return;
             };

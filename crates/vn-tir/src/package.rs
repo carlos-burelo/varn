@@ -17,10 +17,18 @@ pub struct InlinePackage {
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct ModuleTemplates {
     pub exports: Vec<(Arc<str>, Arc<InlinePackage>)>,
+    pub constants: Vec<(Arc<str>, TirExpr)>,
     pub inert: bool,
 }
 
 impl ModuleTemplates {
+    pub fn constant(&self, export: &str) -> Option<&TirExpr> {
+        self.constants
+            .iter()
+            .find(|(name, _)| name.as_ref() == export)
+            .map(|(_, literal)| literal)
+    }
+
     pub fn package(&self, export: &str) -> Option<&Arc<InlinePackage>> {
         self.exports
             .iter()
@@ -29,9 +37,107 @@ impl ModuleTemplates {
     }
 }
 
+fn is_literal(kind: &TirExprKind) -> bool {
+    matches!(
+        kind,
+        TirExprKind::IntLit(_)
+            | TirExprKind::FloatLit(_)
+            | TirExprKind::BoolLit(_)
+            | TirExprKind::StrLit(_)
+            | TirExprKind::CharLit(_)
+    )
+}
+
+fn literal_assignment(stmt: &TirStmt) -> Option<(u32, &TirExpr)> {
+    let TirStmt::Expr(TirExpr {
+        kind: TirExprKind::Assign { target, value },
+        ..
+    }) = stmt
+    else {
+        return None;
+    };
+    let Resolution::GlobalSlot(slot) = target.res else {
+        return None;
+    };
+    is_literal(&value.kind).then_some((slot, value))
+}
+
+fn visit_stmts(stmts: &[TirStmt], f: &mut dyn FnMut(&TirExpr)) {
+    for stmt in stmts {
+        match stmt {
+            TirStmt::Expr(e) | TirStmt::Throw(e) => visit_expr(e, f),
+            TirStmt::Let { init, .. } => init.iter().for_each(|e| visit_expr(e, f)),
+            TirStmt::Return(value) => value.iter().for_each(|e| visit_expr(e, f)),
+            TirStmt::If {
+                cond,
+                then_body,
+                else_body,
+            } => {
+                visit_expr(cond, f);
+                visit_stmts(then_body, f);
+                visit_stmts(else_body, f);
+            }
+            TirStmt::Loop { cond, body } => {
+                visit_expr(cond, f);
+                visit_stmts(body, f);
+            }
+            TirStmt::Try {
+                body, catch_body, ..
+            } => {
+                visit_stmts(body, f);
+                visit_stmts(catch_body, f);
+            }
+            TirStmt::Break | TirStmt::Continue | TirStmt::BuildClass(_) => {}
+        }
+    }
+}
+
+fn visit_expr(e: &TirExpr, f: &mut dyn FnMut(&TirExpr)) {
+    f(e);
+    if let TirExprKind::Seq { stmts, .. } = &e.kind {
+        visit_stmts(stmts, f);
+    }
+    for child in crate::children::child_exprs(e) {
+        visit_expr(child, f);
+    }
+}
+
+fn module_constants(module: &TirModule) -> FxHashMap<u32, TirExpr> {
+    let mut assignments: FxHashMap<u32, u32> = FxHashMap::default();
+    let mut count = |e: &TirExpr| {
+        if let TirExprKind::Assign { target, .. } = &e.kind
+            && let Resolution::GlobalSlot(slot) = target.res
+        {
+            *assignments.entry(slot).or_insert(0) += 1;
+        }
+    };
+    visit_stmts(&module.top_level.body, &mut count);
+    for function in &module.functions {
+        visit_stmts(&function.body, &mut count);
+    }
+    let mut constants = FxHashMap::default();
+    for stmt in &module.top_level.body {
+        if let Some((slot, literal)) = literal_assignment(stmt)
+            && assignments.get(&slot) == Some(&1)
+        {
+            constants.insert(slot, literal.clone());
+        }
+    }
+    constants
+}
+
 pub fn extract(module: &TirModule) -> ModuleTemplates {
+    let constants = module_constants(module);
     let mut exports = Vec::new();
+    let mut exported_constants = Vec::new();
     for export in &module.exports {
+        if export.reexport_from.is_none()
+            && !export.namespace
+            && let Some(slot) = module.global_names.iter().position(|n| *n == export.local)
+            && let Some(literal) = constants.get(&(slot as u32))
+        {
+            exported_constants.push((export.exported.clone(), literal.clone()));
+        }
         if export.reexport_from.is_some() || export.namespace {
             continue;
         }
@@ -44,6 +150,7 @@ pub fn extract(module: &TirModule) -> ModuleTemplates {
             functions: Vec::new(),
             done: FxHashMap::default(),
             active: Vec::new(),
+            constants: &constants,
         };
         if let Some(entry) = extractor.include(id) {
             exports.push((
@@ -58,12 +165,17 @@ pub fn extract(module: &TirModule) -> ModuleTemplates {
     }
     ModuleTemplates {
         exports,
+        constants: exported_constants,
         inert: is_inert(module),
     }
 }
 
 fn is_inert(module: &TirModule) -> bool {
-    module.top_level.body.is_empty()
+    module
+        .top_level
+        .body
+        .iter()
+        .all(|stmt| literal_assignment(stmt).is_some())
         && !module.top_level.is_async
         && module.class_defs.is_empty()
         && module.exports.iter().all(|e| e.reexport_from.is_none())
@@ -89,6 +201,7 @@ struct Extractor<'m> {
     functions: Vec<TirFunction>,
     done: FxHashMap<FnId, u32>,
     active: Vec<FnId>,
+    constants: &'m FxHashMap<u32, TirExpr>,
 }
 
 impl Extractor<'_> {
@@ -148,6 +261,15 @@ impl Extractor<'_> {
         expr.span = Span::EMPTY;
         if !self.ty(&mut expr.ty) {
             return false;
+        }
+        if let (TirExprKind::Var, Resolution::GlobalSlot(slot)) = (&expr.kind, &expr.res)
+            && let Some(literal) = self.constants.get(slot)
+        {
+            if literal.ty.representation() != expr.ty.representation() {
+                return false;
+            }
+            expr.kind = literal.kind.clone();
+            expr.res = Resolution::None;
         }
         match &mut expr.kind {
             TirExprKind::IntLit(_)
