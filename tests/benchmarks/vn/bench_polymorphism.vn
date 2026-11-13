@@ -1,0 +1,41 @@
+interface Shape {
+    area(): float;
+    scale(f: float): Shape;
+}
+
+class Circle implements Shape {
+    r: float;
+    constructor(r: float) { this.r = r; }
+    area(): float { return 3.14159 * this.r * this.r; }
+    scale(f: float): Shape { return new Circle(this.r * f); }
+}
+
+class Rect implements Shape {
+    w: float;
+    h: float;
+    constructor(w: float, h: float) { this.w = w; this.h = h; }
+    area(): float { return this.w * this.h; }
+    scale(f: float): Shape { return new Rect(this.w * f, this.h * f); }
+}
+
+class Square implements Shape {
+    s: float;
+    constructor(s: float) { this.s = s; }
+    area(): float { return this.s * this.s; }
+    scale(f: float): Shape { return new Square(this.s * f); }
+}
+
+let shapes: Shape[] = [];
+for (let i = 0; i < 300000; i = i + 1) {
+    let k = i % 3;
+    if (k == 0) { shapes.push(new Circle((i % 10) as float + 1.0)); }
+    else if (k == 1) { shapes.push(new Rect((i % 7) as float + 1.0, (i % 5) as float + 1.0)); }
+    else { shapes.push(new Square((i % 9) as float + 1.0)); }
+}
+let total = 0.0;
+for (let round = 0; round < 10; round = round + 1) {
+    for (let i = 0; i < shapes.length; i = i + 1) {
+        total = total + shapes[i].scale(1.01).area();
+    }
+}
+print(`polymorphism total=${total}`);

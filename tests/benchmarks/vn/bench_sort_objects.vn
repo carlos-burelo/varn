@@ -1,0 +1,33 @@
+class Person {
+    id: int;
+    name: str;
+    age: int;
+    score: float;
+
+    constructor(id: int, name: str, age: int, score: float) {
+        this.id = id;
+        this.name = name;
+        this.age = age;
+        this.score = score;
+    }
+}
+
+let people: Person[] = [];
+let seed = 12345;
+for (let i = 0; i < 100000; i = i + 1) {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    let age = 18 + (seed % 60);
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    let score = (seed % 10000) as float / 100.0;
+    people.push(new Person(i, `name_${seed % 5000}`, age, score));
+}
+
+let byAge = people.slice().sort((a: Person, b: Person) => a.age - b.age);
+let byName = people.slice().sort((a: Person, b: Person) => a.name < b.name ? -1 : (a.name > b.name ? 1 : 0));
+let byScore = people.slice().sort((a: Person, b: Person) => b.score > a.score ? 1 : (b.score < a.score ? -1 : 0));
+
+let check = 0;
+for (let i = 0; i < 100000; i = i + 997) {
+    check = check + byAge[i].id + byName[i].id + byScore[i].id;
+}
+print(`sorted check=${check} first=${byAge[0].age} ${byName[0].name} ${byScore[0].score}`);
