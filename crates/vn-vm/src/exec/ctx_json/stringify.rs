@@ -36,8 +36,49 @@ fn raise(message: &'static str) {
     });
 }
 
+fn write_short_decimal(f: f64, out: &mut String) -> bool {
+    const POWERS: [f64; 5] = [1.0, 10.0, 100.0, 1000.0, 10000.0];
+    let magnitude = f.abs();
+    if !(1e-4..1e9).contains(&magnitude) {
+        return false;
+    }
+    for (decimals, power) in POWERS.iter().enumerate() {
+        let scaled = (magnitude * power).round();
+        if scaled / power != magnitude {
+            continue;
+        }
+        let scaled = scaled as i64;
+        let divisor = POWERS[decimals] as i64;
+        if f < 0.0 {
+            out.push('-');
+        }
+        write_int(scaled / divisor, out);
+        out.push('.');
+        if decimals == 0 {
+            out.push('0');
+            return true;
+        }
+        let fraction = scaled % divisor;
+        let mut digits = decimals;
+        let mut shifted = fraction;
+        while shifted > 0 {
+            digits -= 1;
+            shifted /= 10;
+        }
+        for _ in 0..digits {
+            out.push('0');
+        }
+        write_int(fraction, out);
+        return true;
+    }
+    false
+}
+
 fn write_json_float(f: f64, out: &mut String) {
     if f.is_finite() {
+        if write_short_decimal(f, out) {
+            return;
+        }
         out.push_str(ryu::Buffer::new().format(f));
     } else {
         raise("NaN and Infinity have no JSON form");
