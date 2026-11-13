@@ -6,7 +6,7 @@ use vn_tir::TirStmt;
 
 fn creates_closure(e: &vn_tir::TirExpr) -> bool {
     matches!(e.kind, vn_tir::TirExprKind::Closure { .. })
-        || crate::from_tir::tir_children::child_exprs(e)
+        || vn_tir::children::child_exprs(e)
             .into_iter()
             .any(creates_closure)
 }

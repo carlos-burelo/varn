@@ -1,14 +1,14 @@
-use vn_tir::{TirExpr, TirExprKind, TirStmt};
+use crate::{TirExpr, TirExprKind, TirStmt};
 
-fn arg_exprs(args: &[vn_tir::TirArg]) -> impl Iterator<Item = &TirExpr> {
+fn arg_exprs(args: &[crate::TirArg]) -> impl Iterator<Item = &TirExpr> {
     args.iter().map(|a| match a {
-        vn_tir::TirArg::Expr(x)
-        | vn_tir::TirArg::Named { value: x, .. }
-        | vn_tir::TirArg::Spread(x) => x,
+        crate::TirArg::Expr(x)
+        | crate::TirArg::Named { value: x, .. }
+        | crate::TirArg::Spread(x) => x,
     })
 }
 
-pub(crate) fn child_exprs(e: &TirExpr) -> Vec<&TirExpr> {
+pub fn child_exprs(e: &TirExpr) -> Vec<&TirExpr> {
     use TirExprKind::*;
     let mut out: Vec<&TirExpr> = Vec::new();
     match &e.kind {
@@ -60,8 +60,8 @@ pub(crate) fn child_exprs(e: &TirExpr) -> Vec<&TirExpr> {
         ArrayLit(els) => {
             for el in els {
                 match el {
-                    vn_tir::TirArrayEl::Expr(x) | vn_tir::TirArrayEl::Spread(x) => out.push(x),
-                    vn_tir::TirArrayEl::Hole => {}
+                    crate::TirArrayEl::Expr(x) | crate::TirArrayEl::Spread(x) => out.push(x),
+                    crate::TirArrayEl::Hole => {}
                 }
             }
         }
@@ -69,8 +69,8 @@ pub(crate) fn child_exprs(e: &TirExpr) -> Vec<&TirExpr> {
         ObjectLit { entries } => {
             for en in entries {
                 match en {
-                    vn_tir::TirObjectEntry::Field { value, .. } => out.push(value),
-                    vn_tir::TirObjectEntry::Spread(x) => out.push(x),
+                    crate::TirObjectEntry::Field { value, .. } => out.push(value),
+                    crate::TirObjectEntry::Spread(x) => out.push(x),
                 }
             }
         }
@@ -109,7 +109,7 @@ fn stmt_exprs(s: &TirStmt) -> Vec<&TirExpr> {
     }
 }
 
-pub(crate) fn seq_bodies(s: &TirStmt) -> Vec<&[TirStmt]> {
+pub fn seq_bodies(s: &TirStmt) -> Vec<&[TirStmt]> {
     let mut out = Vec::new();
     let mut stack = stmt_exprs(s);
     while let Some(e) = stack.pop() {

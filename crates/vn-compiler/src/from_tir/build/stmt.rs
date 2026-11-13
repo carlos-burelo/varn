@@ -26,7 +26,7 @@ fn first_real_span(e: &vn_tir::TirExpr) -> Option<u32> {
     if e.span.end > 0 {
         return Some(e.span.start);
     }
-    crate::from_tir::tir_children::child_exprs(e)
+    vn_tir::children::child_exprs(e)
         .into_iter()
         .find_map(first_real_span)
 }

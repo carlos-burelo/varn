@@ -3,33 +3,14 @@ use crate::ssa::ir::{InstKind, SsaFunc, Terminator, VarId};
 use std::sync::Arc;
 use vn_tir::DynReason;
 use vn_tir::{
-    BackendTy, Resolution, TirExpr, TirExprKind, TirFunction, TirModule, TirStmt, TirUnOp,
+    BackendTy, TirExpr, TirFunction, TirModule, TirStmt,
 };
-
-pub(super) fn absent_param(cond: &TirExpr) -> Option<u32> {
-    let TirExprKind::Unary {
-        op: TirUnOp::IsNull,
-        operand,
-    } = &cond.kind
-    else {
-        return None;
-    };
-    if let TirExpr {
-        kind: TirExprKind::Var,
-        res: Resolution::Param(i),
-        ..
-    } = operand.as_ref()
-    {
-        return Some(*i);
-    }
-    None
-}
 
 pub(crate) fn defaulted_param_mask(body: &[TirStmt], nparams: usize) -> Vec<bool> {
     let mut mask = vec![false; nparams];
     for stmt in body {
         if let TirStmt::If { cond, .. } = stmt
-            && let Some(i) = absent_param(cond).filter(|i| (*i as usize) < nparams)
+            && let Some(i) = vn_tir::inlinable::absent_param(cond).filter(|i| (*i as usize) < nparams)
         {
             mask[i as usize] = true;
         }
@@ -169,7 +150,7 @@ pub fn build_module(tir: &TirModule, lines: &[u32]) -> Result<Vec<SsaFunc>> {
 
 impl<'m> Builder<'m> {
     pub(super) fn filled_param_ty(&mut self, cond: &TirExpr) -> Result<Option<BackendTy>> {
-        let Some(i) = absent_param(cond) else {
+        let Some(i) = vn_tir::inlinable::absent_param(cond) else {
             return Ok(None);
         };
         if !self.is_open() || !matches!(self.defaulted.get(i as usize), Some(Some(_))) {
@@ -184,7 +165,7 @@ impl<'m> Builder<'m> {
         cond: &TirExpr,
         filled: Option<BackendTy>,
     ) -> Result<()> {
-        let Some(i) = absent_param(cond) else {
+        let Some(i) = vn_tir::inlinable::absent_param(cond) else {
             return Ok(());
         };
         let Some(declared) = self.defaulted.get_mut(i as usize).and_then(Option::take) else {

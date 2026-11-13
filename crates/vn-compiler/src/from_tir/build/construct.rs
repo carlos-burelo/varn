@@ -233,7 +233,7 @@ fn default_fill(stmt: &TirStmt) -> Option<(u32, &TirExpr)> {
     else {
         return None;
     };
-    let param = super::functions::absent_param(cond)?;
+    let param = vn_tir::inlinable::absent_param(cond)?;
     let [TirStmt::Expr(fill)] = then_body.as_slice() else {
         return None;
     };
@@ -305,7 +305,7 @@ fn needs_own_frame(e: &TirExpr) -> bool {
     matches!(
         e.kind,
         TirExprKind::Closure { .. } | TirExprKind::Seq { .. }
-    ) || super::super::tir_children::child_exprs(e)
+    ) || vn_tir::children::child_exprs(e)
         .into_iter()
         .any(needs_own_frame)
 }

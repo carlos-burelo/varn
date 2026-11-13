@@ -128,7 +128,7 @@ impl<'m> Builder<'m> {
     pub(super) fn loop_body_pinned(&self, body: &[TirStmt]) -> Vec<VarId> {
         fn walk(stmts: &[TirStmt], pinned: &FxHashSet<VarId>, base: u32, out: &mut Vec<VarId>) {
             for s in stmts {
-                for nested in crate::from_tir::tir_children::seq_bodies(s) {
+                for nested in vn_tir::children::seq_bodies(s) {
                     walk(nested, pinned, base, out);
                 }
                 match s {
