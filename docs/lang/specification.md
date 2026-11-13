@@ -1,6 +1,6 @@
 # Varn Language Specification (índice verificado)
 
-Fuente única: `tests/*.vn` (220 archivos; `tests/main.vn` importa 218). Código manda.
+Fuente única: `tests/*.vn` (347 archivos; `tests/main.vn` importa 345). Código manda.
 
 | Área | Doc | Test canónico |
 |---|---|---|

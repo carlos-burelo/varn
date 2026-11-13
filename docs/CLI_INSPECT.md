@@ -1,6 +1,6 @@
 # Inspección fases (`vn debug`)
 
-Código manda. Fuentes: `crates/vn-cli/src/cli.rs`, `crates/vn-cli/src/commands/debug.rs`, `crates/vn-debug/src/registry.rs`, `crates/vn-debug/src/flags/phases.rs`, `crates/vn-core/src/debug_flags/state.rs`, `crates/vn-cli/src/debug_sink.rs`, `crates/vn-debug/src/clif.rs`.
+Código manda. Fuentes: `crates/vn-cli/src/cli.rs`, `crates/vn-cli/src/commands/debug.rs`, `crates/vn-debug/src/registry.rs`, `crates/vn-debug/src/flags/phases.rs`, `crates/vn-core/src/debug_flags/state.rs`, `crates/vn-debug/src/clif.rs`.
 
 ## CLI (`cli.rs`)
 
@@ -14,7 +14,7 @@ pub struct DebugArgs {
 }
 ```
 
-Flujo (`commands/debug.rs`): `--list-phases` → `print_phases()` y sale. Si no: `parse_debug_opt(phase)` (`debug_sink.rs` → `parse_debug_flags`) + `fn_filter`, requiere file o `--eval`, `no_run = !needs_execution()` (solo `gc` necesita correr, `state.rs`).
+Flujo (`commands/debug.rs`): `--list-phases` → `print_phases()` y sale. Si no: `parse_debug_opt(phase)` (`commands/debug.rs` → `parse_debug_flags`) + `fn_filter`, requiere file o `--eval`, `no_run = !needs_execution()` (solo `gc` necesita correr, `state.rs`).
 
 ## Uso
 

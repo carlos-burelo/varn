@@ -4,10 +4,10 @@ Fuente única: `tests/*.vn`. Código manda.
 
 ## Suite
 
-- 220 archivos `tests/*.vn`; `tests/main.vn` importa 218.
+- 347 archivos `tests/*.vn`; `tests/main.vn` importa 345.
 - No importados: `main.vn` y `75-async-shapes-lib.vn` (auxiliar de `75-async-shapes.vn`).
 - Cierre: `import { summary } from "std:test"` + `summary()` al final de `main.vn`.
-- Huecos de numeración: 39, 81, 91, 104–108.
+- Huecos de numeración: 39, 81, 91, 104–108, 172, 249, 333.
 
 ## Rasgos probados (cita mínima)
 

@@ -14,6 +14,6 @@ Convención de los ejemplos: usan `assertTrue("etiqueta", condición)` y
 `import { assertTrue, assertEqual } from "std:test"`. Varios bloques continúan
 al anterior (reutilizan sus clases y funciones).
 
-Suite: 220 archivos `tests/*.vn`; `tests/main.vn` importa 218 (todos salvo sí
+Suite: 347 archivos `tests/*.vn`; `tests/main.vn` importa 345 (todos salvo sí
 mismo y `75-async-shapes-lib.vn`, auxiliar de `75-async-shapes.vn`) y cierra con
-`summary()`. Huecos de numeración: 39, 81, 91, 104–108.
+`summary()`. Huecos de numeración: 39, 81, 91, 104–108, 172, 249, 333.

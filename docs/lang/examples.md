@@ -2,7 +2,7 @@
 
 # Varn Language — Ejemplos Integrados
 
-Colección de ejemplos completos extraídos directamente de los archivos de prueba `tests/*.vn` (220 archivos, 218 importados por `tests/main.vn`).
+Colección de ejemplos completos extraídos directamente de los archivos de prueba `tests/*.vn` (347 archivos, 345 importados por `tests/main.vn`).
 
 ---
 
@@ -457,7 +457,7 @@ await h1.join()
 
 ---
 
-## 69 — Tuples y Records (`tests/69-tuples-records.vn`)
+## 69 — Tuples y Structs (`tests/69-tuples-structs.vn`)
 
 ```vn
 let t1 = (1, "hello", true)

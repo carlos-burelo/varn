@@ -1,6 +1,6 @@
 # Varn Language — Sistema de Tipos
 
-> Fuentes: `tests/08-null-safety.vn`, `tests/12-classes.vn`, `tests/13-interfaces.vn`, `tests/14-generics.vn`, `tests/15-unions.vn`, `tests/16-enums.vn`, `tests/24-record.vn`, `tests/26-numeric-coercion.vn`, `tests/30-nullable-types.vn`, `tests/34-char-type.vn`, `tests/35-decimal-bigint.vn`, `tests/36-advanced-generics.vn`, `tests/41-advanced-enums.vn`, `tests/69-tuples-records.vn`, `tests/79-control-flow-narrowing.vn`, `tests/87-primary-constructors-nullish-assign.vn`.
+> Fuentes: `tests/08-null-safety.vn`, `tests/12-classes.vn`, `tests/13-interfaces.vn`, `tests/14-generics.vn`, `tests/15-unions.vn`, `tests/16-enums.vn`, `tests/24-record.vn`, `tests/26-numeric-coercion.vn`, `tests/30-nullable-types.vn`, `tests/34-char-type.vn`, `tests/35-decimal-bigint.vn`, `tests/36-advanced-generics.vn`, `tests/41-advanced-enums.vn`, `tests/69-tuples-structs.vn`, `tests/79-control-flow-narrowing.vn`, `tests/87-primary-constructors-nullish-assign.vn`.
 
 ---
 
@@ -53,7 +53,7 @@ let nested: int[][] = [[1, 2], [3, 4]]           // 2D array
 Colecciones heterogéneas inmutables con igualdad estructural:
 
 ```vn
-let t1 = (1, "hello", true)    // tests/69-tuples-records.vn
+let t1 = (1, "hello", true)    // tests/69-tuples-structs.vn
 assertTrue("tuple elem 0", t1[0] == 1)
 assertTrue("tuple length", t1.length == 3)
 
