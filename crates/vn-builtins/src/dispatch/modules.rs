@@ -67,7 +67,8 @@ pub(crate) fn build_module(id: &str, ctx: &mut dyn NativeCtx) -> Option<VmValue>
             EntryKind::InstanceMethod
             | EntryKind::StaticMethod
             | EntryKind::InstanceGetter
-            | EntryKind::StaticGetter => continue,
+            | EntryKind::StaticGetter
+            | EntryKind::Constructor => continue,
             EntryKind::Function => ctx.alloc_fn(entry.func(), symbol),
         };
 

@@ -79,14 +79,26 @@ impl<'m> Builder<'m> {
         ty: BackendTy,
     ) -> Result<Option<Value>> {
         use vn_core::abi::NATIVE_GLOBALS;
-        let is_map = NATIVE_GLOBALS
-            .get(native as usize)
-            .is_some_and(|g| g.name == vn_core::BuiltinType::Map.name());
-        if !is_map || !matches!(ty, BackendTy::Map(..)) {
+        use vn_core::op_id::KnownOp;
+        use vn_core::BuiltinType;
+        let Some(global) = NATIVE_GLOBALS.get(native as usize) else {
             return Ok(None);
+        };
+        let factory = [
+            (BuiltinType::Map, KnownOp::MapNew),
+            (BuiltinType::Set, KnownOp::SetNew),
+            (BuiltinType::Array, KnownOp::ArrayNew),
+        ]
+        .into_iter()
+        .find(|(class, _)| class.name() == global.name);
+        let Some((class, op)) = factory else {
+            return Ok(None);
+        };
+        if class != BuiltinType::Map || !matches!(ty, BackendTy::Map(..)) {
+            return self.lower_factory_construction(op, args, ty);
         }
         let Some(entries) = map_entries(args) else {
-            return Ok(None);
+            return self.lower_factory_construction(KnownOp::MapNew, args, ty);
         };
         let by_value = |key: &TirExpr| {
             matches!(
@@ -95,7 +107,7 @@ impl<'m> Builder<'m> {
             )
         };
         if !entries.iter().all(|(key, _)| by_value(key)) {
-            return Ok(None);
+            return self.lower_factory_construction(KnownOp::MapNew, args, ty);
         }
         let mut lowered = Vec::with_capacity(entries.len());
         for (key, value) in entries {
@@ -104,6 +116,30 @@ impl<'m> Builder<'m> {
             lowered.push((key, value));
         }
         Ok(Some(self.emit(InstKind::BuildMap { pairs: lowered }, ty)))
+    }
+
+    fn lower_factory_construction(
+        &mut self,
+        op: vn_core::op_id::KnownOp,
+        args: &[vn_tir::TirArg],
+        ty: BackendTy,
+    ) -> Result<Option<Value>> {
+        if args
+            .iter()
+            .any(|arg| matches!(arg, vn_tir::TirArg::Spread(_)))
+        {
+            return Ok(None);
+        }
+        let argv = self.lower_args(args)?;
+        let object = self.emit(InstKind::ConstNull, BackendTy::Dynamic(DynReason::Boxed));
+        Ok(Some(self.emit(
+            InstKind::CallNativeOp {
+                object,
+                args: argv,
+                op_id: op.id(),
+            },
+            ty,
+        )))
     }
 
     pub(super) fn lower_method_call(

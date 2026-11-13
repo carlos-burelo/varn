@@ -239,7 +239,8 @@ pub(super) fn generate(cx: &Cx, m: &Member, out: &mut Generated) {
             Kind::StaticMethod => Some(quote!(StaticMethod)),
             Kind::Getter => Some(quote!(InstanceGetter)),
             Kind::StaticGetter => Some(quote!(StaticGetter)),
-            Kind::Constructor | Kind::Property | Kind::Function => None,
+            Kind::Constructor => Some(quote!(Constructor)),
+            Kind::Property | Kind::Function => None,
         };
         if let Some(mkind) = mkind {
             let mentry_ident = format_ident!(

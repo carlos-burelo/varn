@@ -16,10 +16,13 @@ pub enum KnownOp {
     StrCharCodeAt,
     StrCodePointAt,
     GeneratorNext,
+    ArrayNew,
+    MapNew,
+    SetNew,
 }
 
 impl KnownOp {
-    pub const ALL: [KnownOp; 12] = [
+    pub const ALL: [KnownOp; 15] = [
         KnownOp::ArrayPush,
         KnownOp::IntToString,
         KnownOp::StrStartsWith,
@@ -32,6 +35,9 @@ impl KnownOp {
         KnownOp::StrCharCodeAt,
         KnownOp::StrCodePointAt,
         KnownOp::GeneratorNext,
+        KnownOp::ArrayNew,
+        KnownOp::MapNew,
+        KnownOp::SetNew,
     ];
 
     pub const fn id(self) -> u64 {
@@ -52,6 +58,9 @@ impl KnownOp {
             KnownOp::StrCharCodeAt => (RuntimeKind::Str, crate::MemberKey::CharCodeAt.as_str()),
             KnownOp::StrCodePointAt => (RuntimeKind::Str, crate::MemberKey::CodePointAt.as_str()),
             KnownOp::GeneratorNext => (RuntimeKind::Generator, crate::MemberKey::IterNext.as_str()),
+            KnownOp::ArrayNew => (RuntimeKind::Array, crate::TokenKind::Constructor.as_str()),
+            KnownOp::MapNew => (RuntimeKind::Map, crate::TokenKind::Constructor.as_str()),
+            KnownOp::SetNew => (RuntimeKind::Set, crate::TokenKind::Constructor.as_str()),
         }
     }
 

@@ -12,6 +12,7 @@ pub enum EntryKind {
     StaticMethod,
     InstanceGetter,
     StaticGetter,
+    Constructor,
 }
 
 #[repr(u8)]
