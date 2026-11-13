@@ -1,4 +1,4 @@
-> Estado verificado 2026-10-13: VIGENTE como registro — cada entrada murió por medición; reabrir solo con dato nuevo (regla del propio doc).
+> Estado verificado 2026-11-13: VIGENTE como registro — cada entrada murió por medición; reabrir solo con dato nuevo (regla del propio doc).
 > Validación: `.\scripts\verify.ps1 -Fast`; sin JIT `VN_NO_JIT=1 vn run tests/main.vn`. Cifras = sesión indicada, no cita.
 >
 > Histórico. No spec vigente. Código manda. Revalidar antes de usar.
@@ -89,6 +89,37 @@ función la búsqueda recorre 1-2 elementos contiguos.
 
 El cambio a `Vec` indexado por slot del pool se **revirtió**: añade `resize` y
 un vector disperso a cambio de nada demostrable.
+
+### La búsqueda de método por nombre es el coste de `bench_polymorphism` — NO
+
+El perfil con símbolos de `bench_polymorphism` mostraba `call_method` (14%),
+`ClassObj::find_by_id` (11%), `invoke_vm_method_fast` (10%) y una búsqueda hash por cadena
+(9%), cerca del 60% en total.
+
+**Medición**: sondear la caché polimórfica por `class_id` antes de `call_method`, tanto en
+`jit_call_method_cached_window` como en `jit_call_method_window`, no cambió el tiempo:
+base 143-182 ms y con el cambio 145-229 ms en 12 procesos nuevos por variante (mismo
+rango). Contadores temporales en ambos helpers mostraron menos de 1M llamadas cada uno
+sobre ~6M llamadas a método: el JIT ya resuelve la caché en el código generado
+(`vn-jit/src/clif/from_ssa/call/method.rs`, 8 entradas) y llama a la entrada nativa del
+método. El tiempo se reparte entre construcción con promoción del GC (≈33 ms), `area()`
+(≈29 ms) y `scale()` con asignación (≈70 ms) sobre un arranque de ≈25 ms. El cambio se
+revirtió.
+
+### El GC explica la dispersión de `vn bench` en `bench_polymorphism` — NO
+
+`execute (warm)` daba mínimo 190 ms y mediana 390 ms con el mismo binario.
+
+**Medición**: `VN_GC_TRACE=1` muestra 4 recolecciones menores de 3 a 7 ms (≈23 ms en
+total). En procesos nuevos el benchmark da unos 150 ms (141-213 ms) sin bimodalidad. La dispersión viene
+de repetir la ejecución dentro del mismo proceso (la heap crece entre repeticiones).
+
+### El perfil `quick` sirve para medir tiempos de ejecución — NO
+
+`bench_polymorphism` da unos 390 ms con el perfil `quick` y unos 150 ms con `release`; la
+causa de la diferencia no se investigó. Los A/B de rendimiento se hacen con `release`, o con
+`quick` solo si ambos lados usan `quick` y la diferencia es grande. El A/B del
+comparador de `sort` (258 → 180 ms) se midió con `quick` en ambos lados.
 
 ---
 

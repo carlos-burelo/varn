@@ -1,17 +1,52 @@
 # Roadmap — Varn
 
-> Estado parcial. Código manda (AGENTS.md Ley 12). Última sync: 2026-10-17 desde código.
+> Estado parcial. Código manda (AGENTS.md Ley 12). Última sync: 2026-11-13 desde código.
 
 Trabajo futuro verificado, no intenciones. Cada entrada cita su evidencia y
 su puerta de validación. Nada aquí se implementa sin pasar por `AGENTS.md`
 (checklist de diseño + matriz de validación).
 
+## Rendimiento: brechas abiertas (medidas 2026-11-13)
+
+Estado estable en ms, Varn / mejor rival (`tests/benchmarks/README.md`): `sort_objects`
+222 / 72 (medida antes de `01b21300`), `polymorphism` 103 / 40, `generator` 15 / 6, `matrix_local` 13 / 8,
+`http_routing` 135 / 109, `str_ops` 62 / 50, `json_pure` 235 / 217.
+
+- **`sort_objects`.** Perfil con símbolos tras verificar el comparador una vez por
+  elemento: ~46% en el callback compilado y ~30% en el puente Rust → JIT
+  y copias asociadas (`vn-vm/src/exec/host/direct_call.rs::call_compiled_direct`: push de
+  frame, estado de salida del JIT). Palanca: reutilizar el frame entre comparaciones consecutivas del mismo
+  `sort`. No implementada; ganancia estimada del 15-20%, sin medir.
+- **`polymorphism`.** Reparto medido en procesos nuevos (≈25 ms de arranque): construir
+  300k objetos ≈33 ms (≈23 ms de GC por promover los objetos vivos), 3M llamadas a
+  `area()` ≈29 ms, 3M llamadas a `scale()` (asignar y construir) ≈70 ms. El JIT ya
+  inlinea la caché polimórfica de métodos (`vn-jit/src/clif/from_ssa/call/method.rs`);
+  sondear esa caché desde los helpers no cambió el tiempo
+  ([`HIPOTESIS_DESCARTADAS`](dev/HIPOTESIS_DESCARTADAS.md)). Palanca abierta: el coste de
+  promoción del GC menor.
+- **`generator`.** Poco uso; sin trabajo planificado.
+- **`matrix_local`, `http_routing`, `str_ops`, `json_pure`.** Sin perfil con símbolos
+  todavía.
+
+## Inlining entre módulos: alcance pendiente (ADR-0028)
+
+Cubierto: funciones exportadas pequeñas y autocontenidas, los helpers que llaman,
+constantes literales exportadas, módulos inertes. Pendiente:
+
+- Métodos y clases importados (los ids de clase son locales a cada módulo).
+- Funciones que leen estado de módulo que no es constante.
+- Llamadas nativas sin argumentos (`NativeOp` sin args) dentro de un paquete.
+- Imports de espacio de nombres (`import * as ns`) y paquetes (`ImportSpecifier::Package`).
+- Enlace entre módulos de `std` al construir la imagen (hoy solo hacia código de usuario).
+- Por evaluar: los forwarders de `vn-binder` y las plantillas cubren en parte los mismos
+  wrappers; solo los forwarders propagan la decodificación tipada (`as T`).
+
 ## LSP: paralelismo real del análisis (futuro)
 
-**Estado (código, 2026-10-17).** El análisis corre en un solo hilo dedicado
-(`vn-lsp/src/analysis/mod.rs`: hilo `varn-analysis` con dos colas de jobs
+**Estado (código, 2026-11-13).** El análisis corre en un solo hilo dedicado
+(`vn-lsp/src/analysis/mod.rs`: hilo `vn-analysis` con dos colas de jobs
 `FnOnce(&mut Analyzer) + Send`, primer plano con prioridad sobre fondo). Cada
-documento guarda un `Arc<vn_resolver::DiskResolver>`; no queda ningún
+documento guarda un `Arc<vn_resolver::ModuleResolver>`; no queda ningún
 `thread_local` en `vn-lsp`. `ModuleLoader: Send + Sync`
 (`vn-modules/src/loader.rs`) y `Checker::check_with` toma
 `&dyn ImportResolver`, así que un resolvedor compartido entra sin cambiar el

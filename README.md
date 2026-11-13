@@ -39,7 +39,7 @@ await describe("formas", async () => {
 - **Async real**: `async`/`await`, generadores y generadores async, tareas, `TaskGroup`, canales, isolates en hilos del SO.
 - **Errores**: `try`/`catch`/`finally`, multi-catch tipado y operador `try` sobre `Result`/`Option`/nulables.
 - **Permisos de host**: `--sandbox` y `--allow-read/write/net/env/ffi/ui`, al estilo Deno.
-- **Std amplia**: `fs`, `http`, `ws`, `net`, `sqlite`, `crypto`, `encoding` (JSON, CSV, TOML, msgpack…), `time`, `regex`, `task`, `test`, `gpu`, `ui`, `text`…
+- **Std amplia**: `fs`, `http`, `ws`, `net`, `sqlite`, `crypto`, `encoding` (JSON, CSV, TOML, msgpack…), `time`, `task`, `signals`, `test`, `gpu`, `ui`… (`Regex` es un tipo del lenguaje).
 - **Tooling**: LSP, DAP, formateador, gestor de paquetes y `vn debug` para ver cada fase del compilador.
 
 ## Empezar
@@ -61,8 +61,8 @@ Instalación y perfiles: [`docs/INSTALL.md`](docs/INSTALL.md).
 
 ## Comandos
 
-`run`, `check`, `eval`, `repl`, `test`, `bench`, `debug`, `build`, `fmt`, `pkg`,
-`init`, `doctor`, `cache`, `lsp`, `dap`, `completions`, `std-bundle`.
+`run`, `check`, `eval`, `repl`, `bench`, `debug`, `build`, `test`, `task`, `fmt`, `pkg`,
+`init`, `doctor`, `cache`, `lsp`, `completions`, `explain`, `dap`, `std-bundle`.
 Referencia completa y variables de entorno: [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md).
 
 ## Cómo está hecho
@@ -71,10 +71,19 @@ Referencia completa y variables de entorno: [`docs/CLI_REFERENCE.md`](docs/CLI_R
 texto → tokens → AST → check → TIR tipado → SSA → pases → bytecode → VM ⇄ JIT (Cranelift)
 ```
 
-28 crates en un workspace (`vn-lexer`, `vn-parser`, `vn-checker`, `vn-emit`,
+30 crates más `xtask` en un workspace (`vn-lexer`, `vn-parser`, `vn-checker`, `vn-emit`,
 `vn-compiler`, `vn-vm`, `vn-jit`, `vn-builtins`, `vn-lsp`…). Cada fase
 produce un artefacto inmutable que consume la siguiente, y las dependencias van en
 una sola dirección. Mapa completo: [`docs/internals/ARCHITECTURE.md`](docs/internals/ARCHITECTURE.md).
+
+## Rendimiento
+
+Medido el 2026-11-13 con los benchmarks de [`tests/benchmarks/`](tests/benchmarks/README.md)
+(binario `release`, Windows x64, una corrida, contra Node y Bun): Varn es el más rápido en
+14 de 23 cargas comparables en tiempo de proceso y en 15 de 23 en estado estable. Pierde
+con claridad en ordenar objetos con comparador (`sort_objects`), en llamadas por interfaz
+con asignación (`polymorphism`) y en generadores. La tabla completa y el método de
+medición están en el README de benchmarks.
 
 ## Documentación
 
@@ -94,7 +103,7 @@ especificación. Si un documento contradice al código, manda el código.
 
 Lee [`AGENTS.md`](AGENTS.md) (contrato de arquitectura) y
 [`CONTRIBUTING.md`](CONTRIBUTING.md). La prueba canónica es la suite
-`tests/main.vn` (más de 3500 casos), no `cargo test`:
+`tests/main.vn` (más de 5600 casos), no `cargo test`:
 
 ```powershell
 .\scripts\verify.ps1 -Quick   # iteración: build quick + un cuadrante

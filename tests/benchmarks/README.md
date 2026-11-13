@@ -1,4 +1,4 @@
-> Estado verificado 2026-10-13: VIGENTE — metodología (checksum antes que tiempo, `cargo xtask compare`, re-medir siempre). Sin tabla de ratios históricos que borrar: no hay.
+> Estado verificado 2026-11-13: VIGENTE — metodología (checksum antes que tiempo, `cargo xtask compare`, re-medir siempre). Sin tabla de ratios históricos que borrar: no hay.
 >
 # Benchmarks
 
@@ -8,7 +8,7 @@ directamente sin transpilar.
 
 ## Contenido por carpeta
 
-- `vn/` — benchmarks Varn (20 ficheros `bench_*.vn`).
+- `vn/` — benchmarks Varn (28 ficheros `bench_*.vn`).
 - `ts/` — contrapartes TypeScript para Bun/Node.
 - `js/` — contrapartes JavaScript planas (las corren Bun y Node).
 - `py/` — contrapartes Python + `_harness.py` compartido.
@@ -53,6 +53,56 @@ bun run tests/benchmarks/ts/bench_fib.ts
 
 ---
 
+## Resultados (2026-11-13)
+
+Binario `release` de `85b0e6bb` (anterior a `01b21300`, que cambia el comparador de `sort`;
+`sort_objects` no se volvió a medir en esta matriz), Windows 11 x64, una corrida de `compare.ps1 -Runtimes vn,bun,node -Runs 5
+-Warmup 2`. Milisegundos, mediana. «Proceso» es el tiempo de pared del proceso completo;
+«estable» es proceso menos arranque. Una sola corrida de la matriz: diferencias de unos
+5 ms están dentro del ruido.
+
+| Carga | vn proceso | node | bun | vn estable | node | bun |
+|---|---|---|---|---|---|---|
+| `array_ops` | 25.4 | 107.0 | 62.0 | 6 | 67 | 46 |
+| `class_fields` | 20.8 | 44.9 | 19.8 | 2 | 5 | 4 |
+| `collection_pipeline` | 34.4 | 65.4 | 37.5 | 15 | 25 | 22 |
+| `dto` | 29.5 | 156.7 | 140.4 | 10 | 116 | 125 |
+| `dto_local` | 29.9 | 59.0 | 35.0 | 11 | 19 | 19 |
+| `fib` | 49.2 | 666.2 | 399.0 | 30 | 626 | 383 |
+| `gc_alloc` | 41.8 | 263.9 | 311.2 | 22 | 224 | 296 |
+| `generator` | 34.8 | 46.7 | 25.8 | 15 | 6 | 10 |
+| `http_routing` | 154.5 | 158.5 | 125.1 | 135 | 118 | 109 |
+| `json` | 41.3 | 60.1 | 38.0 | 22 | 20 | 22 |
+| `json_api_payloads` | 33.7 | 55.4 | 35.5 | 14 | 15 | 20 |
+| `json_parts` | 38.1 | 60.3 | 37.9 | 19 | 20 | 22 |
+| `json_pure` | 254.7 | 267.5 | 233.0 | 235 | 227 | 217 |
+| `math` | 23.7 | 108.9 | 105.5 | 4 | 69 | 90 |
+| `matrix` | 27.8 | 93.6 | 67.0 | 8 | 53 | 51 |
+| `matrix_local` | 31.9 | 52.6 | 23.2 | 13 | 12 | 8 |
+| `multiple` | 167.6 | 285.0 | 174.0 | 148 | 245 | 158 |
+| `new_retained` | 26.3 | 54.8 | 29.5 | 7 | 14 | 14 |
+| `now` | 23.8 | 51.9 | 32.4 | 4 | 12 | 17 |
+| `polymorphism` | 122.3 | 181.7 | 56.1 | 103 | 141 | 40 |
+| `sort_objects` | 240.8 | 123.3 | 87.3 | 222 | 83 | 72 |
+| `str_ops` | 81.4 | 90.8 | 83.6 | 62 | 50 | 68 |
+| `word_freq` | 52.0 | 98.4 | 61.8 | 33 | 58 | 46 |
+| `csv_etl` | 36.2 | — | — | 17 | — | — |
+| `csv_pipeline` | 116.3 | — | — | 97 | — | — |
+| `gpu_matmul` | 253.4 | — | — | 234 | — | — |
+| `task_soak` | 341.8 | — | — | 322 | — | — |
+| `task_spawn` | 124.7 | — | — | 105 | — | — |
+
+Varn es el más rápido en 14 de 23 cargas comparables en tiempo de proceso y en 15 de 23
+en estado estable. Las cinco cargas sin par (`csv_etl`, `csv_pipeline`, `gpu_matmul`,
+`task_soak`, `task_spawn`) solo corren en Varn.
+
+Mayores brechas en estado estable (vn / mejor rival): `sort_objects` 222 / 72,
+`polymorphism` 103 / 40, `generator` 15 / 6, `matrix_local` 13 / 8, `http_routing`
+135 / 109, `str_ops` 62 / 50. Las causas medidas y las palancas abiertas están en
+[`docs/ROADMAP.md`](../../docs/ROADMAP.md).
+
+---
+
 ## Disciplina de medición
 
 **Primero la salida, después el tiempo.** Un benchmark que imprime un resultado
@@ -83,6 +133,14 @@ suma un campo puede reportar ~0.07 ms en Bun: no es que sea rápido asignando, e
 que **no asignó nada**. Para medir allocation de verdad, los objetos tienen que
 escapar (guardarlos en un array que siga vivo). Si el número de Bun parece
 imposible, lo es.
+
+**Repetir dentro de un proceso distorsiona.** `vn bench` repite la ejecución en el mismo
+proceso (`execute (warm)`): la heap crece entre repeticiones y la mediana puede duplicar el
+valor de un proceso nuevo. En `bench_polymorphism`: mínimo 190 ms y mediana 390 ms dentro de
+`vn bench`, contra unos 150 ms en procesos nuevos (141-213 ms). Para A/B entre binarios, alternar
+procesos nuevos (`compare.ps1`, o `vn run` en bucle) y no fiarse de diferencias menores del
+10%. El perfil `quick` tampoco sirve para tiempos de ejecución: este mismo benchmark da unos
+390 ms en `quick` y unos 150 ms en `release` (la causa no se investigó).
 
 **Térmica.** La máquina baja ~2x bajo carga sostenida (un `cargo build` la
 calienta). Solo son comparables las corridas pareadas en el mismo momento. Tomar
