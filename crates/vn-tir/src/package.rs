@@ -252,7 +252,7 @@ fn placeholder(res: Resolution) -> TirExpr {
     }
 }
 
-fn stmt_types(stmts: &mut [TirStmt], f: &mut impl FnMut(&mut BackendTy)) {
+pub(crate) fn stmt_types(stmts: &mut [TirStmt], f: &mut impl FnMut(&mut BackendTy)) {
     for stmt in stmts {
         match stmt {
             TirStmt::Let { ty, .. } => f(ty),
