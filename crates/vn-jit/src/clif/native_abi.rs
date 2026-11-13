@@ -63,7 +63,7 @@ impl NativeShape {
 
     pub(crate) fn self_signature(&self) -> Signature {
         let mut sig = Signature::new(CALL_CONV);
-        for _ in 0..3 {
+        for _ in 0..2 {
             sig.params.push(AbiParam::new(types::I64));
         }
         for c in &self.params[1..] {

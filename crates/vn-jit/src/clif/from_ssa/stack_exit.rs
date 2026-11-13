@@ -91,25 +91,29 @@ fn raise_overflow(b: &mut FunctionBuilder, ctx: &Ctx<'_>, helper: usize) {
 pub(super) fn guard_self_call(b: &mut FunctionBuilder, ctx: &Ctx<'_>, abi: &SelfAbi) -> Value {
     let helpers = ctx.helpers;
     let sp = b.ins().get_stack_pointer(types::I64);
-    let stack_low = b.ins().icmp(IntCC::UnsignedLessThan, sp, abi.floor);
+    let floor = b.ins().load(
+        types::I64,
+        MemFlagsData::trusted(),
+        ctx.exec_ctx,
+        helpers.jit_stack_floor_offset as i32,
+    );
+    let stack_low = b.ins().icmp(IntCC::UnsignedLessThan, sp, floor);
     let too_deep = b.ins().icmp_imm_u(
         IntCC::UnsignedGreaterThanOrEqual,
         abi.depth,
         helpers.call_layout.max_call_depth as i64,
     );
-    let exhausted = b.ins().bor(stack_low, too_deep);
-
-    let raise = b.create_block();
     let raise_stack = b.create_block();
     let raise_depth = b.create_block();
+    let check_depth = b.create_block();
     let cont = b.create_block();
-    b.set_cold_block(raise);
     b.set_cold_block(raise_stack);
     b.set_cold_block(raise_depth);
-    b.ins().brif(exhausted, raise, &[], cont, &[]);
+    b.ins().brif(stack_low, raise_stack, &[], check_depth, &[]);
 
-    b.switch_to_block(raise);
-    b.ins().brif(stack_low, raise_stack, &[], raise_depth, &[]);
+    b.switch_to_block(check_depth);
+    b.ins().brif(too_deep, raise_depth, &[], cont, &[]);
+
     b.switch_to_block(raise_stack);
     raise_overflow(b, ctx, helpers.stack_overflow);
     b.switch_to_block(raise_depth);

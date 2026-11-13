@@ -2,7 +2,8 @@ use super::super::abi::{raw_signature, Activation};
 use super::super::native_abi::NativeShape;
 use super::super::piece::compile_piece;
 use super::{
-    block, call, exceptions, hoist, induction, osr, pinned, ranges, setup, stack_exit, versions,
+    block, call, exceptions, hoist, induction, osr, pinned, ranges, self_entry, setup, stack_exit,
+    versions,
     Ctx, Lowered,
 };
 use crate::JitHelpers;
@@ -118,6 +119,11 @@ pub(in crate::clif) fn try_lower(
     } else {
         ranges::analyze(ssa, &reach.preds, &reach.rpo_pos, &reach.reached)
     };
+    let redundant_self_guards = if self_body {
+        self_entry::redundant_guards(ssa, &reach)
+    } else {
+        Default::default()
+    };
     let entry_stacks = reach.full_entry_stacks;
     let mut clif_map: std::collections::BTreeMap<usize, Block> = Default::default();
     for h in landing_live.keys() {
@@ -139,8 +145,9 @@ pub(in crate::clif) fn try_lower(
         constants,
         self_ref,
         self_abi: est.self_abi,
+        redundant_self_guards,
         arg_word_base: if self_body {
-            3
+            2
         } else {
             2 + super::super::native_abi::NativeClass::of(shape.params[0]).words()
         },

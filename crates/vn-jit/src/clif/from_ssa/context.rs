@@ -21,7 +21,6 @@ pub(super) struct FrameIo {
 
 pub(super) struct SelfAbi {
     pub depth: Value,
-    pub floor: Value,
 }
 
 pub(super) struct Ctx<'a> {
@@ -34,6 +33,8 @@ pub(super) struct Ctx<'a> {
     pub self_ref: FuncRef,
 
     pub self_abi: Option<SelfAbi>,
+
+    pub redundant_self_guards: FxHashSet<u32>,
 
     pub arg_word_base: usize,
 

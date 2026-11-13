@@ -124,8 +124,12 @@ pub(super) fn emit_inst(
                 .self_abi
                 .as_ref()
                 .ok_or("from_ssa: frameless self-call without a self-call ABI")?;
-            let next_depth = super::stack_exit::guard_self_call(b, ctx, abi);
-            let mut a = vec![ctx.exec_ctx, next_depth, abi.floor];
+            let next_depth = if ctx.redundant_self_guards.contains(&ctx.site_ip.get()) {
+                b.ins().iadd_imm_u(abi.depth, 1)
+            } else {
+                super::stack_exit::guard_self_call(b, ctx, abi)
+            };
+            let mut a = vec![ctx.exec_ctx, next_depth];
             for v in args {
                 a.push(load_value(b, ctx, values, *v)?);
             }

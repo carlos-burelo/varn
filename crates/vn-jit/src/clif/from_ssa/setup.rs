@@ -196,7 +196,7 @@ pub(super) fn enter(
 
     let entry_params = b.block_params(entry_blk).to_vec();
     if self_body {
-        let expected = 3 + shape.params[1..]
+        let expected = 2 + shape.params[1..]
             .iter()
             .map(|c| super::super::native_abi::NativeClass::of(*c).words())
             .sum::<usize>();
@@ -208,7 +208,6 @@ pub(super) fn enter(
             exec_ctx: entry_params[0],
             self_abi: Some(super::context::SelfAbi {
                 depth: entry_params[1],
-                floor: entry_params[2],
             }),
             frame: None,
             this: None,
