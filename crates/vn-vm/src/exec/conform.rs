@@ -258,6 +258,24 @@ fn fit_in(cx: &Cx, v: VmValue, desc: &TypeDesc, scope: Option<&Scope>) -> Option
                 parent: scope,
             };
             let scope = Some(&inner);
+            if crate::exec::decode::aligned_with(
+                obj.shape(),
+                fields,
+                desc as *const TypeDesc as usize,
+            ) {
+                for (slot, field) in fields.iter().enumerate() {
+                    let Some(x) = obj.field_at(slot).filter(|x| !x.is_null()) else {
+                        if field.optional
+                            || matches!(field.ty, TypeDesc::Nullable(_) | TypeDesc::Any)
+                        {
+                            continue;
+                        }
+                        return None;
+                    };
+                    fit_in(cx, x, &field.ty, scope)?;
+                }
+                return Some(());
+            }
             let mut present = 0;
             for field in fields {
                 let value = obj.get_field(&field.name).filter(|x| !x.is_null());

@@ -1,5 +1,5 @@
 use crate::exec::value_views::{elements, object_entries, object_layout, ObjectLayout};
-use crate::heap::Heap;
+use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use std::sync::Arc;
 use vn_core::TypeDesc;
@@ -23,7 +23,7 @@ thread_local! {
         const { std::cell::Cell::new((0, 0, false)) };
 }
 
-fn aligned_with(
+pub(crate) fn aligned_with(
     shape: &vn_types::Shape,
     fields: &[vn_core::type_desc::FieldDesc],
     desc: usize,
@@ -40,6 +40,105 @@ fn aligned_with(
             .all(|(name, field)| field.name == **name);
     LAST_ALIGNMENT.with(|cell| cell.set((shape.id, desc, aligned)));
     aligned
+}
+
+fn inner_changes(desc: &TypeDesc) -> bool {
+    match desc {
+        TypeDesc::Float | TypeDesc::Map(..) | TypeDesc::Object(_) | TypeDesc::Enclosing { .. } => {
+            true
+        }
+        TypeDesc::Nullable(inner) | TypeDesc::Array(inner) => inner_changes(inner),
+        TypeDesc::Tuple(slots) => slots.iter().any(inner_changes),
+        TypeDesc::Any
+        | TypeDesc::Literal(_)
+        | TypeDesc::Int
+        | TypeDesc::Bool
+        | TypeDesc::Char
+        | TypeDesc::Str
+        | TypeDesc::Bytes
+        | TypeDesc::Decimal
+        | TypeDesc::BigInt
+        | TypeDesc::Callable
+        | TypeDesc::Class { .. }
+        | TypeDesc::Enum { .. }
+        | TypeDesc::Set(_)
+        | TypeDesc::Args { .. } => false,
+    }
+}
+
+fn walk_needed(desc: &TypeDesc) -> bool {
+    match desc {
+        TypeDesc::Array(_) | TypeDesc::Tuple(_) => true,
+        TypeDesc::Nullable(inner) => walk_needed(inner),
+        _ => inner_changes(desc),
+    }
+}
+
+fn changed_items<'d>(
+    heap: &mut Heap,
+    stack_floor: u64,
+    items: &[VmValue],
+    keeps_kind: bool,
+    desc_of: impl Fn(usize) -> &'d TypeDesc,
+    scope: Option<&Scope>,
+    visiting: &mut Vec<(u64, *const TypeDesc)>,
+) -> Option<Vec<VmValue>> {
+    let mut changed: Option<Vec<VmValue>> = (!keeps_kind).then(|| Vec::with_capacity(items.len()));
+    for (at, item) in items.iter().enumerate() {
+        let projected = walk(heap, stack_floor, *item, desc_of(at), scope, visiting);
+        match &mut changed {
+            Some(out) => out.push(projected),
+            None if !projected.bits_eq(*item) => {
+                let mut out = Vec::with_capacity(items.len());
+                out.extend_from_slice(&items[..at]);
+                out.push(projected);
+                changed = Some(out);
+            }
+            None => {}
+        }
+    }
+    changed
+}
+
+fn project_aligned_fields(
+    heap: &mut Heap,
+    stack_floor: u64,
+    v: VmValue,
+    desc: &TypeDesc,
+    fields: &[vn_core::type_desc::FieldDesc],
+    scope: Option<&Scope>,
+    visiting: &mut Vec<(u64, *const TypeDesc)>,
+) -> Option<bool> {
+    if !v.is_heap() {
+        return None;
+    }
+    let Some(crate::heap::HeapObj::Object(obj)) = heap.get(v.as_heap()) else {
+        return None;
+    };
+    {
+        let obj = obj.borrow();
+        if !aligned_with(obj.shape(), fields, desc as *const TypeDesc as usize) {
+            return None;
+        }
+    }
+    let inner = Scope {
+        desc,
+        parent: scope,
+    };
+    for (slot, field) in fields.iter().enumerate() {
+        if !inner_changes(&field.ty) {
+            continue;
+        }
+        let x = match heap.get(v.as_heap()) {
+            Some(crate::heap::HeapObj::Object(obj)) => obj.borrow().field_at(slot)?,
+            _ => return None,
+        };
+        let projected = walk(heap, stack_floor, x, &field.ty, Some(&inner), visiting);
+        if !projected.bits_eq(x) {
+            return Some(false);
+        }
+    }
+    Some(true)
 }
 
 pub(crate) fn project(
@@ -60,7 +159,7 @@ fn walk(
     scope: Option<&Scope>,
     visiting: &mut Vec<(u64, *const TypeDesc)>,
 ) -> VmValue {
-    if crate::frame::native_stack_low(stack_floor) {
+    if crate::frame::native_stack_low(stack_floor) || !walk_needed(desc) {
         return v;
     }
     match desc {
@@ -88,14 +187,25 @@ fn walk(
             }
         }
         TypeDesc::Array(inner) => {
+            let keeps_kind = v.is_heap() && matches!(heap.get(v.as_heap()), Some(HeapObj::Array(_)));
+            if keeps_kind && !inner_changes(inner) {
+                return v;
+            }
             let Some(items) = elements(heap, v) else {
                 return v;
             };
-            let items = items
-                .into_iter()
-                .map(|x| walk(heap, stack_floor, x, inner, scope, visiting))
-                .collect();
-            heap.alloc_array_vm(items)
+            match changed_items(
+                heap,
+                stack_floor,
+                &items,
+                keeps_kind,
+                |_| inner,
+                scope,
+                visiting,
+            ) {
+                Some(items) => heap.alloc_array_vm(items),
+                None => v,
+            }
         }
         TypeDesc::Tuple(slots) => {
             let Some(items) = elements(heap, v) else {
@@ -104,12 +214,22 @@ fn walk(
             if items.len() != slots.len() {
                 return v;
             }
-            let items = items
-                .into_iter()
-                .zip(slots)
-                .map(|(x, ty)| walk(heap, stack_floor, x, ty, scope, visiting))
-                .collect();
-            heap.alloc_tuple_vm(items)
+            let keeps_kind = matches!(heap.get(v.as_heap()), Some(HeapObj::Tuple(_)));
+            if keeps_kind && !slots.iter().any(inner_changes) {
+                return v;
+            }
+            match changed_items(
+                heap,
+                stack_floor,
+                &items,
+                keeps_kind,
+                |at| &slots[at],
+                scope,
+                visiting,
+            ) {
+                Some(items) => heap.alloc_tuple_vm(items),
+                None => v,
+            }
         }
         TypeDesc::Map(key, inner) => {
             let entries = if let Some(entries) = object_entries(heap, v) {
@@ -133,6 +253,12 @@ fn walk(
             heap.alloc_map_vm(map)
         }
         TypeDesc::Object(fields) => {
+            if let Some(unchanged) =
+                project_aligned_fields(heap, stack_floor, v, desc, fields, scope, visiting)
+                && unchanged
+            {
+                return v;
+            }
             let Some(layout) = object_layout(heap, v) else {
                 return v;
             };
