@@ -156,9 +156,26 @@ pub(crate) fn compile_tir(
 #[derive(Default)]
 pub(crate) struct TemplateLibrary {
     modules: rustc_hash::FxHashMap<String, std::sync::Arc<vn_tir::package::ModuleTemplates>>,
+    shipped: std::sync::Mutex<
+        rustc_hash::FxHashMap<String, Option<std::sync::Arc<vn_tir::package::ModuleTemplates>>>,
+    >,
 }
 
 impl TemplateLibrary {
+    fn shipped(&self, specifier: &str) -> Option<std::sync::Arc<vn_tir::package::ModuleTemplates>> {
+        let mut cache = self.shipped.lock().ok()?;
+        if let Some(known) = cache.get(specifier) {
+            return known.clone();
+        }
+        let decoded = vn_modules::provider::get()
+            .and_then(|provider| provider.module(specifier))
+            .and_then(|module| module.templates)
+            .and_then(|bytes| postcard::from_bytes::<vn_tir::package::ModuleTemplates>(bytes).ok())
+            .map(std::sync::Arc::new);
+        cache.insert(specifier.to_owned(), decoded.clone());
+        decoded
+    }
+
     pub(crate) fn insert(&mut self, path: &str, templates: vn_tir::package::ModuleTemplates) {
         self.modules.insert(
             vn_modules::canonical_or_original(std::path::Path::new(path)),
@@ -179,9 +196,11 @@ impl vn_tir::link::TemplateSource for LibraryView<'_> {
         import_source: &str,
     ) -> Option<std::sync::Arc<vn_tir::package::ModuleTemplates>> {
         use vn_core::ImportSpecifier as IS;
-        let IS::Relative(_) = IS::parse(import_source) else {
-            return None;
-        };
+        match IS::parse(import_source) {
+            IS::Relative(_) => {}
+            IS::Stdlib(_) | IS::Core(_) => return self.library.shipped(import_source),
+            IS::Runtime(_) | IS::Package(_) => return None,
+        }
         let base = std::path::Path::new(self.module_path)
             .parent()
             .unwrap_or_else(|| std::path::Path::new("."));
@@ -268,9 +287,7 @@ pub(crate) fn lower_module(input: LowerInput<'_>) -> Result<Lowered, Failure> {
     let proto = proto.map_err(|e| {
         Failure::internal(format!(
             "{}: {e}",
-            vn_core::term::chalk::chalk("error[emit:tir]")
-                .red()
-                .bold()
+            vn_core::term::chalk::chalk("error[emit:tir]").red().bold()
         ))
     })?;
     Ok(Lowered {

@@ -149,6 +149,7 @@ impl StdlibProvider for BuiltinsProvider {
                 source: m.source,
                 interface: Some(m.interface).filter(|b| !b.is_empty()),
                 bytecode: Some(m.bytecode),
+                templates: Some(m.templates).filter(|b| !b.is_empty()),
             });
         }
         if vn_core::ModuleKind::Stdlib.owns(specifier) || std_spec(specifier).is_some() {
@@ -158,6 +159,7 @@ impl StdlibProvider for BuiltinsProvider {
             source: spec_for(specifier)?.source()?,
             interface: None,
             bytecode: None,
+            templates: None,
         })
     }
 

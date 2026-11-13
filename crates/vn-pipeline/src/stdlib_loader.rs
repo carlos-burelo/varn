@@ -95,7 +95,7 @@ pub fn compile_source(
     path: &str,
     session: &crate::ModuleResolver,
 ) -> Result<FunctionProto, String> {
-    compile_source_inner(source, path, false, session)
+    compile_source_inner(source, path, false, session).map(|(proto, _)| proto)
 }
 
 pub fn compile_source_checked(
@@ -103,7 +103,7 @@ pub fn compile_source_checked(
     path: &str,
     session: &crate::ModuleResolver,
 ) -> Result<FunctionProto, String> {
-    compile_source_inner(source, path, true, session)
+    compile_source_inner(source, path, true, session).map(|(proto, _)| proto)
 }
 
 fn compile_source_inner(
@@ -111,7 +111,7 @@ fn compile_source_inner(
     path: &str,
     reject_type_errors: bool,
     session: &crate::ModuleResolver,
-) -> Result<FunctionProto, String> {
+) -> Result<(FunctionProto, vn_tir::package::ModuleTemplates), String> {
     let (program, arena, interner) =
         crate::quiet_parse::parse_module(source, path).map_err(|f| f.to_string())?;
     let check = vn_checker::Checker::check(&program, &arena, interner, session);
@@ -134,7 +134,7 @@ fn compile_source_inner(
         library: &crate::lower::TemplateLibrary::default(),
         measure: false,
     })
-    .map(|lowered| lowered.proto)
+    .map(|lowered| (lowered.proto, lowered.templates))
     .map_err(|e| e.to_string())
 }
 
@@ -206,6 +206,7 @@ pub fn compile_stdlib_image(
         pure: bool,
         interface: Vec<u8>,
         bytecode: Vec<u8>,
+        templates: Vec<u8>,
     }
 
     let mut units = core_units()?;
@@ -242,8 +243,8 @@ pub fn compile_stdlib_image(
             Vec::new()
         };
 
-        let proto = match compile_source_checked(&unit.source, id, session) {
-            Ok(p) => p,
+        let (proto, templates) = match compile_source_inner(&unit.source, id, true, session) {
+            Ok(done) => done,
             Err(e) => {
                 failures.push_str(&format!("\n{e}"));
                 continue;
@@ -252,11 +253,15 @@ pub fn compile_stdlib_image(
         let bytecode = postcard::to_allocvec(&proto)
             .map_err(|e| format!("bytecode serialization failed for {id}: {e}"))?;
 
+        let templates = postcard::to_allocvec(&templates)
+            .map_err(|e| format!("template serialization failed for {id}: {e}"))?;
+
         compiled.push(Compiled {
             unit,
             pure,
             interface,
             bytecode,
+            templates,
         });
     }
     if !failures.is_empty() {
@@ -271,6 +276,7 @@ pub fn compile_stdlib_image(
             pure: m.pure,
             interface: &m.interface,
             bytecode: &m.bytecode,
+            templates: &m.templates,
             source: &m.unit.source,
         })
         .collect();

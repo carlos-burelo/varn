@@ -6,6 +6,7 @@ pub struct ImageModule<'a> {
     pub pure: bool,
     pub interface: &'a [u8],
     pub bytecode: &'a [u8],
+    pub templates: &'a [u8],
     pub source: &'a str,
 }
 
@@ -16,7 +17,7 @@ pub struct StdImage {
     modules: Vec<ImageModule<'static>>,
 }
 
-const ENTRY_WORDS: usize = 11;
+const ENTRY_WORDS: usize = 13;
 const FLAG_PURE: u32 = 1;
 
 impl StdImage {
@@ -40,7 +41,8 @@ impl StdImage {
                 pure: w[4] & FLAG_PURE != 0,
                 interface: cursor.bytes_at(w[5], w[6])?,
                 bytecode: cursor.bytes_at(w[7], w[8])?,
-                source: cursor.str_at(w[9], w[10])?,
+                templates: cursor.bytes_at(w[9], w[10])?,
+                source: cursor.str_at(w[11], w[12])?,
             });
         }
         if !modules.windows(2).all(|p| p[0].id < p[1].id) {
@@ -121,12 +123,14 @@ pub fn write_image(
         let path = place(m.path.as_bytes());
         let interface = place(m.interface);
         let bytecode = place(m.bytecode);
+        let templates = place(m.templates);
         let source = place(m.source.as_bytes());
         words.extend_from_slice(&id);
         words.extend_from_slice(&path);
         words.push(if m.pure { FLAG_PURE } else { 0 });
         words.extend_from_slice(&interface);
         words.extend_from_slice(&bytecode);
+        words.extend_from_slice(&templates);
         words.extend_from_slice(&source);
     }
     let mut payload = Vec::with_capacity(words.len() * 4 + data.len());

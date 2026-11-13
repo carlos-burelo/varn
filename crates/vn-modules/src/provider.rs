@@ -9,6 +9,7 @@ pub struct ProvidedModule {
     pub source: &'static str,
     pub interface: Option<&'static [u8]>,
     pub bytecode: Option<&'static [u8]>,
+    pub templates: Option<&'static [u8]>,
 }
 
 pub trait StdlibProvider: Send + Sync {
