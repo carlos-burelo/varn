@@ -142,21 +142,13 @@ impl Builder<'_> {
         if text.ty != BackendTy::Str {
             return None;
         }
-        let name = self.tir.global_names.get(*slot as usize)?;
-        let is_std_parse = self
-            .tir
-            .imports
-            .iter()
-            .filter(|import| import.source.as_ref() == vn_core::well_known::STD_ENCODING_MODULE)
-            .flat_map(|import| import.specs.iter())
-            .any(|spec| {
-                spec.local == *name
-                    && matches!(
-                        &spec.kind,
-                        vn_tir::TirImportKind::Named(original)
-                            if original.as_ref() == vn_core::well_known::JSON_PARSE_IMPORT
-                    )
-            });
+        let (import, spec) = self.tir.imported_binding(*slot)?;
+        let is_std_parse = import.source.as_ref() == vn_core::well_known::STD_ENCODING_MODULE
+            && matches!(
+                &spec.kind,
+                vn_tir::TirImportKind::Named(original)
+                    if original.as_ref() == vn_core::well_known::JSON_PARSE_IMPORT
+            );
         is_std_parse.then_some(text)
     }
 

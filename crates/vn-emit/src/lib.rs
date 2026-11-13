@@ -199,6 +199,11 @@ pub fn emit_module(
     imports.extend(collect_imports(program, ast_arena, interner));
     namespace_scope::import_members(&mut imports, &bind.namespace_imports);
     imports.extend(linked_extensions);
+    for spec in imports.iter_mut().flat_map(|import| import.specs.iter_mut()) {
+        spec.slot = global_slots
+            .get(spec.local.as_ref())
+            .and_then(|slot| u16::try_from(*slot).ok());
+    }
     let mut exports = collect_exports(program, ast_arena, interner, &namespace_exports);
     exports.extend(
         extensions::exported_extension_names(program, ast_arena, bind)

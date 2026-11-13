@@ -135,6 +135,17 @@ pub struct TirModule {
 }
 
 impl TirModule {
+    pub fn imported_binding(&self, slot: u32) -> Option<(&TirImport, &TirImportSpec)> {
+        let slot = u16::try_from(slot).ok()?;
+        self.imports.iter().find_map(|import| {
+            import
+                .specs
+                .iter()
+                .find(|spec| spec.slot == Some(slot))
+                .map(|spec| (import, spec))
+        })
+    }
+
     pub fn class(&self, id: ClassId) -> Option<&crate::tables::ClassInfo> {
         self.classes.get(id.0 as usize)
     }
