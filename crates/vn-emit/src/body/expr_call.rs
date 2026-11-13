@@ -154,6 +154,9 @@ impl<'a> FnEmitter<'a> {
                 _ if all_positional && self.m.math_intrinsics.contains_key(name) => {
                     Resolution::Intrinsic(self.m.math_intrinsics[name] as u16)
                 }
+                _ if all_positional && self.m.native_fns.contains_key(name) => {
+                    Resolution::NativeOp(self.m.native_fns[name])
+                }
                 _ => match c.res {
                     Resolution::NativeGlobal(idx) => Resolution::NativeGlobal(idx),
                     Resolution::None

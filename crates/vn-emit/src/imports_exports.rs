@@ -177,3 +177,36 @@ pub(super) fn math_intrinsic_imports(
     }
     out
 }
+
+pub(super) fn native_function_imports(
+    program: &Program,
+    ast_arena: &AstArena,
+    interner: &AtomInterner,
+) -> FxHashMap<Atom, u64> {
+    use vn_core::ast::ImportSpecifier;
+    let mut out = FxHashMap::default();
+    let Some(provider) = vn_modules::provider::get() else {
+        return out;
+    };
+    for &stmt in &program.body {
+        let StmtKind::Decl(d) = &ast_arena.stmt(stmt).kind else {
+            continue;
+        };
+        let Decl::Import(imp) = d.as_ref() else {
+            continue;
+        };
+        let source = interner.resolve(imp.source);
+        for spec in &imp.specifiers {
+            let ImportSpecifier::Named {
+                local, imported, ..
+            } = spec
+            else {
+                continue;
+            };
+            if let Some(id) = provider.native_op_id(source, "", interner.resolve(*imported)) {
+                out.insert(*local, id);
+            }
+        }
+    }
+    out
+}

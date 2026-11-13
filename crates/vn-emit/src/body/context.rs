@@ -33,6 +33,8 @@ pub(crate) struct ModuleCtx<'a> {
 
     pub math_intrinsics: &'a FxHashMap<Atom, u8>,
 
+    pub native_fns: &'a FxHashMap<Atom, u64>,
+
     pub interner: &'a AtomInterner,
 
     pub checker_table: &'a vn_sem::types::CheckerTyTable,

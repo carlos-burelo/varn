@@ -24,6 +24,20 @@ impl<'m> Builder<'m> {
                 ty,
             ));
         }
+        if let Resolution::NativeOp(op_id) = res
+            && !args.is_empty()
+        {
+            let mut argv = self.lower_args(args)?;
+            let object = argv.remove(0);
+            return Ok(self.emit(
+                InstKind::CallNativeOp {
+                    object,
+                    args: argv,
+                    op_id: *op_id,
+                },
+                ty,
+            ));
+        }
         if let Resolution::NativeGlobal(n) = &callee.res
             && let Some(map) = self.try_lower_map_construction(*n, args, ty)?
         {
