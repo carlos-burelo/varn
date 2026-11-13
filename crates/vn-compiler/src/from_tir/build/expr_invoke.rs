@@ -24,6 +24,11 @@ impl<'m> Builder<'m> {
                 ty,
             ));
         }
+        if let Resolution::NativeGlobal(n) = &callee.res
+            && let Some(map) = self.try_lower_map_construction(*n, args, ty)?
+        {
+            return Ok(map);
+        }
         if let Resolution::DirectFn(f) = res {
             if Some(*f) == self.self_fn
                 && let Some(v) = self.try_lower_self_call(args, ty)?
@@ -65,6 +70,73 @@ impl<'m> Builder<'m> {
             | Resolution::ByName { .. } => self.lower_expr(callee)?,
         };
         self.lower_call(cv, args, ty)
+    }
+
+    fn try_lower_map_construction(
+        &mut self,
+        native: u32,
+        args: &[vn_tir::TirArg],
+        ty: BackendTy,
+    ) -> Result<Option<Value>> {
+        use vn_core::abi::NATIVE_GLOBALS;
+        use vn_tir::{TirArg, TirArrayEl, TirExprKind};
+        let is_map = NATIVE_GLOBALS
+            .get(native as usize)
+            .is_some_and(|g| g.name == vn_core::BuiltinType::Map.name());
+        if !is_map || !matches!(ty, BackendTy::Map(..)) {
+            return Ok(None);
+        }
+        let entries: Vec<(&TirExpr, &TirExpr)> = match args {
+            [] => Vec::new(),
+            [TirArg::Expr(only)] => {
+                let mut source = only;
+                while let TirExprKind::Cast { operand } = &source.kind {
+                    source = operand;
+                }
+                match &source.kind {
+                    TirExprKind::NullLit => Vec::new(),
+                    TirExprKind::ArrayLit(elements) => {
+                        let mut pairs = Vec::with_capacity(elements.len());
+                        for element in elements {
+                            let TirArrayEl::Expr(entry) = element else {
+                                return Ok(None);
+                            };
+                            match &entry.kind {
+                                TirExprKind::TupleLit(pair) if pair.len() == 2 => {
+                                    pairs.push((&pair[0], &pair[1]));
+                                }
+                                TirExprKind::ArrayLit(pair) => match pair.as_slice() {
+                                    [TirArrayEl::Expr(key), TirArrayEl::Expr(value)] => {
+                                        pairs.push((key, value));
+                                    }
+                                    _ => return Ok(None),
+                                },
+                                _ => return Ok(None),
+                            }
+                        }
+                        pairs
+                    }
+                    _ => return Ok(None),
+                }
+            }
+            _ => return Ok(None),
+        };
+        let by_value = |key: &TirExpr| {
+            matches!(
+                key.ty.representation(),
+                BackendTy::Str | BackendTy::Int | BackendTy::Bool
+            )
+        };
+        if !entries.iter().all(|(key, _)| by_value(key)) {
+            return Ok(None);
+        }
+        let mut lowered = Vec::with_capacity(entries.len());
+        for (key, value) in entries {
+            let key = self.lower_expr(key)?;
+            let value = self.lower_expr(value)?;
+            lowered.push((key, value));
+        }
+        Ok(Some(self.emit(InstKind::BuildMap { pairs: lowered }, ty)))
     }
 
     pub(super) fn lower_method_call(
