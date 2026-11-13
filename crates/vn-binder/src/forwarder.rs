@@ -1,6 +1,6 @@
 use super::Binder;
 use std::sync::Arc;
-use vn_core::ast::{Arg, ExprKind, FunctionDecl, Pattern, StmtKind};
+use vn_core::ast::{Arg, ExprId, ExprKind, FunctionDecl, Pattern, StmtKind};
 use vn_sem::symbol::Forward;
 
 impl Binder<'_> {
@@ -29,12 +29,7 @@ impl Binder<'_> {
         let [only] = stmts.as_slice() else {
             return None;
         };
-        let StmtKind::Return {
-            argument: Some(mut value),
-        } = self.ast_arena.stmt(*only).kind
-        else {
-            return None;
-        };
+        let mut value = Self::forwarded_expr(self.ast_arena.stmt(*only).kind.clone())?;
         let mut decodes = false;
         while let ExprKind::As {
             expression,
@@ -86,5 +81,18 @@ impl Binder<'_> {
             args: u8::try_from(args.len()).ok()?,
             typed: decodes.then(|| imported.decode_op.clone()).flatten(),
         }))
+    }
+
+    fn forwarded_expr(kind: StmtKind) -> Option<ExprId> {
+        if let StmtKind::Return {
+            argument: Some(value),
+        } = kind
+        {
+            return Some(value);
+        }
+        if let StmtKind::Expr { expression } = kind {
+            return Some(expression);
+        }
+        None
     }
 }
