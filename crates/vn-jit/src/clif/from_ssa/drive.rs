@@ -60,9 +60,18 @@ pub(in crate::clif) fn try_lower(
 
     let cc = isa.default_call_conv();
     let shape = NativeShape::of_proto(proto);
-    let signature = match activation {
-        Activation::Native => shape.signature(),
-        Activation::Framed => raw_signature(proto, flags.abi_params, cc),
+    let self_body = flags.frameless
+        && activation == Activation::Native
+        && osr.is_none()
+        && ssa.blocks.iter().any(|blk| {
+            blk.insts
+                .iter()
+                .any(|i| matches!(i.op, vn_types::ssa::SsaOp::SelfCall { .. }))
+        });
+    let signature = match (activation, self_body) {
+        (Activation::Native, true) => shape.self_signature(),
+        (Activation::Native, false) => shape.signature(),
+        (Activation::Framed, _) => raw_signature(proto, flags.abi_params, cc),
     };
     let mut func = Function::with_name_signature(UserFuncName::user(0, 0), signature.clone());
     let self_sig = func.import_signature(signature);
@@ -101,6 +110,7 @@ pub(in crate::clif) fn try_lower(
         flags.abi_params,
         &shape,
         entry_blk,
+        self_body,
     )?;
     let scratch = call::ScratchWin::create(&mut b, call::scratch_max(ssa));
     let (no_overflow, version_plans) = if osr.is_some() {
@@ -128,6 +138,12 @@ pub(in crate::clif) fn try_lower(
         proto,
         constants,
         self_ref,
+        self_abi: est.self_abi,
+        arg_word_base: if self_body {
+            3
+        } else {
+            2 + super::super::native_abi::NativeClass::of(shape.params[0]).words()
+        },
         exec_ctx: est.exec_ctx,
         frame: est.frame,
         activation,
@@ -331,8 +347,15 @@ pub(in crate::clif) fn try_lower(
     super::super::debug::capture_ir(&mut debug, &func);
     super::super::debug::capture_kinds_ssa(&mut debug, ssa);
     let frameless = flags.frameless;
+    let body = compile_piece(func, isa)?;
+    let (piece, self_body) = if self_body {
+        (super::self_entry::build(&shape, helpers, isa)?, Some(body))
+    } else {
+        (body, None)
+    };
     Ok(Lowered {
-        piece: compile_piece(func, isa)?,
+        piece,
+        self_body,
         natives: ctx.natives.take(),
         frameless,
     })

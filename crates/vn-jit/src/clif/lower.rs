@@ -208,7 +208,7 @@ pub fn try_compile(
 pub struct CodeImage {
     code: Vec<u8>,
     wrapper_off: u32,
-    call_relocs: Vec<u32>,
+    call_relocs: Vec<(u32, u32)>,
     abs_relocs: Vec<(u32, super::reloc::AbsSym)>,
     natives: Vec<u64>,
     safepoints: Vec<(u32, Box<[u32]>)>,
@@ -225,40 +225,78 @@ impl CodeImage {
         wrapper: super::piece::CompiledPiece,
         activation: Activation,
     ) -> Self {
-        let raw = lowered.piece;
-        let wrapper_off = (raw.code.len() + 15) & !15;
+        let entry = lowered.piece;
+        let body_off = (entry.code.len() + 15) & !15;
+        let raw_end = lowered
+            .self_body
+            .as_ref()
+            .map_or(entry.code.len(), |body| body_off + body.code.len());
+        let wrapper_off = (raw_end + 15) & !15;
         let mut code = vec![0u8; wrapper_off + wrapper.code.len()];
-        code[..raw.code.len()].copy_from_slice(&raw.code);
+        code[..entry.code.len()].copy_from_slice(&entry.code);
+        if let Some(body) = &lowered.self_body {
+            code[body_off..body_off + body.code.len()].copy_from_slice(&body.code);
+        }
         code[wrapper_off..].copy_from_slice(&wrapper.code);
-        let shift = |off: usize| (wrapper_off + off) as u32;
-        let call_relocs = raw
+        let shift_wrapper = |off: usize| (wrapper_off + off) as u32;
+        let shift_body = |off: usize| (body_off + off) as u32;
+        let entry_target = if lowered.self_body.is_some() {
+            body_off as u32
+        } else {
+            0
+        };
+        let mut call_relocs: Vec<(u32, u32)> = entry
             .call_reloc_offsets
             .iter()
-            .map(|&r| r as u32)
-            .chain(wrapper.call_reloc_offsets.iter().map(|&r| shift(r)))
+            .map(|&r| (r as u32, entry_target))
             .collect();
-        let abs_relocs = raw
-            .abs_relocs
-            .iter()
-            .copied()
-            .chain(
-                wrapper
-                    .abs_relocs
-                    .iter()
-                    .map(|&(off, sym)| (shift(off as usize), sym)),
-            )
-            .collect();
-        let safepoints = raw
+        let mut abs_relocs = entry.abs_relocs.clone();
+        let mut safepoints: Vec<(u32, Box<[u32]>)> = entry
             .safepoints
             .into_iter()
             .map(|s| (s.return_offset, s.slots))
-            .chain(
-                wrapper
-                    .safepoints
-                    .into_iter()
-                    .map(|s| (shift(s.return_offset as usize), s.slots)),
-            )
             .collect();
+        let mut locations = entry.locations;
+        if let Some(body) = lowered.self_body {
+            call_relocs.extend(
+                body.call_reloc_offsets
+                    .iter()
+                    .map(|&r| (shift_body(r), body_off as u32)),
+            );
+            abs_relocs.extend(
+                body.abs_relocs
+                    .iter()
+                    .map(|&(off, sym)| (shift_body(off as usize), sym)),
+            );
+            safepoints.extend(
+                body.safepoints
+                    .into_iter()
+                    .map(|s| (shift_body(s.return_offset as usize), s.slots)),
+            );
+            locations.extend(
+                body.locations
+                    .iter()
+                    .map(|&(off, loc)| (shift_body(off as usize), loc)),
+            );
+        }
+        call_relocs.extend(
+            wrapper
+                .call_reloc_offsets
+                .iter()
+                .map(|&r| (shift_wrapper(r), 0)),
+        );
+        abs_relocs.extend(
+            wrapper
+                .abs_relocs
+                .iter()
+                .map(|&(off, sym)| (shift_wrapper(off as usize), sym)),
+        );
+        safepoints.extend(
+            wrapper
+                .safepoints
+                .into_iter()
+                .map(|s| (shift_wrapper(s.return_offset as usize), s.slots)),
+        );
         CodeImage {
             code,
             wrapper_off: wrapper_off as u32,
@@ -266,7 +304,7 @@ impl CodeImage {
             abs_relocs,
             natives: lowered.natives,
             safepoints,
-            locations: raw.locations,
+            locations,
             activation,
             frameless: lowered.frameless,
             pinned: super::reloc::pinned_address(),
@@ -306,8 +344,8 @@ impl CodeImage {
         {
             let slice = buf.as_mut_slice();
             slice[..self.code.len()].copy_from_slice(&self.code);
-            for &r in &self.call_relocs {
-                patch_rel32(slice, r as usize, 0)?;
+            for &(site, target) in &self.call_relocs {
+                patch_rel32(slice, site as usize, target as usize)?;
             }
             for &(off, sym) in &self.abs_relocs {
                 let value = natives.resolve(sym)?;

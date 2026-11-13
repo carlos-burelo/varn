@@ -19,6 +19,11 @@ pub(super) struct FrameIo {
     pub layout: FrameLayout,
 }
 
+pub(super) struct SelfAbi {
+    pub depth: Value,
+    pub floor: Value,
+}
+
 pub(super) struct Ctx<'a> {
     pub cc: CallConv,
     pub helpers: &'a JitHelpers,
@@ -27,6 +32,10 @@ pub(super) struct Ctx<'a> {
 
     pub constants: &'a [VmValue],
     pub self_ref: FuncRef,
+
+    pub self_abi: Option<SelfAbi>,
+
+    pub arg_word_base: usize,
 
     pub exec_ctx: Value,
 
@@ -82,6 +91,8 @@ pub(super) struct PureTryState {
 
 pub(in crate::clif) struct Lowered {
     pub piece: CompiledPiece,
+
+    pub self_body: Option<CompiledPiece>,
 
     pub natives: Vec<u64>,
 

@@ -175,6 +175,7 @@ pub(super) fn reachability(ssa: &SsaProto, start: usize, with_full: bool) -> Res
 pub(super) struct EntryState {
     pub views: Views,
     pub exec_ctx: Value,
+    pub self_abi: Option<super::context::SelfAbi>,
     pub frame: Option<FrameIo>,
     pub this: Option<Value>,
 }
@@ -189,10 +190,30 @@ pub(super) fn enter(
     abi_params: usize,
     shape: &NativeShape,
     entry_blk: Block,
+    self_body: bool,
 ) -> Result<EntryState, String> {
     let views = Views::declare(b, ssa);
 
     let entry_params = b.block_params(entry_blk).to_vec();
+    if self_body {
+        let expected = 3 + shape.params[1..]
+            .iter()
+            .map(|c| super::super::native_abi::NativeClass::of(*c).words())
+            .sum::<usize>();
+        if entry_params.len() != expected {
+            return Err("from_ssa: entry param count mismatch".into());
+        }
+        return Ok(EntryState {
+            views,
+            exec_ctx: entry_params[0],
+            self_abi: Some(super::context::SelfAbi {
+                depth: entry_params[1],
+                floor: entry_params[2],
+            }),
+            frame: None,
+            this: None,
+        });
+    }
     let expected = match activation {
         Activation::Native => {
             2 + shape
@@ -238,6 +259,7 @@ pub(super) fn enter(
     Ok(EntryState {
         views,
         exec_ctx,
+        self_abi: None,
         frame,
         this,
     })

@@ -67,7 +67,7 @@ pub(super) fn lower_block(
     store::drop_home_addrs(ctx);
 
     let params: Vec<Value> = b.block_params(clif_blk).to_vec();
-    let mut word = 4;
+    let mut word = ctx.arg_word_base;
     for (k, &p) in blk.params.iter().enumerate() {
         let kind = ssa.value_ty(p);
         let pv = if is_call_entry {

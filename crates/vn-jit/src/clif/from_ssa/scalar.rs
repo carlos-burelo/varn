@@ -120,20 +120,17 @@ pub(super) fn emit_inst(
                     b, ctx, values, args,
                 )?)));
             }
-            let entry_depth = super::stack_exit::enter_self_call(b, ctx);
-            let no_closure = b.ins().iconst(types::I64, 0);
-            let null_tag = b
-                .ins()
-                .iconst(types::I64, vn_types::vm_value::KIND_NULL as i64);
-            let null_payload = b.ins().iconst(types::I64, 0);
-            let mut a = vec![ctx.exec_ctx, no_closure, null_tag, null_payload];
+            let abi = ctx
+                .self_abi
+                .as_ref()
+                .ok_or("from_ssa: frameless self-call without a self-call ABI")?;
+            let next_depth = super::stack_exit::guard_self_call(b, ctx, abi);
+            let mut a = vec![ctx.exec_ctx, next_depth, abi.floor];
             for v in args {
                 a.push(load_value(b, ctx, values, *v)?);
             }
             let call = b.ins().call(ctx.self_ref, &a);
-            let result = b.inst_results(call)[0];
-            super::stack_exit::leave_self_call(b, ctx, entry_depth);
-            result
+            b.inst_results(call)[0]
         }
         SsaOp::MethodCall {
             recv,

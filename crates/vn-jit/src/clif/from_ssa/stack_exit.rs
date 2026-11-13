@@ -2,7 +2,7 @@ use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlagsData, 
 use cranelift_frontend::FunctionBuilder;
 
 use super::super::emit::call_helper_void;
-use super::context::Ctx;
+use super::context::{Ctx, SelfAbi};
 use crate::JitHelpers;
 
 pub(super) fn guard_headroom(b: &mut FunctionBuilder, ctx: &Ctx<'_>) {
@@ -88,29 +88,14 @@ fn raise_overflow(b: &mut FunctionBuilder, ctx: &Ctx<'_>, helper: usize) {
     }
 }
 
-pub(super) fn enter_self_call(b: &mut FunctionBuilder, ctx: &Ctx<'_>) -> Value {
+pub(super) fn guard_self_call(b: &mut FunctionBuilder, ctx: &Ctx<'_>, abi: &SelfAbi) -> Value {
     let helpers = ctx.helpers;
-    let lay = &helpers.call_layout;
-    let m = MemFlagsData::trusted();
     let sp = b.ins().get_stack_pointer(types::I64);
-    let floor = b.ins().load(
-        types::I64,
-        m,
-        ctx.exec_ctx,
-        helpers.jit_stack_floor_offset as i32,
-    );
-    let frames = b
-        .ins()
-        .load(types::I64, m, ctx.exec_ctx, lay.frames_len_off as i32);
-    let frameless = b
-        .ins()
-        .load(types::I64, m, ctx.exec_ctx, lay.frameless_depth_off as i32);
-    let depth = b.ins().iadd(frames, frameless);
-    let stack_low = b.ins().icmp(IntCC::UnsignedLessThan, sp, floor);
+    let stack_low = b.ins().icmp(IntCC::UnsignedLessThan, sp, abi.floor);
     let too_deep = b.ins().icmp_imm_u(
         IntCC::UnsignedGreaterThanOrEqual,
-        depth,
-        lay.max_call_depth as i64,
+        abi.depth,
+        helpers.call_layout.max_call_depth as i64,
     );
     let exhausted = b.ins().bor(stack_low, too_deep);
 
@@ -131,19 +116,7 @@ pub(super) fn enter_self_call(b: &mut FunctionBuilder, ctx: &Ctx<'_>) -> Value {
     raise_overflow(b, ctx, helpers.call_depth_overflow);
 
     b.switch_to_block(cont);
-    let next = b.ins().iadd_imm_u(frameless, 1);
-    b.ins()
-        .store(m, next, ctx.exec_ctx, lay.frameless_depth_off as i32);
-    frameless
-}
-
-pub(super) fn leave_self_call(b: &mut FunctionBuilder, ctx: &Ctx<'_>, entry_depth: Value) {
-    b.ins().store(
-        MemFlagsData::trusted(),
-        entry_depth,
-        ctx.exec_ctx,
-        ctx.helpers.call_layout.frameless_depth_off as i32,
-    );
+    b.ins().iadd_imm_u(abi.depth, 1)
 }
 
 pub(crate) fn publish(b: &mut FunctionBuilder, helpers: &JitHelpers, exec_ctx: Value) {

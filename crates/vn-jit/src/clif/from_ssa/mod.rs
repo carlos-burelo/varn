@@ -33,6 +33,7 @@ mod scalar;
 mod scalar_ops;
 mod setup;
 mod stack_exit;
+mod self_entry;
 mod store;
 mod term;
 mod try_stacks;

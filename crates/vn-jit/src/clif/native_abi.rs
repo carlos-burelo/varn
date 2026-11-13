@@ -61,6 +61,18 @@ impl NativeShape {
         Self::new(&proto.param_kinds, proto.return_kind)
     }
 
+    pub(crate) fn self_signature(&self) -> Signature {
+        let mut sig = Signature::new(CALL_CONV);
+        for _ in 0..3 {
+            sig.params.push(AbiParam::new(types::I64));
+        }
+        for c in &self.params[1..] {
+            NativeClass::of(*c).push(&mut sig.params);
+        }
+        NativeClass::of(self.ret).push(&mut sig.returns);
+        sig
+    }
+
     pub(crate) fn signature(&self) -> Signature {
         let mut sig = Signature::new(CALL_CONV);
         sig.params.push(AbiParam::new(types::I64));
