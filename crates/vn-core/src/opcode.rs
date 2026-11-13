@@ -204,12 +204,19 @@ pub enum OpCode {
     Convert,
 
     BytesLength,
+
+    LtImm,
+    LteImm,
+    GtImm,
+    GteImm,
+    EqImm,
+    NeqImm,
 }
 
 impl OpCode {
     #[inline(always)]
     pub fn from_u8(v: u8) -> Option<Self> {
-        if v <= OpCode::BytesLength as u8 {
+        if v <= OpCode::NeqImm as u8 {
             Some(unsafe { std::mem::transmute::<u8, OpCode>(v) })
         } else {
             None

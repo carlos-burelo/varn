@@ -278,7 +278,8 @@ impl ExecCtx {
                 return Err(crate::frame::call_depth_exceeded());
             }
             let owned = self.frames[frame_idx]._owned_closure.clone();
-            let alloc = self.push_call_frame(&closure_ref.proto, base, arg_start, arg_count)?;
+            let alloc =
+                self.push_self_call_frame(&closure_ref.proto, base, arg_start, arg_count)?;
             let mut frame = crate::frame::CallFrame::new(closure_ref, alloc);
             frame._owned_closure = owned;
             frame.return_reg = dest as u16;
@@ -302,14 +303,14 @@ impl ExecCtx {
             let rest_idx = arity.saturating_sub(1);
             let regular_count = arg_count.min(rest_idx);
             let mut failed: Option<crate::error::RuntimeError> = None;
-            for i in 0..regular_count {
+            for i in 1..regular_count {
                 if let Err(e) = self.stack.mov_cross(alloc, i, base, arg_start + i) {
                     failed = Some(e);
                     break;
                 }
             }
             if failed.is_none() {
-                for i in regular_count..rest_idx {
+                for i in regular_count.max(1)..rest_idx {
                     if let Err(e) = self.stack.unbox_into_reg(alloc, i, VmValue::null()) {
                         failed = Some(e);
                         break;
@@ -319,7 +320,10 @@ impl ExecCtx {
             if failed.is_none() {
                 let rest_items: Vec<VmValue> = if arg_count > rest_idx {
                     (rest_idx..arg_count)
-                        .map(|i| self.stack.box_reg(base, arg_start + i))
+                        .map(|i| match i {
+                            0 => VmValue::null(),
+                            _ => self.stack.box_reg(base, arg_start + i),
+                        })
                         .collect()
                 } else {
                     vec![]
@@ -346,7 +350,11 @@ impl ExecCtx {
         self.stage.clear();
         self.stage.push(callee);
         for i in 0..arg_count {
-            self.stage.push(self.stack.box_reg(base, arg_start + i));
+            let arg = match i {
+                0 => VmValue::null(),
+                _ => self.stack.box_reg(base, arg_start + i),
+            };
+            self.stage.push(arg);
         }
         let prepared = self.prepare_call(callee, arg_count)?;
         self.dispatch_prepared_call(prepared)?;

@@ -56,6 +56,12 @@ pub fn is_alloc_free_op(op: OpCode) -> bool {
             | OpCode::Not
             | OpCode::AddImm
             | OpCode::SubImm
+            | OpCode::LtImm
+            | OpCode::LteImm
+            | OpCode::GtImm
+            | OpCode::GteImm
+            | OpCode::EqImm
+            | OpCode::NeqImm
             | OpCode::AddInt
             | OpCode::SubInt
             | OpCode::MulInt

@@ -5,6 +5,12 @@ pub(super) fn infix(op: OpCode) -> Option<&'static str> {
     Some(match op {
         O::Add | O::AddInt | O::AddFloat | O::AddImm | O::StrConcat => "+",
         O::Sub | O::SubInt | O::SubFloat | O::SubImm => "-",
+        O::LtImm => "<",
+        O::LteImm => "<=",
+        O::GtImm => ">",
+        O::GteImm => ">=",
+        O::EqImm => "==",
+        O::NeqImm => "!=",
         O::Mul | O::MulInt | O::MulFloat => "*",
         O::Div | O::DivInt | O::DivFloat => "/",
         O::Mod | O::ModInt | O::ModFloat => "%",

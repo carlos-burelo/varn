@@ -281,6 +281,12 @@ pub(super) fn emit_module_body(
             | OpCode::StoreModuleSlot
             | OpCode::InvokeRuntimeStatic
             | OpCode::SubImm
+            | OpCode::LtImm
+            | OpCode::LteImm
+            | OpCode::GtImm
+            | OpCode::GteImm
+            | OpCode::EqImm
+            | OpCode::NeqImm
             | OpCode::BuildStr
             | OpCode::LoadIntMinusOne
             | OpCode::AddInt

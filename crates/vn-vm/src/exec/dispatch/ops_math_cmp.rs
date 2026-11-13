@@ -53,7 +53,14 @@ impl ExecCtx {
                 self.exec_unary(op, code, ip, base, first_reg)?;
             }
 
-            OpCode::AddImm | OpCode::SubImm => {
+            OpCode::AddImm
+            | OpCode::SubImm
+            | OpCode::LtImm
+            | OpCode::LteImm
+            | OpCode::GtImm
+            | OpCode::GteImm
+            | OpCode::EqImm
+            | OpCode::NeqImm => {
                 self.exec_imm(op, code, ip, base, first_reg)?;
             }
 

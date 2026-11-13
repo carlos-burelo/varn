@@ -1,4 +1,4 @@
-use super::ir::{BlockId, Inst, InstKind, SsaFunc};
+use super::ir::{BlockId, Inst, InstKind, SsaFunc, Terminator};
 use crate::OptError;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -143,8 +143,16 @@ pub(crate) fn emit_function_meta(
     }
 
     chunk.scope_cursor = 0;
-    chunk.write(Chunk::pack_op(OpCode::LoadNull, null_reg), fn_line);
-    chunk.emit1(OpCode::Return, Chunk::pack(0, null_reg), fn_line);
+    let ends_in_exit = order.last().is_some_and(|&b| {
+        matches!(
+            ssa.blocks[b].term,
+            Terminator::Return(_) | Terminator::Throw(_) | Terminator::Unreachable
+        )
+    });
+    if !ends_in_exit {
+        chunk.write(Chunk::pack_op(OpCode::LoadNull, null_reg), fn_line);
+        chunk.emit1(OpCode::Return, Chunk::pack(0, null_reg), fn_line);
+    }
 
     for (pos, target) in fixups {
         let target_off = block_offset[target.0 as usize];
@@ -270,101 +278,15 @@ fn emit_inst(
     {
         return Ok(());
     }
-    if let Some((_, other, value)) = immediates::immediate_operand(&inst.kind, &imms.imm) {
+    if let Some(form) = immediates::immediate_operand(&inst.kind, &imms.imm) {
         let dest = reg[inst.dest.expect("binary defines a value").0 as usize];
-
-        let opcode = match &inst.kind {
-            InstKind::Binary {
-                op: crate::hir::HirBinOp::Sub,
-                ..
-            } => OpCode::SubImm,
-            InstKind::ConstInt(_)
-            | InstKind::ConstFloat(_)
-            | InstKind::ConstBool(_)
-            | InstKind::ConstStr(_)
-            | InstKind::ConstChar(_)
-            | InstKind::ConstDecimal(_)
-            | InstKind::ConstBigInt(_)
-            | InstKind::ConstNull
-            | InstKind::Binary { .. }
-            | InstKind::Unary { .. }
-            | InstKind::LoadGlobal(_)
-            | InstKind::LoadGlobalIdx(_)
-            | InstKind::LoadNativeGlobalIdx(_)
-            | InstKind::LoadUpvalue(_)
-            | InstKind::StoreGlobal { .. }
-            | InstKind::StoreGlobalIdx { .. }
-            | InstKind::StoreUpvalue { .. }
-            | InstKind::Call { .. }
-            | InstKind::AllocInstance { .. }
-            | InstKind::SelfCall { .. }
-            | InstKind::GetProperty { .. }
-            | InstKind::GetFixedField { .. }
-            | InstKind::GetIndex { .. }
-            | InstKind::ArrayGetIndex { .. }
-            | InstKind::BytesGetIndex { .. }
-            | InstKind::MapGetIndex { .. }
-            | InstKind::SetProperty { .. }
-            | InstKind::SetFixedField { .. }
-            | InstKind::SetIndex { .. }
-            | InstKind::ArraySetIndex { .. }
-            | InstKind::BytesSetIndex { .. }
-            | InstKind::MapSetIndex { .. }
-            | InstKind::ArrayPush { .. }
-            | InstKind::ObjectMerge { .. }
-            | InstKind::MethodCall { .. }
-            | InstKind::IsNull { .. }
-            | InstKind::Cast { .. }
-            | InstKind::Convert { .. }
-            | InstKind::BuildArray { .. }
-            | InstKind::BuildTuple { .. }
-            | InstKind::BuildObject { .. }
-            | InstKind::BuildMap { .. }
-            | InstKind::ObjectRest { .. }
-            | InstKind::ToString { .. }
-            | InstKind::BuildStr { .. }
-            | InstKind::MakeClosure { .. }
-            | InstKind::LoadCaptured { .. }
-            | InstKind::StoreCaptured { .. }
-            | InstKind::MakeClass { .. }
-            | InstKind::DeclareLayout { .. }
-            | InstKind::DefineStatic { .. }
-            | InstKind::DefineMethod { .. }
-            | InstKind::DefineAccessor { .. }
-            | InstKind::MakeEnumVariant { .. }
-            | InstKind::Try { .. }
-            | InstKind::PopTry
-            | InstKind::CatchParam { .. }
-            | InstKind::CloseUpvalues { .. }
-            | InstKind::Dispose { .. }
-            | InstKind::LoadModule { .. }
-            | InstKind::StoreModuleSlot { .. }
-            | InstKind::Await { .. }
-            | InstKind::Spawn { .. }
-            | InstKind::Yield { .. }
-            | InstKind::IntrinsicCall { .. }
-            | InstKind::CallNativeOp { .. }
-            | InstKind::AssertNotNull { .. }
-            | InstKind::GetPropertyMaybe { .. }
-            | InstKind::ModuleSlot { .. }
-            | InstKind::GetEnumTag { .. }
-            | InstKind::IsArray { .. }
-            | InstKind::StrLength { .. }
-            | InstKind::ArrayLength { .. }
-            | InstKind::BytesLength { .. }
-            | InstKind::This
-            | InstKind::Range { .. }
-            | InstKind::ObjectKeys { .. }
-            | InstKind::GetSuper { .. }
-            | InstKind::SuperCall { .. }
-            | InstKind::SuperMethodCall { .. }
-            | InstKind::ExtensionCall { .. }
-            | InstKind::CallSpread { .. }
-            | InstKind::BuildArraySpread { .. }
-            | InstKind::BuildObjectSpread { .. } => OpCode::AddImm,
-        };
-
-        chunk.emit_rrr(opcode, dest, reg[other.0 as usize], value as u8, inst.line);
+        chunk.emit_rrr(
+            form.opcode,
+            dest,
+            reg[form.other.0 as usize],
+            form.value as u8,
+            inst.line,
+        );
         return Ok(());
     }
 

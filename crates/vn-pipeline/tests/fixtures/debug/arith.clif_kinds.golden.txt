@@ -6,12 +6,12 @@
   ────────┼───────────────────────────────────────────────────────────
   block@0 │ v0:Ref, v1:Ref, v24:Ref, v25:Str, v26:Dynamic, v27:Dynamic
   add
-    kinds (5 regs):
+    kinds (6 regs):
   block   │ kinds                 
   ────────┼───────────────────────
   block@0 │ v0:Int, v1:Int, v2:Int
   scale
-    kinds (5 regs):
+    kinds (4 regs):
   block   │ kinds                                 
   ────────┼───────────────────────────────────────
   block@0 │ v0:Int, v1:Int, v2:Int, v3:Int, v4:Int

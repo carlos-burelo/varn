@@ -31,7 +31,14 @@ pub(super) fn emit_self_call(
     call_base: u8,
     line: u32,
 ) {
-    super::super::terminator::emit_call_args(chunk, reg, call_base, args, line);
+    for (i, a) in args.iter().enumerate() {
+        chunk.emit_rr(
+            OpCode::Move,
+            call_base + 1 + i as u8,
+            reg[a.0 as usize],
+            line,
+        );
+    }
     let total = (args.len() + 1) as u8;
     chunk.emit(OpCode::CallSelf, line);
     chunk.write(Chunk::pack(d, 0), line);

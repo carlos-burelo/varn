@@ -108,7 +108,14 @@ pub fn layout(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<La
         | O::Spawn
         | O::ObjectKeys => (2, vec![w(hi(0)), r(hi(1))]),
         O::Convert => (2, vec![w(hi(0)), r(hi(1)), imm(lo(1), I::Conv)]),
-        O::AddImm | O::SubImm => (2, vec![w(hi(0)), r(hi(1)), imm(lo(1), I::Int)]),
+        O::AddImm
+        | O::SubImm
+        | O::LtImm
+        | O::LteImm
+        | O::GtImm
+        | O::GteImm
+        | O::EqImm
+        | O::NeqImm => (2, vec![w(hi(0)), r(hi(1)), imm(lo(1), I::Int)]),
         O::IntrinsicDirect => (2, vec![w(hi(0)), imm(lo(1), I::Intrinsic), r(hi(1))]),
 
         O::Add

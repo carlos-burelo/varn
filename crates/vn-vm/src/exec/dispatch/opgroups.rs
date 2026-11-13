@@ -33,6 +33,12 @@ macro_rules! math_cmp_ops {
             | OpCode::Not
             | OpCode::AddImm
             | OpCode::SubImm
+            | OpCode::LtImm
+            | OpCode::LteImm
+            | OpCode::GtImm
+            | OpCode::GteImm
+            | OpCode::EqImm
+            | OpCode::NeqImm
             | OpCode::AddInt
             | OpCode::SubInt
             | OpCode::MulInt

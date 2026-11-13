@@ -16,7 +16,7 @@ fn <module> (arity: 1, regs: 16, upvalues: 0)
   [2m[011][0m [32m"value=10"[0m
   [2m[012][0m [32m"generics map"[0m
   [2m[013][0m [32m"generics ok"[0m
-  [2mcode (123) words[0m
+  [2mcode (120) words[0m
   Off  │ Lin │ Opcode               │ Operands / Hint
   ────────────────────────────────────────────────────────────────────────
   0000 │   1 │ [34mLoadStaticFn        [0m │ r1 = #0  [2m;[0m [34mfn identity[0m(arity=2)
@@ -36,7 +36,7 @@ fn <module> (arity: 1, regs: 16, upvalues: 0)
   0035 │   5 │ SetFixedField       [0m │ r2, r3, field0, +0, :dynamic
   0039 │   9 │ GetFixedField       [0m │ r4 = r2, field0, +0, :dynamic
   0043 │  22 │ Move                [0m │ r5 = r4
-  0045 │  22 │ [32mNeqInt              [0m │ r6 = r5 != r3
+  0045 │  22 │ [32mNeqImm              [0m │ r6 = r5 != 10
   0047 │  22 │ [33mJumpIfFalse         [0m │ r6, → 0067
   0050 │  22 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@4
   0052 │  22 │ [36mLoadConst           [0m │ r7 = #9  [2m;[0m [32m"generics get"[0m
@@ -73,40 +73,32 @@ fn <module> (arity: 1, regs: 16, upvalues: 0)
   0114 │  26 │ [35mCall                [0m │ r8 = r1, (r13..r14)
   0117 │  26 │ LoadNull            [0m │ r12 = null
   0118 │  26 │ [33mReturn              [0m │ r12
-  0120 │   1 │ LoadNull            [0m │ r12 = null
-  0121 │   1 │ [33mReturn              [0m │ r12
 
-  fn identity (arity: 2, regs: 3, upvalues: 0)
-    [2mcode (5) words[0m
+  fn identity (arity: 2, regs: 4, upvalues: 0)
+    [2mcode (2) words[0m
     Off  │ Lin │ Opcode               │ Operands / Hint
     ────────────────────────────────────────────────────────────────────────
     0000 │  18 │ [33mReturn              [0m │ r1
-    0002 │   1 │ LoadNull            [0m │ r2 = null
-    0003 │   1 │ [33mReturn              [0m │ r2
 
   fn Box.constructor (arity: 2, regs: 4, upvalues: 0)  [2m[has_this][0m
-    [2mcode (12) words[0m
+    [2mcode (9) words[0m
     Off  │ Lin │ Opcode               │ Operands / Hint
     ────────────────────────────────────────────────────────────────────────
     0000 │   5 │ Move                [0m │ r2 = r0
     0002 │   5 │ SetFixedField       [0m │ r2, r1, field0, +0, :dynamic
     0006 │   5 │ LoadNull            [0m │ r3 = null
     0007 │   5 │ [33mReturn              [0m │ r3
-    0009 │   1 │ LoadNull            [0m │ r3 = null
-    0010 │   1 │ [33mReturn              [0m │ r3
 
-  fn Box.get (arity: 1, regs: 3, upvalues: 0)  [2m[has_this][0m
-    [2mcode (11) words[0m
+  fn Box.get (arity: 1, regs: 5, upvalues: 0)  [2m[has_this][0m
+    [2mcode (8) words[0m
     Off  │ Lin │ Opcode               │ Operands / Hint
     ────────────────────────────────────────────────────────────────────────
     0000 │   9 │ Move                [0m │ r1 = r0
     0002 │   9 │ GetFixedField       [0m │ r2 = r1, field0, +0, :dynamic
     0006 │   9 │ [33mReturn              [0m │ r2
-    0008 │   1 │ LoadNull            [0m │ r2 = null
-    0009 │   1 │ [33mReturn              [0m │ r2
 
   fn Box.map (arity: 2, regs: 10, upvalues: 0)  [2m[has_this][0m
-    [2mcode (25) words[0m
+    [2mcode (22) words[0m
     Off  │ Lin │ Opcode               │ Operands / Hint
     ────────────────────────────────────────────────────────────────────────
     0000 │  13 │ [36mLoadGlobalIdx       [0m │ r2 = global@1
@@ -118,14 +110,12 @@ fn <module> (arity: 1, regs: 16, upvalues: 0)
     0014 │  13 │ AllocInstance       [0m │ r3 = r2
     0016 │   5 │ SetFixedField       [0m │ r3, r5, field0, +0, :dynamic
     0020 │  13 │ [33mReturn              [0m │ r3
-    0022 │   1 │ LoadNull            [0m │ r7 = null
-    0023 │   1 │ [33mReturn              [0m │ r7
 
-  fn <closure> (arity: 2, regs: 6, upvalues: 0)
+  fn <closure> (arity: 2, regs: 7, upvalues: 0)
     [2mconstants (2)[0m
     [2m[000][0m [32m"value="[0m
     [2m[001][0m [32m""[0m
-    [2mcode (15) words[0m
+    [2mcode (12) words[0m
     Off  │ Lin │ Opcode               │ Operands / Hint
     ────────────────────────────────────────────────────────────────────────
     0000 │  24 │ [36mLoadConst           [0m │ r2 = #0  [2m;[0m [32m"value="[0m
@@ -134,7 +124,5 @@ fn <module> (arity: 1, regs: 16, upvalues: 0)
     0006 │  24 │ [36mLoadConst           [0m │ r2 = #1  [2m;[0m [32m""[0m
     0008 │  24 │ [32mStrConcat           [0m │ r3 = r4 + r2
     0010 │  24 │ [33mReturn              [0m │ r3
-    0012 │   1 │ LoadNull            [0m │ r5 = null
-    0013 │   1 │ [33mReturn              [0m │ r5
 
   ── end: bytecode ──

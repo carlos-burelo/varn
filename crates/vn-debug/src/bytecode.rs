@@ -29,7 +29,7 @@ fn op_color(op: OpCode) -> &'static str {
         | ModInt | PowInt | LtInt | GtInt | LteInt | GteInt | EqInt | NeqInt | AddFloat
         | SubFloat | MulFloat | DivFloat | ModFloat | PowFloat | LtFloat | GtFloat | LteFloat
         | GteFloat | EqFloat | NeqFloat | EqStr | NeqStr | StrConcat | StrSlice | AddImm
-        | SubImm => GREEN,
+        | SubImm | LtImm | LteImm | GtImm | GteImm | EqImm | NeqImm => GREEN,
         LoadNull | LoadTrue | LoadFalse | Move | CloseUpvalue | Negate | Not | ToString
         | BuildTuple | GetIndex | SetIndex | ObjectRest | ObjectKeys | ObjectMerge
         | GetProperty | GetPropertyMaybe | SetProperty | GetFixedField | SetFixedField

@@ -12,22 +12,22 @@
   block@5 │ v27:Ref, v28:Str, v29:Dynamic, v30:Dynamic, v31:Ref                        
   block@6 │ v32:Ref, v33:Str, v34:Dynamic, v35:Dynamic                                 
   makeAdder (framed)
-    kinds (4 regs):
+    kinds (5 regs):
   block   │ kinds         
   ────────┼───────────────
   block@0 │ v0:Int, v1:Ref
   <closure> (native)
-    kinds (5 regs):
+    kinds (6 regs):
   block   │ kinds                 
   ────────┼───────────────────────
   block@0 │ v0:Int, v1:Int, v2:Int
   makeCounter (framed)
-    kinds (5 regs):
+    kinds (4 regs):
   block   │ kinds         
   ────────┼───────────────
   block@0 │ v0:Int, v1:Ref
   <closure> (native)
-    kinds (4 regs):
+    kinds (3 regs):
   block   │ kinds                         
   ────────┼───────────────────────────────
   block@0 │ v0:Int, v1:Int, v2:Int, v3:Int

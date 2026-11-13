@@ -17,7 +17,7 @@
   ────────┼─────────────────
   block@0 │ v0:Float, v1:Ref
   Temperature.get celsius (native)
-    kinds (4 regs):
+    kinds (5 regs):
   block   │ kinds           
   ────────┼─────────────────
   block@0 │ v0:Ref, v1:Float
@@ -27,7 +27,7 @@
   ────────┼─────────────────
   block@0 │ v0:Float, v1:Ref
   Temperature.get fahrenheit (native)
-    kinds (6 regs):
+    kinds (7 regs):
   block   │ kinds                                                   
   ────────┼─────────────────────────────────────────────────────────
   block@0 │ v0:Ref, v1:Float, v2:Float, v3:Float, v4:Float, v5:Float

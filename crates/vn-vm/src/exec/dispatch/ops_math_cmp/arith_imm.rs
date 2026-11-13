@@ -5,6 +5,23 @@ use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 use vn_core::OpCode;
 
+macro_rules! imm_compare {
+    ($ctx:ident, $base:ident, $src:ident, $dest:ident, $imm:ident, $int_cmp:tt, $heap_cmp:path) => {{
+        let verdict = if $ctx.stack.reg_class($base, $src) == crate::frame_store::SlotClass::Gpr {
+            $ctx.stack.g($base, $src) $int_cmp $imm
+        } else {
+            let v = $ctx.stack.box_reg($base, $src);
+            if $ctx.heap.is_int(v) {
+                $ctx.heap.as_int(v) $int_cmp $imm
+            } else {
+                $heap_cmp(v, VmValue::from_int($imm), &$ctx.heap)
+            }
+        };
+        $ctx.stack
+            .unbox_into_reg($base, $dest, VmValue::from_bool(verdict))?;
+    }};
+}
+
 impl ExecCtx {
     pub(super) fn exec_imm(
         &mut self,
@@ -74,6 +91,24 @@ impl ExecCtx {
                         self.stack.unbox_into_reg(base, first_reg, r)?;
                     }
                 }
+            }
+            OpCode::LtImm => {
+                imm_compare!(self, base, src, first_reg, imm, <, crate::exec::compare::lt_heap)
+            }
+            OpCode::LteImm => {
+                imm_compare!(self, base, src, first_reg, imm, <=, crate::exec::compare::lte_heap)
+            }
+            OpCode::GtImm => {
+                imm_compare!(self, base, src, first_reg, imm, >, crate::exec::compare::gt_heap)
+            }
+            OpCode::GteImm => {
+                imm_compare!(self, base, src, first_reg, imm, >=, crate::exec::compare::gte_heap)
+            }
+            OpCode::EqImm => {
+                imm_compare!(self, base, src, first_reg, imm, ==, crate::exec::compare::eq)
+            }
+            OpCode::NeqImm => {
+                imm_compare!(self, base, src, first_reg, imm, !=, crate::exec::compare::neq)
             }
             OpCode::LoadConst
             | OpCode::LoadNull

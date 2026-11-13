@@ -25,7 +25,7 @@
   block@1 │ v4:Int, v11:Int, v5:Int, v6:Int, v8:Int, v9:Bool
   block@2 │ v10:Int, v12:Int                                
   firstAbove (native)
-    kinds (9 regs):
+    kinds (10 regs):
   block   │ kinds                         
   ────────┼───────────────────────────────
   block@0 │ v0:Ref, v1:Int, v2:Int, v4:Int

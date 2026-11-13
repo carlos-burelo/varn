@@ -10,7 +10,7 @@
   block@3 │ v34:Ref, v35:Str, v36:Dynamic, v37:Dynamic, v38:Ref                                         
   block@4 │ v39:Ref, v40:Str, v41:Dynamic, v42:Dynamic                                                  
   identity (native)
-    kinds (3 regs):
+    kinds (4 regs):
   block   │ kinds     
   ────────┼───────────
   block@0 │ v0:Dynamic
@@ -20,7 +20,7 @@
   ────────┼───────────────────
   block@0 │ v0:Dynamic, v1:Ref
   Box.get (native)
-    kinds (3 regs):
+    kinds (5 regs):
   block   │ kinds             
   ────────┼───────────────────
   block@0 │ v0:Ref, v1:Dynamic
@@ -30,7 +30,7 @@
   ────────┼───────────────────────────────────────────────────────────
   block@0 │ v0:Dynamic, v1:Ref, v2:Ref, v3:Dynamic, v4:Dynamic, v5:Ref
   <closure> (native)
-    kinds (6 regs):
+    kinds (7 regs):
   block   │ kinds                                         
   ────────┼───────────────────────────────────────────────
   block@0 │ v0:Int, v1:Str, v2:Str, v3:Str, v4:Str, v5:Str

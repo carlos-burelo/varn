@@ -5,7 +5,7 @@ fn <module> (arity: 1, regs: 6, upvalues: 0)
   [2m[000][0m [34mfn add[0m(arity=3)
   [2m[001][0m [34mfn scale[0m(arity=2)
   [2m[002][0m [32m"arith ok"[0m
-  [2mcode (28) words[0m
+  [2mcode (25) words[0m
   Off  │ Lin │ Opcode               │ Operands / Hint
   ────────────────────────────────────────────────────────────────────────
   0000 │   1 │ [34mLoadStaticFn        [0m │ r3 = #0  [2m;[0m [34mfn add[0m(arity=3)
@@ -20,27 +20,21 @@ fn <module> (arity: 1, regs: 6, upvalues: 0)
   0019 │  12 │ [35mCall                [0m │ r5 = r3, (r1..r2)
   0022 │  12 │ LoadNull            [0m │ r1 = null
   0023 │  12 │ [33mReturn              [0m │ r1
-  0025 │   1 │ LoadNull            [0m │ r1 = null
-  0026 │   1 │ [33mReturn              [0m │ r1
 
-  fn add (arity: 3, regs: 5, upvalues: 0)
-    [2mcode (7) words[0m
+  fn add (arity: 3, regs: 6, upvalues: 0)
+    [2mcode (4) words[0m
     Off  │ Lin │ Opcode               │ Operands / Hint
     ────────────────────────────────────────────────────────────────────────
     0000 │   2 │ [32mAddInt              [0m │ r3 = r1 + r2
     0002 │   2 │ [33mReturn              [0m │ r3
-    0004 │   1 │ LoadNull            [0m │ r4 = null
-    0005 │   1 │ [33mReturn              [0m │ r4
 
-  fn scale (arity: 2, regs: 5, upvalues: 0)
-    [2mcode (11) words[0m
+  fn scale (arity: 2, regs: 4, upvalues: 0)
+    [2mcode (8) words[0m
     Off  │ Lin │ Opcode               │ Operands / Hint
     ────────────────────────────────────────────────────────────────────────
     0000 │   6 │ [36mLoadInt             [0m │ r2 = 2
     0002 │   6 │ [32mMulInt              [0m │ r3 = r1 * r2
     0004 │   6 │ [32mAddImm              [0m │ r2 = r3 + 1
     0006 │   6 │ [33mReturn              [0m │ r2
-    0008 │   1 │ LoadNull            [0m │ r4 = null
-    0009 │   1 │ [33mReturn              [0m │ r4
 
   ── end: bytecode ──

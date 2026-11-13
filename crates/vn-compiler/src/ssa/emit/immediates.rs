@@ -1,4 +1,5 @@
 use super::super::ir::{InstKind, SsaFunc, Value};
+use vn_core::OpCode;
 use vn_tir::BackendTy;
 
 pub(super) struct Immediates {
@@ -13,7 +14,14 @@ impl Immediates {
     }
 }
 
-pub(super) fn immediate_operand(kind: &InstKind, imm: &[Option<i8>]) -> Option<(Value, Value, i8)> {
+pub(super) struct ImmediateForm {
+    pub(super) carrier: Value,
+    pub(super) other: Value,
+    pub(super) value: i8,
+    pub(super) opcode: OpCode,
+}
+
+pub(super) fn immediate_operand(kind: &InstKind, imm: &[Option<i8>]) -> Option<ImmediateForm> {
     let InstKind::Binary {
         op,
         lhs,
@@ -24,33 +32,37 @@ pub(super) fn immediate_operand(kind: &InstKind, imm: &[Option<i8>]) -> Option<(
         return None;
     };
     let get = |v: &Value| -> Option<i8> { *imm.get(v.0 as usize)? };
+    let form = |opcode: OpCode, swapped: bool| -> Option<ImmediateForm> {
+        let (carrier, other) = if swapped { (lhs, rhs) } else { (rhs, lhs) };
+        Some(ImmediateForm {
+            carrier: *carrier,
+            other: *other,
+            value: get(carrier)?,
+            opcode,
+        })
+    };
+    use crate::hir::HirBinOp as H;
     match op {
-        crate::hir::HirBinOp::Add => {
-            if let Some(i) = get(rhs) {
-                Some((*rhs, *lhs, i))
-            } else {
-                get(lhs).map(|i| (*lhs, *rhs, i))
-            }
-        }
-        crate::hir::HirBinOp::Sub => get(rhs).map(|i| (*rhs, *lhs, i)),
-        crate::hir::HirBinOp::Mul
-        | crate::hir::HirBinOp::Div
-        | crate::hir::HirBinOp::Mod
-        | crate::hir::HirBinOp::Pow
-        | crate::hir::HirBinOp::Eq
-        | crate::hir::HirBinOp::Ne
-        | crate::hir::HirBinOp::Lt
-        | crate::hir::HirBinOp::Le
-        | crate::hir::HirBinOp::Gt
-        | crate::hir::HirBinOp::Ge
-        | crate::hir::HirBinOp::BitAnd
-        | crate::hir::HirBinOp::BitOr
-        | crate::hir::HirBinOp::BitXor
-        | crate::hir::HirBinOp::Shl
-        | crate::hir::HirBinOp::Shr
-        | crate::hir::HirBinOp::Ushr
-        | crate::hir::HirBinOp::Instanceof
-        | crate::hir::HirBinOp::In => None,
+        H::Add => form(OpCode::AddImm, false).or_else(|| form(OpCode::AddImm, true)),
+        H::Sub => form(OpCode::SubImm, false),
+        H::Lt => form(OpCode::LtImm, false).or_else(|| form(OpCode::GtImm, true)),
+        H::Le => form(OpCode::LteImm, false).or_else(|| form(OpCode::GteImm, true)),
+        H::Gt => form(OpCode::GtImm, false).or_else(|| form(OpCode::LtImm, true)),
+        H::Ge => form(OpCode::GteImm, false).or_else(|| form(OpCode::LteImm, true)),
+        H::Eq => form(OpCode::EqImm, false).or_else(|| form(OpCode::EqImm, true)),
+        H::Ne => form(OpCode::NeqImm, false).or_else(|| form(OpCode::NeqImm, true)),
+        H::Mul
+        | H::Div
+        | H::Mod
+        | H::Pow
+        | H::BitAnd
+        | H::BitOr
+        | H::BitXor
+        | H::Shl
+        | H::Shr
+        | H::Ushr
+        | H::Instanceof
+        | H::In => None,
     }
 }
 
@@ -72,8 +84,8 @@ pub(super) fn plan_immediates(ssa: &SsaFunc) -> Immediates {
     for block in &ssa.blocks {
         for inst in &block.insts {
             crate::ssa::uses::visit_uses(&inst.kind, &mut |v| total[v.0 as usize] += 1);
-            if let Some((carrier, _, _)) = immediate_operand(&inst.kind, &imm) {
-                folded[carrier.0 as usize] += 1;
+            if let Some(form) = immediate_operand(&inst.kind, &imm) {
+                folded[form.carrier.0 as usize] += 1;
             }
         }
         crate::ssa::uses::visit_term_uses(&block.term, &mut |v| total[v.0 as usize] += 1);

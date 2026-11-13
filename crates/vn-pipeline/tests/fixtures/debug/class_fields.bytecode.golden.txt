@@ -22,7 +22,7 @@ fn <module> (arity: 1, regs: 15, upvalues: 0)
   [2m[017][0m [32m32[0m
   [2m[018][0m [32m"class setter"[0m
   [2m[019][0m [32m"class ok"[0m
-  [2mcode (147) words[0m
+  [2mcode (144) words[0m
   Off  │ Lin │ Opcode               │ Operands / Hint
   ────────────────────────────────────────────────────────────────────────
   0000 │   1 │ [34mMakeClass           [0m │ r1 = #0, r0  [2m;[0m [32m"Temperature"[0m
@@ -89,46 +89,38 @@ fn <module> (arity: 1, regs: 15, upvalues: 0)
   0138 │  26 │ [35mCall                [0m │ r8 = r1, (r12..r13)
   0141 │  26 │ LoadNull            [0m │ r11 = null
   0142 │  26 │ [33mReturn              [0m │ r11
-  0144 │   1 │ LoadNull            [0m │ r11 = null
-  0145 │   1 │ [33mReturn              [0m │ r11
 
   fn Temperature.constructor (arity: 2, regs: 4, upvalues: 0)  [2m[has_this][0m
-    [2mcode (12) words[0m
+    [2mcode (9) words[0m
     Off  │ Lin │ Opcode               │ Operands / Hint
     ────────────────────────────────────────────────────────────────────────
     0000 │   5 │ Move                [0m │ r2 = r0
     0002 │   5 │ SetFixedField       [0m │ r2, r1, field0, +0, :float
     0006 │   5 │ LoadNull            [0m │ r3 = null
     0007 │   5 │ [33mReturn              [0m │ r3
-    0009 │   1 │ LoadNull            [0m │ r3 = null
-    0010 │   1 │ [33mReturn              [0m │ r3
 
-  fn Temperature.get celsius (arity: 1, regs: 4, upvalues: 0)  [2m[has_this][0m
-    [2mcode (11) words[0m
+  fn Temperature.get celsius (arity: 1, regs: 5, upvalues: 0)  [2m[has_this][0m
+    [2mcode (8) words[0m
     Off  │ Lin │ Opcode               │ Operands / Hint
     ────────────────────────────────────────────────────────────────────────
     0000 │   9 │ Move                [0m │ r1 = r0
     0002 │   9 │ GetFixedField       [0m │ r2 = r1, field0, +0, :float
     0006 │   9 │ [33mReturn              [0m │ r2
-    0008 │   1 │ LoadNull            [0m │ r3 = null
-    0009 │   1 │ [33mReturn              [0m │ r3
 
   fn Temperature.set celsius (arity: 2, regs: 4, upvalues: 0)  [2m[has_this][0m
-    [2mcode (12) words[0m
+    [2mcode (9) words[0m
     Off  │ Lin │ Opcode               │ Operands / Hint
     ────────────────────────────────────────────────────────────────────────
     0000 │  13 │ Move                [0m │ r2 = r0
     0002 │  13 │ SetFixedField       [0m │ r2, r1, field0, +0, :float
     0006 │  13 │ LoadNull            [0m │ r3 = null
     0007 │  13 │ [33mReturn              [0m │ r3
-    0009 │   1 │ LoadNull            [0m │ r3 = null
-    0010 │   1 │ [33mReturn              [0m │ r3
 
-  fn Temperature.get fahrenheit (arity: 1, regs: 6, upvalues: 0)  [2m[has_this][0m
+  fn Temperature.get fahrenheit (arity: 1, regs: 7, upvalues: 0)  [2m[has_this][0m
     [2mconstants (2)[0m
     [2m[000][0m [32m1.8[0m
     [2m[001][0m [32m32[0m
-    [2mcode (19) words[0m
+    [2mcode (16) words[0m
     Off  │ Lin │ Opcode               │ Operands / Hint
     ────────────────────────────────────────────────────────────────────────
     0000 │  17 │ Move                [0m │ r1 = r0
@@ -138,7 +130,5 @@ fn <module> (arity: 1, regs: 15, upvalues: 0)
     0010 │  17 │ [36mLoadConst           [0m │ r2 = #1  [2m;[0m [32m32[0m
     0012 │  17 │ [32mAddFloat            [0m │ r3 = r4 + r2
     0014 │  17 │ [33mReturn              [0m │ r3
-    0016 │   1 │ LoadNull            [0m │ r5 = null
-    0017 │   1 │ [33mReturn              [0m │ r5
 
   ── end: bytecode ──

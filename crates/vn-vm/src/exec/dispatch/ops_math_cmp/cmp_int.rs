@@ -226,6 +226,12 @@ impl ExecCtx {
             | OpCode::InvokeRuntimeStatic
             | OpCode::AddImm
             | OpCode::SubImm
+            | OpCode::LtImm
+            | OpCode::LteImm
+            | OpCode::GtImm
+            | OpCode::GteImm
+            | OpCode::EqImm
+            | OpCode::NeqImm
             | OpCode::BuildStr
             | OpCode::LoadIntZero
             | OpCode::LoadIntOne

@@ -102,6 +102,23 @@ impl ExecCtx {
         Ok(alloc)
     }
 
+    pub(crate) fn push_self_call_frame(
+        &mut self,
+        proto: &Rc<vn_types::FunctionProto>,
+        src_base: usize,
+        src_start: usize,
+        arg_count: usize,
+    ) -> VmResult<usize> {
+        let alloc = self.stack.push_frame(proto);
+        for i in 1..arg_count {
+            if let Err(e) = self.stack.mov_cross(alloc, i, src_base, src_start + i) {
+                self.stack.pop_frame();
+                return Err(e);
+            }
+        }
+        Ok(alloc)
+    }
+
     pub(crate) fn push_call_frame_with_this(
         &mut self,
         proto: &Rc<vn_types::FunctionProto>,
