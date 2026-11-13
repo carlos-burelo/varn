@@ -30,8 +30,15 @@
     omite lint y benchmark, y corre solo el cuadrante 1 (dev-checkout + JIT).
     No sustituye a la matriz completa antes de commitear.
 
+.PARAMETER Min
+    Ejecucion minima: perfil `quick`, sin lint, sin auditoria de tamano, sin
+    corpus de errores ni goldens (que recompilan los tests de vn-cli), y solo el
+    cuadrante 1 (tests/main.vn con dev-checkout + JIT). Implica -Quick.
+    Es lo mas barato que sigue ejecutando la suite de integracion.
+
 .EXAMPLE
     .\scripts\verify.ps1
+    .\scripts\verify.ps1 -Min
     .\scripts\verify.ps1 -Fast
     .\scripts\verify.ps1 -Quick
 #>
@@ -40,9 +47,13 @@ param (
     [switch]$Fast,
     [switch]$SkipLint,
     [switch]$CleanCache,
-    [switch]$Quick
+    [switch]$Quick,
+    [switch]$Min
 )
 
+if ($Min) {
+    $Quick = $true
+}
 if ($Quick) {
     $SkipLint = $true
     $Fast = $true
@@ -100,6 +111,9 @@ if (-not $SkipLint) {
 }
 
 # 3. Auditoria de Tamano de Archivos (techo AGENTS §6: 400; >1000 falla)
+if ($Min) {
+    Write-WarningMsg "Saltando auditoria de tamano de archivos (-Min activo)."
+} else {
 Write-StepHeader "3/6: Auditoria de Gobernanza de Tamano de Archivos (Anti-God Files)"
 $largeFiles = Get-ChildItem -Path "crates" -Recurse -Filter "*.rs" |
     ForEach-Object {
@@ -122,6 +136,7 @@ if ($largeFiles) {
     }
 } else {
     Write-Success "Todos los archivos de crates cumplen con la gobernanza de tamano (<400 lineas)."
+}
 }
 
 # 4. Compilacion en Modo Release
@@ -225,6 +240,9 @@ if (-not $Quick) {
     if (-not $qs) { $failedSteps += "Estres del GC (256 + verificador)" }
 }
 
+if ($Min) {
+    Write-WarningMsg "Saltando corpus de errores y goldens de vn debug (-Min activo)."
+} else {
 # 5b. Corpus de errores (lo ejecuta el CI; sin esto un fixture obsoleto solo falla alli)
 Write-StepHeader "5b: Corpus de errores (cargo test -p vn-cli --test error_corpus)"
 cargo test --profile $BuildProfile -p vn-cli --test error_corpus
@@ -243,6 +261,7 @@ if ($LASTEXITCODE -ne 0) {
     $failedSteps += "Goldens de vn debug"
 } else {
     Write-Success "Goldens de vn debug correctos."
+}
 }
 
 # 6. Benchmark de Estabilidad
@@ -269,7 +288,7 @@ Write-Host "  RESUMEN DE PRE-VERIFICACION LOCAL (Tiempo total: ${elapsed}s)" -Fo
 Write-Host ("=" * 70) -ForegroundColor Cyan
 
 if ($failedSteps.Count -eq 0) {
-    $scope = if ($Quick) { "el cuadrante 1" } elseif ($Fast) { "el camino de produccion (@embedded + JIT)" } else { "la matriz de 4 cuadrantes" }
+    $scope = if ($Min) { "tests/main.vn (cuadrante 1)" } elseif ($Quick) { "el cuadrante 1" } elseif ($Fast) { "el camino de produccion (@embedded + JIT)" } else { "la matriz de 4 cuadrantes" }
     Write-Host "`n [TODO CORRECTO] Todas las verificaciones y $scope pasaron exitosamente." -ForegroundColor Green
     Write-Host " El codigo esta listo para produccion y es seguro hacer commit / push.`n" -ForegroundColor Green
     exit 0
