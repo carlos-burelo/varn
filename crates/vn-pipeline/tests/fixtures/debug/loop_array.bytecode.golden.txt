@@ -7,7 +7,7 @@ fn <module> (arity: 1, regs: 20, upvalues: 0)
   [2m[002][0m [32m"loop sum"[0m
   [2m[003][0m [32m"loop firstAbove"[0m
   [2m[004][0m [32m"loop ok"[0m
-  [2mcode (149) words[0m
+  [2mcode (139) words[0m
   Off  │ Lin │ Opcode               │ Operands / Hint
   ────────────────────────────────────────────────────────────────────────
   0000 │   1 │ [34mLoadStaticFn        [0m │ r1 = #0  [2m;[0m [34mfn sum[0m(arity=2)
@@ -39,54 +39,49 @@ fn <module> (arity: 1, regs: 20, upvalues: 0)
   0053 │   4 │ Move                [0m │ r3 = r4
   0055 │   4 │ [33mLoop                [0m │ → 0038
   0058 │  23 │ [32mNeqImm              [0m │ r6 = r3 != 14
-  0060 │  23 │ [33mJumpIfFalse         [0m │ r6, → 0080
+  0060 │  23 │ [33mJumpIfFalse         [0m │ r6, → 0076
   0063 │  23 │ [36mLoadNativeGlobalIdx [0m │ r7 = native@4
   0065 │  23 │ [36mLoadConst           [0m │ r8 = #2  [2m;[0m [32m"loop sum"[0m
-  0067 │  23 │ Move                [0m │ r9 = r8
-  0069 │  23 │ LoadNull            [0m │ r10 = null
+  0067 │  23 │ Move                [0m │ r16 = r8
+  0069 │  23 │ LoadNull            [0m │ r17 = null
   0070 │  23 │ LoadNull            [0m │ r15 = null
-  0071 │  23 │ Move                [0m │ r16 = r9
-  0073 │  23 │ Move                [0m │ r17 = r10
-  0075 │  23 │ [35mCall                [0m │ r11 = r7, (r15..r17)
-  0078 │  23 │ [33mThrow               [0m │ r11
-  0080 │  10 │ [36mLoadIntZero         [0m │ r3 = 0
-  0081 │  11 │ [36mLoadIntMinusOne     [0m │ r4 = -1
-  0082 │  12 │ ArrayLength         [0m │ r5 = r1
-  0084 │  12 │ [32mLtInt               [0m │ r6 = r3 < r5
-  0086 │  12 │ [33mJumpIfFalse         [0m │ r6, → 0110
-  0089 │  13 │ ArrayGetIndex       [0m │ r5 = r1, r3
-  0091 │  13 │ [32mGtImm               [0m │ r6 = r5 > 3
-  0093 │  13 │ [33mJumpIfFalse         [0m │ r6, → 0103
-  0096 │  14 │ ArrayGetIndex       [0m │ r5 = r1, r3
-  0098 │  14 │ Move                [0m │ r2 = r5
-  0100 │  14 │ [33mJump                [0m │ → 0112
-  0103 │  17 │ [32mAddImm              [0m │ r12 = r3 + 1
-  0105 │  17 │ Move                [0m │ r3 = r12
-  0107 │  17 │ [33mLoop                [0m │ → 0082
-  0110 │  12 │ Move                [0m │ r2 = r4
-  0112 │  24 │ [32mNeqImm              [0m │ r6 = r2 != 4
-  0114 │  24 │ [33mJumpIfFalse         [0m │ r6, → 0134
-  0117 │  24 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@4
-  0119 │  24 │ [36mLoadConst           [0m │ r8 = #3  [2m;[0m [32m"loop firstAbove"[0m
-  0121 │  24 │ Move                [0m │ r9 = r8
-  0123 │  24 │ LoadNull            [0m │ r10 = null
-  0124 │  24 │ LoadNull            [0m │ r15 = null
-  0125 │  24 │ Move                [0m │ r16 = r9
-  0127 │  24 │ Move                [0m │ r17 = r10
-  0129 │  24 │ [35mCall                [0m │ r7 = r1, (r15..r17)
-  0132 │  24 │ [33mThrow               [0m │ r7
-  0134 │  25 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@0
-  0136 │  25 │ [36mLoadConst           [0m │ r8 = #4  [2m;[0m [32m"loop ok"[0m
-  0138 │  25 │ Move                [0m │ r9 = r8
-  0140 │  25 │ LoadNull            [0m │ r15 = null
-  0141 │  25 │ Move                [0m │ r16 = r9
-  0143 │  25 │ [35mCall                [0m │ r10 = r1, (r15..r16)
-  0146 │  25 │ LoadNull            [0m │ r14 = null
-  0147 │  25 │ [33mReturn              [0m │ r14
+  0071 │  23 │ [35mCall                [0m │ r11 = r7, (r15..r17)
+  0074 │  23 │ [33mThrow               [0m │ r11
+  0076 │  10 │ [36mLoadIntZero         [0m │ r3 = 0
+  0077 │  11 │ [36mLoadIntMinusOne     [0m │ r4 = -1
+  0078 │  12 │ ArrayLength         [0m │ r5 = r1
+  0080 │  12 │ [32mLtInt               [0m │ r6 = r3 < r5
+  0082 │  12 │ [33mJumpIfFalse         [0m │ r6, → 0106
+  0085 │  13 │ ArrayGetIndex       [0m │ r5 = r1, r3
+  0087 │  13 │ [32mGtImm               [0m │ r6 = r5 > 3
+  0089 │  13 │ [33mJumpIfFalse         [0m │ r6, → 0099
+  0092 │  14 │ ArrayGetIndex       [0m │ r5 = r1, r3
+  0094 │  14 │ Move                [0m │ r2 = r5
+  0096 │  14 │ [33mJump                [0m │ → 0108
+  0099 │  17 │ [32mAddImm              [0m │ r12 = r3 + 1
+  0101 │  17 │ Move                [0m │ r3 = r12
+  0103 │  17 │ [33mLoop                [0m │ → 0078
+  0106 │  12 │ Move                [0m │ r2 = r4
+  0108 │  24 │ [32mNeqImm              [0m │ r6 = r2 != 4
+  0110 │  24 │ [33mJumpIfFalse         [0m │ r6, → 0126
+  0113 │  24 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@4
+  0115 │  24 │ [36mLoadConst           [0m │ r8 = #3  [2m;[0m [32m"loop firstAbove"[0m
+  0117 │  24 │ Move                [0m │ r16 = r8
+  0119 │  24 │ LoadNull            [0m │ r17 = null
+  0120 │  24 │ LoadNull            [0m │ r15 = null
+  0121 │  24 │ [35mCall                [0m │ r7 = r1, (r15..r17)
+  0124 │  24 │ [33mThrow               [0m │ r7
+  0126 │  25 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@0
+  0128 │  25 │ [36mLoadConst           [0m │ r8 = #4  [2m;[0m [32m"loop ok"[0m
+  0130 │  25 │ Move                [0m │ r16 = r8
+  0132 │  25 │ LoadNull            [0m │ r15 = null
+  0133 │  25 │ [35mCall                [0m │ r10 = r1, (r15..r16)
+  0136 │  25 │ LoadNull            [0m │ r14 = null
+  0137 │  25 │ [33mReturn              [0m │ r14
 [2marray-hoist loop diagnostics (2 loops)[0m
   [2m@0038[0m..[2m@0055[0m  [32mHOISTED[0m
     [2mcache_reg[0][0m ← r1 (register-invariant)
-  [2m@0082[0m..[2m@0107[0m  [32mHOISTED[0m
+  [2m@0078[0m..[2m@0103[0m  [32mHOISTED[0m
     [2mcache_reg[0][0m ← r1 (register-invariant)
 
   fn sum (arity: 2, regs: 8, upvalues: 0)

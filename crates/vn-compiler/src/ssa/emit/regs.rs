@@ -49,98 +49,7 @@ pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignme
     let mut max_call = 0u32;
     for block in &ssa.blocks {
         for inst in &block.insts {
-            let t = match &inst.kind {
-                InstKind::Call { args, .. } => args.len() as u32 + 1,
-                InstKind::SelfCall { args } => args.len() as u32 + 1,
-                InstKind::MethodCall { args, .. } => args.len() as u32,
-
-                InstKind::BuildArray { elements, .. } => elements.len() as u32,
-                InstKind::BuildTuple { elements } => elements.len() as u32,
-                InstKind::BuildMap { pairs } => (pairs.len() * 2) as u32,
-
-                InstKind::BuildObject { pairs } => pairs.len() as u32,
-
-                InstKind::IntrinsicCall { args, .. } => args.len() as u32 + 1,
-                InstKind::CallNativeOp { args, .. } => args.len() as u32 + 1,
-
-                InstKind::SuperCall { args } => args.len() as u32 + 2,
-                InstKind::SuperMethodCall { args, .. } => args.len() as u32 + 1,
-
-                InstKind::ExtensionCall { args, .. } => args.len() as u32 + 2,
-                InstKind::CallSpread { args, .. } => args.len() as u32 + 1,
-
-                InstKind::BuildArraySpread { .. }
-                | InstKind::ConstInt(_)
-                | InstKind::ConstFloat(_)
-                | InstKind::ConstBool(_)
-                | InstKind::ConstStr(_)
-                | InstKind::ConstChar(_)
-                | InstKind::ConstDecimal(_)
-                | InstKind::ConstBigInt(_)
-                | InstKind::ConstNull
-                | InstKind::Binary { .. }
-                | InstKind::Unary { .. }
-                | InstKind::LoadGlobal(_)
-                | InstKind::LoadGlobalIdx(_)
-                | InstKind::LoadNativeGlobalIdx(_)
-                | InstKind::LoadUpvalue(_)
-                | InstKind::StoreGlobal { .. }
-                | InstKind::StoreGlobalIdx { .. }
-                | InstKind::StoreUpvalue { .. }
-                | InstKind::GetProperty { .. }
-                | InstKind::GetFixedField { .. }
-                | InstKind::GetIndex { .. }
-                | InstKind::ArrayGetIndex { .. }
-                | InstKind::BytesGetIndex { .. }
-                | InstKind::MapGetIndex { .. }
-                | InstKind::SetProperty { .. }
-                | InstKind::SetFixedField { .. }
-                | InstKind::SetIndex { .. }
-                | InstKind::ArraySetIndex { .. }
-                | InstKind::BytesSetIndex { .. }
-                | InstKind::MapSetIndex { .. }
-                | InstKind::ArrayPush { .. }
-                | InstKind::ObjectMerge { .. }
-                | InstKind::IsNull { .. }
-                | InstKind::Cast { .. }
-                | InstKind::Convert { .. }
-                | InstKind::ObjectRest { .. }
-                | InstKind::ToString { .. }
-                | InstKind::BuildStr { .. }
-                | InstKind::MakeClosure { .. }
-                | InstKind::LoadCaptured { .. }
-                | InstKind::StoreCaptured { .. }
-                | InstKind::MakeClass { .. }
-                | InstKind::DeclareLayout { .. }
-                | InstKind::AllocInstance { .. }
-                | InstKind::DefineStatic { .. }
-                | InstKind::DefineMethod { .. }
-                | InstKind::DefineAccessor { .. }
-                | InstKind::MakeEnumVariant { .. }
-                | InstKind::Try { .. }
-                | InstKind::PopTry
-                | InstKind::CatchParam { .. }
-                | InstKind::CloseUpvalues { .. }
-                | InstKind::Dispose { .. }
-                | InstKind::LoadModule { .. }
-                | InstKind::StoreModuleSlot { .. }
-                | InstKind::Await { .. }
-                | InstKind::Spawn { .. }
-                | InstKind::Yield { .. }
-                | InstKind::AssertNotNull { .. }
-                | InstKind::GetPropertyMaybe { .. }
-                | InstKind::ModuleSlot { .. }
-                | InstKind::GetEnumTag { .. }
-                | InstKind::IsArray { .. }
-                | InstKind::StrLength { .. }
-                | InstKind::ArrayLength { .. }
-                | InstKind::BytesLength { .. }
-                | InstKind::This
-                | InstKind::Range { .. }
-                | InstKind::ObjectKeys { .. }
-                | InstKind::GetSuper { .. }
-                | InstKind::BuildObjectSpread { .. } => 0,
-            };
+            let t = window_size(&inst.kind);
             max_call = max_call.max(t);
         }
     }
@@ -213,6 +122,7 @@ pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignme
     let null_reg = (next + 1) as u8;
     let call_base = (next + 2) as u8;
     let register_count = total.max(1) as u16;
+    coalesce_window_args(ssa, &mut reg, call_base);
     Ok(Assignment {
         reg,
         scratch,
@@ -221,6 +131,137 @@ pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<Assignme
         register_count,
         liveness: lv,
     })
+}
+
+fn window_size(kind: &InstKind) -> u32 {
+    match kind {
+        InstKind::Call { args, .. } => args.len() as u32 + 1,
+        InstKind::SelfCall { args } => args.len() as u32 + 1,
+        InstKind::MethodCall { args, .. } => args.len() as u32,
+
+        InstKind::BuildArray { elements, .. } => elements.len() as u32,
+        InstKind::BuildTuple { elements } => elements.len() as u32,
+        InstKind::BuildMap { pairs } => (pairs.len() * 2) as u32,
+
+        InstKind::BuildObject { pairs } => pairs.len() as u32,
+
+        InstKind::IntrinsicCall { args, .. } => args.len() as u32 + 1,
+        InstKind::CallNativeOp { args, .. } => args.len() as u32 + 1,
+
+        InstKind::SuperCall { args } => args.len() as u32 + 2,
+        InstKind::SuperMethodCall { args, .. } => args.len() as u32 + 1,
+
+        InstKind::ExtensionCall { args, .. } => args.len() as u32 + 2,
+        InstKind::CallSpread { args, .. } => args.len() as u32 + 1,
+
+        InstKind::BuildArraySpread { .. }
+        | InstKind::ConstInt(_)
+        | InstKind::ConstFloat(_)
+        | InstKind::ConstBool(_)
+        | InstKind::ConstStr(_)
+        | InstKind::ConstChar(_)
+        | InstKind::ConstDecimal(_)
+        | InstKind::ConstBigInt(_)
+        | InstKind::ConstNull
+        | InstKind::Binary { .. }
+        | InstKind::Unary { .. }
+        | InstKind::LoadGlobal(_)
+        | InstKind::LoadGlobalIdx(_)
+        | InstKind::LoadNativeGlobalIdx(_)
+        | InstKind::LoadUpvalue(_)
+        | InstKind::StoreGlobal { .. }
+        | InstKind::StoreGlobalIdx { .. }
+        | InstKind::StoreUpvalue { .. }
+        | InstKind::GetProperty { .. }
+        | InstKind::GetFixedField { .. }
+        | InstKind::GetIndex { .. }
+        | InstKind::ArrayGetIndex { .. }
+        | InstKind::BytesGetIndex { .. }
+        | InstKind::MapGetIndex { .. }
+        | InstKind::SetProperty { .. }
+        | InstKind::SetFixedField { .. }
+        | InstKind::SetIndex { .. }
+        | InstKind::ArraySetIndex { .. }
+        | InstKind::BytesSetIndex { .. }
+        | InstKind::MapSetIndex { .. }
+        | InstKind::ArrayPush { .. }
+        | InstKind::ObjectMerge { .. }
+        | InstKind::IsNull { .. }
+        | InstKind::Cast { .. }
+        | InstKind::Convert { .. }
+        | InstKind::ObjectRest { .. }
+        | InstKind::ToString { .. }
+        | InstKind::BuildStr { .. }
+        | InstKind::MakeClosure { .. }
+        | InstKind::LoadCaptured { .. }
+        | InstKind::StoreCaptured { .. }
+        | InstKind::MakeClass { .. }
+        | InstKind::DeclareLayout { .. }
+        | InstKind::AllocInstance { .. }
+        | InstKind::DefineStatic { .. }
+        | InstKind::DefineMethod { .. }
+        | InstKind::DefineAccessor { .. }
+        | InstKind::MakeEnumVariant { .. }
+        | InstKind::Try { .. }
+        | InstKind::PopTry
+        | InstKind::CatchParam { .. }
+        | InstKind::CloseUpvalues { .. }
+        | InstKind::Dispose { .. }
+        | InstKind::LoadModule { .. }
+        | InstKind::StoreModuleSlot { .. }
+        | InstKind::Await { .. }
+        | InstKind::Spawn { .. }
+        | InstKind::Yield { .. }
+        | InstKind::AssertNotNull { .. }
+        | InstKind::GetPropertyMaybe { .. }
+        | InstKind::ModuleSlot { .. }
+        | InstKind::GetEnumTag { .. }
+        | InstKind::IsArray { .. }
+        | InstKind::StrLength { .. }
+        | InstKind::ArrayLength { .. }
+        | InstKind::BytesLength { .. }
+        | InstKind::This
+        | InstKind::Range { .. }
+        | InstKind::ObjectKeys { .. }
+        | InstKind::GetSuper { .. }
+        | InstKind::BuildObjectSpread { .. } => 0,
+    }
+}
+
+fn coalesce_window_args(ssa: &SsaFunc, reg: &mut [u8], call_base: u8) {
+    let mut uses = vec![0u32; ssa.values.len()];
+    for block in &ssa.blocks {
+        for inst in &block.insts {
+            crate::ssa::uses::visit_uses(&inst.kind, &mut |v| uses[v.0 as usize] += 1);
+        }
+        crate::ssa::uses::visit_term_uses(&block.term, &mut |v| uses[v.0 as usize] += 1);
+    }
+    for block in &ssa.blocks {
+        for (at, inst) in block.insts.iter().enumerate() {
+            let args = match &inst.kind {
+                InstKind::Call { args, .. } | InstKind::SelfCall { args } => args,
+                _ => continue,
+            };
+            for (i, arg) in args.iter().enumerate() {
+                if uses[arg.0 as usize] != 1 {
+                    continue;
+                }
+                let Some(def_at) = block.insts[..at]
+                    .iter()
+                    .rposition(|prior| prior.dest == Some(*arg))
+                else {
+                    continue;
+                };
+                if block.insts[def_at + 1..at]
+                    .iter()
+                    .any(|between| window_size(&between.kind) > 0)
+                {
+                    continue;
+                }
+                reg[arg.0 as usize] = call_base + 1 + i as u8;
+            }
+        }
+    }
 }
 
 pub(crate) fn var_reg(var: VarId, nparams: usize) -> u8 {

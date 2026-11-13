@@ -2,7 +2,7 @@
   tiers ──────────────────────────────────────────── <module> · 3/3 ruteadas
   función  │ words │ tier │ razón                 
   ─────────┼───────┼──────┼───────────────────────
-  <module> │    25 │ clif │  (native: alloc+boxed)
+  <module> │    23 │ clif │  (native: alloc+boxed)
   add      │     4 │ clif │                       
   scale    │     8 │ clif │                       
   ── end: tiers ──

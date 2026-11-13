@@ -2,10 +2,10 @@
   tiers ──────────────────────────────────────────── <module> · 6/6 ruteadas
   función         │ words │ tier │ razón                      
   ────────────────┼───────┼──────┼────────────────────────────
-  <module>        │   120 │ clif │  (native: alloc+boxed)     
+  <module>        │   108 │ clif │  (native: alloc+boxed)     
   identity        │     2 │ clif │  (native: boxed)           
   Box.constructor │     9 │ clif │  (native: this+boxed)      
   Box.get         │     8 │ clif │  (native: this+boxed)      
-  Box.map         │    22 │ clif │  (native: this+alloc+boxed)
+  Box.map         │    20 │ clif │  (native: this+alloc+boxed)
   <closure>       │    12 │ clif │  (native: alloc+boxed)     
   ── end: tiers ──

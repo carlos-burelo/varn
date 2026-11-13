@@ -2,7 +2,7 @@
   tiers ──────────────────────────────────────────── <module> · 5/5 ruteadas
   función     │ words │ tier │ razón                 
   ────────────┼───────┼──────┼───────────────────────
-  <module>    │   123 │ clif │  (native: alloc+boxed)
+  <module>    │   105 │ clif │  (native: alloc+boxed)
   makeAdder   │     6 │ clif │  (framed: alloc+boxed)
   <closure>   │     6 │ clif │  (native: alloc)      
   makeCounter │     9 │ clif │  (framed: alloc+boxed)

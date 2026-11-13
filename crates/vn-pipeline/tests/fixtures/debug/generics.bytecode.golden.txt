@@ -16,7 +16,7 @@ fn <module> (arity: 1, regs: 16, upvalues: 0)
   [2m[011][0m [32m"value=10"[0m
   [2m[012][0m [32m"generics map"[0m
   [2m[013][0m [32m"generics ok"[0m
-  [2mcode (120) words[0m
+  [2mcode (108) words[0m
   Off  │ Lin │ Opcode               │ Operands / Hint
   ────────────────────────────────────────────────────────────────────────
   0000 │   1 │ [34mLoadStaticFn        [0m │ r1 = #0  [2m;[0m [34mfn identity[0m(arity=2)
@@ -37,42 +37,36 @@ fn <module> (arity: 1, regs: 16, upvalues: 0)
   0039 │   9 │ GetFixedField       [0m │ r4 = r2, field0, +0, :dynamic
   0043 │  22 │ Move                [0m │ r5 = r4
   0045 │  22 │ [32mNeqImm              [0m │ r6 = r5 != 10
-  0047 │  22 │ [33mJumpIfFalse         [0m │ r6, → 0067
+  0047 │  22 │ [33mJumpIfFalse         [0m │ r6, → 0063
   0050 │  22 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@4
   0052 │  22 │ [36mLoadConst           [0m │ r7 = #9  [2m;[0m [32m"generics get"[0m
-  0054 │  22 │ Move                [0m │ r4 = r7
-  0056 │  22 │ LoadNull            [0m │ r8 = null
+  0054 │  22 │ Move                [0m │ r14 = r7
+  0056 │  22 │ LoadNull            [0m │ r15 = null
   0057 │  22 │ LoadNull            [0m │ r13 = null
-  0058 │  22 │ Move                [0m │ r14 = r4
-  0060 │  22 │ Move                [0m │ r15 = r8
-  0062 │  22 │ [35mCall                [0m │ r9 = r1, (r13..r15)
-  0065 │  22 │ [33mThrow               [0m │ r9
-  0067 │  24 │ [34mLoadStaticFn        [0m │ r1 = #10  [2m;[0m [34mfn <closure>[0m(arity=2)
-  0069 │  13 │ GetFixedField       [0m │ r4 = r2, field0, +0, :dynamic
-  0073 │  13 │ LoadNull            [0m │ r13 = null
-  0074 │  13 │ Move                [0m │ r14 = r4
-  0076 │  13 │ [35mCall                [0m │ r8 = r1, (r13..r14)
-  0079 │  25 │ Move                [0m │ r7 = r8
-  0081 │  25 │ [36mLoadConst           [0m │ r10 = #11  [2m;[0m [32m"value=10"[0m
-  0083 │  25 │ [32mNeqStr              [0m │ r6 = r7 != r10
-  0085 │  25 │ [33mJumpIfFalse         [0m │ r6, → 0105
-  0088 │  25 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@4
-  0090 │  25 │ [36mLoadConst           [0m │ r7 = #12  [2m;[0m [32m"generics map"[0m
-  0092 │  25 │ Move                [0m │ r4 = r7
-  0094 │  25 │ LoadNull            [0m │ r8 = null
-  0095 │  25 │ LoadNull            [0m │ r13 = null
-  0096 │  25 │ Move                [0m │ r14 = r4
-  0098 │  25 │ Move                [0m │ r15 = r8
-  0100 │  25 │ [35mCall                [0m │ r2 = r1, (r13..r15)
-  0103 │  25 │ [33mThrow               [0m │ r2
-  0105 │  26 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@0
-  0107 │  26 │ [36mLoadConst           [0m │ r7 = #13  [2m;[0m [32m"generics ok"[0m
-  0109 │  26 │ Move                [0m │ r4 = r7
-  0111 │  26 │ LoadNull            [0m │ r13 = null
-  0112 │  26 │ Move                [0m │ r14 = r4
-  0114 │  26 │ [35mCall                [0m │ r8 = r1, (r13..r14)
-  0117 │  26 │ LoadNull            [0m │ r12 = null
-  0118 │  26 │ [33mReturn              [0m │ r12
+  0058 │  22 │ [35mCall                [0m │ r9 = r1, (r13..r15)
+  0061 │  22 │ [33mThrow               [0m │ r9
+  0063 │  24 │ [34mLoadStaticFn        [0m │ r1 = #10  [2m;[0m [34mfn <closure>[0m(arity=2)
+  0065 │  13 │ GetFixedField       [0m │ r14 = r2, field0, +0, :dynamic
+  0069 │  13 │ LoadNull            [0m │ r13 = null
+  0070 │  13 │ [35mCall                [0m │ r8 = r1, (r13..r14)
+  0073 │  25 │ Move                [0m │ r7 = r8
+  0075 │  25 │ [36mLoadConst           [0m │ r10 = #11  [2m;[0m [32m"value=10"[0m
+  0077 │  25 │ [32mNeqStr              [0m │ r6 = r7 != r10
+  0079 │  25 │ [33mJumpIfFalse         [0m │ r6, → 0095
+  0082 │  25 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@4
+  0084 │  25 │ [36mLoadConst           [0m │ r7 = #12  [2m;[0m [32m"generics map"[0m
+  0086 │  25 │ Move                [0m │ r14 = r7
+  0088 │  25 │ LoadNull            [0m │ r15 = null
+  0089 │  25 │ LoadNull            [0m │ r13 = null
+  0090 │  25 │ [35mCall                [0m │ r2 = r1, (r13..r15)
+  0093 │  25 │ [33mThrow               [0m │ r2
+  0095 │  26 │ [36mLoadNativeGlobalIdx [0m │ r1 = native@0
+  0097 │  26 │ [36mLoadConst           [0m │ r7 = #13  [2m;[0m [32m"generics ok"[0m
+  0099 │  26 │ Move                [0m │ r14 = r7
+  0101 │  26 │ LoadNull            [0m │ r13 = null
+  0102 │  26 │ [35mCall                [0m │ r8 = r1, (r13..r14)
+  0105 │  26 │ LoadNull            [0m │ r12 = null
+  0106 │  26 │ [33mReturn              [0m │ r12
 
   fn identity (arity: 2, regs: 4, upvalues: 0)
     [2mcode (2) words[0m
@@ -98,18 +92,17 @@ fn <module> (arity: 1, regs: 16, upvalues: 0)
     0006 │   9 │ [33mReturn              [0m │ r2
 
   fn Box.map (arity: 2, regs: 10, upvalues: 0)  [2m[has_this][0m
-    [2mcode (22) words[0m
+    [2mcode (20) words[0m
     Off  │ Lin │ Opcode               │ Operands / Hint
     ────────────────────────────────────────────────────────────────────────
     0000 │  13 │ [36mLoadGlobalIdx       [0m │ r2 = global@1
     0002 │  13 │ Move                [0m │ r3 = r0
-    0004 │  13 │ GetFixedField       [0m │ r4 = r3, field0, +0, :dynamic
+    0004 │  13 │ GetFixedField       [0m │ r9 = r3, field0, +0, :dynamic
     0008 │  13 │ LoadNull            [0m │ r8 = null
-    0009 │  13 │ Move                [0m │ r9 = r4
-    0011 │  13 │ [35mCall                [0m │ r5 = r1, (r8..r9)
-    0014 │  13 │ AllocInstance       [0m │ r3 = r2
-    0016 │   5 │ SetFixedField       [0m │ r3, r5, field0, +0, :dynamic
-    0020 │  13 │ [33mReturn              [0m │ r3
+    0009 │  13 │ [35mCall                [0m │ r5 = r1, (r8..r9)
+    0012 │  13 │ AllocInstance       [0m │ r3 = r2
+    0014 │   5 │ SetFixedField       [0m │ r3, r5, field0, +0, :dynamic
+    0018 │  13 │ [33mReturn              [0m │ r3
 
   fn <closure> (arity: 2, regs: 7, upvalues: 0)
     [2mconstants (2)[0m

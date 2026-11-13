@@ -5,6 +5,7 @@ pub(super) fn derive_register_meta(
     ssa: &SsaFunc,
     reg: &[u8],
     register_count: u16,
+    window_start: u8,
     param_kinds: &[vn_types::register_meta::SlotKind],
 ) -> Vec<vn_types::register_meta::RegisterMeta> {
     use vn_types::register_meta::{RegisterMeta, SlotKind};
@@ -22,7 +23,7 @@ pub(super) fn derive_register_meta(
     for (vi, def) in ssa.values.iter().enumerate() {
         let Some(&r) = reg.get(vi) else { continue };
         let r = r as usize;
-        if r >= n {
+        if r >= n || r >= window_start as usize {
             continue;
         }
         let k = slot_kind_of(def.ty);

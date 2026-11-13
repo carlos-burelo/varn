@@ -56,7 +56,8 @@ pub(crate) fn emit_function_meta(
         liveness,
     } = regs::assign_registers(&ssa, nparams).map_err(|e| e.in_function(&f.name))?;
     let param_kinds = f.param_kinds.clone();
-    let register_meta = derive_register_meta(&ssa, &reg, register_count, &param_kinds);
+    let register_meta =
+        derive_register_meta(&ssa, &reg, register_count, call_base, &param_kinds);
     let return_kind = f.return_kind;
 
     let order = emission_order(&ssa);

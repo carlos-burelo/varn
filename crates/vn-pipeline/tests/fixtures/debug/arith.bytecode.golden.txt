@@ -5,7 +5,7 @@ fn <module> (arity: 1, regs: 6, upvalues: 0)
   [2m[000][0m [34mfn add[0m(arity=3)
   [2m[001][0m [34mfn scale[0m(arity=2)
   [2m[002][0m [32m"arith ok"[0m
-  [2mcode (25) words[0m
+  [2mcode (23) words[0m
   Off  │ Lin │ Opcode               │ Operands / Hint
   ────────────────────────────────────────────────────────────────────────
   0000 │   1 │ [34mLoadStaticFn        [0m │ r3 = #0  [2m;[0m [34mfn add[0m(arity=3)
@@ -14,12 +14,11 @@ fn <module> (arity: 1, regs: 6, upvalues: 0)
   0007 │   1 │ [36mDefineGlobalIdx     [0m │ r3, global@2
   0010 │  12 │ [36mLoadNativeGlobalIdx [0m │ r3 = native@0
   0012 │  12 │ [36mLoadConst           [0m │ r4 = #2  [2m;[0m [32m"arith ok"[0m
-  0014 │  12 │ Move                [0m │ r5 = r4
+  0014 │  12 │ Move                [0m │ r2 = r4
   0016 │  12 │ LoadNull            [0m │ r1 = null
-  0017 │  12 │ Move                [0m │ r2 = r5
-  0019 │  12 │ [35mCall                [0m │ r5 = r3, (r1..r2)
-  0022 │  12 │ LoadNull            [0m │ r1 = null
-  0023 │  12 │ [33mReturn              [0m │ r1
+  0017 │  12 │ [35mCall                [0m │ r5 = r3, (r1..r2)
+  0020 │  12 │ LoadNull            [0m │ r1 = null
+  0021 │  12 │ [33mReturn              [0m │ r1
 
   fn add (arity: 3, regs: 6, upvalues: 0)
     [2mcode (4) words[0m
