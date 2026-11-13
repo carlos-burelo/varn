@@ -32,9 +32,10 @@ struct Discovered {
 fn discover(
     entry_program: &Program,
     entry_arena: &AstArena,
-    entry_source: &str,
+    entry_original: &str,
     entry_path: &str,
     entry_interner: &vn_core::AtomInterner,
+    resolver: &crate::ModuleResolver,
 ) -> Result<Discovered, crate::Failure> {
     let canonical_entry = vn_modules::canonical_or_original(Path::new(entry_path));
 
@@ -42,7 +43,7 @@ fn discover(
     let mut source_hashes: HashMap<String, u64> = HashMap::default();
     source_hashes.insert(
         canonical_entry.clone(),
-        fingerprint(entry_source.as_bytes()),
+        fingerprint(entry_original.as_bytes()),
     );
 
     let mut node_sources: HashMap<String, (String, Program, AstArena, vn_core::AtomInterner)> =
@@ -85,6 +86,10 @@ fn discover(
             .map_err(|e| format!("cannot read module '{module_path}': {e}"))?;
         source_hashes.insert(module_path.clone(), fingerprint(source.as_bytes()));
 
+        let source = match crate::inline_imports::expand(&source, &module_path, resolver) {
+            Some(expanded) => expanded,
+            None => source,
+        };
         let (program, arena, interner) = crate::quiet_parse::parse_module(&source, &module_path)?;
 
         let module_dir = Path::new(&module_path)
@@ -220,6 +225,7 @@ pub fn check_module_graph(
         entry_source,
         entry_path,
         entry_interner,
+        session,
     )?;
     let mut warnings: Vec<crate::DiagnosticReport> = Vec::new();
     for module_path in found.sorted.iter().rev() {
@@ -259,7 +265,7 @@ fn check_node(
 pub fn build_module_graph(
     entry_program: &Program,
     entry_arena: &AstArena,
-    entry_source: &str,
+    entry_original: &str,
     entry_path: &str,
     entry_proto: &FunctionProto,
     entry_interner: &vn_core::AtomInterner,
@@ -275,9 +281,10 @@ pub fn build_module_graph(
     } = discover(
         entry_program,
         entry_arena,
-        entry_source,
+        entry_original,
         entry_path,
         entry_interner,
+        session,
     )?;
 
     let mut modules: HashMap<String, FunctionProto> = HashMap::default();

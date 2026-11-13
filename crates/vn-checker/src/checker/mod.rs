@@ -18,6 +18,7 @@ pub(crate) mod foreign_classes;
 pub(crate) mod foreign_collect;
 mod foreign_enums;
 mod generic_boundaries;
+pub mod inline_candidate;
 mod generic_uses;
 mod literal_fit;
 mod nominal_shapes;

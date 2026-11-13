@@ -70,6 +70,7 @@ impl ImportResolver for ModuleResolver {
             &program,
             ast_arena.as_ref(),
             bind.as_ref(),
+            source,
             &canonical,
             base_dir,
             &mut Vec::new(),

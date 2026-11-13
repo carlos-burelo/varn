@@ -44,6 +44,7 @@ pub(crate) fn build_executable(
     program: &Program,
     arena: &AstArena,
     source: &str,
+    original_source: &str,
     check: &vn_sem::output::CheckResult,
     resolver: &crate::ModuleResolver,
     measure: bool,
@@ -67,7 +68,7 @@ pub(crate) fn build_executable(
     let graph_build = crate::module_precompile::build_module_graph(
         program,
         arena,
-        source,
+        original_source,
         &program.filename,
         &proto,
         &check.bind.interner,

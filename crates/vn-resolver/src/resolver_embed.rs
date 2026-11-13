@@ -13,6 +13,11 @@ impl ModuleResolver {
     ) -> ExportMap {
         let base_dir = Path::new(abs_path).parent().unwrap_or(Path::new("."));
 
+        let Some(source) = self.load_source(&ModuleId::local_str(abs_path)) else {
+            return ExportMap::default();
+        };
+        let source = source.text;
+
         if let (Some(bind), Some(program), Some(ast_arena)) = (
             self.cached_bind(abs_path),
             self.cached_program(abs_path),
@@ -22,16 +27,13 @@ impl ModuleResolver {
                 &program,
                 ast_arena.as_ref(),
                 bind.as_ref(),
+                &source,
                 abs_path,
                 base_dir,
                 visiting,
             );
         }
 
-        let Some(source) = self.load_source(&ModuleId::local_str(abs_path)) else {
-            return ExportMap::default();
-        };
-        let source = source.text;
         let Some(super::resolver_parse::ParsedModule {
             program,
             arena: ast_arena,
@@ -49,6 +51,7 @@ impl ModuleResolver {
             &program,
             ast_arena.as_ref(),
             bind.as_ref(),
+            &source,
             abs_path,
             base_dir,
             visiting,
@@ -93,6 +96,7 @@ impl ModuleResolver {
             &program,
             ast_arena.as_ref(),
             bind.as_ref(),
+            &source.text,
             virtual_id,
             Path::new("."),
             visiting,

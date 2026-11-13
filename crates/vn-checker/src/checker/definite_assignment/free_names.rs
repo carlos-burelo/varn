@@ -6,12 +6,12 @@ use vn_core::ast::{
 };
 use vn_core::Atom;
 
-pub(super) enum Body<'a> {
+pub(in crate::checker) enum Body<'a> {
     Stmt(StmtId),
     Arrow(&'a ArrowBody),
 }
 
-pub(super) fn free_reads(arena: &AstArena, params: &[Param], body: Body) -> FxHashSet<Atom> {
+pub(in crate::checker) fn free_reads(arena: &AstArena, params: &[Param], body: Body) -> FxHashSet<Atom> {
     let mut c = Collector {
         arena,
         reads: FxHashSet::default(),

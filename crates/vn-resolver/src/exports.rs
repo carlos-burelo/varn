@@ -100,6 +100,7 @@ pub(super) fn collect_exports(
     stmts: &[StmtId],
     ast_arena: &AstArena,
     bind: &BindResult,
+    source: &str,
     abs_path: &str,
     base_dir: &Path,
     visiting: &mut Vec<String>,
@@ -120,6 +121,20 @@ pub(super) fn collect_exports(
                     if let Some(sym) = lookup_global(bind, name_str) {
                         let mut s = sym.clone();
                         s.origin_module = Some(intern_origin(out, abs_path));
+                        if let Decl::Function(f) = declaration.as_ref() {
+                            s.inline_src = vn_checker::checker::inline_candidate::inline_source(
+                                f,
+                                ast_arena,
+                                &bind.interner,
+                                source,
+                            )
+                            .map(|found| {
+                                Arc::new(vn_sem::symbol::InlineSrc {
+                                    text: Arc::from(found.text),
+                                    name_offset: found.name_offset as u32,
+                                })
+                            });
+                        }
                         out.insert(name_str.to_string(), s);
                     }
                 }
