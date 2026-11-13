@@ -18,7 +18,14 @@ fn rebuild(heap: &mut Heap, layout: &ObjectLayout, values: Vec<VmValue>) -> VmVa
     }
 }
 
+struct ProjectionPlan {
+    shape: std::rc::Rc<vn_types::Shape>,
+    sources: Vec<(usize, usize)>,
+}
+
 thread_local! {
+    static PLANS: std::cell::RefCell<rustc_hash::FxHashMap<(u32, usize), std::rc::Rc<ProjectionPlan>>> =
+        std::cell::RefCell::new(rustc_hash::FxHashMap::default());
     static LAST_ALIGNMENT: std::cell::Cell<(u32, usize, bool)> =
         const { std::cell::Cell::new((0, 0, false)) };
 }
@@ -284,9 +291,30 @@ fn walk(
             {
                 return v;
             }
+            let plan_key = (layout.shape.id, desc as *const TypeDesc as usize);
+            let cached = PLANS.with(|plans| plans.borrow().get(&plan_key).cloned());
+            if let Some(plan) = cached {
+                let values: Vec<VmValue> = plan
+                    .sources
+                    .iter()
+                    .map(|&(field, at)| {
+                        walk(
+                            heap,
+                            stack_floor,
+                            layout.values[at],
+                            &fields[field].ty,
+                            Some(&inner),
+                            visiting,
+                        )
+                    })
+                    .collect();
+                return heap.alloc_object_with_shape(&plan.shape, values);
+            }
+            let mut sources: Vec<(usize, usize)> = Vec::with_capacity(fields.len());
             let mut pairs: Vec<(Arc<str>, VmValue)> = Vec::with_capacity(fields.len());
-            for field in fields {
+            for (field_index, field) in fields.iter().enumerate() {
                 if let Some(at) = names.iter().position(|name| **name == *field.name) {
+                    sources.push((field_index, at));
                     let projected = walk(
                         heap,
                         stack_floor,
@@ -298,7 +326,18 @@ fn walk(
                     pairs.push((Arc::clone(&names[at]), projected));
                 }
             }
-            heap.alloc_object_pairs(pairs)
+            let rebuilt = heap.alloc_object_pairs(pairs);
+            if let Some(HeapObj::Object(obj)) = heap.get(rebuilt.as_heap()) {
+                let shape = std::rc::Rc::clone(obj.borrow().shape());
+                if shape.class.is_none() && shape.ordered_names().len() == sources.len() {
+                    PLANS.with(|plans| {
+                        plans
+                            .borrow_mut()
+                            .insert(plan_key, std::rc::Rc::new(ProjectionPlan { shape, sources }));
+                    });
+                }
+            }
+            rebuilt
         }
         TypeDesc::Enclosing { up, .. } => {
             let Some(mut target) = scope else {
