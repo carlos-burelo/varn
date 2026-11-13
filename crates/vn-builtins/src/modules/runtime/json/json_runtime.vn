@@ -1,4 +1,5 @@
 // runtime:json — low-level host JSON operations.
 
+@decodes("parse-typed")
 export declare function parse$(text: str): dynamic;
 export declare function stringify$(value: dynamic): str;

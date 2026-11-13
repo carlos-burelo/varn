@@ -70,7 +70,7 @@ pub struct Forward {
     pub module: std::sync::Arc<str>,
     pub symbol: std::sync::Arc<str>,
     pub args: u8,
-    pub decodes: bool,
+    pub typed: Option<std::sync::Arc<str>>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -122,6 +122,9 @@ pub struct Symbol {
 
     #[serde(default)]
     pub forward: Option<std::sync::Arc<Forward>>,
+
+    #[serde(default)]
+    pub decode_op: Option<std::sync::Arc<str>>,
 }
 
 impl Symbol {
@@ -156,6 +159,7 @@ impl Symbol {
             throws: Vec::new(),
             is_test: false,
             forward: None,
+            decode_op: None,
         }
     }
 

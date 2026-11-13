@@ -84,7 +84,7 @@ impl Binder<'_> {
             module: Arc::from(module),
             symbol: Arc::from(symbol),
             args: u8::try_from(args.len()).ok()?,
-            decodes,
+            typed: decodes.then(|| imported.decode_op.clone()).flatten(),
         }))
     }
 }

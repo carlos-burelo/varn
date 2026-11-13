@@ -49,15 +49,17 @@ impl BuiltinDecorator {
 pub enum ContractDecorator {
     Throws,
     Permission,
+    Decodes,
 }
 
 impl ContractDecorator {
-    const ALL: [Self; 2] = [Self::Throws, Self::Permission];
+    const ALL: [Self; 3] = [Self::Throws, Self::Permission, Self::Decodes];
 
     pub const fn name(self) -> &'static str {
         match self {
             Self::Throws => "throws",
             Self::Permission => "permission",
+            Self::Decodes => "decodes",
         }
     }
 

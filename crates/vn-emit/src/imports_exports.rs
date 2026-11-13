@@ -231,11 +231,9 @@ pub(super) fn native_targets(
                     op,
                     max_args: Some(forward.args),
                     typed: forward
-                        .decodes
-                        .then(|| {
-                            vn_core::runtime_ops::typed_variant(&forward.module, &forward.symbol)
-                        })
-                        .flatten(),
+                        .typed
+                        .as_deref()
+                        .map(vn_core::runtime_ops::op_id),
                 },
             );
         }

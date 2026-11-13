@@ -1,6 +1,8 @@
 use super::Binder;
 use vn_core::ast::decorator_kind::ContractDecorator;
-use vn_core::ast::decorators::{decorator_head, match_builtin, BuiltinDecorator};
+use vn_core::ast::decorators::{
+    decorator_head, match_builtin, single_string_arg, BuiltinDecorator,
+};
 use vn_core::ast::types::Decorator;
 use vn_core::ast::{Arg, ExprKind};
 use vn_core::{Atom, AtomInterner};
@@ -8,6 +10,10 @@ use vn_sem::symbol::SymbolId;
 
 fn head_is_throws(binder: &Binder, head: Atom) -> bool {
     ContractDecorator::of(binder.interner.resolve(head)) == Some(ContractDecorator::Throws)
+}
+
+fn head_is_decodes(binder: &Binder, head: Atom) -> bool {
+    ContractDecorator::of(binder.interner.resolve(head)) == Some(ContractDecorator::Decodes)
 }
 
 fn throws_classes(
@@ -61,6 +67,11 @@ impl Binder<'_> {
                             sym.throws.push(c);
                         }
                     }
+                    continue;
+                }
+                if head_is_decodes(self, head) {
+                    let op = single_string_arg(self.ast_arena, d);
+                    self.arena.get_mut(symid).decode_op = op.map(Into::into);
                     continue;
                 }
                 let mut matched =

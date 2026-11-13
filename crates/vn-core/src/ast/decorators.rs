@@ -118,7 +118,10 @@ fn written_head(arena: &AstArena, d: &Decorator) -> Option<Atom> {
 
 pub fn decorator_head(arena: &AstArena, interner: &AtomInterner, d: &Decorator) -> Option<Atom> {
     let head = written_head(arena, d)?;
-    super::decorator_kind::BuiltinDecoratorKind::of(interner.resolve(head)).map(|_| head)
+    let name = interner.resolve(head);
+    (super::decorator_kind::BuiltinDecoratorKind::of(name).is_some()
+        || super::decorator_kind::ContractDecorator::of(name).is_some())
+    .then_some(head)
 }
 
 pub fn is_contract_decorator(arena: &AstArena, interner: &AtomInterner, d: &Decorator) -> bool {
@@ -141,6 +144,16 @@ pub fn is_active_builtin(
     d: &Decorator,
 ) -> bool {
     is_builtin(arena, interner, d) && !is_shadowed(d.range.start.offset)
+}
+
+pub fn single_string_arg(arena: &AstArena, d: &Decorator) -> Option<String> {
+    let ExprKind::Call { args, .. } = &arena.expr(d.expression).kind else {
+        return None;
+    };
+    match args.as_slice() {
+        [Arg::Positional(arg)] => str_arg(arena, *arg),
+        _ => None,
+    }
 }
 
 fn str_arg(arena: &AstArena, id: ExprId) -> Option<String> {
