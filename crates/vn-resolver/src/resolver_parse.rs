@@ -91,7 +91,6 @@ impl ModuleResolver {
         program: &vn_core::ast::Program,
         ast_arena: &vn_core::ast::AstArena,
         bind: &BindResult,
-        source: &str,
         key: &str,
         base_dir: &Path,
         visiting: &mut Vec<String>,
@@ -102,13 +101,11 @@ impl ModuleResolver {
             &program.body,
             ast_arena,
             bind,
-            source,
             key,
             base_dir,
             visiting,
             &mut exports,
         );
-        exports.inert = super::exports::is_inert(&program.body, ast_arena);
         super::exports::assign_slots(&mut exports);
         exports
     }

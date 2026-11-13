@@ -178,7 +178,7 @@ impl Extractor<'_> {
                         return false;
                     };
                     expr.res = Resolution::DirectFn(FnId(index));
-                    **callee = placeholder(Resolution::DirectFn(FnId(index)));
+                    **callee = placeholder(Resolution::None);
                 }
                 Resolution::NativeOp(_) | Resolution::NativeDecode { .. } => {
                     if args.is_empty() {

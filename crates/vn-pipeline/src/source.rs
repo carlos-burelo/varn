@@ -32,19 +32,6 @@ impl Source {
         }
     }
 
-    pub fn with_text(&self, text: String) -> Source {
-        match self {
-            Source::File { path, .. } => Source::File {
-                path: path.clone(),
-                text: Arc::from(text),
-            },
-            Source::Virtual { name, .. } => Source::Virtual {
-                name: name.clone(),
-                text: Arc::from(text),
-            },
-        }
-    }
-
     pub fn path(&self) -> &str {
         match self {
             Source::File { path, .. } => path,

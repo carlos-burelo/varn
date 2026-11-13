@@ -108,12 +108,6 @@ impl Compilation {
             }
         }
 
-        let original = self.source.clone();
-        if let Some(text) =
-            crate::inline_imports::expand(original.text(), original.path(), resolver)
-        {
-            self.source = original.with_text(text);
-        }
         let source = self.source.clone();
         let (tokens, _, lex_diagnostics) = self.timed(Stage::Lex, || {
             crate::lex::scan_tolerant(source.text(), source.path())
@@ -188,7 +182,6 @@ impl Compilation {
             &parsed.program,
             &parsed.arena,
             source.text(),
-            original.text(),
             checked,
             resolver,
             request.measure_optimizer,

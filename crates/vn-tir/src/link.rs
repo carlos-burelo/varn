@@ -57,6 +57,8 @@ impl Linker {
                 if let TirExprKind::Seq { stmts, .. } = &mut expr.kind {
                     stmt_types(stmts, &mut |ty| ok &= remap(&mut module.types, &from, ty));
                 }
+            });
+            stmts_mut(&mut body, &mut |expr| {
                 if let (TirExprKind::Call { callee, .. }, Resolution::DirectFn(target)) =
                     (&mut expr.kind, expr.res.clone())
                 {

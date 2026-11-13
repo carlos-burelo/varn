@@ -85,34 +85,6 @@ fn origin_text(bind: &BindResult, out: &ExportMap, atom: Option<Atom>, fallback:
     .unwrap_or_else(|| fallback.to_owned())
 }
 
-pub(super) fn is_inert(stmts: &[StmtId], arena: &AstArena) -> bool {
-    stmts.iter().all(|&stmt| {
-        let StmtKind::Decl(decl) = &arena.stmt(stmt).kind else {
-            return false;
-        };
-        match decl.as_ref() {
-            Decl::Function(_) | Decl::Interface(_) | Decl::TypeAlias(_) => true,
-            Decl::Export(ExportDecl::Decl { declaration, .. }) => matches!(
-                declaration.as_ref(),
-                Decl::Function(_) | Decl::Interface(_) | Decl::TypeAlias(_)
-            ),
-            Decl::Export(ExportDecl::Named { source: None, .. }) => true,
-            Decl::Export(
-                ExportDecl::Named { source: Some(_), .. }
-                | ExportDecl::All { .. }
-                | ExportDecl::Default { .. },
-            )
-            | Decl::Variable(_)
-            | Decl::Class(_)
-            | Decl::Enum(_)
-            | Decl::Namespace(_)
-            | Decl::Import(_)
-            | Decl::Extension(_)
-            | Decl::SumType(_) => false,
-        }
-    })
-}
-
 pub(super) fn assign_slots(exports: &mut ExportMap) {
     let mut keys: Vec<String> = exports.keys().cloned().collect();
     keys.sort();
@@ -128,19 +100,11 @@ pub(super) fn collect_exports(
     stmts: &[StmtId],
     ast_arena: &AstArena,
     bind: &BindResult,
-    source: &str,
     abs_path: &str,
     base_dir: &Path,
     visiting: &mut Vec<String>,
     out: &mut ExportMap,
 ) {
-    let mut analyzer = vn_checker::checker::inline_candidate::InlineAnalyzer::new(
-        stmts,
-        ast_arena,
-        &bind.interner,
-        source,
-        abs_path,
-    );
     for &stmt_id in stmts {
         let StmtKind::Decl(decl) = &ast_arena.stmt(stmt_id).kind else {
             continue;
@@ -156,9 +120,6 @@ pub(super) fn collect_exports(
                     if let Some(sym) = lookup_global(bind, name_str) {
                         let mut s = sym.clone();
                         s.origin_module = Some(intern_origin(out, abs_path));
-                        if let Decl::Function(f) = declaration.as_ref() {
-                            s.inline_src = analyzer.analyze(f.id);
-                        }
                         out.insert(name_str.to_string(), s);
                     }
                 }

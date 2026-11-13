@@ -131,6 +131,7 @@ fn compile_source_inner(
         check: &check,
         resolver: session,
         source,
+        library: &crate::lower::TemplateLibrary::default(),
         measure: false,
     })
     .map(|lowered| lowered.proto)

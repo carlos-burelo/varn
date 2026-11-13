@@ -44,43 +44,37 @@ pub(crate) fn build_executable(
     program: &Program,
     arena: &AstArena,
     source: &str,
-    original_source: &str,
     check: &vn_sem::output::CheckResult,
     resolver: &crate::ModuleResolver,
     measure: bool,
 ) -> Result<Built, Failure> {
     let lowering = Instant::now();
+    let found = crate::module_precompile::discover(
+        program,
+        arena,
+        source,
+        &program.filename,
+        &check.bind.interner,
+    )?;
+    let dependencies = crate::module_precompile::lower_dependencies(&found, resolver)?;
     let Lowered {
         tir,
         proto,
         optimize,
+        ..
     } = lower_module(LowerInput {
         program,
         arena,
         check,
         resolver,
         source,
+        library: &dependencies.library,
         measure,
     })?;
     let lower = lowering.elapsed().saturating_sub(optimize);
 
     let linking = Instant::now();
-    let graph_build = crate::module_precompile::build_module_graph(
-        program,
-        arena,
-        original_source,
-        &program.filename,
-        &proto,
-        &check.bind.interner,
-        resolver,
-    )
-    .map_err(|e| match e {
-        diagnostics @ Failure::Diagnostics(_) => diagnostics,
-        other @ (Failure::Runtime(_)
-        | Failure::Io(_)
-        | Failure::Internal(_)
-        | Failure::Project(_)) => Failure::internal(format!("module graph error: {other}")),
-    })?;
+    let graph_build = crate::module_precompile::assemble_graph(found, dependencies, &proto);
 
     let mut class_tables = graph_build.class_tables.clone();
     class_tables.insert(

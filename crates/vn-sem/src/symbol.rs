@@ -66,21 +66,6 @@ impl SymbolKind {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct InlineSrc {
-    pub module: std::sync::Arc<str>,
-    pub name: std::sync::Arc<str>,
-    pub text: std::sync::Arc<str>,
-    pub name_offset: u32,
-    pub deps: Vec<InlineDep>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct InlineDep {
-    pub offsets: Vec<u32>,
-    pub src: std::sync::Arc<InlineSrc>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Forward {
     pub module: std::sync::Arc<str>,
     pub symbol: std::sync::Arc<str>,
@@ -140,9 +125,6 @@ pub struct Symbol {
 
     #[serde(default)]
     pub decode_op: Option<std::sync::Arc<str>>,
-
-    #[serde(default)]
-    pub inline_src: Option<std::sync::Arc<InlineSrc>>,
 }
 
 impl Symbol {
@@ -178,7 +160,6 @@ impl Symbol {
             is_test: false,
             forward: None,
             decode_op: None,
-            inline_src: None,
         }
     }
 

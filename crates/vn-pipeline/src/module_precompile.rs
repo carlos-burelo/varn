@@ -20,7 +20,7 @@ pub struct ModuleGraphBuild {
     pub warnings: Vec<crate::DiagnosticReport>,
 }
 
-struct Discovered {
+pub(crate) struct Discovered {
     canonical_entry: String,
     graph: HashMap<String, Vec<String>>,
     source_hashes: HashMap<String, u64>,
@@ -29,13 +29,12 @@ struct Discovered {
     sorted: Vec<String>,
 }
 
-fn discover(
+pub(crate) fn discover(
     entry_program: &Program,
     entry_arena: &AstArena,
-    entry_original: &str,
+    entry_source: &str,
     entry_path: &str,
     entry_interner: &vn_core::AtomInterner,
-    resolver: &crate::ModuleResolver,
 ) -> Result<Discovered, crate::Failure> {
     let canonical_entry = vn_modules::canonical_or_original(Path::new(entry_path));
 
@@ -43,7 +42,7 @@ fn discover(
     let mut source_hashes: HashMap<String, u64> = HashMap::default();
     source_hashes.insert(
         canonical_entry.clone(),
-        fingerprint(entry_original.as_bytes()),
+        fingerprint(entry_source.as_bytes()),
     );
 
     let mut node_sources: HashMap<String, (String, Program, AstArena, vn_core::AtomInterner)> =
@@ -86,10 +85,6 @@ fn discover(
             .map_err(|e| format!("cannot read module '{module_path}': {e}"))?;
         source_hashes.insert(module_path.clone(), fingerprint(source.as_bytes()));
 
-        let source = match crate::inline_imports::expand(&source, &module_path, resolver) {
-            Some(expanded) => expanded,
-            None => source,
-        };
         let (program, arena, interner) = crate::quiet_parse::parse_module(&source, &module_path)?;
 
         let module_dir = Path::new(&module_path)
@@ -225,7 +220,6 @@ pub fn check_module_graph(
         entry_source,
         entry_path,
         entry_interner,
-        session,
     )?;
     let mut warnings: Vec<crate::DiagnosticReport> = Vec::new();
     for module_path in found.sorted.iter().rev() {
@@ -262,41 +256,30 @@ fn check_node(
     )
 }
 
-pub fn build_module_graph(
-    entry_program: &Program,
-    entry_arena: &AstArena,
-    entry_original: &str,
-    entry_path: &str,
-    entry_proto: &FunctionProto,
-    entry_interner: &vn_core::AtomInterner,
+pub(crate) struct Dependencies {
+    modules: HashMap<String, FunctionProto>,
+    class_tables: HashMap<String, crate::class_link::ModuleClasses>,
+    warnings: Vec<crate::DiagnosticReport>,
+    pub(crate) library: crate::lower::TemplateLibrary,
+}
+
+pub(crate) fn lower_dependencies(
+    found: &Discovered,
     session: &crate::ModuleResolver,
-) -> Result<ModuleGraphBuild, crate::Failure> {
-    let Discovered {
-        canonical_entry,
-        graph,
-        source_hashes,
-        node_sources,
-        package_nodes,
-        sorted,
-    } = discover(
-        entry_program,
-        entry_arena,
-        entry_original,
-        entry_path,
-        entry_interner,
-        session,
-    )?;
+) -> Result<Dependencies, crate::Failure> {
+    let mut dependencies = Dependencies {
+        modules: HashMap::default(),
+        class_tables: HashMap::default(),
+        warnings: Vec::new(),
+        library: crate::lower::TemplateLibrary::default(),
+    };
 
-    let mut modules: HashMap<String, FunctionProto> = HashMap::default();
-    modules.insert(canonical_entry.clone(), entry_proto.clone());
-    let mut class_tables: HashMap<String, crate::class_link::ModuleClasses> = HashMap::default();
-    let mut warnings: Vec<crate::DiagnosticReport> = Vec::new();
-
-    for module_path in sorted.into_iter().rev() {
-        if module_path == canonical_entry {
+    for module_path in found.sorted.iter().rev() {
+        if *module_path == found.canonical_entry {
             continue;
         }
-        let Some((module_source, program, arena, interner)) = node_sources.get(&module_path) else {
+        let Some((module_source, program, arena, interner)) = found.node_sources.get(module_path)
+        else {
             continue;
         };
 
@@ -305,7 +288,7 @@ pub fn build_module_graph(
         if let Some(report) =
             crate::check::warnings_of(&check.diagnostics, &program.filename, module_source)?
         {
-            warnings.push(report);
+            dependencies.warnings.push(report);
         }
         let lowered = crate::lower::lower_module(crate::lower::LowerInput {
             program,
@@ -313,10 +296,11 @@ pub fn build_module_graph(
             check: &check,
             resolver: session,
             source: module_source,
+            library: &dependencies.library,
             measure: false,
         })
         .map_err(|e| crate::Failure::internal(format!("compile error in '{module_path}': {e}")))?;
-        class_tables.insert(
+        dependencies.class_tables.insert(
             module_path.clone(),
             crate::class_link::ModuleClasses {
                 classes: lowered.tir.classes.clone(),
@@ -329,19 +313,35 @@ pub fn build_module_graph(
                 types: lowered.tir.types.clone(),
             },
         );
-
-        modules.insert(module_path, lowered.proto);
+        dependencies
+            .library
+            .insert(module_path, lowered.templates);
+        dependencies.modules.insert(module_path.clone(), lowered.proto);
     }
+    Ok(dependencies)
+}
 
-    Ok(ModuleGraphBuild {
-        entry_path: canonical_entry,
-        modules,
-        source_hashes,
-        package_nodes: package_nodes.into_values().collect(),
-        deps: graph,
+pub(crate) fn assemble_graph(
+    found: Discovered,
+    dependencies: Dependencies,
+    entry_proto: &FunctionProto,
+) -> ModuleGraphBuild {
+    let Dependencies {
+        mut modules,
         class_tables,
         warnings,
-    })
+        ..
+    } = dependencies;
+    modules.insert(found.canonical_entry.clone(), entry_proto.clone());
+    ModuleGraphBuild {
+        entry_path: found.canonical_entry,
+        modules,
+        source_hashes: found.source_hashes,
+        package_nodes: found.package_nodes.into_values().collect(),
+        deps: found.graph,
+        class_tables,
+        warnings,
+    }
 }
 
 fn read_module_source(module_path: &str) -> Result<String, String> {

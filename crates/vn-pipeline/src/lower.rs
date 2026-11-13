@@ -153,18 +153,58 @@ pub(crate) fn compile_tir(
     (result.map_err(|e| e.to_string()), opt_time)
 }
 
+#[derive(Default)]
+pub(crate) struct TemplateLibrary {
+    modules: rustc_hash::FxHashMap<String, std::sync::Arc<vn_tir::package::ModuleTemplates>>,
+}
+
+impl TemplateLibrary {
+    pub(crate) fn insert(&mut self, path: &str, templates: vn_tir::package::ModuleTemplates) {
+        self.modules.insert(
+            vn_modules::canonical_or_original(std::path::Path::new(path)),
+            std::sync::Arc::new(templates),
+        );
+    }
+}
+
+struct LibraryView<'a> {
+    library: &'a TemplateLibrary,
+    resolver: &'a crate::ModuleResolver,
+    module_path: &'a str,
+}
+
+impl vn_tir::link::TemplateSource for LibraryView<'_> {
+    fn templates(
+        &self,
+        import_source: &str,
+    ) -> Option<std::sync::Arc<vn_tir::package::ModuleTemplates>> {
+        use vn_core::ImportSpecifier as IS;
+        let IS::Relative(_) = IS::parse(import_source) else {
+            return None;
+        };
+        let base = std::path::Path::new(self.module_path)
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."));
+        let resolved = self.resolver.resolve_specifier(base, import_source)?;
+        let key = vn_modules::canonical_or_original(std::path::Path::new(&resolved));
+        self.library.modules.get(&key).cloned()
+    }
+}
+
 pub(crate) struct LowerInput<'a> {
     pub(crate) program: &'a Program,
     pub(crate) arena: &'a AstArena,
     pub(crate) check: &'a vn_sem::output::CheckResult,
     pub(crate) resolver: &'a crate::ModuleResolver,
     pub(crate) source: &'a str,
+    pub(crate) library: &'a TemplateLibrary,
     pub(crate) measure: bool,
 }
 
 pub(crate) struct Lowered {
     pub(crate) tir: vn_tir::TirModule,
     pub(crate) proto: FunctionProto,
+    pub(crate) templates: vn_tir::package::ModuleTemplates,
     pub(crate) optimize: std::time::Duration,
 }
 
@@ -195,6 +235,7 @@ pub(crate) fn lower_module(input: LowerInput<'_>) -> Result<Lowered, Failure> {
         check,
         resolver,
         source,
+        library,
         measure,
     } = input;
     let path = program.filename.as_ref();
@@ -214,6 +255,15 @@ pub(crate) fn lower_module(input: LowerInput<'_>) -> Result<Lowered, Failure> {
     .map_err(Failure::internal)?;
     inject_star_reexports(&mut tir, &exports);
     resolve_import_slots(&mut tir, resolver, path);
+    vn_tir::link::link(
+        &mut tir,
+        &LibraryView {
+            library,
+            resolver,
+            module_path: path,
+        },
+    );
+    let templates = vn_tir::package::extract(&tir);
     let (proto, optimize) = compile_tir(&tir, export_names, source, measure);
     let proto = proto.map_err(|e| {
         Failure::internal(format!(
@@ -226,6 +276,7 @@ pub(crate) fn lower_module(input: LowerInput<'_>) -> Result<Lowered, Failure> {
     Ok(Lowered {
         tir,
         proto,
+        templates,
         optimize,
     })
 }

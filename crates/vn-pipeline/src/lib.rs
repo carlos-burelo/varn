@@ -10,7 +10,6 @@ mod executable;
 mod execute;
 pub mod fmt;
 pub mod import_collector;
-mod inline_imports;
 mod layer_link;
 mod lex;
 mod lower;
