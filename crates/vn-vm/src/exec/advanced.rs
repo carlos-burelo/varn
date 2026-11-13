@@ -36,7 +36,7 @@ pub(crate) fn instanceof(obj: VmValue, class_nv: VmValue, heap: &Heap) -> bool {
         return false;
     }
     let cls = match heap.get(class_nv.as_heap()) {
-        Some(HeapObj::Class(c)) => c.clone(),
+        Some(HeapObj::Class(c)) => c,
         Some(
             HeapObj::Str(_)
             | HeapObj::Array(_)
