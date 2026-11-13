@@ -33,5 +33,6 @@ pub use coverage::Coverage;
 mod registry;
 pub mod children;
 pub mod inlinable;
+pub mod package;
 pub mod walk;
 pub use registry::{ClassRegistry, ClassRegistryBuilder, GlobalClassId};

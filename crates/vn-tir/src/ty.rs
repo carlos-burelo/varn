@@ -330,7 +330,7 @@ impl TyTable {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct PortableTable {
     literal_strings: Vec<String>,
     entries: Vec<BackendTy>,
