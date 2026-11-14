@@ -132,15 +132,22 @@ impl<'a> FnEmitter<'a> {
                         span,
                     };
                 }
-                let recv_ty = obj.ty;
+                let name: Arc<str> = Arc::from(vn_core::MemberKey::Slice.as_str());
+                let res = match self
+                    .core_class_name(obj.ty)
+                    .and_then(|cls| self.m.core_ops.get(&(Arc::from(cls), Arc::clone(&name))))
+                {
+                    Some(&op_id) => Resolution::NativeOp(op_id),
+                    None => self.by_name(Arc::clone(&name), obj.ty),
+                };
                 let slice = TirExpr {
                     kind: TirExprKind::MethodCall {
                         recv: Box::new(obj.clone()),
-                        name: Arc::from(vn_core::MemberKey::Slice.as_str()),
+                        name,
                         args: vec![TirArg::Expr(s), TirArg::Expr(e)],
                     },
                     ty,
-                    res: self.by_name(Arc::from(vn_core::MemberKey::Slice.as_str()), recv_ty),
+                    res,
                     span,
                 };
                 return self.guard_optional(optional, obj, slice, span);
