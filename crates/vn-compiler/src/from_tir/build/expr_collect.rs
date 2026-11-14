@@ -94,8 +94,10 @@ impl<'m> Builder<'m> {
                         let v = self.lower_expr(value)?;
                         pairs.push((key_val, v));
                     }
-                    vn_tir::TirObjectEntry::Spread(x) => {
-                        let _ = self.lower_expr(x)?;
+                    vn_tir::TirObjectEntry::Spread(_) => {
+                        return Err(crate::OptError::Unsupported(
+                            "from_tir: a Map literal holds `key: value` entries only, never a spread",
+                        ));
                     }
                 }
             }
@@ -134,12 +136,10 @@ impl<'m> Builder<'m> {
     pub(super) fn lower_assign_expr(&mut self, target: &TirExpr, value: &TirExpr) -> Result<Value> {
         let v = self.lower_expr(value)?;
         let v = match (&target.kind, &target.res) {
-            (vn_tir::TirExprKind::Var, Resolution::Local(id)) => {
-                match self.local_declared(id.0) {
-                    Some(declared) => self.widen_exact(v, value.ty, declared),
-                    None => v,
-                }
-            }
+            (vn_tir::TirExprKind::Var, Resolution::Local(id)) => match self.local_declared(id.0) {
+                Some(declared) => self.widen_exact(v, value.ty, declared),
+                None => v,
+            },
             (vn_tir::TirExprKind::Var, Resolution::GlobalSlot(n)) => {
                 match self.tir.globals.get(*n as usize).copied() {
                     Some(declared) => self.widen_exact(v, value.ty, declared),
