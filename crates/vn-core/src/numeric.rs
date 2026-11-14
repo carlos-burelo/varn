@@ -235,8 +235,8 @@ pub fn binary_operand_kind(
     match (l?, r?) {
         (Int, Int) => Some(Int),
         (Float, Float) => Some(Float),
-        (Decimal, Decimal) | (Decimal, Int) | (Int, Decimal) => Some(Decimal),
-        (BigInt, BigInt) | (BigInt, Int) | (Int, BigInt) => Some(BigInt),
+        (Decimal, Decimal) => Some(Decimal),
+        (BigInt, BigInt) => Some(BigInt),
         (Int, Float)
         | (Float, Int)
         | (Decimal, Float)
@@ -244,7 +244,11 @@ pub fn binary_operand_kind(
         | (BigInt, Float)
         | (Float, BigInt)
         | (BigInt, Decimal)
-        | (Decimal, BigInt) => None,
+        | (Decimal, BigInt)
+        | (Decimal, Int)
+        | (Int, Decimal)
+        | (BigInt, Int)
+        | (Int, BigInt) => None,
     }
 }
 

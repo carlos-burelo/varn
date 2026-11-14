@@ -51,9 +51,8 @@ await describe("35 decimal bigint", async () => {
         expect(neg.isNegative()).toBeTruthy()
         expect((2.9d).trunc()).toBe(2.0d)
         
-        // Widening from int
         const iv: int = 5
-        const dv: decimal = iv
+        const dv: decimal = iv as decimal
         expect(dv.toString()).toBe("5")
         expect(sumDecimal(3, 2.0d)).toBe(5.0d)
         expect(isDecimalType(1.0d)).toBeTruthy()

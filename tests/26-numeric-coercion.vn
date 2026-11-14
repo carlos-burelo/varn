@@ -4,11 +4,11 @@ function takesFloat(x: float): float { return x + 1; }
 function takesDecimal(x: decimal): decimal { return x + 1; }
 
 await describe("26 Numeric Coercion", async () => {
-    await it("implicit conversions", () => {
+    await it("an int variable widens to bigint and decimal only through as", () => {
         const i: int = 42;
-        const bi: bigint = i;
+        const bi: bigint = i as bigint;
         expect(bi.toString()).toBe("42");
-        const d: decimal = i;
+        const d: decimal = i as decimal;
         expect(d.toString()).toBe("42");
     });
 

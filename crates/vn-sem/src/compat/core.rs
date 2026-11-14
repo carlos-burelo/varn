@@ -149,11 +149,7 @@ pub(super) fn types_compatible_impl(
         (TypeKind::Primitive(_), TypeKind::Primitive(_)) => {
             simple_types_compatible(declared, inferred, table)
         }
-        (TypeKind::Primitive(p), TypeKind::Literal(l)) => {
-            use vn_core::LangPrimitive as P;
-            let base = l.base();
-            p == base || (matches!(p, P::Decimal | P::BigInt) && base == P::Int)
-        }
+        (TypeKind::Primitive(p), TypeKind::Literal(l)) => p == l.base(),
         (TypeKind::Primitive(vn_core::LangPrimitive::Str), TypeKind::TemplateLiteral(_)) => true,
         (TypeKind::TemplateLiteral(a), TypeKind::TemplateLiteral(b)) => a == b,
 

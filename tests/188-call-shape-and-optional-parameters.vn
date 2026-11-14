@@ -133,7 +133,7 @@ await describe("188 call shape and optional parameters", async () => {
         const box = new Box<float>(2)
         const held = new Box<float?>(4)
         const exact = new Box<decimal>(1)
-        const counted = new Box<decimal>(count)
+        const counted = new Box<decimal>(count as decimal)
         const table = new Map<str, float>()
         table.set("a", 1)
         expect(box.value::type).toBe("float")

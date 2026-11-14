@@ -23,7 +23,6 @@ pub(super) fn simple_types_compatible(
         (_, TypeKind::Primitive(P::Dynamic)) => false,
         (a, b) if a == b => true,
         (_, TypeKind::Primitive(P::Never)) => true,
-        (TypeKind::Primitive(P::Decimal | P::BigInt), TypeKind::Primitive(P::Int)) => true,
         _ => false,
     }
 }

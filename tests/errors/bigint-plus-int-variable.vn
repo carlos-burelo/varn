@@ -1,0 +1,4 @@
+// expect: error[VN3010]
+const a: bigint = 10n
+const i: int = 7
+const s = a + i
