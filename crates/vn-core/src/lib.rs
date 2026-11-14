@@ -56,7 +56,7 @@ pub use opcode::OpCode;
 pub use source::{SourceLocation, SourceRange};
 
 pub use accessor::AccessorKind;
-pub use intrinsics::MemberKey;
+pub use intrinsics::{MemberKey, MetaKey};
 pub use module_id::{ImportSpecifier, ModuleId, ModuleKind};
 pub use numeric::{
     add_int, binary_operand_kind, ceil_div_int, checked_int, clamp_index, div_int, fixed_digits,

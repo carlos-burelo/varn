@@ -18,10 +18,8 @@ impl<'r> Checker<'r> {
         let field_tys: Vec<Type> = members
             .iter()
             .filter(|m| {
-                matches!(
-                    m.kind,
-                    vn_sem::semantic_info::ResolvedMemberKind::Property
-                ) && !m.is_static
+                matches!(m.kind, vn_sem::semantic_info::ResolvedMemberKind::Property)
+                    && !m.is_static
             })
             .map(|m| m.ty)
             .collect();
@@ -42,20 +40,18 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) -> Type {
         let target_ty = self.infer_type(rec, target, bind);
-        match vn_core::MemberKey::from_str(bind.interner.resolve(property)) {
-            Some(vn_core::MemberKey::Name) | Some(vn_core::MemberKey::Type) => Type::Str,
-            Some(vn_core::MemberKey::Class) => Type::builtin(
+        match vn_core::MetaKey::from_str(bind.interner.resolve(property)) {
+            Some(vn_core::MetaKey::Name) | Some(vn_core::MetaKey::Type) => Type::Str,
+            Some(vn_core::MetaKey::Class) => Type::builtin(
                 vn_core::BuiltinType::Class,
                 vec![target_ty],
                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
             ),
-            Some(vn_core::MemberKey::Fields) | Some(vn_core::MemberKey::Methods) => {
-                Type::array(
-                    Type::Str,
-                    &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-                )
-            }
-            Some(vn_core::MemberKey::Keys) => {
+            Some(vn_core::MetaKey::Fields) | Some(vn_core::MetaKey::Methods) => Type::array(
+                Type::Str,
+                &mut *std::sync::Arc::make_mut(&mut self.ty_table),
+            ),
+            Some(vn_core::MetaKey::Keys) => {
                 let ret = Type::array(
                     Type::Str,
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
@@ -71,7 +67,7 @@ impl<'r> Checker<'r> {
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 )
             }
-            Some(vn_core::MemberKey::Values) => {
+            Some(vn_core::MetaKey::Values) => {
                 let value_ty = self.field_value_type(target_ty, bind);
                 let ret = Type::array(value_ty, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
                 Type::fn_(
@@ -85,7 +81,7 @@ impl<'r> Checker<'r> {
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 )
             }
-            Some(vn_core::MemberKey::Entries) => {
+            Some(vn_core::MetaKey::Entries) => {
                 let value_ty = self.field_value_type(target_ty, bind);
                 let ids: Vec<vn_sem::types::CheckerTyId> = vec![Type::Str.0, value_ty.0];
                 let list = std::sync::Arc::make_mut(&mut self.ty_table).intern_list(&ids);
@@ -105,7 +101,7 @@ impl<'r> Checker<'r> {
                     &mut *std::sync::Arc::make_mut(&mut self.ty_table),
                 )
             }
-            Some(vn_core::MemberKey::HasOwn) => Type::fn_(
+            Some(vn_core::MetaKey::HasOwn) => Type::fn_(
                 vn_sem::types::FunctionType {
                     params: vec![vn_sem::types::FunctionParam {
                         name: Some(std::sync::Arc::from("key")),
@@ -120,7 +116,7 @@ impl<'r> Checker<'r> {
                 },
                 &mut *std::sync::Arc::make_mut(&mut self.ty_table),
             ),
-            None | Some(_) => Type::Dynamic,
+            None => Type::Dynamic,
         }
     }
 }

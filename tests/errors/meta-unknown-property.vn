@@ -1,0 +1,3 @@
+// expect: error[VN3004]
+const x = 3
+const t = x::tag

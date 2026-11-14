@@ -239,6 +239,26 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) {
         self.check_expr(rec, target, bind);
+        if let vn_core::ast::ExprKind::MetaAccess { property, .. } = &self.ast_arena.expr(expr).kind
+        {
+            let name = bind.interner.resolve(*property);
+            if vn_core::MetaKey::from_str(name).is_none() {
+                let known: Vec<String> = vn_core::MetaKey::ALL
+                    .iter()
+                    .map(|key| format!("::{}", key.as_str()))
+                    .collect();
+                self.emit(
+                    Diagnostic::error(
+                        ErrorCode::MissingProperty,
+                        format!(
+                            "'::{name}' is not a meta property: the meta properties are {}",
+                            known.join(", ")
+                        ),
+                    )
+                    .with_range(range),
+                );
+            }
+        }
         let ty = self.infer_type(rec, expr, bind);
         self.record_type(rec, range.start.offset, ty);
     }
