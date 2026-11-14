@@ -185,13 +185,13 @@ impl<'m> Builder<'m> {
         }
 
         let mut argv = Vec::with_capacity(args.len());
-        for (a, &pty) in args.iter().zip(&tf.params) {
+        for a in args {
             let e = match a {
                 vn_tir::TirArg::Expr(e) => e,
                 vn_tir::TirArg::Named { value, .. } => value,
                 vn_tir::TirArg::Spread(_) => return Ok(None),
             };
-            argv.push(self.lower_inlined_arg(e, pty)?);
+            argv.push(self.lower_inlined_arg(e)?);
         }
 
         self.push_inline(InlineFrame {
@@ -211,11 +211,7 @@ impl<'m> Builder<'m> {
         Ok(Some(coerced))
     }
 
-    pub(super) fn lower_inlined_arg(
-        &mut self,
-        arg: &vn_tir::TirExpr,
-        param: vn_tir::BackendTy,
-    ) -> Result<Value> {
+    pub(super) fn lower_inlined_arg(&mut self, arg: &vn_tir::TirExpr) -> Result<Value> {
         let boxed = matches!(
             arg.ty,
             vn_tir::BackendTy::Nullable(_) | vn_tir::BackendTy::Dynamic(_)
@@ -261,8 +257,7 @@ impl<'m> Builder<'m> {
             | vn_tir::TirExprKind::ObjectRest { .. }
             | vn_tir::TirExprKind::ExtensionCall { .. } => arg,
         };
-        let v = self.lower_expr(precise)?;
-        Ok(self.widen_exact(v, precise.ty, param))
+        self.lower_expr(precise)
     }
 
     pub(super) fn lower_args(&mut self, args: &[vn_tir::TirArg]) -> Result<Vec<Value>> {

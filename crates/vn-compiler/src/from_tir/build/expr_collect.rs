@@ -2,7 +2,7 @@ use super::context::{Builder, Result};
 use crate::ssa::ir::{InstKind, Value};
 use std::sync::Arc;
 use vn_tir::{BackendTy, DynReason};
-use vn_tir::{Resolution, TirExpr};
+use vn_tir::TirExpr;
 
 const ARRAY_CHUNK: usize = 64;
 
@@ -135,19 +135,6 @@ impl<'m> Builder<'m> {
 
     pub(super) fn lower_assign_expr(&mut self, target: &TirExpr, value: &TirExpr) -> Result<Value> {
         let v = self.lower_expr(value)?;
-        let v = match (&target.kind, &target.res) {
-            (vn_tir::TirExprKind::Var, Resolution::Local(id)) => match self.local_declared(id.0) {
-                Some(declared) => self.widen_exact(v, value.ty, declared),
-                None => v,
-            },
-            (vn_tir::TirExprKind::Var, Resolution::GlobalSlot(n)) => {
-                match self.tir.globals.get(*n as usize).copied() {
-                    Some(declared) => self.widen_exact(v, value.ty, declared),
-                    None => v,
-                }
-            }
-            _ => v,
-        };
         self.lower_assign(target, v)?;
         Ok(v)
     }

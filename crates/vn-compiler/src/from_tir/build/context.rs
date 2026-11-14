@@ -33,8 +33,6 @@ pub(crate) struct Builder<'m> {
     pub(super) next_synthetic: u32,
     pub(super) current: BlockId,
     pub(super) inlining: Vec<InlineFrame>,
-    pub(super) locals_bt: Vec<BackendTy>,
-    pub(super) return_bt: Option<BackendTy>,
     pub(super) inline_serial: u32,
     pub(super) inline_scopes: Vec<vn_types::chunk::InlineScope>,
     pub(super) inline_scope_stack: Vec<u32>,
@@ -49,7 +47,6 @@ pub(super) struct InlineFrame {
 }
 
 pub(super) struct InlineBody {
-    pub(super) func: vn_tir::FnId,
     pub(super) base: u32,
     pub(super) param_base: u32,
     pub(super) exit: BlockId,
@@ -78,8 +75,6 @@ impl<'m> Builder<'m> {
             next_synthetic: 0,
             current: BlockId(0),
             inlining: Vec::new(),
-            locals_bt: Vec::new(),
-            return_bt: None,
             inline_serial: 0,
             inline_scopes: Vec::new(),
             inline_scope_stack: Vec::new(),

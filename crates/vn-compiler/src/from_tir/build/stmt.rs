@@ -74,7 +74,6 @@ impl<'m> Builder<'m> {
                 let value = match init {
                     Some(e) => {
                         let v = self.lower_expr(e)?;
-                        let v = self.widen_exact(v, e.ty, *ty);
                         self.coerce(v, declared)
                     }
                     None => match declared {
@@ -110,24 +109,14 @@ impl<'m> Builder<'m> {
             }
             TirStmt::Return(v) if self.inlining.last().is_some_and(|f| f.body.is_some()) => {
                 let val = match v {
-                    Some(e) => {
-                        let x = self.lower_expr(e)?;
-                        let ret_ty = self.return_bt.unwrap_or(e.ty);
-                        Some(self.widen_exact(x, e.ty, ret_ty))
-                    }
+                    Some(e) => Some(self.lower_expr(e)?),
                     None => None,
                 };
                 self.leave_inlined(val);
             }
             TirStmt::Return(v) => {
                 let val = match v {
-                    Some(e) => {
-                        let v = self.lower_expr(e)?;
-                        Some(match self.return_bt {
-                            Some(rt) => self.widen_exact(v, e.ty, rt),
-                            None => v,
-                        })
-                    }
+                    Some(e) => Some(self.lower_expr(e)?),
                     None => None,
                 };
                 for _ in 0..self.try_depth {

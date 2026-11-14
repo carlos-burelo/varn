@@ -1,7 +1,7 @@
 use super::context::Builder;
 use crate::ssa::ir::{InstKind, Value};
 use std::sync::Arc;
-use vn_tir::{BackendTy, DynReason};
+use vn_tir::BackendTy;
 
 impl<'m> Builder<'m> {
     pub(super) fn gname(&self, name: &str) -> Arc<str> {
@@ -40,50 +40,11 @@ impl<'m> Builder<'m> {
         }
     }
 
-    pub(super) fn widen_exact(&mut self, v: Value, from: BackendTy, to: BackendTy) -> Value {
-        let conv = match to {
-            BackendTy::BigInt if from == BackendTy::Int => vn_core::ValueConv::IntToBigInt,
-            BackendTy::Decimal if from == BackendTy::Int => vn_core::ValueConv::IntToDecimal,
-            BackendTy::Literal(_)
-            | BackendTy::Int
-            | BackendTy::Float
-            | BackendTy::Bool
-            | BackendTy::Char
-            | BackendTy::Str
-            | BackendTy::Bytes
-            | BackendTy::BigInt
-            | BackendTy::Decimal
-            | BackendTy::Array(_)
-            | BackendTy::Map(..)
-            | BackendTy::Set(_)
-            | BackendTy::Tuple(_)
-            | BackendTy::Class(_)
-            | BackendTy::Enum(_)
-            | BackendTy::Fn(_)
-            | BackendTy::Nullable(_)
-            | BackendTy::Void
-            | BackendTy::Never
-            | BackendTy::Dynamic(_) => return v,
-        };
-        self.emit(
-            InstKind::Convert { operand: v, conv },
-            BackendTy::Dynamic(DynReason::Boxed),
-        )
-    }
-
     pub(super) fn coerce(&mut self, v: Value, target: BackendTy) -> Value {
         let target = target.representation();
         let from = self.value_ty(v);
         if from == target || (from.is_boxed() && target.is_boxed()) {
             v
-        } else if from == BackendTy::Int && target == BackendTy::Float {
-            self.emit(
-                InstKind::Convert {
-                    operand: v,
-                    conv: vn_core::ValueConv::IntToFloat,
-                },
-                BackendTy::Float,
-            )
         } else {
             self.emit(
                 InstKind::Cast {

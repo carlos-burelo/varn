@@ -159,12 +159,12 @@ impl<'m> Builder<'m> {
             .function(func)
             .ok_or(OptError::Unsupported("from_tir: constructor out of range"))?;
         let mut argv = Vec::with_capacity(args.len());
-        for (a, &pty) in args.iter().zip(&ctor.params) {
+        for a in args.iter().take(ctor.params.len()) {
             let e = match a {
                 TirArg::Expr(e) | TirArg::Named { value: e, .. } => e,
                 TirArg::Spread(_) => return Err(OptError::Unsupported("from_tir: spread in new")),
             };
-            argv.push(self.lower_inlined_arg(e, pty)?);
+            argv.push(self.lower_inlined_arg(e)?);
         }
         Ok(argv)
     }
@@ -189,17 +189,12 @@ impl<'m> Builder<'m> {
         let lowered = ctor
             .body
             .iter()
-            .try_for_each(|s| self.lower_inlined_ctor_stmt(s, ctor, args));
+            .try_for_each(|s| self.lower_inlined_ctor_stmt(s, args));
         self.pop_inline();
         lowered
     }
 
-    fn lower_inlined_ctor_stmt(
-        &mut self,
-        stmt: &TirStmt,
-        ctor: &vn_tir::TirFunction,
-        args: &[TirArg],
-    ) -> Result<()> {
+    fn lower_inlined_ctor_stmt(&mut self, stmt: &TirStmt, args: &[TirArg]) -> Result<()> {
         let Some((param, default)) = default_fill(stmt) else {
             return self.lower_stmt(stmt);
         };
@@ -207,12 +202,7 @@ impl<'m> Builder<'m> {
         if args.get(at).and_then(supplied) != Some(false) {
             return Ok(());
         }
-        let declared = ctor
-            .params
-            .get(at)
-            .map(|ty| ty.non_nullable(&self.tir.types))
-            .ok_or(OptError::Unsupported("from_tir: default out of range"))?;
-        let filled = self.lower_inlined_arg(default, declared)?;
+        let filled = self.lower_inlined_arg(default)?;
         if let Some(slot) = self
             .inlining
             .last_mut()

@@ -47,8 +47,6 @@ fn build_inner(
     pinned.extend(super::super::pinning::try_pinned_vars(func));
     let mut b = Builder::with_pinned(tir, pinned.clone(), lines);
     b.self_fn = self_fn;
-    b.locals_bt = func.locals.clone();
-    b.return_bt = Some(func.return_ty);
     b.next_synthetic = func.locals.len() as u32;
     let entry = b.current;
 
@@ -67,31 +65,6 @@ fn build_inner(
         };
         let v = b.new_value(t);
         b.block_mut(entry).params.push(v);
-        let v = match *pty {
-            BackendTy::BigInt | BackendTy::Decimal if !defaulted[i] => {
-                b.widen_exact(v, BackendTy::Int, *pty)
-            }
-            BackendTy::Literal(_)
-            | BackendTy::Int
-            | BackendTy::Float
-            | BackendTy::Bool
-            | BackendTy::Char
-            | BackendTy::Str
-            | BackendTy::Bytes
-            | BackendTy::BigInt
-            | BackendTy::Decimal
-            | BackendTy::Array(_)
-            | BackendTy::Map(..)
-            | BackendTy::Set(_)
-            | BackendTy::Tuple(_)
-            | BackendTy::Class(_)
-            | BackendTy::Enum(_)
-            | BackendTy::Fn(_)
-            | BackendTy::Nullable(_)
-            | BackendTy::Void
-            | BackendTy::Never
-            | BackendTy::Dynamic(_) => v,
-        };
         b.write_var(VarId::Param(i as u32), entry, v);
     }
 

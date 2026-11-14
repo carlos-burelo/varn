@@ -27,16 +27,6 @@ impl<'m> Builder<'m> {
         Some(VarId::Local(LocalId(body.param_base + index)))
     }
 
-    pub(super) fn local_declared(&self, id: u32) -> Option<BackendTy> {
-        match self.inline_body() {
-            Some(body) => self
-                .tir
-                .function(body.func)
-                .and_then(|tf| tf.locals.get(id as usize).copied()),
-            None => self.locals_bt.get(id as usize).copied(),
-        }
-    }
-
     pub(super) fn try_inline_body_call(
         &mut self,
         f: FnId,
@@ -62,12 +52,12 @@ impl<'m> Builder<'m> {
         }
 
         let mut argv = Vec::with_capacity(args.len());
-        for (a, &pty) in args.iter().zip(&tf.params) {
+        for a in args {
             let e = match a {
                 TirArg::Expr(e) | TirArg::Named { value: e, .. } => e,
                 TirArg::Spread(_) => return Ok(None),
             };
-            argv.push(self.lower_inlined_arg(e, pty)?);
+            argv.push(self.lower_inlined_arg(e)?);
         }
 
         self.inline_serial += 1;
@@ -82,7 +72,6 @@ impl<'m> Builder<'m> {
             params: argv,
             this,
             body: Some(InlineBody {
-                func: f,
                 base,
                 param_base,
                 exit,
@@ -90,12 +79,10 @@ impl<'m> Builder<'m> {
                 ret_ty: tf.return_ty,
             }),
         });
-        let saved_return = self.return_bt.replace(tf.return_ty);
         let lowered = self.lower_block(&tf.body);
         if lowered.is_ok() && self.is_open() {
             self.leave_inlined(None);
         }
-        self.return_bt = saved_return;
         let frame = self.pop_inline();
         lowered?;
 
