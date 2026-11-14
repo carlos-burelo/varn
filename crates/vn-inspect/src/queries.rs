@@ -82,24 +82,20 @@ pub fn run_query(verb: Verb, ctx: &Ctx) -> (Vec<String>, Outcome) {
         }
         Verb::Signature => single(
             "sig",
-            vn_lsp::features::signature_help::build_signature_help(
-                ctx.analysis,
-                ctx.line,
-                ctx.col,
-            )
-            .and_then(|s| {
-                let idx = s.active_signature.unwrap_or(0) as usize;
-                s.signatures
-                    .get(idx)
-                    .or_else(|| s.signatures.first())
-                    .map(|info| {
-                        format!(
-                            "{}  ({} sigs)",
-                            one_line(&info.label, 100),
-                            s.signatures.len()
-                        )
-                    })
-            }),
+            vn_lsp::features::signature_help::build_signature_help(ctx.analysis, ctx.line, ctx.col)
+                .and_then(|s| {
+                    let idx = s.active_signature.unwrap_or(0) as usize;
+                    s.signatures
+                        .get(idx)
+                        .or_else(|| s.signatures.first())
+                        .map(|info| {
+                            format!(
+                                "{}  ({} sigs)",
+                                one_line(&info.label, 100),
+                                s.signatures.len()
+                            )
+                        })
+                }),
         ),
     }
 }

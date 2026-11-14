@@ -196,10 +196,8 @@ impl Checker<'_> {
         if ty.is_unresolved() {
             return;
         }
-        let accepted = vn_sem::types::Type::union(
-            allowed,
-            &mut *std::sync::Arc::make_mut(&mut self.ty_table),
-        );
+        let accepted =
+            vn_sem::types::Type::union(allowed, &mut *std::sync::Arc::make_mut(&mut self.ty_table));
         if self.types_compatible_cached(&accepted, &ty, Some(bind)) {
             return;
         }

@@ -288,12 +288,7 @@ impl Boundary for ExecCtx {
         crate::exec::conform::decode(&mut self.heap, self.jit_stack_floor, value, desc, witnesses)
     }
 
-    fn parse_typed(
-        &mut self,
-        text: VmValue,
-        desc: &str,
-        witnesses: &[VmValue],
-    ) -> NativeFnResult {
+    fn parse_typed(&mut self, text: VmValue, desc: &str, witnesses: &[VmValue]) -> NativeFnResult {
         crate::exec::conform::parse_typed(self, text, desc, witnesses)
     }
 

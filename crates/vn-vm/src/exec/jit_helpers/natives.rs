@@ -26,11 +26,7 @@ pub(crate) extern "C" fn jit_call_native_window(
     }
 }
 
-unsafe fn resolve_native(
-    ctx_ref: &mut ExecCtx,
-    fn_addr: usize,
-    op_id: u64,
-) -> vn_types::NativeFn {
+unsafe fn resolve_native(ctx_ref: &mut ExecCtx, fn_addr: usize, op_id: u64) -> vn_types::NativeFn {
     if fn_addr != 0 {
         return unsafe { std::mem::transmute::<usize, vn_types::NativeFn>(fn_addr) };
     }

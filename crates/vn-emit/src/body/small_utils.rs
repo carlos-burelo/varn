@@ -49,9 +49,7 @@ pub(super) fn bool_lit(v: bool) -> TirExpr {
     }
 }
 
-pub(super) fn assign_bin_op(
-    op: vn_core::ast::operators::AssignOp,
-) -> Result<Option<TirBinOp>, ()> {
+pub(super) fn assign_bin_op(op: vn_core::ast::operators::AssignOp) -> Result<Option<TirBinOp>, ()> {
     use vn_core::ast::operators::AssignOp as A;
     Ok(Some(match op {
         A::Assign => return Ok(None),

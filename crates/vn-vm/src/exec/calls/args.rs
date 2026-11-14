@@ -20,8 +20,7 @@ pub(crate) fn bundle_rest_args(
             for _ in *arg_count..rest_idx {
                 staging.push(VmValue::null());
             }
-            let nv =
-                heap.alloc_array_repr(false, vn_types::vm_value::ArrayRepr::boxed(Vec::new()));
+            let nv = heap.alloc_array_repr(false, vn_types::vm_value::ArrayRepr::boxed(Vec::new()));
             staging.push(nv);
             *arg_count = rest_idx + 1;
         }

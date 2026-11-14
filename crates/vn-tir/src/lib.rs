@@ -1,10 +1,10 @@
 mod ty;
 
+pub use ty::PortableTable;
 pub use ty::{
     BackendTy, ClassId, DynReason, EnumId, FnId, LiteralStrId, LocalId, ModuleId, ShapeField,
     ShapeId, SigId, TyId, TyListId, TyTable,
 };
-pub use ty::PortableTable;
 
 mod resolution;
 pub use resolution::Resolution;
@@ -31,10 +31,10 @@ pub use verify::{verify_module, VerifyError};
 mod coverage;
 pub use coverage::Coverage;
 
-mod registry;
 pub mod children;
 pub mod inlinable;
 pub mod link;
 pub mod package;
+mod registry;
 pub mod walk;
 pub use registry::{ClassRegistry, ClassRegistryBuilder, GlobalClassId};

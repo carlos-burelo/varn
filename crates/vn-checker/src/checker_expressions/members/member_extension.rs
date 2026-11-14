@@ -17,8 +17,7 @@ pub(super) fn collect_extension_members(
 
     let strip_this = |ft: &vn_sem::types::FunctionType| {
         let mut params = ft.params.clone();
-        if params.first().and_then(|p| p.name.as_deref())
-            == Some(vn_core::TokenKind::This.as_str())
+        if params.first().and_then(|p| p.name.as_deref()) == Some(vn_core::TokenKind::This.as_str())
         {
             params.remove(0);
         }

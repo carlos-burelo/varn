@@ -34,8 +34,7 @@ impl<'r> Checker<'r> {
                 );
                 continue;
             }
-            if vn_core::ast::decorators::is_contract_decorator(self.ast_arena, &bind.interner, d)
-            {
+            if vn_core::ast::decorators::is_contract_decorator(self.ast_arena, &bind.interner, d) {
                 continue;
             }
             if let Some(kind) = Self::builtin_kind(b) {
@@ -207,20 +206,14 @@ impl<'r> Checker<'r> {
         }
     }
 
-    fn is_void_ty(
-        table: &vn_sem::types::CheckerTyTable,
-        id: vn_sem::types::CheckerTyId,
-    ) -> bool {
+    fn is_void_ty(table: &vn_sem::types::CheckerTyTable, id: vn_sem::types::CheckerTyId) -> bool {
         matches!(
             table.get(id),
             vn_core::TypeKind::Primitive(vn_core::LangPrimitive::Void)
         )
     }
 
-    fn is_null_ty(
-        table: &vn_sem::types::CheckerTyTable,
-        id: vn_sem::types::CheckerTyId,
-    ) -> bool {
+    fn is_null_ty(table: &vn_sem::types::CheckerTyTable, id: vn_sem::types::CheckerTyId) -> bool {
         matches!(
             table.get(id),
             vn_core::TypeKind::Primitive(vn_core::LangPrimitive::Null)

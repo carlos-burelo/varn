@@ -200,11 +200,8 @@ impl<'r> Checker<'r> {
                     1
                 };
                 for i in 0..count {
-                    let arg = vn_sem::resolve::expand_alias(
-                        ty.builtin_arg(i, table),
-                        Some(&view),
-                        table,
-                    );
+                    let arg =
+                        vn_sem::resolve::expand_alias(ty.builtin_arg(i, table), Some(&view), table);
                     if matches!(table.get(arg.0), TypeKind::Literal(_)) {
                         return true;
                     }
@@ -215,12 +212,7 @@ impl<'r> Checker<'r> {
         false
     }
 
-    fn check_type_name(
-        &mut self,
-        name: vn_core::Atom,
-        node: &TypeNode,
-        bind: &BindResult,
-    ) -> bool {
+    fn check_type_name(&mut self, name: vn_core::Atom, node: &TypeNode, bind: &BindResult) -> bool {
         let text = self.resolve_bind_atom(bind, name);
         if TypeKind::<(), (), (), (), (), ()>::of_primitive_name(&text).is_some()
             || text.as_ref() == vn_core::well_known::RECORD

@@ -91,11 +91,9 @@ pub(crate) fn emit_get_property(
         let id = b.ins().uextend(types::I64, id32);
         let kc = b.ins().uload8(types::I64, m, entry, 6);
         let id_eq = b.ins().icmp(IntCC::Equal, id, shape_id);
-        let kind_ok = b.ins().icmp_imm_u(
-            IntCC::Equal,
-            kc,
-            vn_types::chunk::ICKind::SHAPE_PROP as i64,
-        );
+        let kind_ok =
+            b.ins()
+                .icmp_imm_u(IntCC::Equal, kc, vn_types::chunk::ICKind::SHAPE_PROP as i64);
         let matched = b.ins().band(id_eq, kind_ok);
         b.ins().brif(matched, hit, &[], next, &[]);
 

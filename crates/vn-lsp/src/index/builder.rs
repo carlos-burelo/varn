@@ -152,9 +152,7 @@ fn resolve_specifier_to_uri(specifier: &str, doc_dir: Option<&std::path::Path>) 
         vn_core::ModuleId::Local(path) => std::path::Path::new(path.as_ref())
             .exists()
             .then(|| path_to_uri(path.as_ref())),
-        vn_core::ModuleId::Std(s)
-        | vn_core::ModuleId::Core(s)
-        | vn_core::ModuleId::Runtime(s) => {
+        vn_core::ModuleId::Std(s) | vn_core::ModuleId::Core(s) | vn_core::ModuleId::Runtime(s) => {
             let path = crate::workspace::std_sources::resolve_module_file(s.as_ref())?;
             Some(path_to_uri(&path.to_string_lossy()))
         }

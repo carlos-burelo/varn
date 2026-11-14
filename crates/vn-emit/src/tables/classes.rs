@@ -237,12 +237,7 @@ fn build_one_class(
     info
 }
 
-pub(super) type StaticMember<'a> = (
-    ClassMemberKind,
-    &'a Arc<str>,
-    &'a vn_sem::types::Type,
-    bool,
-);
+pub(super) type StaticMember<'a> = (ClassMemberKind, &'a Arc<str>, &'a vn_sem::types::Type, bool);
 
 pub(super) fn build_statics<'a>(
     members: impl Iterator<Item = StaticMember<'a>> + Clone,

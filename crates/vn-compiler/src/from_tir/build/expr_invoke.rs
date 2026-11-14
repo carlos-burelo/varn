@@ -177,8 +177,7 @@ impl<'m> Builder<'m> {
         if !matches!(
             res,
             Resolution::NativeOp(_) | Resolution::NativeDecode { .. }
-        )
-            && let Some(v) = self.try_inline_method_call(recv, r, name, args, ty)?
+        ) && let Some(v) = self.try_inline_method_call(recv, r, name, args, ty)?
         {
             return Ok(v);
         }

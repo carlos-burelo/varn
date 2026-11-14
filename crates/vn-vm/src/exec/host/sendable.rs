@@ -122,10 +122,7 @@ pub(super) fn to_sendable(
                         vn_core::MemberKey::Inclusive.as_str().to_string(),
                         vn_types::value::SendValue::Bool(r.inclusive),
                     ),
-                    (
-                        "step".to_string(),
-                        vn_types::value::SendValue::Int(r.step),
-                    ),
+                    ("step".to_string(), vn_types::value::SendValue::Int(r.step)),
                 ];
                 Ok(vn_types::value::SendValue::Object(fields))
             }

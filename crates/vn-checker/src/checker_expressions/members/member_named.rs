@@ -16,9 +16,7 @@ impl<'r> Checker<'r> {
         {
             return Some((Type::Str, None));
         }
-        if key == vn_core::MemberKey::Tag.as_str()
-            || key == vn_core::MemberKey::RawValue.as_str()
-        {
+        if key == vn_core::MemberKey::Tag.as_str() || key == vn_core::MemberKey::RawValue.as_str() {
             return Some((Type::Int, None));
         }
         if let Some(res) = self.find_member_info_uncached(&Type::resolved(payload_ty), key, bind) {

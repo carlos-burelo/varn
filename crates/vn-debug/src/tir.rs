@@ -15,8 +15,7 @@ pub fn debug_tir(
     desugar: &Desugarings,
     flags: &DebugFlags,
 ) {
-    let module =
-        vn_emit::emit_module(program, ast_arena, bind, expr_table, call_mappings, desugar);
+    let module = vn_emit::emit_module(program, ast_arena, bind, expr_table, call_mappings, desugar);
 
     if flags.tir {
         Section::new("tir")

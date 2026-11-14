@@ -1,6 +1,4 @@
-fn nested(
-    k: vn_sem::semantic_info::NestedTypeKind,
-) -> vn_sem::semantic_info::ResolvedMemberKind {
+fn nested(k: vn_sem::semantic_info::NestedTypeKind) -> vn_sem::semantic_info::ResolvedMemberKind {
     vn_sem::semantic_info::ResolvedMemberKind::NestedType(k)
 }
 
@@ -17,12 +15,8 @@ pub(super) fn map_class_member_kind(
         vn_sem::types::ClassMemberKind::Constructor => {
             vn_sem::semantic_info::ResolvedMemberKind::Constructor
         }
-        vn_sem::types::ClassMemberKind::Getter => {
-            vn_sem::semantic_info::ResolvedMemberKind::Getter
-        }
-        vn_sem::types::ClassMemberKind::Setter => {
-            vn_sem::semantic_info::ResolvedMemberKind::Setter
-        }
+        vn_sem::types::ClassMemberKind::Getter => vn_sem::semantic_info::ResolvedMemberKind::Getter,
+        vn_sem::types::ClassMemberKind::Setter => vn_sem::semantic_info::ResolvedMemberKind::Setter,
         vn_sem::types::ClassMemberKind::Class => {
             nested(vn_sem::semantic_info::NestedTypeKind::Class)
         }
@@ -32,8 +26,6 @@ pub(super) fn map_class_member_kind(
         vn_sem::types::ClassMemberKind::Namespace => {
             nested(vn_sem::semantic_info::NestedTypeKind::Namespace)
         }
-        vn_sem::types::ClassMemberKind::Enum => {
-            nested(vn_sem::semantic_info::NestedTypeKind::Enum)
-        }
+        vn_sem::types::ClassMemberKind::Enum => nested(vn_sem::semantic_info::NestedTypeKind::Enum),
     }
 }

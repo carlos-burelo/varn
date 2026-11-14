@@ -98,8 +98,7 @@ impl<'r> Checker<'r> {
                     .iter()
                     .map(|slot| Type::resolved(*slot))
                     .collect();
-                if let vn_core::ast::ExprKind::IntLiteral { value, .. } =
-                    &arena.expr(property).kind
+                if let vn_core::ast::ExprKind::IntLiteral { value, .. } = &arena.expr(property).kind
                 {
                     return (
                         usize::try_from(*value)

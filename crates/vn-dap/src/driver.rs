@@ -34,10 +34,9 @@ impl Driver {
         let source = vn_pipeline::Source::file(program)
             .map_err(|e| format!("cannot load '{program}': {e}"))?;
         let canonical = source.path().to_owned();
-        let session = vn_pipeline::Session::open(vn_pipeline::Anchor::File(
-            std::path::Path::new(&canonical),
-        ))
-        .map_err(|e| format!("cannot open project: {e}"))?;
+        let session =
+            vn_pipeline::Session::open(vn_pipeline::Anchor::File(std::path::Path::new(&canonical)))
+                .map_err(|e| format!("cannot open project: {e}"))?;
         let compiled = session
             .compile(source, Request::executable(CachePolicy::Bypass))
             .into_executable()

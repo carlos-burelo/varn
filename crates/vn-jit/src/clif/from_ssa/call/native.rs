@@ -38,8 +38,7 @@ pub(crate) fn emit_call_native_op(
         )?;
         return Ok(box_int(b, code));
     }
-    if args.len() == 1 && op_id == vn_core::runtime_ops::op_id(vn_core::runtime_ops::STR_INDEX)
-    {
+    if args.len() == 1 && op_id == vn_core::runtime_ops::op_id(vn_core::runtime_ops::STR_INDEX) {
         let (recv_tag, recv_payload) = b.ins().isplit(receiver);
         let (pos_tag, pos_payload) = heap::boxed_parts(b, ctx, values, args[0])?;
         crate::clif::from_ssa::exceptions::call_checked(
@@ -123,8 +122,7 @@ pub(crate) fn emit_call_native_op(
             ctx.helpers.jit_native_result_offset as i32,
         ));
     }
-    if op_id == vn_core::op_id::KnownOp::StrSubstring.id() && (args.len() == 1 || args.len() == 2)
-    {
+    if op_id == vn_core::op_id::KnownOp::StrSubstring.id() && (args.len() == 1 || args.len() == 2) {
         let (recv_tag, recv_payload) = b.ins().isplit(receiver);
         let (start_tag, start_payload) = heap::boxed_parts(b, ctx, values, args[0])?;
         let has_end_v = b.ins().iconst(types::I64, (args.len() - 1) as i64);

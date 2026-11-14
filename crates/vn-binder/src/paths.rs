@@ -14,10 +14,8 @@ pub fn resolve_relative(
     specifier: &str,
 ) -> String {
     let raw = match vn_core::ImportSpecifier::parse(specifier) {
-        vn_core::ImportSpecifier::Package(_) => {
-            resolve_package_specifier_path(base_dir, specifier)
-                .unwrap_or_else(|_| base_dir.join(specifier).to_string_lossy().into_owned())
-        }
+        vn_core::ImportSpecifier::Package(_) => resolve_package_specifier_path(base_dir, specifier)
+            .unwrap_or_else(|_| base_dir.join(specifier).to_string_lossy().into_owned()),
         vn_core::ImportSpecifier::Relative(_)
         | vn_core::ImportSpecifier::Stdlib(_)
         | vn_core::ImportSpecifier::Core(_)

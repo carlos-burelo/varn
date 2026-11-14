@@ -8,9 +8,7 @@ pub(super) fn fold_convert(conv: vn_core::ValueConv, operand: &InstKind) -> Opti
     use vn_core::ValueConv::*;
     match (conv, operand) {
         (IntToFloat, InstKind::ConstInt(n)) => Some(InstKind::ConstFloat(*n as f64)),
-        (FloatToInt, InstKind::ConstFloat(f)) => {
-            vn_core::float_to_int(*f).map(InstKind::ConstInt)
-        }
+        (FloatToInt, InstKind::ConstFloat(f)) => vn_core::float_to_int(*f).map(InstKind::ConstInt),
         (BigIntToInt, InstKind::ConstBigInt(b)) => {
             let b: num_bigint::BigInt = b.parse().ok()?;
             i64::try_from(&b).ok().map(InstKind::ConstInt)

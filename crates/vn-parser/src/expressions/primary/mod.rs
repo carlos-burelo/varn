@@ -115,9 +115,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> PResult<ExprId> {
         }
         TokenKind::Placeholder => {
             s.advance();
-            let name = s
-                .interner
-                .intern(vn_core::TokenKind::Placeholder.as_str());
+            let name = s.interner.intern(vn_core::TokenKind::Placeholder.as_str());
             Ok(s.expr(range, ExprKind::Identifier { name }))
         }
 

@@ -19,12 +19,12 @@ impl<'r> Checker<'r> {
         if callee_ty.is_unresolved() {
             return Type::Dynamic;
         }
-        let callee_ty =
-            if callee_ty.builtin_of(&self.ty_table) == Some(vn_core::BuiltinType::Class) {
-                callee_ty.builtin_arg(0, &self.ty_table)
-            } else {
-                callee_ty
-            };
+        let callee_ty = if callee_ty.builtin_of(&self.ty_table) == Some(vn_core::BuiltinType::Class)
+        {
+            callee_ty.builtin_arg(0, &self.ty_table)
+        } else {
+            callee_ty
+        };
         let callee_kind = self.ty_table.get(callee_ty.0);
         match callee_kind {
             TypeKind::Named(name, origin) => {
@@ -204,8 +204,7 @@ impl<'r> Checker<'r> {
     }
 
     fn declared_type_defaults(&self, callee: ExprId, bind: &BindResult) -> Vec<Option<Type>> {
-        let vn_core::ast::ExprKind::Identifier { name } = &self.ast_arena.expr(callee).kind
-        else {
+        let vn_core::ast::ExprKind::Identifier { name } = &self.ast_arena.expr(callee).kind else {
             return Vec::new();
         };
         bind.scopes

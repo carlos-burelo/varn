@@ -26,12 +26,7 @@ fn overflow_neg(a: i64) -> RuntimeError {
 
 #[cold]
 #[inline(never)]
-pub(crate) fn int_div_fault(
-    fault: vn_core::IntDivFault,
-    op: &str,
-    a: i64,
-    b: i64,
-) -> RuntimeError {
+pub(crate) fn int_div_fault(fault: vn_core::IntDivFault, op: &str, a: i64, b: i64) -> RuntimeError {
     match fault {
         vn_core::IntDivFault::DivisionByZero => RuntimeError::division_by_zero(if op == "%" {
             "modulo by zero"

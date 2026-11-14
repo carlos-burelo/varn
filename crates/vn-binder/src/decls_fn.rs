@@ -64,11 +64,7 @@ impl<'r> Binder<'r> {
         }
     }
 
-    pub(super) fn bind_type_params(
-        &mut self,
-        type_params: &[vn_core::ast::TypeParam],
-        line: u32,
-    ) {
+    pub(super) fn bind_type_params(&mut self, type_params: &[vn_core::ast::TypeParam], line: u32) {
         use vn_sem::symbol::{Symbol, SymbolKind};
         use vn_sem::types::Type;
 

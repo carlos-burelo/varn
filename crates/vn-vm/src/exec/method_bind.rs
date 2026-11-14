@@ -49,11 +49,9 @@ pub(crate) fn invoke_runtime_static(
                     elem: vn_types::value::RangeElem::Char,
                     ..vn_types::value::RangeData::int(a as i64, b as i64, flag != 0)
                 },
-                _ => vn_types::value::RangeData::int(
-                    heap.as_int(start),
-                    heap.as_int(end),
-                    flag != 0,
-                ),
+                _ => {
+                    vn_types::value::RangeData::int(heap.as_int(start), heap.as_int(end), flag != 0)
+                }
             };
             Ok(heap.alloc_range_data(r))
         }

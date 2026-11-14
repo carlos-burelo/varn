@@ -20,10 +20,7 @@ impl NativeCtx for ExecCtx {
         self.heap.alloc_str_dynamic(s)
     }
 
-    fn map_key(
-        &mut self,
-        v: VmValue,
-    ) -> Result<vn_types::value::MapKey, vn_types::NativeError> {
+    fn map_key(&mut self, v: VmValue) -> Result<vn_types::value::MapKey, vn_types::NativeError> {
         self.host_map_key(v)
     }
 
@@ -310,14 +307,11 @@ impl NativeCtx for ExecCtx {
         unsafe { &mut *self.resources.get() }
     }
 
-    fn resume_generator(
-        &mut self,
-        generator: VmValue,
-        input: VmValue,
-    ) -> vn_types::NativeFnResult {
-        let state = self.heap.generator_of(generator).ok_or_else(|| {
-            vn_types::NativeError::type_error("generator.next: invalid receiver")
-        })?;
+    fn resume_generator(&mut self, generator: VmValue, input: VmValue) -> vn_types::NativeFnResult {
+        let state = self
+            .heap
+            .generator_of(generator)
+            .ok_or_else(|| vn_types::NativeError::type_error("generator.next: invalid receiver"))?;
         if state.is_async {
             return Ok(self.step_generator_task(&state));
         }

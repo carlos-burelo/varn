@@ -271,8 +271,7 @@ fn parse_var_declarator_suffix(
         None
     };
     if let (Pattern::Identifier { name, .. }, None, Some(init)) = (&id, &type_ann, init)
-        && let vn_core::ast::ExprKind::ClassExpr { declaration } =
-            &mut s.arena.expr_mut(init).kind
+        && let vn_core::ast::ExprKind::ClassExpr { declaration } = &mut s.arena.expr_mut(init).kind
         && declaration.id.is_none()
     {
         declaration.id = Some(*name);

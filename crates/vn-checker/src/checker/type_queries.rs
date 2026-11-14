@@ -95,8 +95,7 @@ impl<'r> Checker<'r> {
         bind: &BindResult,
     ) -> Option<Type> {
         use vn_sem::types::TypeContext;
-        let vn_core::TypeKind::Generic(name_atom, args_list, origin_atom) =
-            self.ty_table.get(ty.0)
+        let vn_core::TypeKind::Generic(name_atom, args_list, origin_atom) = self.ty_table.get(ty.0)
         else {
             return None;
         };

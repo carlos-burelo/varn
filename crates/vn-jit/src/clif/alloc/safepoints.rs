@@ -10,10 +10,7 @@ pub(crate) enum IntrinsicScan {
     ByWireByte,
 }
 
-pub(crate) fn has_alloc(
-    code: &[u16],
-    pool: &[vn_types::chunk::PoolEntry],
-) -> Result<bool, String> {
+pub(crate) fn has_alloc(code: &[u16], pool: &[vn_types::chunk::PoolEntry]) -> Result<bool, String> {
     has_alloc_scan(code, pool, IntrinsicScan::Conservative)
 }
 

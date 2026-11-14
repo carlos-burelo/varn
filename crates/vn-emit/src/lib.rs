@@ -22,9 +22,7 @@ mod ty;
 pub use ty::{lower_type, NameResolver, NoNames};
 
 use extensions::emit_extensions;
-use imports_exports::{
-    collect_exports, collect_imports, math_intrinsic_imports, native_targets,
-};
+use imports_exports::{collect_exports, collect_imports, math_intrinsic_imports, native_targets};
 use module_ctx::MCtx;
 use rustc_hash::FxHashMap;
 use std::sync::Arc;

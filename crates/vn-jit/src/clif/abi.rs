@@ -110,12 +110,7 @@ pub(super) fn build_host_thunk(
     }
     let call = b.ins().call(raw_ref, &args);
     let res = b.inst_results(call).to_vec();
-    let boxed = native_result_boxed(
-        &mut b,
-        NativeClass::of(shape.ret),
-        proto.return_kind,
-        &res,
-    );
+    let boxed = native_result_boxed(&mut b, NativeClass::of(shape.ret), proto.return_kind, &res);
     let (tag, payload) = b.ins().isplit(boxed);
     b.ins().store(m, tag, out, 0);
     b.ins().store(m, payload, out, 8);

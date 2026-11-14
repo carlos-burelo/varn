@@ -313,10 +313,10 @@ pub(crate) fn lower_dependencies(
                 types: lowered.tir.types.clone(),
             },
         );
+        dependencies.library.insert(module_path, lowered.templates);
         dependencies
-            .library
-            .insert(module_path, lowered.templates);
-        dependencies.modules.insert(module_path.clone(), lowered.proto);
+            .modules
+            .insert(module_path.clone(), lowered.proto);
     }
     Ok(dependencies)
 }

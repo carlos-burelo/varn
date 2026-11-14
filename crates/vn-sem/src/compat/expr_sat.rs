@@ -67,12 +67,8 @@ pub fn expr_satisfies_target_type(
                 return false;
             };
             let key_str = match key {
-                vn_core::ast::PropKey::Identifier(s) | vn_core::ast::PropKey::Str(s) => {
-                    s.as_str()
-                }
-                vn_core::ast::PropKey::Int(_) | vn_core::ast::PropKey::Computed(_) => {
-                    return false
-                }
+                vn_core::ast::PropKey::Identifier(s) | vn_core::ast::PropKey::Str(s) => s.as_str(),
+                vn_core::ast::PropKey::Int(_) | vn_core::ast::PropKey::Computed(_) => return false,
             };
             let matched = members.iter().any(|m| match m {
                 ObjectTypeMember::Property { name, ty, .. } if name.as_ref() == key_str => {

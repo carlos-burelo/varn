@@ -37,8 +37,7 @@ pub fn numeric_operand(t: &Type, table: &CheckerTyTable) -> Option<vn_core::Nume
 
 pub fn numeric_binary_type(l: &Type, r: &Type, table: &CheckerTyTable) -> Option<Type> {
     use vn_core::NumericOperand;
-    let kind =
-        vn_core::binary_operand_kind(numeric_operand(l, table), numeric_operand(r, table))?;
+    let kind = vn_core::binary_operand_kind(numeric_operand(l, table), numeric_operand(r, table))?;
     Some(match kind {
         NumericOperand::Int => Type::Int,
         NumericOperand::Float => Type::Float,

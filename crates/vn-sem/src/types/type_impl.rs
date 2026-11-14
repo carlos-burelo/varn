@@ -299,9 +299,7 @@ impl Type {
                 | vn_core::LangPrimitive::Error => None,
             },
             TypeKind::Array(_) => Some(vn_core::BuiltinType::Array.name()),
-            TypeKind::Named(..) if self.is_bytes(table) => {
-                Some(vn_core::BuiltinType::Bytes.name())
-            }
+            TypeKind::Named(..) if self.is_bytes(table) => Some(vn_core::BuiltinType::Bytes.name()),
             TypeKind::Literal(_)
             | TypeKind::This
             | TypeKind::Union(_)

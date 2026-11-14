@@ -23,10 +23,7 @@ pub(super) fn parse_match_expr(s: &mut TokenStream) -> PResult<ExprId> {
     }
     s.expect(TokenKind::RBrace)?;
     let full_range = s.span_from(range);
-    Ok(s.expr(
-        full_range,
-        vn_core::ast::ExprKind::Match { subject, cases },
-    ))
+    Ok(s.expr(full_range, vn_core::ast::ExprKind::Match { subject, cases }))
 }
 
 fn parse_match_case(s: &mut TokenStream) -> PResult<Vec<MatchCase>> {

@@ -6,11 +6,7 @@ use vn_core::TypeDesc;
 const MAX_TYPED_FIELDS: usize = 16;
 
 impl ExecCtx {
-    pub(crate) fn json_parse_typed(
-        &mut self,
-        text: &str,
-        desc: &TypeDesc,
-    ) -> Option<VmValue> {
+    pub(crate) fn json_parse_typed(&mut self, text: &str, desc: &TypeDesc) -> Option<VmValue> {
         let mut parser = FastJsonParser::new(self, text);
         let value = parser.parse_typed(desc)?;
         parser.skip_whitespace();
@@ -186,7 +182,9 @@ impl FastJsonParser<'_, '_> {
         if shape.class.is_some() || shape.ordered_names().len() != present.count_ones() as usize {
             return None;
         }
-        self.ctx.typed_shapes.insert(key, std::rc::Rc::clone(&shape));
+        self.ctx
+            .typed_shapes
+            .insert(key, std::rc::Rc::clone(&shape));
         Some(shape)
     }
 }

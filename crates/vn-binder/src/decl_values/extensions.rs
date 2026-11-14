@@ -75,11 +75,8 @@ impl<'r> super::super::Binder<'r> {
                         let ty = self.param_type(p, crate::ParamSite::Declared);
                         param_types.push(vn_sem::types::FunctionParam {
                             name: Some(Arc::from(
-                                vn_sem::infer::pattern_to_string(
-                                    &p.pattern,
-                                    Some(&self.interner),
-                                )
-                                .as_str(),
+                                vn_sem::infer::pattern_to_string(&p.pattern, Some(&self.interner))
+                                    .as_str(),
                             )),
                             ty: ty.0,
                             optional: p.is_optional || p.default.is_some(),

@@ -48,10 +48,11 @@ pub fn execute(session: &pipeline::Session, args: CheckArgs) -> Result<(), CliEr
 fn targets(session: &pipeline::Session, requested: &[String]) -> Result<Vec<PathBuf>, CliError> {
     let project = session.project();
     if requested.is_empty() {
-        let main =
-            project.manifest.main.as_deref().ok_or_else(|| {
-                CliError::usage("no files given and vn.toml declares no 'main'")
-            })?;
+        let main = project
+            .manifest
+            .main
+            .as_deref()
+            .ok_or_else(|| CliError::usage("no files given and vn.toml declares no 'main'"))?;
         return Ok(vec![project.root.join(main)]);
     }
     let mut files = Vec::new();

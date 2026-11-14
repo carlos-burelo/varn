@@ -15,10 +15,7 @@ pub fn run_doctor() -> CliResult<()> {
         vn_core::env::EnvVar::Home.name(),
         vn_core::paths::vn_home_dir().display()
     );
-    println!(
-        "  cache dir: {}",
-        vn_core::paths::vn_cache_dir().display()
-    );
+    println!("  cache dir: {}", vn_core::paths::vn_cache_dir().display());
     match &vn_core::env::process().std {
         Some(raw) => println!("  VN_STD: {raw}"),
         None => println!("  VN_STD: <not set>"),

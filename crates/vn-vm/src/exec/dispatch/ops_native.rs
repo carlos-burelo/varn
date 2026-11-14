@@ -53,9 +53,9 @@ impl ExecCtx {
                 *ip += 2;
 
                 let op_id = match closure.proto.chunk.constants.get(cidx) {
-                    Some(vn_types::chunk::PoolEntry::Literal(
-                        vn_types::chunk::Literal::Int(i),
-                    )) => *i as u64,
+                    Some(vn_types::chunk::PoolEntry::Literal(vn_types::chunk::Literal::Int(i))) => {
+                        *i as u64
+                    }
                     Some(vn_types::chunk::PoolEntry::Literal(
                         vn_types::chunk::Literal::Null
                         | vn_types::chunk::Literal::Bool(_)

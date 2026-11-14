@@ -24,7 +24,9 @@ fn native_callable(proto: &FunctionProto, activation: Activation) -> bool {
         && !proto.has_rest
         && !proto.is_async
         && !proto.is_generator
-        && super::native_abi::NativeShape::of_proto(proto).id().is_some()
+        && super::native_abi::NativeShape::of_proto(proto)
+            .id()
+            .is_some()
 }
 
 impl ClifArtifact {
@@ -247,9 +249,9 @@ impl CodeImage {
             .map_or(entry.code.len(), |body| body_off + body.code.len());
         let wrapper_off = (raw_end + 15) & !15;
         let host_off = (wrapper_off + wrapper.code.len() + 15) & !15;
-        let total = host
-            .as_ref()
-            .map_or(wrapper_off + wrapper.code.len(), |h| host_off + h.code.len());
+        let total = host.as_ref().map_or(wrapper_off + wrapper.code.len(), |h| {
+            host_off + h.code.len()
+        });
         let mut code = vec![0u8; total];
         code[..entry.code.len()].copy_from_slice(&entry.code);
         if let Some(body) = &lowered.self_body {
@@ -319,17 +321,22 @@ impl CodeImage {
                 .map(|s| (shift_wrapper(s.return_offset as usize), s.slots)),
         );
         if let Some(h) = &host {
-            call_relocs.extend(h.call_reloc_offsets.iter().map(|&r| ((host_off + r) as u32, 0)));
+            call_relocs.extend(
+                h.call_reloc_offsets
+                    .iter()
+                    .map(|&r| ((host_off + r) as u32, 0)),
+            );
             abs_relocs.extend(
                 h.abs_relocs
                     .iter()
                     .map(|&(off, sym)| ((host_off + off as usize) as u32, sym)),
             );
-            safepoints.extend(
-                h.safepoints
-                    .iter()
-                    .map(|s| ((host_off + s.return_offset as usize) as u32, s.slots.clone())),
-            );
+            safepoints.extend(h.safepoints.iter().map(|s| {
+                (
+                    (host_off + s.return_offset as usize) as u32,
+                    s.slots.clone(),
+                )
+            }));
         }
         CodeImage {
             code,

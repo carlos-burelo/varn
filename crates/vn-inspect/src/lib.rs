@@ -6,12 +6,7 @@ mod types;
 
 use vn_debug::flags::DebugFlags;
 
-pub fn run_for(
-    session: &vn_pipeline::Session,
-    path: &str,
-    eval: Option<&str>,
-    flags: &DebugFlags,
-) {
+pub fn run_for(session: &vn_pipeline::Session, path: &str, eval: Option<&str>, flags: &DebugFlags) {
     if !(flags.types || flags.lsp) {
         return;
     }

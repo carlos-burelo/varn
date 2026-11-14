@@ -102,12 +102,12 @@ pub(super) fn print_scoreboard(
         }
     }
 
-    let su_speedup =
-        if let (Some(v), Some(b)) = (startup_stats.get("vn"), startup_stats.get("bun")) {
-            b.median / v.median.max(0.1)
-        } else {
-            1.0
-        };
+    let su_speedup = if let (Some(v), Some(b)) = (startup_stats.get("vn"), startup_stats.get("bun"))
+    {
+        b.median / v.median.max(0.1)
+    } else {
+        1.0
+    };
 
     let box_width = 80_usize;
     println!("  {}", term.gray(&format!("┌{}┐", "─".repeat(box_width))));

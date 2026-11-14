@@ -147,9 +147,7 @@ pub fn run(args: &[String]) -> Result<(), String> {
         .ok_or("cannot determine workspace root")?
         .to_path_buf();
 
-    let rs_dir = root.join(format!(
-        "crates/vn-builtins/src/modules/runtime/{mod_name}"
-    ));
+    let rs_dir = root.join(format!("crates/vn-builtins/src/modules/runtime/{mod_name}"));
     let rs_file = rs_dir.join(format!("{mod_name}.rs"));
     let vn_file = rs_dir.join(format!("{mod_name}_runtime.vn"));
     let std_file = root.join(format!("std/{mod_name}/mod.vn"));

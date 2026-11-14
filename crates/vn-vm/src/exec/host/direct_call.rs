@@ -106,11 +106,9 @@ impl ExecCtx {
             .retain(|h| h.frame_depth <= self.frames.len());
         match err_obj {
             Some(error) => error,
-            None => crate::exec::exceptions::build_thrown_error(
-                error_val,
-                &self.heap,
-                &self.frames,
-            ),
+            None => {
+                crate::exec::exceptions::build_thrown_error(error_val, &self.heap, &self.frames)
+            }
         }
     }
 }

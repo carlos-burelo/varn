@@ -57,8 +57,7 @@ pub fn specifier_from_path(path: &str) -> Option<String> {
         return Some(format!("{kind}:{}", file.strip_suffix(".vn")?));
     }
 
-    if let (vn_modules::std_root::StdSource::SourceTree(tree), _) =
-        vn_modules::std_root::resolve()
+    if let (vn_modules::std_root::StdSource::SourceTree(tree), _) = vn_modules::std_root::resolve()
         && let Some(rest) = strip_root(&normalized, &tree)
         && !rest.contains('/')
     {

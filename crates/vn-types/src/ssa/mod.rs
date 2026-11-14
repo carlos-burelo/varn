@@ -114,7 +114,10 @@ pub struct OsrRequest {
 impl SsaProto {
     #[inline]
     pub fn call_shape_at(&self, ip: u32) -> Option<&CallShape> {
-        let at = self.call_sites.binary_search_by_key(&ip, |(site, _)| *site).ok()?;
+        let at = self
+            .call_sites
+            .binary_search_by_key(&ip, |(site, _)| *site)
+            .ok()?;
         self.call_shapes.get(self.call_sites[at].1 as usize)
     }
 

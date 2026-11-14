@@ -92,8 +92,7 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
                 member,
                 parent_name,
             } => {
-                let sig = if member.kind == vn_sem::semantic_info::ResolvedMemberKind::EnumMember
-                {
+                let sig = if member.kind == vn_sem::semantic_info::ResolvedMemberKind::EnumMember {
                     format_enum_member(&parent_name, &member.name, "")
                 } else {
                     format_member_sig(state, &parent_name, &member)

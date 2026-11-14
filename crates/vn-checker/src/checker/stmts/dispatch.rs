@@ -36,12 +36,7 @@ impl<'r> Checker<'r> {
 
             StmtKind::Break { label } => {
                 self.check_break_stmt(range);
-                self.check_jump_label(
-                    *label,
-                    vn_core::ErrorCode::InvalidBreakTarget,
-                    range,
-                    bind,
-                );
+                self.check_jump_label(*label, vn_core::ErrorCode::InvalidBreakTarget, range, bind);
             }
 
             StmtKind::Continue { label } => {

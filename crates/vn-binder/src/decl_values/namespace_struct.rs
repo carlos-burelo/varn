@@ -328,8 +328,7 @@ fn exported_decls(body: &[vn_core::ast::Decl]) -> Vec<vn_core::ast::Decl> {
     body.iter()
         .filter_map(|d| {
             if let vn_core::ast::Decl::Export(vn_core::ast::ExportDecl::Decl {
-                declaration,
-                ..
+                declaration, ..
             }) = d
             {
                 Some(declaration.as_ref().clone())

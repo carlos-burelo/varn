@@ -6,11 +6,7 @@ use vn_sem::scope::{ScopeId, ScopeKind};
 use vn_sem::symbol::SymbolKind;
 
 impl super::Binder<'_> {
-    pub(crate) fn declared_type_name(
-        &mut self,
-        id: Atom,
-        ast_id: vn_core::ast::AstId,
-    ) -> Arc<str> {
+    pub(crate) fn declared_type_name(&mut self, id: Atom, ast_id: vn_core::ast::AstId) -> Arc<str> {
         let bare = self.interner.resolve(id);
         let name: Arc<str> = match self.namespace_path.last() {
             Some(outer) => Arc::from(format!("{outer}::{bare}")),

@@ -62,8 +62,7 @@ pub(crate) fn parse_fn_type_params(s: &mut TokenStream) -> PResult<Vec<vn_core::
             s.advance();
             n
         } else {
-            s.interner
-                .intern(vn_core::TokenKind::Placeholder.as_str())
+            s.interner.intern(vn_core::TokenKind::Placeholder.as_str())
         };
         let ty = super::entry::parse_type(s)?;
         let full_range = s.span_from(prange);

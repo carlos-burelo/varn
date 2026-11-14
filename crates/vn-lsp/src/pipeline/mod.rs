@@ -137,10 +137,8 @@ pub fn run_pipeline(source: String, uri: String, session: &Session) -> DocumentA
         );
     }
 
-    let mut resolved_types: rustc_hash::FxHashMap<
-        vn_sem::symbol::SymbolId,
-        vn_sem::types::Type,
-    > = rustc_hash::FxHashMap::default();
+    let mut resolved_types: rustc_hash::FxHashMap<vn_sem::symbol::SymbolId, vn_sem::types::Type> =
+        rustc_hash::FxHashMap::default();
     let mut all_symbols: Vec<vn_sem::symbol::SymbolId> = Vec::new();
     let mut symbol_map: FxHashMap<String, SymbolKind> = FxHashMap::default();
 

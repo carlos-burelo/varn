@@ -110,9 +110,7 @@ impl ExecCtx {
     pub(super) fn host_alloc_set(&mut self, items: Vec<VmValue>) -> VmValue {
         let mut set = vn_types::value::ValueSet::default();
         for item in items {
-            let key = self
-                .map_key(item)
-                .unwrap_or(vn_types::value::MapKey(item));
+            let key = self.map_key(item).unwrap_or(vn_types::value::MapKey(item));
             set.insert(key);
         }
         self.heap.alloc_set_vm(set)

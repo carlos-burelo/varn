@@ -48,8 +48,7 @@ impl<'r> Checker<'r> {
                     injected_type_params.push(Arc::from(n_str));
                 }
             }
-            if let vn_core::TypeKind::Named(n, origin) =
-                self.ty_table.get(expected_fn.return_type)
+            if let vn_core::TypeKind::Named(n, origin) = self.ty_table.get(expected_fn.return_type)
                 && !vn_core::is_lang_type(n, origin)
             {
                 let n_str = bind.interner.try_resolve(n).unwrap_or_default();

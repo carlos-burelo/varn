@@ -1,8 +1,8 @@
 use super::context::{Builder, Result};
 use crate::ssa::ir::{InstKind, Value};
 use std::sync::Arc;
-use vn_tir::{BackendTy, DynReason};
 use vn_tir::TirExpr;
+use vn_tir::{BackendTy, DynReason};
 
 const ARRAY_CHUNK: usize = 64;
 

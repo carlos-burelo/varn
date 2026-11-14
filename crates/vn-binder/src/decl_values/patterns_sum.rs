@@ -71,9 +71,11 @@ impl<'r> super::super::Binder<'r> {
                             .to_vec()
                             .iter()
                             .find_map(|m| match m {
-                                vn_sem::types::ObjectTypeMember::Property {
-                                    name, ty, ..
-                                } if name.as_ref() == key_str => Some(Type::resolved(*ty)),
+                                vn_sem::types::ObjectTypeMember::Property { name, ty, .. }
+                                    if name.as_ref() == key_str =>
+                                {
+                                    Some(Type::resolved(*ty))
+                                }
                                 vn_sem::types::ObjectTypeMember::Method {
                                     name,
                                     params,

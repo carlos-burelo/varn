@@ -5,10 +5,7 @@ use crate::types::parse_type_args;
 use vn_core::ast::{ExprId, ExprKind};
 use vn_core::TokenKind;
 
-pub(super) fn parse_new_expr(
-    s: &mut TokenStream,
-    range: vn_core::SourceRange,
-) -> PResult<ExprId> {
+pub(super) fn parse_new_expr(s: &mut TokenStream, range: vn_core::SourceRange) -> PResult<ExprId> {
     s.advance();
     let callee = parse_new_callee_expr(s)?;
     let mut type_args = vec![];

@@ -40,8 +40,8 @@ impl Parse for RecordInput {
         input.parse::<Token![struct]>()?;
         let name: Ident = input.parse()?;
         input.parse::<Token![;]>()?;
-        let contract = contract
-            .ok_or_else(|| syn::Error::new(name.span(), "vn_record! needs `contract:`"))?;
+        let contract =
+            contract.ok_or_else(|| syn::Error::new(name.span(), "vn_record! needs `contract:`"))?;
         let (source, declared) = declared.ok_or_else(|| {
             syn::Error::new(name.span(), "vn_record! needs `interface:` or `class:`")
         })?;

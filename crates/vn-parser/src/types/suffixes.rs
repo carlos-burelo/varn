@@ -91,8 +91,7 @@ pub(crate) fn parse_array_type(s: &mut TokenStream) -> PResult<TypeNode> {
             let q_range = s.range();
             s.advance();
             let full_range = s.span_from(start);
-            let null_node =
-                s.type_node(q_range, TypeKind::Primitive(vn_core::LangPrimitive::Null));
+            let null_node = s.type_node(q_range, TypeKind::Primitive(vn_core::LangPrimitive::Null));
             ty = s.type_node(full_range, TypeKind::Union(vec![ty, null_node]));
         } else {
             break;

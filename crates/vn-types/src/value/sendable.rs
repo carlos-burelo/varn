@@ -80,9 +80,9 @@ impl SendValue {
                 fields,
             } => {
                 let message_nv = ctx.alloc_str(message);
-                let instance = ctx.alloc_instance(class).or_else(|| {
-                    ctx.alloc_instance(vn_core::RuntimeErrorKind::Error.class_name())
-                });
+                let instance = ctx
+                    .alloc_instance(class)
+                    .or_else(|| ctx.alloc_instance(vn_core::RuntimeErrorKind::Error.class_name()));
                 let Some(inst) = instance else {
                     return message_nv;
                 };

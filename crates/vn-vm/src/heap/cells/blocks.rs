@@ -1,9 +1,7 @@
 use super::osmem;
 use std::alloc::Layout;
 use std::ptr::NonNull;
-use vn_types::cell::{
-    cells_per_block, BLOCK_BYTES, BLOCK_HEAD_BYTES, CELL_ALIGN, MAX_MARK_WORDS,
-};
+use vn_types::cell::{cells_per_block, BLOCK_BYTES, BLOCK_HEAD_BYTES, CELL_ALIGN, MAX_MARK_WORDS};
 use vn_types::HeapRef;
 
 pub(super) fn large_layout(bytes: usize) -> Layout {
@@ -118,8 +116,7 @@ impl SizeClass {
     }
 }
 
-const _: () =
-    assert!(std::mem::offset_of!(SizeClass, lane) == vn_types::cell::SIZE_CLASS_LANE_OFF);
+const _: () = assert!(std::mem::offset_of!(SizeClass, lane) == vn_types::cell::SIZE_CLASS_LANE_OFF);
 const _: () = assert!(std::mem::size_of::<SizeClass>() == vn_types::cell::SIZE_CLASS_STRIDE);
 
 #[inline(always)]

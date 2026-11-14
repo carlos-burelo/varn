@@ -84,9 +84,7 @@ pub fn debug_lsp(session: &vn_pipeline::Session, path: &str, source: &str, flags
         for tok in &analysis.tokens {
             if matches!(
                 tok.kind,
-                vn_core::TokenKind::Dot
-                    | vn_core::TokenKind::LParen
-                    | vn_core::TokenKind::Comma
+                vn_core::TokenKind::Dot | vn_core::TokenKind::LParen | vn_core::TokenKind::Comma
             ) {
                 let trigger = if tok.kind == vn_core::TokenKind::Dot {
                     "."

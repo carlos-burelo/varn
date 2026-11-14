@@ -116,9 +116,7 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> PResult<TypeNode> {
                         let ty_range = *ty.range();
                         TypeParam {
                             variance: None,
-                            name: s
-                                .interner
-                                .intern(vn_core::TokenKind::Placeholder.as_str()),
+                            name: s.interner.intern(vn_core::TokenKind::Placeholder.as_str()),
                             constraint: Some(ty),
                             default: None,
                             is_rest: false,
@@ -134,9 +132,7 @@ pub(crate) fn parse_primary_type(s: &mut TokenStream) -> PResult<TypeNode> {
                 let ret = super::entry::parse_type(s)?;
                 let full_range = s.span_from(range);
                 let first_range = *first.range();
-                let underscore = s
-                    .interner
-                    .intern(vn_core::TokenKind::Placeholder.as_str());
+                let underscore = s.interner.intern(vn_core::TokenKind::Placeholder.as_str());
                 return Ok(s.type_node(
                     full_range,
                     TypeKind::Fn((

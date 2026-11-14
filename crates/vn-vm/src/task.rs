@@ -421,10 +421,7 @@ pub(crate) fn derives_from_error(class: &Rc<ClassObj>) -> bool {
     }
 }
 
-pub(crate) fn error_value(
-    heap: &HeapInner,
-    thrown: VmValue,
-) -> Option<vn_types::value::SendValue> {
+pub(crate) fn error_value(heap: &HeapInner, thrown: VmValue) -> Option<vn_types::value::SendValue> {
     use vn_core::MemberKey;
     use vn_types::value::SendValue;
     if !thrown.is_heap() {

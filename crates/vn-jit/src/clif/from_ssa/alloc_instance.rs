@@ -71,12 +71,9 @@ pub(super) fn emit_alloc_instance(
         lane,
         vn_types::cell::LANE_BUMP_OFF as i32,
     );
-    let end = b.ins().load(
-        types::I64,
-        flags,
-        lane,
-        vn_types::cell::LANE_END_OFF as i32,
-    );
+    let end = b
+        .ins()
+        .load(types::I64, flags, lane, vn_types::cell::LANE_END_OFF as i32);
     let born_base = b
         .ins()
         .iadd_imm_u(rcbox, (ia.young_off + ia.born_off) as i64);

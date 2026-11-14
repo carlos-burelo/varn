@@ -141,9 +141,7 @@ impl<'a> FnEmitter<'a> {
         let decodes_shape = kind == CheckKind::Decode
             && matches!(
                 ty.non_nullable(self.tt),
-                BackendTy::Dynamic(
-                    vn_tir::DynReason::Interface(_) | vn_tir::DynReason::Shape(_)
-                )
+                BackendTy::Dynamic(vn_tir::DynReason::Interface(_) | vn_tir::DynReason::Shape(_))
             )
             && matches!(e.ty, BackendTy::Dynamic(_));
         if !decodes_shape && !self.crosses_dynamic_boundary(&e, ty) {

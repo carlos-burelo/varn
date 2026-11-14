@@ -38,9 +38,7 @@ impl<'r> Checker<'r> {
             TypeKind::Generic(..) if check_ty.sequence_element(&self.ty_table).is_some() => {
                 Some(Type::Int)
             }
-            TypeKind::Named(..) if builtin == Some(vn_core::BuiltinType::Bytes) => {
-                Some(Type::Int)
-            }
+            TypeKind::Named(..) if builtin == Some(vn_core::BuiltinType::Bytes) => Some(Type::Int),
             TypeKind::Generic(..) | TypeKind::Named(..)
                 if builtin == Some(vn_core::BuiltinType::Range) =>
             {
@@ -88,10 +86,7 @@ impl<'r> Checker<'r> {
             self.with_expected(Some(expected_k), |c| c.check_expr(rec, property, bind));
             let actual_k = self.infer_type(rec, property, bind);
             let is_range_slice = (check_ty.sequence_element(&self.ty_table).is_some()
-                || matches!(
-                    check_kind,
-                    TypeKind::Primitive(vn_core::LangPrimitive::Str)
-                )
+                || matches!(check_kind, TypeKind::Primitive(vn_core::LangPrimitive::Str))
                 || builtin == Some(vn_core::BuiltinType::Bytes))
                 && actual_k.is_range(&self.ty_table);
             if !actual_k.is_unresolved()

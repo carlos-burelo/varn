@@ -23,9 +23,9 @@ mod decls_fn;
 pub(crate) mod decorator_attrs;
 mod definite_field_assignment;
 mod diagnostics;
+mod forwarder;
 mod heritage;
 mod imports;
-mod forwarder;
 mod interface;
 pub mod paths;
 mod regex_hygiene;
@@ -72,8 +72,7 @@ pub struct Binder<'r> {
 
     pub(crate) user_decorators: rustc_hash::FxHashSet<u32>,
     pub(crate) namespace_imports: Vec<vn_sem::bind::NamespaceImport>,
-    pub(crate) imported_forwards:
-        rustc_hash::FxHashMap<Arc<str>, Arc<vn_sem::symbol::Forward>>,
+    pub(crate) imported_forwards: rustc_hash::FxHashMap<Arc<str>, Arc<vn_sem::symbol::Forward>>,
     pub(crate) namespace_path: Vec<Arc<str>>,
     pub(crate) declared_type_names: FxHashMap<vn_core::ast::AstId, Arc<str>>,
     pub(crate) generic_type_uses: Vec<vn_sem::bind::GenericTypeUse>,

@@ -139,8 +139,9 @@ impl<'r> Checker<'r> {
     ) {
         for arg in args {
             let value = match arg {
-                vn_core::ast::Arg::Positional(value)
-                | vn_core::ast::Arg::Named { value, .. } => *value,
+                vn_core::ast::Arg::Positional(value) | vn_core::ast::Arg::Named { value, .. } => {
+                    *value
+                }
                 vn_core::ast::Arg::Spread(_) => continue,
             };
             if let Some(effects) = self.closure_def_effects(value, bind) {

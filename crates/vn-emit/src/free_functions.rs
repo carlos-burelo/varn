@@ -40,8 +40,7 @@ pub(super) fn collect_free_functions<'a>(
         for m in &ns.body {
             let inner = match m {
                 vn_core::ast::Decl::Export(vn_core::ast::ExportDecl::Decl {
-                    declaration,
-                    ..
+                    declaration, ..
                 }) => declaration.as_ref(),
                 other @ vn_core::ast::Decl::Variable(_)
                 | other @ vn_core::ast::Decl::Function(_)

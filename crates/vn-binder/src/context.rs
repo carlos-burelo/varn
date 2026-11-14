@@ -87,9 +87,7 @@ impl TypeContext for Binder<'_> {
         self.interner
             .get(name)
             .and_then(|atom| scope.resolve(atom, &self.scopes))
-            .is_some_and(|id| {
-                self.arena.get(id).kind == vn_sem::symbol::SymbolKind::TypeParameter
-            })
+            .is_some_and(|id| self.arena.get(id).kind == vn_sem::symbol::SymbolKind::TypeParameter)
     }
 
     fn resolve_symbol(&self, name: &str) -> Option<Type> {

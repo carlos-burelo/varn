@@ -31,8 +31,8 @@ impl<'r> Checker<'r> {
                     out.push((id, narrowed_ty));
                 } else {
                     if let Some(original_ty) = self.narrowing_base(rec, id, bind) {
-                        let view = vn_sem::bind::BindView::new(bind, self.resolver)
-                            .at(self.current_scope);
+                        let view =
+                            vn_sem::bind::BindView::new(bind, self.resolver).at(self.current_scope);
                         let target_ty = vn_sem::resolve::resolve_type_node(
                             &type_ann,
                             Some(&view),

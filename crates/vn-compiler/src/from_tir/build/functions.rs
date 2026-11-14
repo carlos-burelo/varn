@@ -2,15 +2,14 @@ use super::context::{Builder, Result};
 use crate::ssa::ir::{InstKind, SsaFunc, Terminator, VarId};
 use std::sync::Arc;
 use vn_tir::DynReason;
-use vn_tir::{
-    BackendTy, TirExpr, TirFunction, TirModule, TirStmt,
-};
+use vn_tir::{BackendTy, TirExpr, TirFunction, TirModule, TirStmt};
 
 pub(crate) fn defaulted_param_mask(body: &[TirStmt], nparams: usize) -> Vec<bool> {
     let mut mask = vec![false; nparams];
     for stmt in body {
         if let TirStmt::If { cond, .. } = stmt
-            && let Some(i) = vn_tir::inlinable::absent_param(cond).filter(|i| (*i as usize) < nparams)
+            && let Some(i) =
+                vn_tir::inlinable::absent_param(cond).filter(|i| (*i as usize) < nparams)
         {
             mask[i as usize] = true;
         }
@@ -111,12 +110,7 @@ pub fn build_module(tir: &TirModule, lines: &[u32]) -> Result<Vec<SsaFunc>> {
     let mut out = Vec::with_capacity(tir.functions.len() + 1);
     out.push(build_function(tir, &tir.top_level, None, lines)?);
     for (i, f) in tir.functions.iter().enumerate() {
-        out.push(build_function(
-            tir,
-            f,
-            Some(vn_tir::FnId(i as u32)),
-            lines,
-        )?);
+        out.push(build_function(tir, f, Some(vn_tir::FnId(i as u32)), lines)?);
     }
     Ok(out)
 }

@@ -180,14 +180,12 @@ fn declared_shape(
         return None;
     }
     let same_class = |a: SlotKind, b: SlotKind| NativeClass::of(a) == NativeClass::of(b);
-    let args_fit = declared
-        .params
-        .iter()
-        .zip(arg_kinds)
-        .all(|(param, arg)| NativeClass::of(*param) == NativeClass::Boxed || same_class(*param, *arg));
-    let ret_fits = same_class(declared.ret, dest_kind) || NativeClass::of(declared.ret) == NativeClass::Boxed;
-    (args_fit && ret_fits)
-        .then(|| NativeShape::new(&declared.params, declared.ret))
+    let args_fit = declared.params.iter().zip(arg_kinds).all(|(param, arg)| {
+        NativeClass::of(*param) == NativeClass::Boxed || same_class(*param, *arg)
+    });
+    let ret_fits =
+        same_class(declared.ret, dest_kind) || NativeClass::of(declared.ret) == NativeClass::Boxed;
+    (args_fit && ret_fits).then(|| NativeShape::new(&declared.params, declared.ret))
 }
 
 fn push_frame(

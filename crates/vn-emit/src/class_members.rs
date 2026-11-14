@@ -252,12 +252,11 @@ pub(super) fn emit_class_members(
                         class_id,
                     );
                     if !decos.is_empty() {
-                        def.property_decorators
-                            .push(vn_tir::TirPropertyDecorator {
-                                key: Arc::from(ctx.interner.resolve(*key)),
-                                is_static: modifiers.is_static,
-                                decorators: decos,
-                            });
+                        def.property_decorators.push(vn_tir::TirPropertyDecorator {
+                            key: Arc::from(ctx.interner.resolve(*key)),
+                            is_static: modifiers.is_static,
+                            decorators: decos,
+                        });
                     }
                 }
                 if modifiers.is_static {

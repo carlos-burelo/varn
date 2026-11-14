@@ -134,11 +134,7 @@ impl InstanceData {
     }
 
     #[inline]
-    pub fn read_field_at(
-        &self,
-        offset: u32,
-        tag: Option<vn_core::RuntimeKind>,
-    ) -> Option<VmValue> {
+    pub fn read_field_at(&self, offset: u32, tag: Option<vn_core::RuntimeKind>) -> Option<VmValue> {
         self.read_scalar(offset, &TypeLayout::of_field(tag))
     }
 

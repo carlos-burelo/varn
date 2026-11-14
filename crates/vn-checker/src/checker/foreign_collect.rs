@@ -4,9 +4,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use vn_core::TypeKind;
 use vn_sem::bind::BindResult;
-use vn_sem::output::{
-    ForeignAccessor, ForeignClass, ForeignMethod, ForeignStatic, InheritedField,
-};
+use vn_sem::output::{ForeignAccessor, ForeignClass, ForeignMethod, ForeignStatic, InheritedField};
 use vn_sem::types::{ClassMemberKind, ObjectTypeMember, Type};
 
 impl Checker<'_> {

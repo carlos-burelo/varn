@@ -16,8 +16,7 @@ impl<'a> FnEmitter<'a> {
         ty: BackendTy,
         span: Span,
     ) -> TirExpr {
-        let Some(constructor) =
-            vn_core::abi::native_global_index(vn_core::BuiltinType::Map.name())
+        let Some(constructor) = vn_core::abi::native_global_index(vn_core::BuiltinType::Map.name())
         else {
             unreachable!()
         };

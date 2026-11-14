@@ -1,8 +1,8 @@
 use rustc_hash::FxHashSet;
 use vn_tir::{Resolution, TirExpr, TirExprKind, TirStmt};
 
-use vn_tir::children::{child_exprs, seq_bodies};
 use crate::ssa::ir::VarId;
+use vn_tir::children::{child_exprs, seq_bodies};
 
 pub(super) fn captured_vars(func: &vn_tir::TirFunction) -> FxHashSet<VarId> {
     use crate::hir::LocalId;

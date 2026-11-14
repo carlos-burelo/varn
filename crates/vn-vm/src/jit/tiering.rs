@@ -98,8 +98,7 @@ impl VmClosure {
             return None;
         }
         if let Some(hit) = proto.osr_lookup(req.ip, req.mode, epoch) {
-            return hit
-                .map(|entry| unsafe { std::mem::transmute::<usize, vn_jit::JitFn>(entry) });
+            return hit.map(|entry| unsafe { std::mem::transmute::<usize, vn_jit::JitFn>(entry) });
         }
 
         let allowed = match req.mode {

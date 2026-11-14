@@ -133,9 +133,7 @@ impl ClassObj {
             .map(|f| (f.name.clone(), f.kind))
             .collect();
         fields.extend(own.iter().cloned());
-        self.set_layout(Rc::new(vn_core::layout::ClassLayout::from_fields(
-            &fields,
-        )));
+        self.set_layout(Rc::new(vn_core::layout::ClassLayout::from_fields(&fields)));
     }
 
     pub fn for_each_value_mut(&self, f: &mut dyn FnMut(&mut VmValue)) {

@@ -107,12 +107,11 @@ impl Builder<'_> {
                 BackendTy::Str,
             );
         }
-        let type_error = vn_core::abi::native_global_index(
-            vn_core::RuntimeErrorKind::TypeError.class_name(),
-        )
-        .ok_or(crate::OptError::Unsupported(
-            "from_tir: TypeError is not a native global",
-        ))?;
+        let type_error =
+            vn_core::abi::native_global_index(vn_core::RuntimeErrorKind::TypeError.class_name())
+                .ok_or(crate::OptError::Unsupported(
+                    "from_tir: TypeError is not a native global",
+                ))?;
         let ctor = self.emit(
             InstKind::LoadNativeGlobalIdx(type_error),
             BackendTy::Dynamic(DynReason::Runtime),
@@ -121,7 +120,7 @@ impl Builder<'_> {
             InstKind::Call {
                 callee: ctor,
                 args: vec![message],
-    shape: None,
+                shape: None,
             },
             BackendTy::Dynamic(DynReason::Runtime),
         );

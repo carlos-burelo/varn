@@ -96,11 +96,7 @@ pub struct Tables {
     pub names: NameIndex,
 }
 
-pub fn build(
-    bind: &BindResult,
-    desugar: &vn_sem::output::Desugarings,
-    tt: &mut TyTable,
-) -> Tables {
+pub fn build(bind: &BindResult, desugar: &vn_sem::output::Desugarings, tt: &mut TyTable) -> Tables {
     let foreign = &desugar.foreign_enums;
     let mut foreign_classes_sorted: Vec<&vn_sem::output::ForeignClass> =
         desugar.foreign_classes.iter().collect();
@@ -131,8 +127,7 @@ pub fn build(
                 .type_params
                 .insert(Arc::from(bind.interner.resolve(symbol.name)));
         }
-        if symbol.kind != vn_sem::symbol::SymbolKind::TypeAlias || !symbol.type_params.is_empty()
-        {
+        if symbol.kind != vn_sem::symbol::SymbolKind::TypeAlias || !symbol.type_params.is_empty() {
             continue;
         }
         let declared = global

@@ -75,8 +75,7 @@ pub fn infer_new(
             .unwrap_or_default();
         let origin = crate::resolve::nominal_origin(&name_str, ctx, table);
         if type_args.is_empty() {
-            if vn_core::BuiltinType::identify(*name, origin) == Some(vn_core::BuiltinType::Map)
-            {
+            if vn_core::BuiltinType::identify(*name, origin) == Some(vn_core::BuiltinType::Map) {
                 return Type::generic_atom(
                     *name,
                     vec![Type::Dynamic, Type::Dynamic],
