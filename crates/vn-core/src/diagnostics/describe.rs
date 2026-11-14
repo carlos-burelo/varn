@@ -54,6 +54,7 @@ impl ErrorCode {
         ErrorCode::DuplicateRecordField,
         ErrorCode::IsNeedsRuntimeType,
         ErrorCode::NotHashable,
+        ErrorCode::InvalidWithReceiver,
         ErrorCode::TypeArgInferenceFailed,
         ErrorCode::ConstraintViolation,
         ErrorCode::WrongTypeArgCount,
@@ -153,6 +154,7 @@ impl ErrorCode {
             | ErrorCode::UntypedEmptyArray
             | ErrorCode::UnusedTask
             | ErrorCode::InvalidWithEntry
+            | ErrorCode::InvalidWithReceiver
             | ErrorCode::DynamicNeedsCast
             | ErrorCode::TypeArgInferenceFailed
             | ErrorCode::ConstraintViolation
@@ -246,6 +248,7 @@ impl ErrorCode {
             ErrorCode::DuplicateRecordField => "A record literal gives the same field more than once, by repeating it or by spreading a record that already has it.",
             ErrorCode::IsNeedsRuntimeType => "The `is` operator was given an interface or a record, which have no identity at run time to test.",
             ErrorCode::NotHashable => "A type that cannot be compared by value or by identity is used as the key of a Map or the element of a Set.",
+            ErrorCode::InvalidWithReceiver => "A `with` expression copies a value whose fields are not a record: collections, primitives, tuples and functions have no fields to replace.",
             ErrorCode::TypeArgInferenceFailed => "The type arguments of a call could not be inferred.",
             ErrorCode::ConstraintViolation => "A type argument does not satisfy the constraint of its type parameter.",
             ErrorCode::WrongTypeArgCount => "A generic is given more or fewer type arguments than it declares.",

@@ -1,0 +1,3 @@
+// expect: error[VN3038]
+const xs: int[] = [1, 2, 3]
+const ys = xs with { length: 1 }

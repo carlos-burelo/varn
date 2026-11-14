@@ -1,0 +1,3 @@
+// expect: error[VN3038]
+const s: Set<int> = new Set<int>([1, 2])
+const t = s with { }

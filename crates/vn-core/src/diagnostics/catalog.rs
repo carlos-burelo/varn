@@ -54,6 +54,7 @@ pub enum ErrorCode {
     DuplicateRecordField = 3035,
     IsNeedsRuntimeType = 3036,
     NotHashable = 3037,
+    InvalidWithReceiver = 3038,
 
     TypeArgInferenceFailed = 3201,
     ConstraintViolation = 3202,
@@ -199,6 +200,7 @@ impl ErrorCode {
             ErrorCode::DuplicateRecordField => "duplicate-record-field",
             ErrorCode::IsNeedsRuntimeType => "is-needs-runtime-type",
             ErrorCode::NotHashable => "not-hashable",
+            ErrorCode::InvalidWithReceiver => "invalid-with-receiver",
             ErrorCode::NotIterable => "not-iterable",
         }
     }

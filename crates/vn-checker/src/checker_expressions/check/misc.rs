@@ -81,6 +81,20 @@ impl<'r> Checker<'r> {
     ) {
         self.check_expr(rec, object, bind);
         let obj_ty = self.infer_type(rec, object, bind);
+        if !obj_ty.is_unresolved() && !self.has_replaceable_fields(&obj_ty) {
+            self.emit(
+                Diagnostic::error(
+                    ErrorCode::InvalidWithReceiver,
+                    format!(
+                        "`with` copies a record and replaces its fields, but '{}' has no fields to replace",
+                        obj_ty.display(&self.ty_table, &bind.interner)
+                    ),
+                )
+                .with_range(range),
+            );
+            self.record_type(rec, range.start.offset, obj_ty);
+            return;
+        }
         for prop in properties {
             match prop {
                 vn_core::ast::ObjectProp::Property {
@@ -170,6 +184,50 @@ impl<'r> Checker<'r> {
             }
         }
         self.record_type(rec, range.start.offset, obj_ty);
+    }
+
+    fn has_replaceable_fields(&mut self, ty: &Type) -> bool {
+        use vn_core::{BuiltinType, TypeKind};
+        let ty = ty.non_nullified(&mut *std::sync::Arc::make_mut(&mut self.ty_table));
+        match self.ty_table.get(ty.0) {
+            TypeKind::Named(..) | TypeKind::Generic(..) => match ty.builtin_of(&self.ty_table) {
+                Some(
+                    BuiltinType::Array
+                    | BuiltinType::Map
+                    | BuiltinType::Set
+                    | BuiltinType::ReadonlyArray
+                    | BuiltinType::ReadonlyMap
+                    | BuiltinType::ReadonlySet
+                    | BuiltinType::Range
+                    | BuiltinType::Bytes
+                    | BuiltinType::Task
+                    | BuiltinType::TaskHandle
+                    | BuiltinType::Generator
+                    | BuiltinType::AsyncGenerator
+                    | BuiltinType::Class,
+                ) => false,
+                None => true,
+            },
+            TypeKind::Primitive(_)
+            | TypeKind::Literal(_)
+            | TypeKind::TemplateLiteral(_)
+            | TypeKind::Array(_)
+            | TypeKind::Tuple(_)
+            | TypeKind::Fn(_)
+            | TypeKind::KeyOf(_)
+            | TypeKind::EnumVariant { .. }
+            | TypeKind::TypePredicate { .. } => false,
+            TypeKind::Record(_)
+            | TypeKind::Interface(_)
+            | TypeKind::This
+            | TypeKind::Union(_)
+            | TypeKind::Intersection(_)
+            | TypeKind::Typeof(_)
+            | TypeKind::IndexedAccess { .. }
+            | TypeKind::Mapped { .. }
+            | TypeKind::Conditional { .. }
+            | TypeKind::Infer(_) => true,
+        }
     }
 
     pub(super) fn check_meta_access(
