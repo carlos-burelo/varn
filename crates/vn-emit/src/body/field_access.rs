@@ -53,6 +53,19 @@ impl<'a> FnEmitter<'a> {
             }
         }
         if read
+            && name.as_ref() == vn_core::MemberKey::RawValue.as_str()
+            && matches!(obj.ty.non_nullable(self.tt), BackendTy::Enum(_))
+        {
+            return TirExpr {
+                kind: TirExprKind::Discriminant {
+                    value: Box::new(obj),
+                },
+                ty: BackendTy::Int,
+                res: Resolution::None,
+                span,
+            };
+        }
+        if read
             && name.as_ref() == vn_core::MemberKey::Length.as_str()
             && matches!(
                 obj.ty.non_nullable(self.tt),
