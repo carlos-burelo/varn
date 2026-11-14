@@ -41,7 +41,24 @@ const RUNTIME_OPS: [(&str, NativeFn); vn_core::runtime_ops::ALL.len()] = [
         vn_core::runtime_ops::PARSE_TYPED,
         crate::exec::conform::parse_typed_native,
     ),
+    (vn_core::runtime_ops::META, meta_native),
 ];
+
+fn meta_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
+    let [target, key] = args else {
+        return Ok(VmValue::null());
+    };
+    let index = ctx.as_int(*key);
+    let Some(key) = vn_core::MetaKey::from_index(index) else {
+        return Err(NativeError::type_error(format!(
+            "meta: no meta property has index {index}"
+        )));
+    };
+    match ctx.boundary_mut() {
+        Some(boundary) => boundary.meta(*target, key),
+        None => Err(NativeError::type_error("meta: this context has no heap")),
+    }
+}
 
 fn inherited_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
     let [home, receiver, name, accessor] = args else {
@@ -258,6 +275,11 @@ pub(crate) fn verify_call(
 }
 
 impl Boundary for ExecCtx {
+    fn meta(&mut self, target: VmValue, key: vn_core::MetaKey) -> NativeFnResult {
+        crate::exec::props::meta::resolve_meta(target, key, &mut self.heap)
+            .map_err(|error| NativeError::type_error(error.to_string()))
+    }
+
     fn conform(&mut self, value: VmValue, desc: &str, witnesses: &[VmValue]) -> NativeFnResult {
         crate::exec::conform::conform(&mut self.heap, self.jit_stack_floor, value, desc, witnesses)
     }

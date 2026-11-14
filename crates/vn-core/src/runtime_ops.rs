@@ -9,8 +9,9 @@ pub const VERIFY_SUPER_SPREAD: &str = "verify-super-spread";
 pub const STR_INDEX: &str = "str-index";
 pub const INHERITED: &str = "inherited";
 pub const PARSE_TYPED: &str = "parse-typed";
+pub const META: &str = "meta";
 
-pub const ALL: [&str; 11] = [
+pub const ALL: [&str; 12] = [
     CONFORM,
     DECODE,
     VERIFY_CALL,
@@ -22,6 +23,7 @@ pub const ALL: [&str; 11] = [
     STR_INDEX,
     INHERITED,
     PARSE_TYPED,
+    META,
 ];
 
 pub const COUNT: u64 = ALL.len() as u64;

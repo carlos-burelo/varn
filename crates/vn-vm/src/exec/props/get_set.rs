@@ -2,7 +2,6 @@ use vn_core::MemberKey;
 use vn_types::value::ClassObj;
 
 use super::intrinsic::{get_class, resolve_intrinsic_method_property};
-use super::meta::resolve_meta_property;
 use super::specialized::resolve_specialized_property;
 use crate::error::{RuntimeError, VmResult};
 use crate::heap::{Heap, HeapObj};
@@ -94,9 +93,6 @@ pub(crate) fn get_property(obj: VmValue, key: &str, heap: &mut Heap) -> VmResult
         {
             return Ok(held);
         }
-    }
-    if let Some(stripped) = key.strip_prefix("::") {
-        return resolve_meta_property(obj, stripped, heap);
     }
     if let Some(nv) = resolve_own_data_property(obj, key, heap) {
         return Ok(nv);

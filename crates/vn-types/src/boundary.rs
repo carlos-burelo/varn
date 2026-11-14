@@ -15,4 +15,5 @@ pub trait Boundary {
         name: &str,
         accessor: bool,
     ) -> NativeFnResult;
+    fn meta(&mut self, target: VmValue, key: vn_core::MetaKey) -> NativeFnResult;
 }

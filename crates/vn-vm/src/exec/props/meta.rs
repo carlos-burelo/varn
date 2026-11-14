@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
-use vn_core::{MemberKey, RuntimeKind};
+use vn_core::{MetaKey, RuntimeKind};
 use vn_types::value::ClassObj;
 use vn_types::NativeCtx;
 
@@ -110,23 +110,15 @@ fn class_snapshot(cls: &ClassObj, heap: &mut Heap) -> VmValue {
     snapshot_object(heap, pairs)
 }
 
-pub(crate) fn resolve_meta_property(
-    obj: VmValue,
-    meta_key: &str,
-    heap: &mut Heap,
-) -> VmResult<VmValue> {
-    let Some(key) = MemberKey::from_str(meta_key) else {
-        return Ok(VmValue::null());
-    };
+pub(crate) fn resolve_meta(obj: VmValue, key: MetaKey, heap: &mut Heap) -> VmResult<VmValue> {
     let cls = class_of(obj, heap);
-    let is_instance = obj.is_heap() && heap.instance(obj.as_heap()).is_some();
     let is_class = obj.is_heap() && matches!(heap.get(obj.as_heap()), Some(HeapObj::Class(_)));
     match key {
-        MemberKey::Type => {
+        MetaKey::Type => {
             let name = type_name(obj, heap);
             Ok(HeapInner::alloc_str(heap, &name))
         }
-        MemberKey::Name => {
+        MetaKey::Name => {
             if obj.is_heap() && heap.instance(obj.as_heap()).is_some() {
                 let name: String = cls
                     .as_ref()
@@ -165,7 +157,7 @@ pub(crate) fn resolve_meta_property(
                 };
             Ok(name.map_or(VmValue::null(), |n| HeapInner::alloc_str(heap, &n)))
         }
-        MemberKey::Class => {
+        MetaKey::Class => {
             let found = if is_class { None } else { get_class(obj, heap) };
             let target = if is_class {
                 Some(obj)
@@ -174,7 +166,7 @@ pub(crate) fn resolve_meta_property(
             };
             Ok(target.unwrap_or(VmValue::null()))
         }
-        MemberKey::Fields => {
+        MetaKey::Fields => {
             if let Some(c) = &cls
                 && obj.is_heap()
                 && heap.instance(obj.as_heap()).is_some()
@@ -191,120 +183,50 @@ pub(crate) fn resolve_meta_property(
             };
             Ok(str_array(heap, names.into_iter()))
         }
-        MemberKey::Methods => {
+        MetaKey::Methods => {
             let names = cls.as_deref().map(class_method_names).unwrap_or_default();
             Ok(str_array(heap, names.into_iter()))
         }
-        MemberKey::Keys | MemberKey::Values | MemberKey::Entries | MemberKey::HasOwn => {
-            let native = match key {
-                MemberKey::Keys => meta_keys_native,
-                MemberKey::Values => meta_values_native,
-                MemberKey::Entries => meta_entries_native,
-                MemberKey::Tag
-                | MemberKey::Value0
-                | MemberKey::RawValue
-                | MemberKey::Length
-                | MemberKey::Size
-                | MemberKey::Name
-                | MemberKey::VariantName
-                | MemberKey::Variant
-                | MemberKey::Callable
-                | MemberKey::ToString
-                | MemberKey::ValueOf
-                | MemberKey::IterNext
-                | MemberKey::IterClose
-                | MemberKey::Push
-                | MemberKey::Pop
-                | MemberKey::Shift
-                | MemberKey::Unshift
-                | MemberKey::Slice
-                | MemberKey::Join
-                | MemberKey::IndexOf
-                | MemberKey::Includes
-                | MemberKey::Split
-                | MemberKey::Class
-                | MemberKey::Type
-                | MemberKey::Fields
-                | MemberKey::Methods
-                | MemberKey::HasOwn
-                | MemberKey::Repeat
-                | MemberKey::PadStart
-                | MemberKey::PadEnd
-                | MemberKey::Start
-                | MemberKey::End
-                | MemberKey::StartsWith
-                | MemberKey::EndsWith
-                | MemberKey::CharCodeAt
-                | MemberKey::CodePointAt
-                | MemberKey::Substring
-                | MemberKey::Substr
-                | MemberKey::At
-                | MemberKey::LastIndexOf
-                | MemberKey::Message
-                | MemberKey::Stack
-                | MemberKey::Cause
-                | MemberKey::IsStatic
-                | MemberKey::IsPrivate
-                | MemberKey::Inclusive
-                | MemberKey::Iter
-                | MemberKey::Chars
-                | MemberKey::ToArray
-                | MemberKey::Stride
-                | MemberKey::CharCode => meta_has_own_native,
-            };
-            let receiver = match (&cls, is_instance, is_class) {
-                (Some(c), true, _) => instance_snapshot(obj, c, heap),
-                (Some(c), _, true) => class_snapshot(c, heap),
-                _ => obj,
-            };
-            Ok(heap.alloc_bound_native(receiver, native, key.as_str()))
-        }
-        MemberKey::Tag
-        | MemberKey::Value0
-        | MemberKey::RawValue
-        | MemberKey::Length
-        | MemberKey::Size
-        | MemberKey::VariantName
-        | MemberKey::Variant
-        | MemberKey::Callable
-        | MemberKey::ToString
-        | MemberKey::ValueOf
-        | MemberKey::IterNext
-        | MemberKey::IterClose
-        | MemberKey::Push
-        | MemberKey::Pop
-        | MemberKey::Shift
-        | MemberKey::Unshift
-        | MemberKey::Slice
-        | MemberKey::Join
-        | MemberKey::IndexOf
-        | MemberKey::Includes
-        | MemberKey::Split
-        | MemberKey::Repeat
-        | MemberKey::PadStart
-        | MemberKey::PadEnd
-        | MemberKey::Start
-        | MemberKey::End
-        | MemberKey::StartsWith
-        | MemberKey::EndsWith
-        | MemberKey::CharCodeAt
-        | MemberKey::CodePointAt
-        | MemberKey::Substring
-        | MemberKey::Substr
-        | MemberKey::At
-        | MemberKey::LastIndexOf
-        | MemberKey::Message
-        | MemberKey::Stack
-        | MemberKey::Cause
-        | MemberKey::IsStatic
-        | MemberKey::IsPrivate
-        | MemberKey::Inclusive
-        | MemberKey::Iter
-        | MemberKey::Chars
-        | MemberKey::ToArray
-        | MemberKey::Stride
-        | MemberKey::CharCode => Ok(VmValue::null()),
+        MetaKey::Keys => Ok(bound_meta(obj, cls.as_deref(), meta_keys_native, key, heap)),
+        MetaKey::Values => Ok(bound_meta(
+            obj,
+            cls.as_deref(),
+            meta_values_native,
+            key,
+            heap,
+        )),
+        MetaKey::Entries => Ok(bound_meta(
+            obj,
+            cls.as_deref(),
+            meta_entries_native,
+            key,
+            heap,
+        )),
+        MetaKey::HasOwn => Ok(bound_meta(
+            obj,
+            cls.as_deref(),
+            meta_has_own_native,
+            key,
+            heap,
+        )),
     }
+}
+
+fn bound_meta(
+    obj: VmValue,
+    cls: Option<&ClassObj>,
+    native: vn_types::NativeFn,
+    key: MetaKey,
+    heap: &mut Heap,
+) -> VmValue {
+    let is_instance = obj.is_heap() && heap.instance(obj.as_heap()).is_some();
+    let is_class = obj.is_heap() && matches!(heap.get(obj.as_heap()), Some(HeapObj::Class(_)));
+    let receiver = match (cls, is_instance, is_class) {
+        (Some(c), true, _) => instance_snapshot(obj, c, heap),
+        (Some(c), _, true) => class_snapshot(c, heap),
+        _ => obj,
+    };
+    heap.alloc_bound_native(receiver, native, key.as_str())
 }
 
 fn meta_keys_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> vn_types::NativeFnResult {
