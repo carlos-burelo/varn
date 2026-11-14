@@ -72,13 +72,17 @@ pub(crate) fn type_name(obj: VmValue, heap: &Heap) -> String {
         return RuntimeKind::Null.name().into();
     }
     if obj.is_heap() && heap.instance(obj.as_heap()).is_some() {
-        return class_of(obj, heap).map_or_else(|| "Object".into(), |c| c.name.as_str().into());
+        return class_of(obj, heap).map_or_else(
+            || vn_core::intrinsics::PLAIN_OBJECT_TYPE_NAME.into(),
+            |c| c.name.as_str().into(),
+        );
     }
     match obj.is_heap().then(|| heap.get(obj.as_heap())).flatten() {
         Some(HeapObj::Class(cls)) => cls.name.as_str().into(),
-        Some(HeapObj::Object(_)) => {
-            class_of(obj, heap).map_or_else(|| "Object".into(), |c| c.name.as_str().into())
-        }
+        Some(HeapObj::Object(_)) => class_of(obj, heap).map_or_else(
+            || vn_core::intrinsics::PLAIN_OBJECT_TYPE_NAME.into(),
+            |c| c.name.as_str().into(),
+        ),
         Some(HeapObj::EnumVariant(ev)) => ev.def.enum_name.to_string(),
         Some(other) => other.tag().name().into(),
         None => vn_core::LangPrimitive::Dynamic.name().into(),
@@ -120,18 +124,19 @@ pub(crate) fn resolve_meta(obj: VmValue, key: MetaKey, heap: &mut Heap) -> VmRes
         }
         MetaKey::Name => {
             if obj.is_heap() && heap.instance(obj.as_heap()).is_some() {
-                let name: String = cls
-                    .as_ref()
-                    .map_or_else(|| "Object".into(), |c| c.name.as_str().into());
+                let name: String = cls.as_ref().map_or_else(
+                    || vn_core::intrinsics::PLAIN_OBJECT_TYPE_NAME.into(),
+                    |c| c.name.as_str().into(),
+                );
                 return Ok(HeapInner::alloc_str(heap, &name));
             }
             let name: Option<String> =
                 match obj.is_heap().then(|| heap.get(obj.as_heap())).flatten() {
                     Some(HeapObj::EnumVariant(ev)) => Some(ev.def.variant_name.to_string()),
-                    Some(HeapObj::Object(_) | HeapObj::Class(_)) => Some(
-                        cls.as_ref()
-                            .map_or_else(|| "Object".into(), |c| c.name.as_str().into()),
-                    ),
+                    Some(HeapObj::Object(_) | HeapObj::Class(_)) => Some(cls.as_ref().map_or_else(
+                        || vn_core::intrinsics::PLAIN_OBJECT_TYPE_NAME.into(),
+                        |c| c.name.as_str().into(),
+                    )),
                     Some(
                         HeapObj::Str(_)
                         | HeapObj::Array(_)

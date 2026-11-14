@@ -349,6 +349,25 @@ impl<'a> FnEmitter<'a> {
                         span,
                     };
                 };
+                if key == vn_core::MetaKey::Type
+                    && let Some(name) = self.static_type_name(obj.ty)
+                {
+                    let name = TirExpr {
+                        kind: TirExprKind::StrLit(Arc::from(name)),
+                        ty: BackendTy::Str,
+                        res: Resolution::None,
+                        span,
+                    };
+                    return TirExpr {
+                        kind: TirExprKind::Seq {
+                            stmts: vec![vn_tir::TirStmt::Expr(obj)],
+                            value: Box::new(name),
+                        },
+                        ty: BackendTy::Str,
+                        res: Resolution::None,
+                        span,
+                    };
+                }
                 return TirExpr {
                     kind: TirExprKind::MethodCall {
                         recv: Box::new(obj),

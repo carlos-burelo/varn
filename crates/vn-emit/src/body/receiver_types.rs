@@ -54,6 +54,42 @@ impl<'a> FnEmitter<'a> {
         (entry.kind == kind).then_some(entry.op)
     }
 
+    pub(super) fn static_type_name(&self, ty: BackendTy) -> Option<String> {
+        use vn_core::RuntimeKind as K;
+        let kind = match ty {
+            BackendTy::Literal(_) => return self.static_type_name(ty.representation()),
+            BackendTy::Int => K::Int,
+            BackendTy::Float => K::Float,
+            BackendTy::Bool => K::Bool,
+            BackendTy::Char => K::Char,
+            BackendTy::Str => K::Str,
+            BackendTy::Bytes => K::Bytes,
+            BackendTy::Decimal => K::Decimal,
+            BackendTy::BigInt => K::BigInt,
+            BackendTy::Array(_) => K::Array,
+            BackendTy::Map(..) => K::Map,
+            BackendTy::Set(_) => K::Set,
+            BackendTy::Tuple(_) => K::Tuple,
+            BackendTy::Fn(_) => K::Function,
+            BackendTy::Enum(id) => {
+                return self
+                    .m
+                    .enums
+                    .get(id.0 as usize)
+                    .map(|info| info.name.to_string());
+            }
+            BackendTy::Dynamic(DynReason::Shape(_)) => {
+                return Some(vn_core::intrinsics::PLAIN_OBJECT_TYPE_NAME.to_owned());
+            }
+            BackendTy::Class(_)
+            | BackendTy::Nullable(_)
+            | BackendTy::Void
+            | BackendTy::Never
+            | BackendTy::Dynamic(_) => return None,
+        };
+        Some(kind.name().to_owned())
+    }
+
     pub(super) fn class_ref_of(&self, obj: &vn_tir::TirExpr) -> Option<&'a ClassInfo> {
         let BackendTy::Dynamic(DynReason::ClassObject(instance)) = obj.ty.non_nullable(self.tt)
         else {

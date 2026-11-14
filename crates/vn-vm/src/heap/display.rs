@@ -96,7 +96,11 @@ impl HeapInner {
     fn write_heap_body(&self, nv: VmValue, out: &mut String, path: &mut Vec<u64>, nested: bool) {
         if let Some(inst) = self.instance(nv.as_heap()) {
             let class = ClassObj::find_by_id(inst.class_id);
-            let name = class.as_ref().map_or("Object", |c| c.name.as_str());
+            let name = class
+                .as_ref()
+                .map_or(vn_core::intrinsics::PLAIN_OBJECT_TYPE_NAME, |c| {
+                    c.name.as_str()
+                });
             let fields: Vec<(String, VmValue)> = match &class {
                 Some(c) => c
                     .layout()

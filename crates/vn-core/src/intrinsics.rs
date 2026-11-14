@@ -151,3 +151,5 @@ impl MetaKey {
         Self::ALL.into_iter().find(|key| key.index() == index)
     }
 }
+
+pub const PLAIN_OBJECT_TYPE_NAME: &str = "Object";
