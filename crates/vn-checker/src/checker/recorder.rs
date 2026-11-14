@@ -11,6 +11,7 @@ pub(crate) struct Recorder {
     pub(crate) expr_types: FxHashMap<u32, ExprInfo>,
     pub(crate) symbol_types: FxHashMap<SymbolId, Type>,
     pub(crate) expr_table: FxHashMap<vn_core::ast::AstId, TypeEntry>,
+    pub(crate) adopted_literals: FxHashMap<vn_core::ast::AstId, Type>,
     pub(crate) expr_seq: u32,
     pub(crate) desugar: Desugarings,
     pub(crate) call_mappings: FxHashMap<vn_core::ast::AstId, Vec<Option<usize>>>,
@@ -29,6 +30,7 @@ impl Recorder {
             expr_types: FxHashMap::default(),
             symbol_types: FxHashMap::default(),
             expr_table: FxHashMap::default(),
+            adopted_literals: FxHashMap::default(),
             expr_seq: 0,
             desugar: Desugarings::default(),
             call_mappings: FxHashMap::default(),
@@ -87,6 +89,13 @@ impl Recorder {
                     symbol_id: Some(symbol_id),
                 },
             );
+        }
+    }
+
+    pub(crate) fn adopt_literal(&mut self, id: vn_core::ast::AstId, ty: Type) {
+        self.adopted_literals.insert(id, ty);
+        if let Some(entry) = self.expr_table.get_mut(&id) {
+            entry.ty = ty;
         }
     }
 

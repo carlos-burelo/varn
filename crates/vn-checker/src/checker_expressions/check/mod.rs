@@ -63,6 +63,11 @@ impl<'r> Checker<'r> {
         }
 
         let seq = rec.next_seq();
+        let ty = rec
+            .adopted_literals
+            .get(&expr.index())
+            .copied()
+            .unwrap_or(ty);
 
         rec.expr_table.insert(
             expr.index(),

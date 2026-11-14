@@ -17,6 +17,9 @@ impl Checker<'_> {
         bind: Option<&BindResult>,
     ) -> bool {
         if self.value_assignable_to(target, given, expr, bind) {
+            if let Some(expr) = expr {
+                self.record_int_literal_adoption(rec, target, expr);
+            }
             return true;
         }
         match (expr, bind) {
@@ -25,6 +28,25 @@ impl Checker<'_> {
                     || self.variant_fits(rec, target, expr, bind, 0)
             }
             (Some(_), None) | (None, _) => false,
+        }
+    }
+
+    pub(crate) fn record_int_literal_adoption(
+        &mut self,
+        rec: &mut Recorder,
+        target: &Type,
+        expr: ExprId,
+    ) {
+        use vn_sem::types::numeric_literal::{const_int_literal, int_literal_adoption};
+        let mut nodes = Vec::new();
+        let Some(value) = const_int_literal(self.ast_arena, expr, &mut nodes) else {
+            return;
+        };
+        let Some(adopted) = int_literal_adoption(target, value, &self.ty_table) else {
+            return;
+        };
+        for node in nodes {
+            rec.adopt_literal(node.index(), adopted);
         }
     }
 

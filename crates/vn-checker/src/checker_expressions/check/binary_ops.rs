@@ -64,6 +64,10 @@ impl<'r> Checker<'r> {
                 r_base,
                 &self.ty_table,
             );
+            if both_numeric {
+                self.record_int_literal_adoption(rec, &r_base, left);
+                self.record_int_literal_adoption(rec, &l_base, right);
+            }
             let same_numeric = both_numeric
                 && vn_sem::types::numeric_ops::numeric_operands_compatible(
                     &l_eff,

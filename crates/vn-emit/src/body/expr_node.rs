@@ -13,7 +13,28 @@ impl<'a> FnEmitter<'a> {
         let span = span_of(self.ast_arena, e);
 
         let kind = match &self.ast_arena.expr(e).kind {
-            ExprKind::IntLiteral { value, .. } => Some(TirExprKind::IntLit(*value)),
+            ExprKind::IntLiteral { value, .. } => Some(match ty {
+                BackendTy::Float => TirExprKind::FloatLit(*value as f64),
+                BackendTy::Decimal => TirExprKind::DecimalLit(Arc::from(value.to_string())),
+                BackendTy::BigInt => TirExprKind::BigIntLit(Arc::from(value.to_string())),
+                BackendTy::Literal(_)
+                | BackendTy::Int
+                | BackendTy::Bool
+                | BackendTy::Char
+                | BackendTy::Str
+                | BackendTy::Bytes
+                | BackendTy::Array(_)
+                | BackendTy::Map(..)
+                | BackendTy::Set(_)
+                | BackendTy::Tuple(_)
+                | BackendTy::Class(_)
+                | BackendTy::Enum(_)
+                | BackendTy::Fn(_)
+                | BackendTy::Nullable(_)
+                | BackendTy::Void
+                | BackendTy::Never
+                | BackendTy::Dynamic(_) => TirExprKind::IntLit(*value),
+            }),
             ExprKind::FloatLiteral { value, .. } => Some(TirExprKind::FloatLit(*value)),
             ExprKind::BoolLiteral { value } => Some(TirExprKind::BoolLit(*value)),
             ExprKind::StrLiteral { value } => Some(TirExprKind::StrLit(Arc::from(value.as_str()))),

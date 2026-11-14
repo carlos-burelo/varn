@@ -5,21 +5,26 @@ use vn_core::TypeKind;
 const F64_EXACT_INT: i64 = 1 << 53;
 
 pub fn const_int_value(arena: &AstArena, expr: ExprId) -> Option<i64> {
+    const_int_literal(arena, expr, &mut Vec::new())
+}
+
+pub fn const_int_literal(arena: &AstArena, expr: ExprId, nodes: &mut Vec<ExprId>) -> Option<i64> {
+    nodes.push(expr);
     match &arena.expr(expr).kind {
         ExprKind::IntLiteral { value, .. } => Some(*value),
-        ExprKind::Paren { expression } => const_int_value(arena, *expression),
+        ExprKind::Paren { expression } => const_int_literal(arena, *expression, nodes),
         ExprKind::Unary {
             op: UnaryOp::Minus,
             prefix: true,
             operand,
             ..
-        } => const_int_value(arena, *operand).and_then(i64::checked_neg),
+        } => const_int_literal(arena, *operand, nodes).and_then(i64::checked_neg),
         ExprKind::Unary {
             op: UnaryOp::Plus,
             prefix: true,
             operand,
             ..
-        } => const_int_value(arena, *operand),
+        } => const_int_literal(arena, *operand, nodes),
         ExprKind::FloatLiteral { .. }
         | ExprKind::BigIntLiteral { .. }
         | ExprKind::DecimalLiteral { .. }
@@ -68,17 +73,33 @@ pub fn const_int_value(arena: &AstArena, expr: ExprId) -> Option<i64> {
 }
 
 pub fn int_literal_adopts(target: &Type, value: i64, table: &CheckerTyTable) -> bool {
+    int_literal_adoption(target, value, table).is_some()
+}
+
+pub fn int_literal_adoption(target: &Type, value: i64, table: &CheckerTyTable) -> Option<Type> {
+    use vn_core::LangPrimitive as P;
     match table.get(target.0) {
-        TypeKind::Primitive(vn_core::LangPrimitive::Float) => {
-            (-F64_EXACT_INT..=F64_EXACT_INT).contains(&value)
+        TypeKind::Primitive(P::Float) => (-F64_EXACT_INT..=F64_EXACT_INT)
+            .contains(&value)
+            .then_some(Type::Float),
+        TypeKind::Primitive(P::Decimal) => Some(Type::Decimal),
+        TypeKind::Primitive(P::BigInt) => Some(Type::BigInt),
+        TypeKind::Union(list) => {
+            let members = table.get_list(list);
+            let admits_int = members.iter().any(|m| {
+                matches!(
+                    table.get(*m),
+                    TypeKind::Primitive(P::Int) | TypeKind::Literal(vn_core::TypeLiteral::Int(_))
+                )
+            });
+            if admits_int {
+                return None;
+            }
+            [Type::Float, Type::Decimal, Type::BigInt]
+                .into_iter()
+                .filter(|candidate| members.contains(&candidate.0))
+                .find_map(|candidate| int_literal_adoption(&candidate, value, table))
         }
-        TypeKind::Primitive(
-            vn_core::LangPrimitive::Decimal | vn_core::LangPrimitive::BigInt,
-        ) => true,
-        TypeKind::Union(list) => table
-            .get_list(list)
-            .iter()
-            .any(|m| int_literal_adopts(&Type::resolved(*m), value, table)),
         TypeKind::Primitive(_)
         | TypeKind::Literal(_)
         | TypeKind::This
@@ -98,7 +119,7 @@ pub fn int_literal_adopts(target: &Type, value: i64, table: &CheckerTyTable) -> 
         | TypeKind::Conditional { .. }
         | TypeKind::Infer(_)
         | TypeKind::EnumVariant { .. }
-        | TypeKind::TypePredicate { .. } => false,
+        | TypeKind::TypePredicate { .. } => None,
     }
 }
 
@@ -109,5 +130,5 @@ pub fn literal_operand_class(
     table: &CheckerTyTable,
 ) -> Option<Type> {
     let value = const_int_value(arena, expr)?;
-    int_literal_adopts(other, value, table).then_some(*other)
+    int_literal_adoption(other, value, table)
 }
