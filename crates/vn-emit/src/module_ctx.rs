@@ -18,7 +18,8 @@ pub(super) struct MCtx<'a> {
     pub(super) call_mappings: &'a FxHashMap<AstId, Vec<Option<usize>>>,
     pub(super) desugar: &'a vn_sem::output::Desugarings,
     pub(super) core_ops: &'a FxHashMap<(Arc<str>, Arc<str>), u64>,
-    pub(super) core_static_ops: &'a FxHashMap<(Arc<str>, Arc<str>), u64>,
+    pub(super) core_static_ops:
+        &'a FxHashMap<(Arc<str>, Arc<str>), crate::module_globals::CoreStatic>,
     pub(super) math_intrinsics: &'a FxHashMap<Atom, u8>,
     pub(super) native_targets: &'a FxHashMap<Arc<str>, crate::imports_exports::NativeTarget>,
     pub(super) interner: &'a AtomInterner,

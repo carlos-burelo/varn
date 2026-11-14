@@ -34,13 +34,8 @@ impl<'a> FnEmitter<'a> {
         }
 
         if all_positional
-            && matches!(recv.kind, TirExprKind::Var)
-            && matches!(recv.res, Resolution::NativeGlobal(_))
-            && let Some(cls) = self.core_class_name(recv.ty)
-            && let Some(&op_id) = self
-                .m
-                .core_static_ops
-                .get(&(Arc::from(cls), Arc::clone(&name)))
+            && let Some(op_id) =
+                self.core_static_op(&recv, &name, crate::module_globals::CoreStaticKind::Method)
         {
             let mut operands = targs.into_iter();
             let head = match operands.next() {

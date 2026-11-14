@@ -27,6 +27,33 @@ impl<'a> FnEmitter<'a> {
         }
     }
 
+    pub(super) fn core_class_ref(&self, obj: &vn_tir::TirExpr) -> Option<&'static str> {
+        if !matches!(obj.kind, vn_tir::TirExprKind::Var)
+            || !matches!(obj.res, vn_tir::Resolution::NativeGlobal(_))
+        {
+            return None;
+        }
+        let BackendTy::Dynamic(DynReason::ClassObject(instance)) = obj.ty.non_nullable(self.tt)
+        else {
+            return None;
+        };
+        self.core_class_name(self.tt.get(instance))
+    }
+
+    pub(super) fn core_static_op(
+        &self,
+        obj: &vn_tir::TirExpr,
+        name: &std::sync::Arc<str>,
+        kind: crate::module_globals::CoreStaticKind,
+    ) -> Option<u64> {
+        let cls = self.core_class_ref(obj)?;
+        let entry = self
+            .m
+            .core_static_ops
+            .get(&(std::sync::Arc::from(cls), std::sync::Arc::clone(name)))?;
+        (entry.kind == kind).then_some(entry.op)
+    }
+
     pub(super) fn class_ref_of(&self, obj: &vn_tir::TirExpr) -> Option<&'a ClassInfo> {
         let BackendTy::Dynamic(DynReason::ClassObject(instance)) = obj.ty.non_nullable(self.tt)
         else {

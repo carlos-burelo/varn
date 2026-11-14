@@ -112,6 +112,26 @@ impl<'a> FnEmitter<'a> {
                 span,
             };
         }
+        if read
+            && let Some(op_id) =
+                self.core_static_op(&obj, &name, crate::module_globals::CoreStaticKind::Value)
+        {
+            return TirExpr {
+                kind: TirExprKind::MethodCall {
+                    recv: Box::new(TirExpr {
+                        kind: TirExprKind::NullLit,
+                        ty: BackendTy::Dynamic(vn_tir::DynReason::Boxed),
+                        res: Resolution::None,
+                        span,
+                    }),
+                    name,
+                    args: Vec::new(),
+                },
+                ty,
+                res: Resolution::NativeOp(op_id),
+                span,
+            };
+        }
         if let Some(ci) = self.class_ref_of(&obj)
             && let Some(slot) = ci.static_slot(&name)
         {

@@ -12,7 +12,19 @@ use vn_core::AtomInterner;
 use vn_sem::bind::BindResult;
 use vn_tir::{BackendTy, DynReason, EnumId, EnumInfo, TyTable};
 
-pub(super) fn core_static_ops(bind: &BindResult) -> FxHashMap<(Arc<str>, Arc<str>), u64> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CoreStaticKind {
+    Method,
+    Value,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct CoreStatic {
+    pub(crate) op: u64,
+    pub(crate) kind: CoreStaticKind,
+}
+
+pub(super) fn core_static_ops(bind: &BindResult) -> FxHashMap<(Arc<str>, Arc<str>), CoreStatic> {
     let mut out = FxHashMap::default();
     let Some(provider) = vn_modules::provider::get() else {
         return out;
@@ -28,15 +40,25 @@ pub(super) fn core_static_ops(bind: &BindResult) -> FxHashMap<(Arc<str>, Arc<str
             continue;
         };
         for m in &info.members {
-            let is_plain_static = m.is_static
-                && !m.is_async
-                && !m.is_generator
-                && m.kind == vn_sem::types::ClassMemberKind::Method;
-            if !is_plain_static {
+            use vn_sem::types::ClassMemberKind as K;
+            if !m.is_static || m.is_async || m.is_generator {
                 continue;
             }
-            if let Some(id) = provider.native_op_id(vn_core::op_id::CORE_MODULE, cname, &m.name) {
-                out.insert((Arc::from(cname), m.name.clone()), id);
+            let kind = match m.kind {
+                K::Method => CoreStaticKind::Method,
+                K::Property => CoreStaticKind::Value,
+                K::Constructor
+                | K::Function
+                | K::Variable
+                | K::Getter
+                | K::Setter
+                | K::Class
+                | K::Interface
+                | K::Namespace
+                | K::Enum => continue,
+            };
+            if let Some(op) = provider.native_op_id(vn_core::op_id::CORE_MODULE, cname, &m.name) {
+                out.insert((Arc::from(cname), m.name.clone()), CoreStatic { op, kind });
             }
         }
     }
