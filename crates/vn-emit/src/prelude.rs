@@ -78,6 +78,7 @@ pub(super) fn prelude_imports(
                     local: Arc::from(*name),
                     kind: TirImportKind::Named(Arc::from(*name)),
                     slot: None,
+                    variants: Vec::new(),
                 })
                 .collect(),
         })

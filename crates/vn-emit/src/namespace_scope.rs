@@ -174,6 +174,7 @@ pub(super) fn import_members(imports: &mut [TirImport], namespaces: &[NamespaceI
                         local: scoped_name(Some(&ns.binding), member),
                         kind: TirImportKind::Named(scoped_name(Some(&ns.exported), member)),
                         slot: None,
+                        variants: Vec::new(),
                     });
                 }
             }

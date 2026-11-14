@@ -134,6 +134,7 @@ pub(super) fn collect_imports(
                     local,
                     kind,
                     slot: None,
+                    variants: Vec::new(),
                 }
             })
             .collect();

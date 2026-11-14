@@ -128,6 +128,26 @@ pub(super) struct GlobalSlots {
     pub(super) first_nested_ordinal: u32,
 }
 
+pub(super) fn imported_variants(
+    enums: &[EnumInfo],
+    slots: &FxHashMap<Arc<str>, u32>,
+    local: &str,
+) -> Vec<vn_tir::TirImportedVariant> {
+    enums
+        .iter()
+        .filter(|info| info.binding.as_deref() == Some(local))
+        .flat_map(|info| {
+            info.variants.iter().filter_map(|variant| {
+                let global = slots.get(&info.variant_global(&variant.name)?)?;
+                Some(vn_tir::TirImportedVariant {
+                    tag: variant.tag,
+                    global: *global,
+                })
+            })
+        })
+        .collect()
+}
+
 pub(super) fn assign_global_slots(
     program: &Program,
     ast_arena: &AstArena,

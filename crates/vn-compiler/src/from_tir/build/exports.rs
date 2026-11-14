@@ -88,25 +88,13 @@ impl<'m> Builder<'m> {
                 };
                 let store = self.global_store(&spec.local, val);
                 self.emit_effect(store);
-                self.bind_imported_variants(&spec.local, val);
+                self.bind_imported_variants(&spec.variants, val);
             }
         }
     }
 
-    fn bind_imported_variants(&mut self, local: &Arc<str>, enum_v: Value) {
-        let slots: Vec<(Arc<str>, u32)> = self
-            .tir
-            .enums
-            .iter()
-            .filter(|info| info.binding.as_ref() == Some(local))
-            .flat_map(|info| {
-                info.variants.iter().filter_map(|v| {
-                    let slot = self.gslot(&info.variant_global(&v.name)?)?;
-                    Some((v.name.clone(), slot))
-                })
-            })
-            .collect();
-        if slots.is_empty() {
+    fn bind_imported_variants(&mut self, variants: &[vn_tir::TirImportedVariant], enum_v: Value) {
+        if variants.is_empty() {
             return;
         }
         let absent = self.emit(InstKind::IsNull { operand: enum_v }, BackendTy::Bool);
@@ -123,15 +111,20 @@ impl<'m> Builder<'m> {
         self.add_pred(bind_blk, from);
         self.seal_block(bind_blk);
         self.current = bind_blk;
-        for (name, slot) in slots {
+        for variant in variants {
             let value = self.emit(
-                InstKind::GetProperty {
+                InstKind::GetFixedField {
                     object: enum_v,
-                    name,
+                    slot: variant.tag,
+                    offset: 0,
+                    tag: vn_core::FieldAccess::Slot,
                 },
                 BackendTy::Dynamic(DynReason::Runtime),
             );
-            self.emit_effect(InstKind::StoreGlobalIdx { slot, value });
+            self.emit_effect(InstKind::StoreGlobalIdx {
+                slot: variant.global,
+                value,
+            });
         }
         let end = self.current;
         self.set_term(Terminator::Jump {

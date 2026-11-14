@@ -91,11 +91,18 @@ pub enum TirImportKind {
     Namespace,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TirImportedVariant {
+    pub tag: u16,
+    pub global: u32,
+}
+
 #[derive(Debug, Clone)]
 pub struct TirImportSpec {
     pub local: Arc<str>,
     pub kind: TirImportKind,
     pub slot: Option<u16>,
+    pub variants: Vec<TirImportedVariant>,
 }
 
 #[derive(Debug, Clone)]

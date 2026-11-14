@@ -166,6 +166,7 @@ pub(super) fn extension_imports(
                     local: name.clone(),
                     kind: vn_tir::TirImportKind::Named(name),
                     slot: None,
+                    variants: Vec::new(),
                 })
                 .collect(),
         })

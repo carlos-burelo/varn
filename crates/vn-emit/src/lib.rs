@@ -199,10 +199,21 @@ pub fn emit_module(
     imports.extend(collect_imports(program, ast_arena, interner));
     namespace_scope::import_members(&mut imports, &bind.namespace_imports);
     imports.extend(linked_extensions);
-    for spec in imports.iter_mut().flat_map(|import| import.specs.iter_mut()) {
-        spec.slot = global_slots
-            .get(spec.local.as_ref())
-            .and_then(|slot| u16::try_from(*slot).ok());
+    for import in imports.iter_mut() {
+        let binds_values = !import.is_type_only;
+        for spec in import.specs.iter_mut() {
+            spec.slot = global_slots
+                .get(spec.local.as_ref())
+                .and_then(|slot| u16::try_from(*slot).ok());
+            let binds_enum = match spec.kind {
+                vn_tir::TirImportKind::Default | vn_tir::TirImportKind::Named(_) => binds_values,
+                vn_tir::TirImportKind::Namespace => false,
+            };
+            if binds_enum {
+                spec.variants =
+                    module_globals::imported_variants(&enums, &global_slots, &spec.local);
+            }
+        }
     }
     let mut exports = collect_exports(program, ast_arena, interner, &namespace_exports);
     exports.extend(
